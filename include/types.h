@@ -68,6 +68,8 @@ public:
     // TODO boundary checks
     TByteObject(uint32_t dataSize, const TClass* klass) : TObject(dataSize, klass, true) { }
     
+    uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(data); }
+    
     uint8_t getByte(uint32_t index) const { return reinterpret_cast<uint8_t*>(data)[index]; }
     uint8_t operator [] (uint32_t index) const { return getByte(index); }
     
