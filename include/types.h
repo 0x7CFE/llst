@@ -4,6 +4,16 @@
 // typedef int32_t  llstInt;
 // typedef int64_t  llstInt64;
 
+// WARNING pointers to this class may actually be values that are SmallInt's
+//struct TInteger : public TObject { };
+typedef uint32_t TInteger;
+
+struct TInstruction {
+    uint8_t low;
+    uint8_t high;
+};
+
+
 struct TSize {
 private:
     uint32_t  data;
@@ -77,16 +87,13 @@ public:
     uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
 };
 
-// WARNING pointers to this class may actually be values that are SmallInt's
-struct TInteger : public TObject { };
-
 struct TContext : public TObject {
     TObject*  method;
     TObject*  arguments;
     TObject*  temporaries;
     TObject*  stack;
-    TInteger* bytePointer;
-    TInteger* stackTop;
+    TInteger  bytePointer;
+    TInteger  stackTop;
     TContext* previousContext;
     const int FIELDS_COUNT = 7;
     
@@ -96,7 +103,7 @@ struct TContext : public TObject {
 struct TBlock : public TContext {
     TObject*  argumentLocation;
     TContext* creatingContext;
-    TInteger* oldBytePointer;
+    TInteger  oldBytePointer;
     const int FIELDS_COUNT = 3;
     
     // TODO method class
@@ -107,8 +114,8 @@ struct TMethod : public TObject {
     TObject*     name;
     TByteObject* byteCodes;
     TObject*     literals;
-    TInteger*    stackSize;
-    TInteger*    temporarySize;
+    TInteger     stackSize;
+    TInteger     temporarySize;
     TClass*      klass;
     TObject*     text;
     TObject*     package;
@@ -118,14 +125,22 @@ struct TMethod : public TObject {
     TContext() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
 };
 
+struct TDictionary : public TObject {
+    TObject* keys;
+    TObject* values;
+    const int FIELDS_COUNT = 2;
+    
+    TDictionary() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+};
+
 struct TClass : public TObject {
-    TObject*  name;
-    TClass*   parentClass;
-    TObject*  methods;
-    TInteger* instanceSize;
-    TObject*  variables;
-    TObject*  package;
-    const int FIELDS_COUNT = 7;
+    TObject*     name;
+    TClass*      parentClass;
+    TDictionary* methods;
+    TInteger     instanceSize;
+    TObject*     variables;
+    TObject*     package;
+    const int    FIELDS_COUNT = 7;
     
     TClass() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
 };
@@ -138,7 +153,12 @@ struct TNode : public TObject {
     
     TNode() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
 };
-
-
-
-
+    
+struct TProcess : public TObject {
+    TContext* context;
+    TObject*  state;
+    TObject*  result;
+    const int FIELDS_COUNT = 3;
+    
+    TProcess() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+};
