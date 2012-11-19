@@ -75,7 +75,17 @@ private:
     
     TClass* getRootClass(TClassID id);
     
+    enum TExecuteResult {
+        returnError = 2,
+        returnBadMethod,
+        returnReturned,
+        returnTimeExpired,
+        returnBreak
+    }; 
+    
     int execute(TProcess* process, uint32_t ticks);
+    void doPushConstant(uint8_t constant, TArray* stack, uint32_t& stackTop);
+    void doSendMessage(TContext* context, TMethod* method);
 public:
     
 };

@@ -91,15 +91,22 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     TArray*  stack    = context->stack;
     uint32_t stackTop = getIntegerValue(context->stackTop);
     
-    TArray* temporaries = 0;
-    TArray* instanceVariables = 0;
-    TArray* arguments = 0;
-    TArray* literals = 0;
+    TArray* temporaries = context->temporaries;
+    TArray* arguments = context->arguments;
+    TArray* instanceVariables = arguments[0];
+    TArray* literals = method->literals;
+    
+    TObject* returedValue = globals.nilObject;
     
     while (true) {
         if (ticks && (--ticks == 0)) {
             // Time frame expired
-            // TODO
+            TProcess* newProcess = rootStack.back(); rootStack.pop_back();
+            newProcess->context = context;
+            newProcess->result = returedValue;
+            context->bytePointer = newInteger(bytePointer);
+            context->stackTop = newInteger(stackTop);
+            return returnTimeExpired;
         }
             
         // decoding the instruction
@@ -112,79 +119,76 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
         }
         
         switch (instruction.high) {
-            case pushInstance:
-                if (!arguments)
-                    arguments = context->arguments;
-                if (!instanceVariables)
-                    instanceVariables = arguments[0];
-                stack[stackTop++] = instanceVariables[instruction.low];  // FIXME
-                break;
-                
-            case pushArgument:
-                if (!arguments)
-                    arguments = context->arguments;
-                stack[stackTop++] = arguments[instruction.low];
-                break;
-                
-            case pushTemporary:
-                if (!temporaries)
-                    temporaries = context->temporaries;
-                stack[stackTop++] = temporaries[instruction.low];
-                break;
-                
-            case pushLiteral:
-                if (!literals)
-                    literals = method->literals;
-                stack[stackTop++] = literals[instruction.low];
-                break;
-                
-            case pushConstant:
-                switch (instruction.low) {
-                    case 0: case 1: 
-                    case 2: case 3: 
-                    case 4: case 5: 
-                    case 6: case 7: 
-                    case 8: case 9: 
-                        stack[stackTop++] = (TObject*) newInteger(instruction.low);
-                        break;
-                        
-                    case nilConst:   stack[stackTop++] = globals.nilObject;   break;
-                    case trueConst:  stack[stackTop++] = globals.trueObject;  break;
-                    case falseConst: stack[stackTop++] = globals.falseObject; break;
-                    default:
-                        /* TODO unknown push constant */ ;
-                }
-                break;
-                
+            case pushInstance:    stack[stackTop++] = instanceVariables[instruction.low]; break;
+            case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
+            case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
+            case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
+            case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
+            
             case assignInstance:
+                instanceVariables[instruction.low] = stack[stackTop - 1];
+                // TODO isDynamicMemory()
+                break;
+                
+            case pushConstant: 
+                doPushConstant(instruction.low, TArray* stack, uint32_t& stackTop); 
+                break;
+                
+            case pushBlock:
                 
                 break;
                 
-            case assignTemporary:
-                if (!temporaries)
-                    temporaries = context->temporaries;
-                temporaries[instruction.low] = stack[stackTop - 1];
-                break;
-                        
-            case markArguments:
+            case markArguments: {
+                // This operation takes instruction.low arguments 
+                // from the top of the stack and creates new array with them
+                
                 rootStack.push_back(context);
-                arguments = newObject<TArray>(instruction.low);
-                arguments->setClass(globals.arrayClass);
-                while (instruction.low > 0)
-                    arguments[--instruction.low] = stack[--stackTop];
-                stack[stackTop++] = arguments;
-                arguments = 0;
-                break;
+                TArray* args = newObject<TArray>(instruction.low);
+                args->setClass(globals.arrayClass);
                 
-            case sendMessage:
-                if (!literals)
-                    literals = method->literals;
-                TObject* messageSelector = literals[instruction.low];
-                arguments = stack[--stackTop];
+                for (int index = instruction.low - 1; index > 0; index--)
+                    args[index] = stack[--stackTop];
                 
-                break;
+                stack[stackTop++] = args;
+            } break;
+                
+            case sendMessage: doSendMessage(context, method, stackTop); break;
+            
         }
     }
+}
+
+
+void SmalltalkVM::doPushConstant(uint8_t constant, TArray* stack, uint32_t& stackTop)
+{
+    switch (constant) {
+        case 0: 
+        case 1: 
+        case 2: 
+        case 3: 
+        case 4: 
+        case 5: 
+        case 6: 
+        case 7: 
+        case 8: 
+        case 9: 
+            stack[stackTop++] = (TObject*) newInteger(constant);
+            break;
+            
+        case nilConst:   stack[stackTop++] = globals.nilObject;   break;
+        case trueConst:  stack[stackTop++] = globals.trueObject;  break;
+        case falseConst: stack[stackTop++] = globals.falseObject; break;
+        default:
+            /* TODO unknown push constant */ ;
+    }
+}
+
+void SmalltalkVM::doSendMessage(TContext* context, TMethod* method, uint32_t& stackTop)
+{
+    TObject* messageSelector = literals[instruction.low];
+    context->arguments = context->stack[--stackTop];
+    
+    break;
 }
 
 void* TObject::operator new(size_t size)

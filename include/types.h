@@ -7,7 +7,9 @@
 
 // WARNING pointers to this class may actually be values that are SmallInt's
 //struct TInteger : public TObject { };
-typedef uint32_t TInteger;
+typedef u_int8_t  uint8_t;
+typedef u_int32_t uint32_t;
+typedef u_int32_t TInteger;
 
 struct TInstruction {
     uint8_t low;
