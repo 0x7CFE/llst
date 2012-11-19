@@ -1,5 +1,6 @@
 #include <vm.h>
 #include <string.h>
+#include <stdlib.h>
 
 int SmalltalkVM::compareSymbols(const TByteObject* left, const TByteObject* right)
 {
@@ -152,7 +153,10 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 stack[stackTop++] = args;
             } break;
                 
-            case sendMessage: doSendMessage(context, method, stackTop); break;
+            case sendMessage: doSendMessage(
+                method->literals[instruction.low],
+                stack[--stackTop],
+                context, stackTop); break;
             
         }
     }
@@ -183,10 +187,43 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TArray* stack, uint32_t& stac
     }
 }
 
-void SmalltalkVM::doSendMessage(TContext* context, TMethod* method, uint32_t& stackTop)
+TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
 {
-    TObject* messageSelector = literals[instruction.low];
-    context->arguments = context->stack[--stackTop];
+    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
+    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
+    if (entry.methodName == selector && entry.receiverClass == klass) {
+        m_cacheHits++;
+        return entry.method;
+    } else {
+        m_cacheMisses++;
+        return 0;
+    }
+}
+
+void SmalltalkVM::doSendMessage(TObject* selector, TArray* arguments, TContext* context, uint32_t& stackTop)
+{
+    TClass*  receiverClass    = arguments[0];
+    
+    // First of all we need to check the lookup cache
+    TMethod* method = lookupMethodInCache(selector, receiverClass);
+    if (!method) {
+        // Cache missed. Now we need to do the full search through
+        // the receiver's class hierarchy:
+        method = lookupMethod(selector, receiverClass);
+        
+        if (! method) {
+            // Damn! Where is that selector? 
+            // Seems that current object does not understand this message
+            
+            if (selector == badMethodSymbol) {
+                // Something really bad happened
+                // TODO error
+                exit(1);
+            }
+            
+            
+        }
+    }
     
     break;
 }
