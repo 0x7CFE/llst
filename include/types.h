@@ -1,4 +1,5 @@
 #include <sys/types.h>
+#include <new>
 
 // typedef uint32_t llstUInt;
 // typedef int32_t  llstInt;
@@ -13,39 +14,39 @@ struct TInstruction {
     uint8_t high;
 };
 
-
-struct TSize {
-private:
-    uint32_t  data;
-    
-    const int FLAG_RELOCATED = 1;
-    const int FLAG_BINARY    = 2;
-    const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
-public:
-    TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
-    { 
-        data = size & ~FLAGS_MASK; // masking lowest two bits
-        data |= (isBinary << 1); 
-        data |= isRelocated; 
-    }
-    
-    TSize(const TSize& size) : data(size.data) {}
-    
-    uint32_t getSize() const { return data & FLAGS_MASK; }
-    bool isBinary() const { return data & FLAG_BINARY; }
-    bool isRelocated() const { return data & FLAG_RELOCATED; }
-    void setBinary(bool value) { data &= (value << 1); }
-    void setRelocated(bool value) { data &= value; }
-};
-
 struct TClass;
 struct TObject {
 private:
+    struct TSize {
+    private:
+        uint32_t  data;
+        
+        const int FLAG_RELOCATED = 1;
+        const int FLAG_BINARY    = 2;
+        const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
+    public:
+        TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
+        { 
+            data = size & ~FLAGS_MASK; // masking lowest two bits
+            data |= (isBinary << 1); 
+            data |= isRelocated; 
+        }
+        
+        TSize(const TSize& size) : data(size.data) { }
+        
+        uint32_t getSize() const { return data >> 2; }
+        bool isBinary() const { return data & FLAG_BINARY; }
+        bool isRelocated() const { return data & FLAG_RELOCATED; }
+        void setBinary(bool value) { data &= (value << 1); }
+        void setRelocated(bool value) { data &= value; }
+    };
+    
     TSize    size;
     TClass*  klass;
     const int FIELDS_COUNT = 2;
     
     TObject* data[0];
+    
 public:    
     TObject(uint32_t dataCount, const TClass* klass, bool isBinary = false) 
         : size(dataCount + FIELDS_COUNT), klass(klass) 
@@ -57,9 +58,10 @@ public:
     
     uint32_t getSize() const { return size.getSize(); }
     TClass*  getClass() const { return klass; } 
+    void     setClass(TClass* classObject) { klass = classObject; } 
     
     // delegated methods from TSize
-    bool isBinary() const { size.isBinary(); }
+    bool isBinary() const { return size.isBinary(); }
     bool isRelocated() const { return size.isRelocated(); }
 //     void setBinary(bool value) { size.setBinary(value); }
     void setRelocated(bool value) { size.setRelocated(value); }
@@ -70,7 +72,8 @@ public:
     void putData(uint32_t index, TObject* value) { data[index] = value; }
     void operator [] (uint32_t index, TObject* value) { return putData(index, value); }
     
-    //TODO operator new() {}
+    static void* operator new(size_t size);
+//     static void* operator new(size_t size, void* placement);
 };
 
 struct TByteObject : public TObject {
@@ -87,17 +90,20 @@ public:
     uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
 };
 
+struct TArray : public TObject { };
+
+struct TMethod;
 struct TContext : public TObject {
-    TObject*  method;
-    TObject*  arguments;
-    TObject*  temporaries;
-    TObject*  stack;
+    TMethod*  method;
+    TArray*   arguments;
+    TArray*   temporaries;
+    TArray*   stack;
     TInteger  bytePointer;
     TInteger  stackTop;
     TContext* previousContext;
     const int FIELDS_COUNT = 7;
     
-    TContext() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    TContext() : TObject(FIELDS_COUNT, globals.contextClass) { /* TODO init fields as nilObject's */ }
 };
 
 struct TBlock : public TContext {
@@ -107,13 +113,13 @@ struct TBlock : public TContext {
     const int FIELDS_COUNT = 3;
     
     // TODO method class
-    TBlock() : TObject(TContext::FIELDS_COUNT + FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    TBlock() : TObject(TContext::FIELDS_COUNT + FIELDS_COUNT, globals.blockClass) { /* TODO init fields as nilObject's */ }
 };
 
 struct TMethod : public TObject {
     TObject*     name;
     TByteObject* byteCodes;
-    TObject*     literals;
+    TArray*      literals;
     TInteger     stackSize;
     TInteger     temporarySize;
     TClass*      klass;
@@ -126,8 +132,8 @@ struct TMethod : public TObject {
 };
 
 struct TDictionary : public TObject {
-    TObject* keys;
-    TObject* values;
+    TArray*   keys;
+    TArray*   values;
     const int FIELDS_COUNT = 2;
     
     TDictionary() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
@@ -138,7 +144,7 @@ struct TClass : public TObject {
     TClass*      parentClass;
     TDictionary* methods;
     TInteger     instanceSize;
-    TObject*     variables;
+    TArray*      variables;
     TObject*     package;
     const int    FIELDS_COUNT = 7;
     
@@ -147,8 +153,8 @@ struct TClass : public TObject {
 
 struct TNode : public TObject {
     TObject*  value;
-    TObject*  left;
-    TObject*  right;
+    TNode*    left;
+    TNode*    right;
     const int FIELDS_COUNT = 3;
     
     TNode() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
@@ -162,3 +168,21 @@ struct TProcess : public TObject {
     
     TProcess() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
 };
+
+// GLobal VM objects
+struct {
+    TObject* nilObject;
+    TObject* trueObject;
+    TObject* falseObject;
+    TClass*  smallIntClass;
+    TClass*  arrayClass;
+    TClass*  blockClass;
+    TClass*  contextClass;
+    TClass*  stringClass;
+    TObject* globalsObject;
+    TMethod* initialMethod;
+    TObject* binaryMessages[3]; // NOTE
+    TClass*  integerClass;
+    TObject* badMethodSymbol;
+} globals;
+

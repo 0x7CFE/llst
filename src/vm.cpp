@@ -12,25 +12,24 @@ int SmalltalkVM::compareSymbols(const TByteObject* left, const TByteObject* righ
     if (rightSize < minSize)
         minSize = rightSize;
     
-    return memcmp(left->getBytes(), right->getBytes(), minSize);
+//    return memcmp(left->getBytes(), right->getBytes(), minSize);
     
-//     // Comparing the byte string symbol by symbol
-//     for (uint32_t i = 0; i < minSize; i++)
-//     {
-//         if (left[i] != right[i])
-//             return left[i] - right[i];
-//     }
-//     
-//     return leftSize - rightSize;
+    // Comparing the byte string symbol by symbol
+    for (uint32_t i = 0; i < minSize; i++) {
+        if (left[i] != right[i])
+            return left[i] - right[i];
+    }
+    
+    return leftSize - rightSize;
 }
 
-TObject* SmalltalkVM::lookupMethod(const TObject* selector, const TClass* klass)
+TMethod* SmalltalkVM::lookupMethod(const TObject* selector, const TClass* klass)
 {
     //Scanning through the class hierarchy from the klass up to the Object
-    for (; klass != m_globals.nilObject; klass = klass->parentClass) {
+    for (; klass != globals.nilObject; klass = klass->parentClass) {
         TDictionary* dictionary = klass->methods;
-        TObject* keys = dictionary->keys;
-        TObject* values = dictionary->values;
+        TArray* keys   = dictionary->keys;
+        TArray* values = dictionary->values;
         
         // keys are stored in order
         // thus we may apply binary search
@@ -43,7 +42,7 @@ TObject* SmalltalkVM::lookupMethod(const TObject* selector, const TClass* klass)
             TObject* key = keys[mid];
             
             if (key == selector)
-                return values[mid];
+                return (TMethod*) values[mid];
             
             if (compareSymbols((TByteObject*) selector, (TByteObject*) key) < 0)
                 high = mid;
@@ -84,13 +83,18 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     
     // current execution context and the executing method
     TContext* context = process->context;
-    TMethod* method = context->method;
+    TMethod*  method  = context->method;
     
-    TByteObject* byteCodes = method->byteCodes;
-    uint32_t bytePointer =  getIntegerValue(context->bytePointer);
+    TByteObject* byteCodes   = method->byteCodes;
+    uint32_t     bytePointer = getIntegerValue(context->bytePointer);
     
-    TObject* stack = context->stack;
+    TArray*  stack    = context->stack;
     uint32_t stackTop = getIntegerValue(context->stackTop);
+    
+    TArray* temporaries = 0;
+    TArray* instanceVariables = 0;
+    TArray* arguments = 0;
+    TArray* literals = 0;
     
     while (true) {
         if (ticks && (--ticks == 0)) {
@@ -109,10 +113,95 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
         
         switch (instruction.high) {
             case pushInstance:
-                TObject* instanceVariables = context->arguments[0];
+                if (!arguments)
+                    arguments = context->arguments;
+                if (!instanceVariables)
+                    instanceVariables = arguments[0];
                 stack[stackTop++] = instanceVariables[instruction.low];  // FIXME
+                break;
+                
+            case pushArgument:
+                if (!arguments)
+                    arguments = context->arguments;
+                stack[stackTop++] = arguments[instruction.low];
+                break;
+                
+            case pushTemporary:
+                if (!temporaries)
+                    temporaries = context->temporaries;
+                stack[stackTop++] = temporaries[instruction.low];
+                break;
+                
+            case pushLiteral:
+                if (!literals)
+                    literals = method->literals;
+                stack[stackTop++] = literals[instruction.low];
+                break;
+                
+            case pushConstant:
+                switch (instruction.low) {
+                    case 0: case 1: 
+                    case 2: case 3: 
+                    case 4: case 5: 
+                    case 6: case 7: 
+                    case 8: case 9: 
+                        stack[stackTop++] = (TObject*) newInteger(instruction.low);
+                        break;
+                        
+                    case nilConst:   stack[stackTop++] = globals.nilObject;   break;
+                    case trueConst:  stack[stackTop++] = globals.trueObject;  break;
+                    case falseConst: stack[stackTop++] = globals.falseObject; break;
+                    default:
+                        /* TODO unknown push constant */ ;
+                }
+                break;
+                
+            case assignInstance:
+                
+                break;
+                
+            case assignTemporary:
+                if (!temporaries)
+                    temporaries = context->temporaries;
+                temporaries[instruction.low] = stack[stackTop - 1];
+                break;
+                        
+            case markArguments:
+                rootStack.push_back(context);
+                arguments = newObject<TArray>(instruction.low);
+                arguments->setClass(globals.arrayClass);
+                while (instruction.low > 0)
+                    arguments[--instruction.low] = stack[--stackTop];
+                stack[stackTop++] = arguments;
+                arguments = 0;
+                break;
+                
+            case sendMessage:
+                if (!literals)
+                    literals = method->literals;
+                TObject* messageSelector = literals[instruction.low];
+                arguments = stack[--stackTop];
+                
                 break;
         }
     }
 }
+
+void* TObject::operator new(size_t size)
+{
+    // TODO allocate the object on the GC heap
+    return llvm_gc_allocate(size);
+}
+
+template<class T> T* newObject(TClass* klass, size_t objectSize /*= 0*/)
+{
+    size_t baseSize = sizeof T;
+    void* objectSlot = llvm_gc_allocate(baseSize + objectSize * 4);
+    TObject* instance = new (objectSlot) T;
+    instance->setClass(klass);
+    instance->construct(objectSize);
+    
+    return instance;
+}
+
 
