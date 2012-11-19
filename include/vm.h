@@ -1,13 +1,6 @@
 #include "types.h"
 #include <list>
 
-
-// struct TRootStack {
-//     TObject* rootStack[];
-//     uint32_t rootTop;
-// };
-
-
 template<class T> T* newObject(size_t objectSize = 0);
     
 class SmalltalkVM {
