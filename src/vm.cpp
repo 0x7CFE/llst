@@ -114,10 +114,8 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 stack[stackTop++] = args;
             } break;
                 
-            case sendMessage: doSendMessage(
-                method->literals[instruction.low],
-                stack[--stackTop],
-                context, stackTop); 
+            case sendMessage: 
+                doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
                 break;
             
         }
