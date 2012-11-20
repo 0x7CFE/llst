@@ -2,7 +2,33 @@
 #include <list>
 
 template<class T> T* newObject(size_t objectSize = 0);
+
+class Image {
+private:
+    TObject* readObject();
     
+public:
+    bool loadImage(const char* fileName);
+    TObject* getGlobal(const char* name);
+    
+    // GLobal VM objects
+    static struct {
+        TObject* nilObject;
+        TObject* trueObject;
+        TObject* falseObject;
+        TClass*  smallIntClass;
+        TClass*  arrayClass;
+        TClass*  blockClass;
+        TClass*  contextClass;
+        TClass*  stringClass;
+        TDictionary* globalsObject;
+        TMethod* initialMethod;
+        TObject* binaryMessages[3]; // NOTE
+        TClass*  integerClass;
+        TObject* badMethodSymbol;
+    } globals;
+};
+
 class SmalltalkVM {
 public:
 private:
@@ -69,7 +95,7 @@ private:
     TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
 
     // lexicographic comparison of two byte objects
-    int compareSymbols(const TByteObject* left, const TByteObject* right);
+//     int compareSymbols(const TByteObject* left, const TByteObject* right);
     
     // locate the method in the hierarchy of the class
     TMethod* lookupMethod(const TObject* selector, const TObject* klass);

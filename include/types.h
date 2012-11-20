@@ -1,14 +1,15 @@
 #include <sys/types.h>
 #include <new>
+#include <string.h>
 
-// typedef uint32_t llstUInt;
-// typedef int32_t  llstInt;
-// typedef int64_t  llstInt64;
-
-// WARNING pointers to this class may actually be values that are SmallInt's
-//struct TInteger : public TObject { };
 typedef u_int8_t  uint8_t;
 typedef u_int32_t uint32_t;
+
+// This is a special interpretation of Smalltalk's SmallInteger
+// VM handles the special case when object pointer has lowest bit set to 1
+// In that case pointer is treated as explicit 31 bit integer equal to (value >> 1)
+// Any operation should be done using SmalltalkVM::getIntegerValue() and SmalltalkVM::newInteger()
+// Explicit type cast should be strictly avoided for the sake of design stability
 typedef u_int32_t TInteger;
 
 struct TInstruction {
@@ -45,13 +46,18 @@ private:
     
     TSize    size;
     TClass*  klass;
-    const int FIELDS_COUNT = 2;
     
     TObject* data[0];
     
+    // This class should not be instantinated explicitly
+    // Descendants should provide own public className method
+    static const char* className() { return ""; }
 public:    
-    TObject(uint32_t dataCount, const TClass* klass, bool isBinary = false) 
-        : size(dataCount + FIELDS_COUNT), klass(klass) 
+    // By default objects subject to non binary specification
+    static bool isBinary() { return false; } 
+    
+    explicit TObject(uint32_t dataCount, const TClass* klass, bool isBinary = false) 
+        : size(dataCount), klass(klass) 
     { 
         size.setBinary(isBinary);
         
@@ -60,12 +66,10 @@ public:
     
     uint32_t getSize() const { return size.getSize(); }
     TClass*  getClass() const { return klass; } 
-    void     setClass(TClass* classObject) { klass = classObject; } 
     
     // delegated methods from TSize
     bool isBinary() const { return size.isBinary(); }
     bool isRelocated() const { return size.isRelocated(); }
-//     void setBinary(bool value) { size.setBinary(value); }
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
@@ -73,15 +77,21 @@ public:
     TObject* operator [] (uint32_t index) const { return getData(index); }
     void putData(uint32_t index, TObject* value) { data[index] = value; }
     void operator [] (uint32_t index, TObject* value) { return putData(index, value); }
-    
-    static void* operator new(size_t size);
-//     static void* operator new(size_t size, void* placement);
 };
 
+
+// Descendants of this class store raw byte data instead of their instance variables
+// The only valid fields are size and class which are inherited from TObject
 struct TByteObject : public TObject {
+private:
+    // This class should not be instantinated directly
+    // Descendants should provide own public className method
+    static const char* className() { return ""; } 
 public:
-    // TODO boundary checks
-    TByteObject(uint32_t dataSize, const TClass* klass) : TObject(dataSize, klass, true) { }
+    // Byte objects are said to be binary
+    static bool isBinary() { return true; } 
+    
+    explicit TByteObject(uint32_t dataSize, const TClass* klass) : TObject(dataSize, klass, true) { }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(data); }
     
@@ -92,30 +102,49 @@ public:
     uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
 };
 
-struct TArray : public TObject { };
+struct TByteArray : public TByteObject { 
+    static const char* className() { return "ByteArray"; }
+};
+
+struct TSymbol : public TByteObject { 
+    static const char* className() { return "Symbol"; }
+    bool equalsTo(const char* value) { 
+        if (!value)
+            return false;
+        int len = strlen(value);
+        if (len != getSize()) 
+            return false;
+        return (memcmp(getBytes(), value, getSize()) == 0);
+    }
+};
+
+struct TString : public TByteObject { 
+    static const char* className() { return "String"; }
+};
+
+struct TArray : public TObject { 
+    static const char* className() { return "Array"; }
+};
 
 struct TMethod;
 struct TContext : public TObject {
-    TMethod*  method;
-    TArray*   arguments;
-    TArray*   temporaries;
-    TArray*   stack;
-    TInteger  bytePointer;
-    TInteger  stackTop;
-    TContext* previousContext;
-    const int FIELDS_COUNT = 7;
+    TMethod*     method;
+    TArray*      arguments;
+    TArray*      temporaries;
+    TArray*      stack;
+    TInteger     bytePointer;
+    TInteger     stackTop;
+    TContext*    previousContext;
     
-    TContext() : TObject(FIELDS_COUNT, globals.contextClass) { /* TODO init fields as nilObject's */ }
+    static const char* className() { return "Context"; }
 };
 
 struct TBlock : public TContext {
-    TObject*  argumentLocation;
-    TContext* creatingContext;
-    TInteger  oldBytePointer;
-    const int FIELDS_COUNT = 3;
-    
-    // TODO method class
-    TBlock() : TObject(TContext::FIELDS_COUNT + FIELDS_COUNT, globals.blockClass) { /* TODO init fields as nilObject's */ }
+    TObject*     argumentLocation;
+    TContext*    creatingContext;
+    TInteger     oldBytePointer;
+
+    static const char* className() { return "Block"; }
 };
 
 struct TMethod : public TObject {
@@ -127,18 +156,23 @@ struct TMethod : public TObject {
     TClass*      klass;
     TObject*     text;
     TObject*     package;
-    const int    FIELDS_COUNT = 8;
     
-    // TODO method class
-    TContext() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    static const char* className() { return "Method"; }
 };
 
 struct TDictionary : public TObject {
-    TArray*   keys;
-    TArray*   values;
-    const int FIELDS_COUNT = 2;
+    TArray*      keys;
+    TArray*      values;
+    static const char* className() { return "Dictionary"; }
     
-    TDictionary() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    // Find a value associated with a key
+    // Returns NULL if nothing was found
+    TObject*     find(const TSymbol* key);
+    TObject*     find(const char* key);
+private:    
+    static int compareSymbols(TSymbol* left, TSymbol* right);
+    static int compareSymbols(TSymbol* left, const char* right);
+    
 };
 
 struct TClass : public TObject {
@@ -148,43 +182,23 @@ struct TClass : public TObject {
     TInteger     instanceSize;
     TArray*      variables;
     TObject*     package;
-    const int    FIELDS_COUNT = 7;
     
-    TClass() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    static const char* className() { return "Class"; }
 };
 
 struct TNode : public TObject {
-    TObject*  value;
-    TNode*    left;
-    TNode*    right;
-    const int FIELDS_COUNT = 3;
+    TObject*     value;
+    TNode*       left;
+    TNode*       right;
     
-    TNode() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    static const char* className() { return "Node"; }
 };
     
 struct TProcess : public TObject {
-    TContext* context;
-    TObject*  state;
-    TObject*  result;
-    const int FIELDS_COUNT = 3;
+    TContext*    context;
+    TObject*     state;
+    TObject*     result;
     
-    TProcess() : TObject(FIELDS_COUNT, 0) { /* TODO init fields as nilObject's */ }
+    static const char* className() { return "Process"; }
 };
-
-// GLobal VM objects
-struct {
-    TObject* nilObject;
-    TObject* trueObject;
-    TObject* falseObject;
-    TClass*  smallIntClass;
-    TClass*  arrayClass;
-    TClass*  blockClass;
-    TClass*  contextClass;
-    TClass*  stringClass;
-    TObject* globalsObject;
-    TMethod* initialMethod;
-    TObject* binaryMessages[3]; // NOTE
-    TClass*  integerClass;
-    TObject* badMethodSymbol;
-} globals;
 

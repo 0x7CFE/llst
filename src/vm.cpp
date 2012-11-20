@@ -2,54 +2,23 @@
 #include <string.h>
 #include <stdlib.h>
 
-int SmalltalkVM::compareSymbols(const TByteObject* left, const TByteObject* right)
+TObject* Image::getGlobal(const char* name)
 {
-    // This function compares two byte objects depending on their lenght and contents
-   
-    uint32_t leftSize = left->getSize();
-    uint32_t rightSize = right->getSize();
-    uint32_t minSize = leftSize;
-    
-    if (rightSize < minSize)
-        minSize = rightSize;
-    
-//    return memcmp(left->getBytes(), right->getBytes(), minSize);
-    
-    // Comparing the byte string symbol by symbol
-    for (uint32_t i = 0; i < minSize; i++) {
-        if (left[i] != right[i])
-            return left[i] - right[i];
-    }
-    
-    return leftSize - rightSize;
+    TDictionary* globalsDictionary = globals.globalsObject;
+    TObject* result = globalsDictionary->find(name);
+    return result;
 }
 
-TMethod* SmalltalkVM::lookupMethod(const TObject* selector, const TClass* klass)
+TMethod* SmalltalkVM::lookupMethod(const TSymbol* selector, const TClass* klass)
 {
+    TClass* currentClass = klass;
+    
     //Scanning through the class hierarchy from the klass up to the Object
-    for (; klass != globals.nilObject; klass = klass->parentClass) {
-        TDictionary* dictionary = klass->methods;
-        TArray* keys   = dictionary->keys;
-        TArray* values = dictionary->values;
-        
-        // keys are stored in order
-        // thus we may apply binary search
-        
-        uint32_t low = 0;
-        uint32_t high = keys->getSize();
-        
-        while (low < high) {
-            uint32_t mid = (low + high) / 2;
-            TObject* key = keys[mid];
-            
-            if (key == selector)
-                return (TMethod*) values[mid];
-            
-            if (compareSymbols((TByteObject*) selector, (TByteObject*) key) < 0)
-                high = mid;
-            else 
-                low = mid + 1;
-        }
+    for (; currentClass != Image::globals.nilObject; currentClass = currentClass->parentClass) {
+        TDictionary* methods = currentClass->methods;
+        TMethod* method = (TMethod*) methods->find(selector);
+        if (method)
+            return method;
     }
     
     return NULL;
@@ -58,7 +27,7 @@ TMethod* SmalltalkVM::lookupMethod(const TObject* selector, const TClass* klass)
 void SmalltalkVM::flushCache()
 {
     for (size_t i = 0; i < LOOKUP_CACHE_SIZE; i++)
-        m_lookupCache[i].name = 0;
+        m_lookupCache[i].methodName = 0;
 }
 
 // uint32_t getIntegerValue(const TInteger* value)
@@ -145,7 +114,6 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 
                 rootStack.push_back(context);
                 TArray* args = newObject<TArray>(instruction.low);
-                args->setClass(globals.arrayClass);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
                     args[index] = stack[--stackTop];
@@ -180,9 +148,9 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TArray* stack, uint32_t& stac
             stack[stackTop++] = (TObject*) newInteger(constant);
             break;
             
-        case nilConst:   stack[stackTop++] = globals.nilObject;   break;
-        case trueConst:  stack[stackTop++] = globals.trueObject;  break;
-        case falseConst: stack[stackTop++] = globals.falseObject; break;
+        case nilConst:   stack[stackTop++] = Image::globals.nilObject;   break;
+        case trueConst:  stack[stackTop++] = Image::globals.trueObject;  break;
+        case falseConst: stack[stackTop++] = Image::globals.falseObject; break;
         default:
             /* TODO unknown push constant */ ;
     }
@@ -229,20 +197,20 @@ void SmalltalkVM::doSendMessage(TObject* selector, TArray* arguments, TContext* 
     break;
 }
 
-void* TObject::operator new(size_t size)
+template<class T> T* newObject(size_t objectSize /*= 0*/)
 {
-    // TODO allocate the object on the GC heap
-    return llvm_gc_allocate(size);
-}
-
-template<class T> T* newObject(TClass* klass, size_t objectSize /*= 0*/)
-{
+    TClass* klass = m_image.getGlobal(T::className());
+    if (!klass)
+        return Image::globals.nilObject;
+    
     size_t baseSize = sizeof T;
     void* objectSlot = llvm_gc_allocate(baseSize + objectSize * 4);
-    TObject* instance = new (objectSlot) T;
-    instance->setClass(klass);
-    instance->construct(objectSize);
+    if (!objectSlot)
+        return Image::globals.nilObject;
     
+    // FIXME compute size correctly depending on object type
+    uint32_t trueSize = baseSize + objectSize;
+    TObject* instance = (TObject*) new (objectSlot) T(klass, trueSize);
     return instance;
 }
 
