@@ -1,8 +1,6 @@
 #include "types.h"
 #include <list>
 
-template<class T> T* newObject(size_t objectSize = 0);
-
 class Image {
 private:
     TObject* readObject();
@@ -77,7 +75,8 @@ private:
         returnBreak
     }; 
     
-    std::list<TObject*> rootStack;
+    std::list<TObject*> m_rootStack;
+    Image m_image;
     
     struct TMethodCacheEntry
     {
@@ -109,6 +108,8 @@ private:
     int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TArray* stack, uint32_t& stackTop);
     void doSendMessage(TContext* context, TMethod* method);
+    
+    template<class T> T* newObject(size_t objectSize = 0);
 public:
     
 };

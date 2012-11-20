@@ -2,13 +2,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-TObject* Image::getGlobal(const char* name)
-{
-    TDictionary* globalsDictionary = globals.globalsObject;
-    TObject* result = globalsDictionary->find(name);
-    return result;
-}
-
 TMethod* SmalltalkVM::lookupMethod(const TSymbol* selector, const TClass* klass)
 {
     TClass* currentClass = klass;
@@ -49,7 +42,7 @@ TInstruction decodeInstruction(TByteObject* byteCodes, uint32_t bytePointer)
 
 int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 {
-    rootStack.push_back(process);
+    m_rootStack.push_back(process);
     
     // current execution context and the executing method
     TContext* context = process->context;
@@ -66,12 +59,12 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     TArray* instanceVariables = arguments[0];
     TArray* literals = method->literals;
     
-    TObject* returedValue = globals.nilObject;
+    TObject* returedValue = m_image.globals.nilObject;
     
     while (true) {
         if (ticks && (--ticks == 0)) {
             // Time frame expired
-            TProcess* newProcess = rootStack.back(); rootStack.pop_back();
+            TProcess* newProcess = m_rootStack.back(); m_rootStack.pop_back();
             newProcess->context = context;
             newProcess->result = returedValue;
             context->bytePointer = newInteger(bytePointer);
@@ -112,7 +105,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 // This operation takes instruction.low arguments 
                 // from the top of the stack and creates new array with them
                 
-                rootStack.push_back(context);
+                m_rootStack.push_back(context);
                 TArray* args = newObject<TArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
@@ -184,7 +177,7 @@ void SmalltalkVM::doSendMessage(TObject* selector, TArray* arguments, TContext* 
             // Damn! Where is that selector? 
             // Seems that current object does not understand this message
             
-            if (selector == badMethodSymbol) {
+            if (selector == m_image.globals.badMethodSymbol) {
                 // Something really bad happened
                 // TODO error
                 exit(1);
@@ -197,8 +190,9 @@ void SmalltalkVM::doSendMessage(TObject* selector, TArray* arguments, TContext* 
     break;
 }
 
-template<class T> T* newObject(size_t objectSize /*= 0*/)
+template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 {
+    // TODO fast access to common classes
     TClass* klass = m_image.getGlobal(T::className());
     if (!klass)
         return Image::globals.nilObject;
