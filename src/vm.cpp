@@ -66,16 +66,16 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     TContext* context = process->context;
     TMethod*  method  = context->method;
     
-    TByteObject* byteCodes   = method->byteCodes;
+    TByteObject& byteCodes   = *method->byteCodes;
     uint32_t     bytePointer = getIntegerValue(context->bytePointer);
     
-    TArray*  stack    = context->stack;
+    TArray&  stack    = *context->stack;
     uint32_t stackTop = getIntegerValue(context->stackTop);
     
-    TArray* temporaries = context->temporaries;
-    TArray* arguments = context->arguments;
-    TArray* instanceVariables = arguments[0];
-    TArray* literals = method->literals;
+    TArray& temporaries       = *context->temporaries;
+    TArray& arguments         = *context->arguments;
+    TArray& instanceVariables = *arguments[0];
+    TArray& literals          = *method->literals;
     
     TObject* returnedValue = m_image.globals.nilObject;
     
@@ -112,7 +112,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 break;
                 
             case pushConstant: 
-                doPushConstant(instruction.low, TArray* stack, uint32_t& stackTop); 
+                doPushConstant(instruction.low, stack, stackTop); 
                 break;
                 
             case pushBlock:
@@ -124,7 +124,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 // from the top of the stack and creates new array with them
                 
                 m_rootStack.push_back(context);
-                TArray* args = newObject<TArray>(instruction.low);
+                TArray& args = * newObject<TArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
                     args[index] = stack[--stackTop];
@@ -141,7 +141,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 }
 
 
-void SmalltalkVM::doPushConstant(uint8_t constant, TArray* stack, uint32_t& stackTop)
+void SmalltalkVM::doPushConstant(uint8_t constant, TArray& stack, uint32_t& stackTop)
 {
     switch (constant) {
         case 0: 
@@ -191,12 +191,12 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     if (!klass)
         return Image::globals.nilObject;
     
+    // FIXME compute size correctly depending on object type
     size_t baseSize = sizeof T;
     void* objectSlot = llvm_gc_allocate(baseSize + objectSize * 4);
     if (!objectSlot)
         return Image::globals.nilObject;
     
-    // FIXME compute size correctly depending on object type
     uint32_t trueSize = baseSize + objectSize;
     TObject* instance = (TObject*) new (objectSlot) T(klass, trueSize);
     return instance;

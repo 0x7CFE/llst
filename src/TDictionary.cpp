@@ -43,14 +43,14 @@ int TDictionary::compareSymbols(TSymbol* left, const char* right)
 
 TObject* TDictionary::find(const TSymbol* key)
 {
-    TArray* keys   = this->keys;
-    TArray* values = this->values;
+    TArray& keys   = * this->keys;
+    TArray& values = * this->values;
     
     // keys are stored in order
     // thus we may apply binary search
     
     uint32_t low  = 0;
-    uint32_t high = keys->getSize();
+    uint32_t high = keys.getSize();
     
     while (low < high) {
         uint32_t mid = (low + high) / 2;
@@ -72,14 +72,14 @@ TObject* TDictionary::find(const TSymbol* key)
 
 TObject* TDictionary::find(const char* key)
 {
-    TArray* keys   = this->keys;
-    TArray* values = this->values;
+    TArray& keys   = * this->keys;
+    TArray& values = * this->values;
     
     // Keys are stored in order
     // Thus we may apply binary search
     
     uint32_t low  = 0;
-    uint32_t high = keys->getSize();
+    uint32_t high = keys.getSize();
     
     while (low < high) {
         uint32_t mid = (low + high) / 2;

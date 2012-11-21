@@ -77,10 +77,10 @@ public:
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
-    TObject* getData(uint32_t index) const { return data[index]; }
-    TObject* operator [] (uint32_t index) const { return getData(index); }
-    void putData(uint32_t index, TObject* value) { data[index] = value; }
-    void operator [] (uint32_t index, TObject* value) { return putData(index, value); }
+    TObject* getField(uint32_t index) const { return data[index]; }
+    TObject* operator [] (uint32_t index) const { return getField(index); }
+    void putField(uint32_t index, TObject* value) { data[index] = value; }
+    void operator [] (uint32_t index, TObject* value) { return putField(index, value); }
 };
 
 

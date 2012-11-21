@@ -2,6 +2,9 @@
 #include <list>
 #include <vector>
 
+uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
+TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
+
 class Image {
 private:
     size_t imageFileSize;
@@ -112,9 +115,6 @@ private:
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
 
-    uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
-    TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
-
     // lexicographic comparison of two byte objects
 //     int compareSymbols(const TByteObject* left, const TByteObject* right);
     
@@ -128,11 +128,12 @@ private:
     void flushCache();
     
     int execute(TProcess* process, uint32_t ticks);
-    void doPushConstant(uint8_t constant, TArray* stack, uint32_t& stackTop);
+    void doPushConstant(uint8_t constant, TArray& stack, uint32_t& stackTop);
     void doSendMessage(TContext* context, TMethod* method);
     
     template<class T> T* newObject(size_t objectSize = 0);
 public:
     
+
 };
 

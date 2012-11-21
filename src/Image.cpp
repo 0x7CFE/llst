@@ -6,6 +6,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <stdio.h>
+#include <netinet/in.h>
 
 TObject* Image::getGlobal(const char* name)
 {
@@ -88,14 +89,14 @@ TObject* Image::readObject()
         case TImageRecordType::invalidObject: return 0; break;
         case TImageRecordType::ordinaryObject: {
             uint32_t fieldsCount = readWord();
-            TObject* newObject = 0; // TODO static_allocate(fieldsCount); 
+            TClass* objectClass  = readObject(); 
+            
+            // TODO allocate statically
+            TObject* newObject = new TObject(fieldsCount, objectClass);
             indirects.push_back(newObject);
             
-            TClass* objectClass = readObject(); 
-            newObject->setClass(objectClass);
-            
             for (int i = 0; i < fieldsCount; i++)
-                newObject[i] = readObject();
+                newObject->putField(i, readObject());
             
             return newObject;
         }
@@ -109,12 +110,17 @@ TObject* Image::readObject()
         
         case TImageRecordType::byteObject: {
             uint32_t dataSize = readWord();
-            TByteObject* newByteObject = 0; // TODO static_allocate(dataSize)
+            
+            // TODO allocate statically
+            TByteObject* newByteObject = new TByteObject(dataSize, 0); 
             indirects.push_back(newByteObject);
+            
             for (int i = 0; i < dataSize; i++)
-                newByteObject[i] = (uint8_t) readWord();
+                newByteObject->putByte(i, (uint8_t) readWord());
+            
             TClass* objectClass = readObject();
             newByteObject->setClass(objectClass);
+            
             return newByteObject;
         }
         
@@ -125,7 +131,7 @@ TObject* Image::readObject()
         }
         
         case TImageRecordType::nilObject:
-            return indirects[0];
+            return indirects[0]; // nilObject is always the first in the image
         
         default:
             return 0; // TODO report error
