@@ -24,9 +24,9 @@ private:
     private:
         uint32_t  data;
         
-        const int FLAG_RELOCATED = 1;
-        const int FLAG_BINARY    = 2;
-        const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
+        static const int FLAG_RELOCATED = 1;
+        static const int FLAG_BINARY    = 2;
+        static const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
     public:
         TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
         { 
@@ -47,20 +47,21 @@ private:
     TSize    size;
     TClass*  klass;
     
-    TObject* data[0];
     
     // This class should not be instantinated explicitly
     // Descendants should provide own public className method
     static const char* className() { return ""; }
 protected:
-    class Image;
-    friend TObject* Image::readObject();
+    TObject* data[0];
+    
+    friend class Image;
+    //friend TObject* Image::readObject();
     void setClass(TClass* klass); // this should only be called from Image::readObject
 public:    
     // By default objects subject to non binary specification
     static bool isBinary() { return false; } 
     
-    explicit TObject(uint32_t dataCount, const TClass* klass, bool isBinary = false) 
+    explicit TObject(uint32_t dataCount, TClass* klass, bool isBinary = false) 
         : size(dataCount), klass(klass) 
     { 
         size.setBinary(isBinary);
@@ -95,7 +96,7 @@ public:
     // Byte objects are said to be binary
     static bool isBinary() { return true; } 
     
-    explicit TByteObject(uint32_t dataSize, const TClass* klass) : TObject(dataSize, klass, true) { }
+    explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(data); }
     

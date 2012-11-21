@@ -7,11 +7,11 @@ TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
 
 class Image {
 private:
+    int    imageFileFD;
     size_t imageFileSize;
     
     void*    imageMap;     // pointer to the map base
     uint8_t* imagePointer; // sliding pointer
-    int      imageFileFD;
     std::vector<TObject*> indirects; // TODO preallocate space
     
     enum TImageRecordType {
@@ -29,7 +29,7 @@ private:
     void     closeImageFile();
     
 public:
-    Image() : imageFileFD(-1), imageFileSize(0), imagePointer(nullptr) {}
+    Image() : imageFileFD(-1), imageFileSize(0), imagePointer(0) {}
     
     bool loadImage(const char* fileName);
     TObject* getGlobal(const char* name);
@@ -110,7 +110,7 @@ private:
         TMethod* method;
     };
     
-    const int LOOKUP_CACHE_SIZE = 4096;
+    static const unsigned int LOOKUP_CACHE_SIZE = 4096;
     TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;

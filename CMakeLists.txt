@@ -1,8 +1,14 @@
+cmake_minimum_required(VERSION 2.8)
+
 project(llst)
-
-add_executable(llst src/main.cpp)
-
-include_directories(include)
 
 add_subdirectory(src)
 add_subdirectory(include)
+
+file(GLOB CPP_FILES "src/*.cpp")
+
+add_executable(llst ${CPP_FILES})
+set_target_properties(llst PROPERTIES COMPILE_FLAGS "-m32 -Wall")
+
+include_directories(include)
+

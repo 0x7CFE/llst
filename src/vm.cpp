@@ -198,7 +198,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
         return Image::globals.nilObject;
     
     uint32_t trueSize = baseSize + objectSize;
-    TObject* instance = (TObject*) new (objectSlot) T(klass, trueSize);
+    TObject* instance = (TObject*) new (objectSlot) T(trueSize, klass);
     return instance;
 }
 
