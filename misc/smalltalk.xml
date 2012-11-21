@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE language SYSTEM "language.dtd">
+<language name="Smalltalk" version="1.0" kateversion="2.4" section="Sources" extensions="*.st;imageSource" mimetype="text/x-smalltalk" license="LGPL" author="Dmitry Kashitsyn">
+    <highlighting>
+        <list name="keywords">
+            <item> RAWCLASS </item>
+            <item> CLASS </item>
+            <!-- <item> METHOD </item> -->
+            <item> COMMENT </item>
+        </list>
+        <list name="keyobjects">
+            <item> nil </item>
+            <item> self </item>
+            <item> super </item>
+            <item> true </item>
+            <item> false </item>
+            <item> yourself </item>
+        </list>
+        <contexts>
+            <context attribute="Normal Text" lineEndContext="#stay" name="Normal">
+                <RegExpr attribute="Class" context="OneLineSelector" String="\+{1}[A-Z]+[_a-zA-Z0-9]*" firstNonSpace="true" />
+                <RegExpr attribute="Class" context="method_def" String="[\!]+[A-Z]+[_a-zA-Z0-9]*$?" firstNonSpace="true" beginRegion="Method" />
+                <RegExpr attribute="MetaClass" context="method_def" String="[\=]+[A-Z]+[_a-zA-Z0-9]*$?" firstNonSpace="true" beginRegion="Method" />
+                   
+                <StringDetect attribute="Keyword" context="method_def" String="METHOD" firstNonSpace="true" beginRegion="Method"/>
+                <keyword attribute="Normal" context="keyword_line" String="keywords"/>
+                <keyword attribute="Keyword" context="SelectorContext" String="keyobjects"/>
+
+                <DetectChar attribute="Symbol" context="LocalsDef" char="|"/>
+                <RegExpr attribute="Float" context="SelectorContext" String="[0-9]+\.[0-9]+" />
+                <!-- <Float attribute="Float" context="SelectorContext"/> -->
+                <Int attribute="Decimal" context="SelectorContext"/>
+                <DetectChar attribute="String" context="String" char="'"/>
+                <Detect2Chars attribute="Comment" context="Commentar 1" char="&quot;" char1="/"/>
+                <DetectChar attribute="Comment" context="Commentar 2" char="&quot;" beginRegion="Comment"/>
+
+                <DetectChar attribute="Symbol" context="Block" char="[" beginRegion="Brace1"/> <!-- beginRegion="Brace1"-->
+                <DetectChar attribute="Symbol" context="SelectorContext" char="]" endRegion="Brace1" /> <!-- endRegion="Brace1" -->
+                <DetectChar attribute="Symbol" context="SelectorContext" char=")" />
+
+                <RegExpr attribute="Class" context="SelectorContext" String="[A-Z]+[_a-zA-Z0-9]*" />
+
+                <RegExpr attribute="Symbol" context="SelectorContext" String="#[_a-zA-Z0-9:]*" />
+                <RegExpr attribute="Selector" context="#stay" String="[_a-zA-Z]+[_a-zA-Z0-9]*\:" />
+                <DetectIdentifier attribute="Normal" context="SelectorContext"/>
+                <RegExpr attribute="Character" context="#stay" String="\$.{1}"/>
+                <!-- <RegExpr attribute="Character" context="#stay" String="\$[\w\d\s:'&quot;\^\|\$#\(\)\[\]&gt;&lt;;\.!\\\/]{1}"/> -->
+
+                <DetectChar attribute="Symbol" context="Normal" char="!" endRegion="Method"/>
+                <Detect2Chars attribute="Assignment" context="Normal" char=":" char1="="/>
+                <Detect2Chars attribute="Assignment" context="Normal" char="&lt;" char1="-"/>
+                <DetectChar attribute="Return" context="Normal" char="^" />
+                <AnyChar attribute="Selector" context="Normal" String="+-*/~&lt;&gt;=?"/>
+                <AnyChar attribute="Symbol" context="Normal" String=";:(!"/>
+            </context>
+
+            <context attribute="Normal" lineEndContext="Normal" name="keyword_line"/>
+
+            <!-- <context attribute="Normal" lineEndContext="Normal" name="method_def"/>
+                <AnyChar attribute="Selector" context="Normal" String="+-*/~&lt;&gt;=?"/>
+                <RegExpr attribute="Selector" context="Normal" String="\w[_a-zA-Z]+[_a-zA-Z0-9]*\:" />
+            </context> -->
+
+            <context attribute="Normal" lineEndContext="method_string" name="method_def"/>
+            <context attribute="Normal" lineEndContext="Normal" name="method_string"> 
+                <AnyChar attribute="Selector" context="#stay" String="+-*/~&lt;&gt;=?"/>
+                <DetectChar attribute="Symbol" context="LocalsDef" char="|"/>
+                <RegExpr attribute="Selector" context="#stay" String="\w[_a-zA-Z]+[_a-zA-Z0-9]*\:" />
+                <DetectIdentifier attribute="Selector" firstNonSpace="true"/>
+            </context>
+
+            <context attribute="Selector" lineEndContext="#stay" name="SelectorContext">
+                <RegExpr attribute="Selector" context="Normal" String="\w[_a-zA-Z]+[_a-zA-Z0-9]*\:" />
+                <DetectIdentifier />
+                <DetectChar attribute="Symbol" context="Normal" char="("/>
+                <DetectChar attribute="Symbol" context="Normal" char="["/>
+                <DetectChar attribute="Symbol" context="Normal" char="."/>
+                <DetectChar attribute="Symbol" context="Normal" char="!" endRegion="Method"/>
+                <IncludeRules context="Normal"/>
+            </context>
+            <context attribute="Selector" lineEndContext="#pop" name="OneLineSelector">
+                <RegExpr attribute="Selector" context="#stay" String="\w[_a-zA-Z]+[_a-zA-Z0-9]*\:" />
+                <RegExpr attribute="Symbol" context="SelectorContext" String="#[_a-zA-Z0-9:]*" />
+                <DetectIdentifier />
+                <DetectChar attribute="Symbol" context="#stay" char="("/>
+                <DetectChar attribute="Symbol" context="#stay" char="["/>
+                <DetectChar attribute="Symbol" context="#stay" char="."/>
+            </context>
+
+            <context attribute="Normal" lineEndContext="#stay" name="Block">
+                <DetectChar attribute="Symbol" context="LocalsDef" char="|"/>
+                <DetectChar attribute="LocalDef" context="ArgsDef" char=":"/>  <!-- FIXME only one time! -->
+                <IncludeRules context="Normal"/>
+            </context>
+
+            <context attribute="LocalDef" lineEndContext="#stay" name="LocalsDef">
+                <DetectChar attribute="Symbol" context="#pop" char="|"/>
+            </context>
+            <context attribute="Normal" lineEndContext="#stay" name="ArgsDef">
+                <DetectChar attribute="LocalDef" context="#stay" char=":"/>
+                <DetectChar attribute="Symbol" context="#pop" char="|"/>
+                <DetectIdentifier attribute="LocalDef" />
+            </context>
+
+            <context attribute="String" lineEndContext="#stay" name="String">
+                <LineContinue attribute="String" context="#stay"/>
+                <DetectChar attribute="String" context="SelectorContext" char="'"/>
+            </context>
+            <context attribute="Comment" lineEndContext="#pop" name="Commentar 1"/>
+            <context attribute="Comment" lineEndContext="#stay" name="Commentar 2">
+                <DetectChar attribute="Comment" context="#pop" char="&quot;" char1="/" endRegion="Comment"/>
+            </context>
+        </contexts>
+        <itemDatas>
+            <itemData name="Normal Text"  defStyleNum="dsNormal"/>
+            <itemData name="Keyword"      defStyleNum="dsKeyword"/>
+            <itemData name="Selector"     defStyleNum="dsFunction" color="#000069"/>
+            <itemData name="Decimal"      defStyleNum="dsDecVal" color="#800000"/>
+            <itemData name="Float"        defStyleNum="dsFloat"/>
+            <itemData name="String"       defStyleNum="dsString" color="#FF6C6C"/>
+            <itemData name="Comment"      defStyleNum="dsComment"/>
+            <itemData name="Symbol"       defStyleNum="dsNormal" color="#7F007F"/>
+            <itemData name="Assignment"   defStyleNum="dsNormal"/>
+            <itemData name="Return"       defStyleNum="dsNormal"/>
+            <itemData name="Class"        defStyleNum="dsNormal" color="#C00000"/>
+            <itemData name="MetaClass"    defStyleNum="dsNormal" color="#0000C0"/>
+            <itemData name="LocalDef"     defStyleNum="dsNormal" color="#008000"/>
+            <itemData name="Character"    defStyleNum="dsNormal" color="#7F007F"/>
+        </itemDatas>
+    </highlighting>
+    <general>
+        <comments>
+            <comment name="singleLine" start="//"/>
+            <comment name="multiLine" start="/*" end="*/"/>
+        </comments>
+        <keywords casesensitive="1"/>
+    </general>
+</language>
