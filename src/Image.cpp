@@ -51,6 +51,16 @@ bool Image::openImageFile(const char* fileName)
     return true;
 }
 
+void Image::closeImageFile()
+{
+    munmap(imageMap);
+    close(imageFileFD);
+    
+    imagePointer = 0;
+    imageMap = 0;
+    imageFileSize = 0;
+}
+
 uint32_t Image::readWord()
 {
     if (imagePointer == (imageMap + imageFileSize) )
@@ -147,6 +157,8 @@ bool Image::loadImage(const char* fileName)
     globals.badMethodSymbol = readObject();
     
     indirects.clear();
+    
+    closeImageFile();
     
     return true;
 }

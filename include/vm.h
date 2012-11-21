@@ -22,7 +22,9 @@ private:
     
     uint32_t readWord();
     TObject* readObject();
-    bool openImageFile(const char* fileName);
+    bool     openImageFile(const char* fileName);
+    void     closeImageFile();
+    
 public:
     Image() : imageFileFD(-1), imageFileSize(0), imagePointer(nullptr) {}
     
