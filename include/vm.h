@@ -1,5 +1,6 @@
 #include "types.h"
 #include <list>
+#include <vector>
 
 class Image {
 private:
@@ -8,7 +9,18 @@ private:
     void*    imageMap;     // pointer to the map base
     uint8_t* imagePointer; // sliding pointer
     int      imageFileFD;
+    std::vector<TObject*> indirects; // TODO preallocate space
     
+    enum TImageRecordType {
+        invalidObject = 0,
+        ordinaryObject,
+        inlineInteger,  // inline 32 bit integer in network byte order
+        byteObject,     // 
+        previousObject, // link to previously loaded object
+        nilObject       // uninitialized (nil) field
+    };
+    
+    uint32_t readWord();
     TObject* readObject();
     bool openImageFile(const char* fileName);
 public:

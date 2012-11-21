@@ -52,6 +52,10 @@ private:
     // This class should not be instantinated explicitly
     // Descendants should provide own public className method
     static const char* className() { return ""; }
+protected:
+    class Image;
+    friend TObject* Image::readObject();
+    void setClass(TClass* klass); // this should only be called from Image::readObject
 public:    
     // By default objects subject to non binary specification
     static bool isBinary() { return false; } 
