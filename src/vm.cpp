@@ -59,14 +59,14 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     TArray* instanceVariables = arguments[0];
     TArray* literals = method->literals;
     
-    TObject* returedValue = m_image.globals.nilObject;
+    TObject* returnedValue = m_image.globals.nilObject;
     
     while (true) {
         if (ticks && (--ticks == 0)) {
             // Time frame expired
             TProcess* newProcess = m_rootStack.back(); m_rootStack.pop_back();
             newProcess->context = context;
-            newProcess->result = returedValue;
+            newProcess->result = returnedValue;
             context->bytePointer = newInteger(bytePointer);
             context->stackTop = newInteger(stackTop);
             return returnTimeExpired;
