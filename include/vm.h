@@ -3,9 +3,17 @@
 
 class Image {
 private:
-    TObject* readObject();
+    size_t imageFileSize;
     
+    void*    imageMap;     // pointer to the map base
+    uint8_t* imagePointer; // sliding pointer
+    int      imageFileFD;
+    
+    TObject* readObject();
+    bool openImageFile(const char* fileName);
 public:
+    Image() : imageFileFD(-1), imageFileSize(0), imagePointer(nullptr) {}
+    
     bool loadImage(const char* fileName);
     TObject* getGlobal(const char* name);
     

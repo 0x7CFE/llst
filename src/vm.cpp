@@ -14,7 +14,7 @@ TMethod* SmalltalkVM::lookupMethod(const TSymbol* selector, const TClass* klass)
             return method;
     }
     
-    return NULL;
+    return nullptr;
 }
 
 void SmalltalkVM::flushCache()

@@ -63,7 +63,7 @@ TObject* TDictionary::find(const TSymbol* key)
             low = mid + 1;
     }
     
-    return NULL;
+    return nullptr;
 }
 
 TObject* TDictionary::find(const char* key)
@@ -91,5 +91,5 @@ TObject* TDictionary::find(const char* key)
             return values[mid];
     }
     
-    return NULL;
+    return nullptr;
 }
