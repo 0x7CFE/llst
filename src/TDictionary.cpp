@@ -9,9 +9,10 @@ int TDictionary::compareSymbols(TSymbol* left, TSymbol* right)
     uint32_t rightSize = right->getSize();
     uint32_t minSize = (leftSize < rightSize) ? leftSize : rightSize;
     
-    // Comparing the byte string symbol by symbol
+    // Comparing the byte strings byte by byte
     int result = memcmp(left->getBytes(), right->getBytes(), minSize);
     
+    // If bytestrings are equal, checking whichever is longer
     if (result)
         return result;
     else
@@ -30,9 +31,10 @@ int TDictionary::compareSymbols(TSymbol* left, const char* right)
     uint8_t* leftBytes = left->getBytes();
     uint8_t* rightBytes = (uint8_t*) right;
     
-    // Comparing the byte string symbol by symbol
+    // Comparing the byte strings byte by byte
     int result = memcmp(leftBytes, rightBytes, minSize);
 
+    // If bytestrings are equal, checking whichever is longer
     if (result)
         return result;
     else
@@ -47,13 +49,15 @@ TObject* TDictionary::find(const TSymbol* key)
     // keys are stored in order
     // thus we may apply binary search
     
-    uint32_t low = 0;
+    uint32_t low  = 0;
     uint32_t high = keys->getSize();
     
     while (low < high) {
         uint32_t mid = (low + high) / 2;
-        TSymbol* candidate = keys[mid];
+        TSymbol* candidate = (TSymbol*) keys[mid];
         
+        // Each symbol is unique within the whole image
+        // This allows us to compare pointers instead of contents
         if (candidate == key)
             return values[mid];
         
@@ -63,7 +67,7 @@ TObject* TDictionary::find(const TSymbol* key)
             low = mid + 1;
     }
     
-    return nullptr;
+    return 0;
 }
 
 TObject* TDictionary::find(const char* key)
@@ -71,15 +75,15 @@ TObject* TDictionary::find(const char* key)
     TArray* keys   = this->keys;
     TArray* values = this->values;
     
-    // keys are stored in order
-    // thus we may apply binary search
+    // Keys are stored in order
+    // Thus we may apply binary search
     
-    uint32_t low = 0;
+    uint32_t low  = 0;
     uint32_t high = keys->getSize();
     
     while (low < high) {
         uint32_t mid = (low + high) / 2;
-        TSymbol* candidate = keys[mid];
+        TSymbol* candidate = (TSymbol*) keys[mid];
         
         int comparison = compareSymbols(candidate, key);
         
@@ -91,5 +95,5 @@ TObject* TDictionary::find(const char* key)
             return values[mid];
     }
     
-    return nullptr;
+    return 0;
 }
