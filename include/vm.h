@@ -119,10 +119,10 @@ private:
 //     int compareSymbols(const TByteObject* left, const TByteObject* right);
     
     // locate the method in the hierarchy of the class
-    TMethod* lookupMethod(const TObject* selector, const TObject* klass);
+    TMethod* lookupMethod(TSymbol* selector, TClass* klass);
     
     // fast method lookup in the method cache
-    TMethod* lookupMethodInCache(const TObject* selector, const TObject* klass);
+    TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
     
     // flush the method lookup cache
     void flushCache();

@@ -2,7 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
+TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
     TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
@@ -15,11 +15,11 @@ TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
     }
 }
 
-TMethod* SmalltalkVM::lookupMethod(const TSymbol* selector, const TClass* klass)
+TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 {
     // First of all checking the method cache
     // Frequently called methods most likely will be there
-    TObject* result = lookupMethodInCache(selector, klass);
+    TMethod* result = (TMethod*) lookupMethodInCache(selector, klass);
     if (result)
         return result; // We're lucky!
     

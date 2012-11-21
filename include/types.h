@@ -73,15 +73,15 @@ public:
     TClass*  getClass() const { return klass; } 
     
     // delegated methods from TSize
-    bool isBinary() const { return size.isBinary(); }
+//     bool isBinary() const { return size.isBinary(); }
     bool isRelocated() const { return size.isRelocated(); }
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
-    TObject* getField(uint32_t index) const { return data[index]; }
-    TObject* operator [] (uint32_t index) const { return getField(index); }
+    TObject* getField(uint32_t index) { return data[index]; }
+    TObject* operator [] (uint32_t index) { return getField(index); }
     void putField(uint32_t index, TObject* value) { data[index] = value; }
-    void operator [] (uint32_t index, TObject* value) { return putField(index, value); }
+//     void operator [] (uint32_t index, TObject* value) { return putField(index, value); }
 };
 
 
@@ -100,11 +100,11 @@ public:
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(data); }
     
-    uint8_t getByte(uint32_t index) const { return reinterpret_cast<uint8_t*>(data)[index]; }
-    uint8_t operator [] (uint32_t index) const { return getByte(index); }
+    uint8_t getByte(uint32_t index) { return reinterpret_cast<uint8_t*>(data)[index]; }
+    uint8_t operator [] (uint32_t index) { return getByte(index); }
     
     void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(data)[index] = value; }
-    uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
+    //uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
 };
 
 struct TByteArray : public TByteObject { 
