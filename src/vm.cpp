@@ -2,19 +2,37 @@
 #include <string.h>
 #include <stdlib.h>
 
+TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
+{
+    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
+    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
+    if (entry.methodName == selector && entry.receiverClass == klass) {
+        m_cacheHits++;
+        return entry.method;
+    } else {
+        m_cacheMisses++;
+        return 0;
+    }
+}
+
 TMethod* SmalltalkVM::lookupMethod(const TSymbol* selector, const TClass* klass)
 {
-    TClass* currentClass = klass;
+    // First of all checking the method cache
+    // Frequently called methods most likely will be there
+    TObject* result = lookupMethodInCache(selector, klass);
+    if (result)
+        return result; // We're lucky!
     
-    //Scanning through the class hierarchy from the klass up to the Object
-    for (; currentClass != Image::globals.nilObject; currentClass = currentClass->parentClass) {
+    // Well, maybe we'll be luckier next time. For now we need to do the full search.
+    // Scanning through the class hierarchy from the klass up to the Object
+    for (TClass* currentClass = klass; currentClass != Image::globals.nilObject; currentClass = currentClass->parentClass) {
         TDictionary* methods = currentClass->methods;
-        TMethod* method = (TMethod*) methods->find(selector);
-        if (method)
-            return method;
+        result = (TMethod*) methods->find(selector);
+        if (result)
+            return result;
     }
     
-    return nullptr;
+    return 0;
 }
 
 void SmalltalkVM::flushCache()
@@ -147,41 +165,19 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TArray* stack, uint32_t& stac
     }
 }
 
-TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
-{
-    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
-    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
-    if (entry.methodName == selector && entry.receiverClass == klass) {
-        m_cacheHits++;
-        return entry.method;
-    } else {
-        m_cacheMisses++;
-        return 0;
-    }
-}
-
 void SmalltalkVM::doSendMessage(TObject* selector, TArray* arguments, TContext* context, uint32_t& stackTop)
 {
     TClass*  receiverClass    = arguments[0];
     
-    // First of all we need to check the lookup cache
-    TMethod* method = lookupMethodInCache(selector, receiverClass);
-    if (!method) {
-        // Cache missed. Now we need to do the full search through
-        // the receiver's class hierarchy:
-        method = lookupMethod(selector, receiverClass);
+    TMethod* method = lookupMethod(selector, receiverClass);
+    if (! method) {
+        // Oops. Nothing was found.
+        // Seems that current object does not understand this message
         
-        if (! method) {
-            // Damn! Where is that selector? 
-            // Seems that current object does not understand this message
-            
-            if (selector == m_image.globals.badMethodSymbol) {
-                // Something really bad happened
-                // TODO error
-                exit(1);
-            }
-            
-            
+        if (selector == m_image.globals.badMethodSymbol) {
+            // Something really bad happened
+            // TODO error
+            exit(1);
         }
     }
     

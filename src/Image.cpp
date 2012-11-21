@@ -103,8 +103,8 @@ TObject* Image::readObject()
         case TImageRecordType::inlineInteger: {
             uint32_t value = * reinterpret_cast<uint32_t*>(imagePointer);
             imagePointer += 4;
-            TObject* newObject = newInteger(ntohs(value));
-            return newObject;
+            TInteger newObject = newInteger(ntohs(value));
+            return reinterpret_cast<TObject*>(newObject);
         }
         
         case TImageRecordType::byteObject: {
