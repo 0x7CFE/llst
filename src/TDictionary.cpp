@@ -41,7 +41,7 @@ int TDictionary::compareSymbols(TSymbol* left, const char* right)
         return leftSize - rightSize;
 }
 
-TObject* TDictionary::find(const TSymbol* key)
+TObject* TDictionary::find(TSymbol* key)
 {
     TArray& keys   = * this->keys;
     TArray& values = * this->values;

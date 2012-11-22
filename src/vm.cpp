@@ -25,7 +25,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     
     // Well, maybe we'll be luckier next time. For now we need to do the full search.
     // Scanning through the class hierarchy from the klass up to the Object
-    for (TClass* currentClass = klass; currentClass != Image::globals.nilObject; currentClass = currentClass->parentClass) {
+    for (TClass* currentClass = klass; currentClass != globals.nilObject; currentClass = currentClass->parentClass) {
         TDictionary* methods = currentClass->methods;
         result = (TMethod*) methods->find(selector);
         if (result)
@@ -74,15 +74,15 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     
     TArray& temporaries       = *context->temporaries;
     TArray& arguments         = *context->arguments;
-    TArray& instanceVariables = *arguments[0];
+    TArray& instanceVariables = (TArray&) *arguments[0];
     TArray& literals          = *method->literals;
     
-    TObject* returnedValue = m_image.globals.nilObject;
+    TObject* returnedValue = globals.nilObject;
     
     while (true) {
         if (ticks && (--ticks == 0)) {
             // Time frame expired
-            TProcess* newProcess = m_rootStack.back(); m_rootStack.pop_back();
+            TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
             newProcess->context = context;
             newProcess->result = returnedValue;
             context->bytePointer = newInteger(bytePointer);
@@ -124,16 +124,16 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 // from the top of the stack and creates new array with them
                 
                 m_rootStack.push_back(context);
-                TArray& args = * newObject<TArray>(instruction.low);
+                TArray* args = newObject<TArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
-                    args[index] = stack[--stackTop];
+                    (*args)[index] = stack[--stackTop];
                 
                 stack[stackTop++] = args;
             } break;
                 
             case sendMessage: 
-                doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
+//                 doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
                 break;
             
         }
@@ -157,48 +157,47 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TArray& stack, uint32_t& stac
             stack[stackTop++] = (TObject*) newInteger(constant);
             break;
             
-        case nilConst:   stack[stackTop++] = Image::globals.nilObject;   break;
-        case trueConst:  stack[stackTop++] = Image::globals.trueObject;  break;
-        case falseConst: stack[stackTop++] = Image::globals.falseObject; break;
+        case nilConst:   stack[stackTop++] = globals.nilObject;   break;
+        case trueConst:  stack[stackTop++] = globals.trueObject;  break;
+        case falseConst: stack[stackTop++] = globals.falseObject; break;
         default:
             /* TODO unknown push constant */ ;
     }
 }
 
-void SmalltalkVM::doSendMessage(TObject* selector, TArray* arguments, TContext* context, uint32_t& stackTop)
+void SmalltalkVM::doSendMessage(TSymbol* selector, TArray& arguments, TContext* context, uint32_t& stackTop)
 {
-    TClass*  receiverClass    = arguments[0];
+    TClass*  receiverClass    = (TClass*) arguments[0];
     
     TMethod* method = lookupMethod(selector, receiverClass);
     if (! method) {
         // Oops. Nothing was found.
         // Seems that current object does not understand this message
         
-        if (selector == m_image.globals.badMethodSymbol) {
+        if (selector == globals.badMethodSymbol) {
             // Something really bad happened
             // TODO error
             exit(1);
         }
     }
     
-    break;
 }
 
 template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 {
     // TODO fast access to common classes
-    TClass* klass = m_image.getGlobal(T::className());
+    TClass* klass = (TClass*) m_image.getGlobal(T::className());
     if (!klass)
-        return Image::globals.nilObject;
+        return (T*) globals.nilObject;
     
     // FIXME compute size correctly depending on object type
-    size_t baseSize = sizeof T;
-    void* objectSlot = llvm_gc_allocate(baseSize + objectSize * 4);
+    size_t baseSize = sizeof(T);
+    void* objectSlot = malloc(baseSize + objectSize * 4); // TODO llvm_gc_allocate
     if (!objectSlot)
-        return Image::globals.nilObject;
+        return (T*) globals.nilObject;
     
     uint32_t trueSize = baseSize + objectSize;
-    TObject* instance = (TObject*) new (objectSlot) T(trueSize, klass);
+    T* instance = (T*) new (objectSlot) T(trueSize, klass);
     return instance;
 }
 

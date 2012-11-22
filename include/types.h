@@ -1,9 +1,10 @@
+#ifndef LLST_TYPES_H_INCLUDED
+#define LLST_TYPES_H_INCLUDED
+
+#include <stdint.h>
 #include <sys/types.h>
 #include <new>
 #include <string.h>
-
-typedef u_int8_t  uint8_t;
-typedef u_int32_t uint32_t;
 
 // This is a special interpretation of Smalltalk's SmallInteger
 // VM handles the special case when object pointer has lowest bit set to 1
@@ -54,14 +55,16 @@ private:
 protected:
     TObject* data[0];
     
-    friend class Image;
-    //friend TObject* Image::readObject();
-    void setClass(TClass* klass); // this should only be called from Image::readObject
+//     friend class Image;
+//     friend TObject* Image::readObject();
 public:    
+    // this should only be called from Image::readObject
+    void setClass(TClass* aClass) { klass = aClass; } 
+    
     // By default objects subject to non binary specification
     static bool isBinary() { return false; } 
     
-    explicit TObject(uint32_t dataCount, TClass* klass, bool isBinary = false) 
+    TObject(uint32_t dataCount, TClass* klass, bool isBinary = false) 
         : size(dataCount), klass(klass) 
     { 
         size.setBinary(isBinary);
@@ -79,7 +82,7 @@ public:
     
     // TODO boundary checks
     TObject* getField(uint32_t index) { return data[index]; }
-    TObject* operator [] (uint32_t index) { return getField(index); }
+    TObject*& operator [] (uint32_t index) { return data[index]; }
     void putField(uint32_t index, TObject* value) { data[index] = value; }
 //     void operator [] (uint32_t index, TObject* value) { return putField(index, value); }
 };
@@ -96,12 +99,12 @@ public:
     // Byte objects are said to be binary
     static bool isBinary() { return true; } 
     
-    explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
+    TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(data); }
     
     uint8_t getByte(uint32_t index) { return reinterpret_cast<uint8_t*>(data)[index]; }
-    uint8_t operator [] (uint32_t index) { return getByte(index); }
+    uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(data)[index]; }
     
     void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(data)[index] = value; }
     //uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
@@ -116,7 +119,7 @@ struct TSymbol : public TByteObject {
     bool equalsTo(const char* value) { 
         if (!value)
             return false;
-        int len = strlen(value);
+        size_t len = strlen(value);
         if (len != getSize()) 
             return false;
         return (memcmp(getBytes(), value, getSize()) == 0);
@@ -128,6 +131,7 @@ struct TString : public TByteObject {
 };
 
 struct TArray : public TObject { 
+    TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* className() { return "Array"; }
 };
 
@@ -172,7 +176,7 @@ struct TDictionary : public TObject {
     
     // Find a value associated with a key
     // Returns NULL if nothing was found
-    TObject*     find(const TSymbol* key);
+    TObject*     find(TSymbol* key);
     TObject*     find(const char* key);
 private:    
     static int compareSymbols(TSymbol* left, TSymbol* right);
@@ -207,3 +211,4 @@ struct TProcess : public TObject {
     static const char* className() { return "Process"; }
 };
 
+#endif

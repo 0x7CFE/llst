@@ -54,7 +54,7 @@ bool Image::openImageFile(const char* fileName)
 
 void Image::closeImageFile()
 {
-    munmap(imageMap);
+    munmap(imageMap, imageFileSize);
     close(imageFileFD);
     
     imagePointer = 0;
@@ -86,10 +86,10 @@ TObject* Image::readObject()
     
     TImageRecordType type = (TImageRecordType) readWord();
     switch (type) {
-        case TImageRecordType::invalidObject: return 0; break;
-        case TImageRecordType::ordinaryObject: {
+        case invalidObject: return 0; break;
+        case ordinaryObject: {
             uint32_t fieldsCount = readWord();
-            TClass* objectClass  = readObject(); 
+            TClass* objectClass  = (TClass*) readObject(); 
             
             // TODO allocate statically
             TObject* newObject = new TObject(fieldsCount, objectClass);
@@ -101,14 +101,14 @@ TObject* Image::readObject()
             return newObject;
         }
         
-        case TImageRecordType::inlineInteger: {
+        case inlineInteger: {
             uint32_t value = * reinterpret_cast<uint32_t*>(imagePointer);
             imagePointer += 4;
             TInteger newObject = newInteger(ntohs(value));
             return reinterpret_cast<TObject*>(newObject);
         }
         
-        case TImageRecordType::byteObject: {
+        case byteObject: {
             uint32_t dataSize = readWord();
             
             // TODO allocate statically
@@ -118,19 +118,19 @@ TObject* Image::readObject()
             for (int i = 0; i < dataSize; i++)
                 newByteObject->putByte(i, (uint8_t) readWord());
             
-            TClass* objectClass = readObject();
+            TClass* objectClass = (TClass*) readObject();
             newByteObject->setClass(objectClass);
             
             return newByteObject;
         }
         
-        case TImageRecordType::previousObject: {
+        case previousObject: {
             uint32_t index = readWord();
             TObject* newObject = indirects[index];
             return newObject;
         }
         
-        case TImageRecordType::nilObject:
+        case nilObject:
             return indirects[0]; // nilObject is always the first in the image
         
         default:
@@ -140,7 +140,7 @@ TObject* Image::readObject()
 
 bool Image::loadImage(const char* fileName)
 {
-    if (!openImageFile())
+    if (!openImageFile(fileName))
         return false;
     
     indirects.reserve(4096);
@@ -148,14 +148,14 @@ bool Image::loadImage(const char* fileName)
     globals.nilObject     = readObject();
     globals.trueObject    = readObject();
     globals.falseObject   = readObject();
-    globals.globalsObject = readObject();
-    globals.smallIntClass = readObject();
-    globals.integerClass  = readObject();
-    globals.arrayClass    = readObject();
-    globals.blockClass    = readObject();
-    globals.contextClass  = readObject();
-    globals.stringClass   = readObject();
-    globals.initialMethod = readObject();
+    globals.globalsObject = (TDictionary*) readObject();
+    globals.smallIntClass = (TClass*)  readObject();
+    globals.integerClass  = (TClass*)  readObject();
+    globals.arrayClass    = (TClass*)  readObject();
+    globals.blockClass    = (TClass*)  readObject();
+    globals.contextClass  = (TClass*)  readObject();
+    globals.stringClass   = (TClass*)  readObject();
+    globals.initialMethod = (TMethod*) readObject();
     
     for (int i = 0; i < 3; i++)
         globals.binaryMessages[i] = readObject();

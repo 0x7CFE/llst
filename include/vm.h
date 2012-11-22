@@ -1,9 +1,13 @@
-#include "types.h"
+#ifndef LLST_VM_H_INCLUDED
+#define LLST_VM_H_INCLUDED
+
 #include <list>
 #include <vector>
 
-uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
-TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
+#include <types.h>
+
+inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
+inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
 
 class Image {
 private:
@@ -35,22 +39,23 @@ public:
     TObject* getGlobal(const char* name);
     
     // GLobal VM objects
-    static struct {
-        TObject* nilObject;
-        TObject* trueObject;
-        TObject* falseObject;
-        TClass*  smallIntClass;
-        TClass*  arrayClass;
-        TClass*  blockClass;
-        TClass*  contextClass;
-        TClass*  stringClass;
-        TDictionary* globalsObject;
-        TMethod* initialMethod;
-        TObject* binaryMessages[3]; // NOTE
-        TClass*  integerClass;
-        TObject* badMethodSymbol;
-    } globals;
 };
+
+static struct{
+    TObject* nilObject;
+    TObject* trueObject;
+    TObject* falseObject;
+    TClass*  smallIntClass;
+    TClass*  arrayClass;
+    TClass*  blockClass;
+    TClass*  contextClass;
+    TClass*  stringClass;
+    TDictionary* globalsObject;
+    TMethod* initialMethod;
+    TObject* binaryMessages[3]; // NOTE
+    TClass*  integerClass;
+    TObject* badMethodSymbol;
+} globals;
 
 class SmalltalkVM {
 public:
@@ -129,7 +134,7 @@ private:
     
     int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TArray& stack, uint32_t& stackTop);
-    void doSendMessage(TContext* context, TMethod* method);
+    void doSendMessage(TSymbol* selector, TArray& arguments, TContext* context, uint32_t& stackTop);
     
     template<class T> T* newObject(size_t objectSize = 0);
 public:
@@ -137,3 +142,4 @@ public:
 
 };
 
+#endif
