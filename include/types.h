@@ -11,7 +11,9 @@
 // In that case pointer is treated as explicit 31 bit integer equal to (value >> 1)
 // Any operation should be done using SmalltalkVM::getIntegerValue() and SmalltalkVM::newInteger()
 // Explicit type cast should be strictly avoided for the sake of design stability
-typedef u_int32_t TInteger;
+typedef uint32_t TInteger;
+
+using namespace std;
 
 struct TInstruction {
     uint8_t low;

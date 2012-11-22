@@ -8,6 +8,10 @@
 #include <stdio.h>
 #include <netinet/in.h>
 
+#include <errno.h>
+#include <stdlib.h>
+#include <string>
+
 TObject* Image::getGlobal(const char* name)
 {
     TDictionary* globalsDictionary = globals.globalsObject;
@@ -17,16 +21,22 @@ TObject* Image::getGlobal(const char* name)
 
 bool Image::openImageFile(const char* fileName)
 {
+    fprintf(stderr, "Opening file for reading: %s\n", fileName);
+    
     // Opening file for reading 
     imageFileFD = open(fileName, O_RDONLY);
     if (imageFileFD < 0)
+    {
+        fprintf(stderr, "Failed to open file %s : %s\n", fileName, strerror(errno));
         return false;
+    }
     
     // Reading file size in bytes
     struct stat st;
     if (fstat(imageFileFD, &st) < 0) {
         close(imageFileFD);
         imageFileFD = -1;
+        fprintf(stderr, "Failed to get file size : %s\n", strerror(errno));
         return false;
     }
     imageFileSize = st.st_size;
@@ -41,6 +51,8 @@ bool Image::openImageFile(const char* fileName)
         0);             // from the very beginning (zero offset)
         
     if (!imageMap) {
+        fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
+        
         // Something goes wrong
         close(imageFileFD);
         imageFileFD = -1;
@@ -49,6 +61,8 @@ bool Image::openImageFile(const char* fileName)
     
     // Initializing pointers
     imagePointer = (uint8_t*) imageMap;
+    
+    fprintf(stderr, "Image file was mmaped successfully!\n");
     return true;
 }
 
@@ -84,16 +98,27 @@ TObject* Image::readObject()
 {
     // TODO error checking 
     
+    //fprintf(stderr, "Reading image record type\n");
     TImageRecordType type = (TImageRecordType) readWord();
+    //fprintf(stderr, "Reading record %d\n", (uint32_t) type);
     switch (type) {
-        case invalidObject: return 0; break;
+        case invalidObject: 
+            fprintf(stderr, "Invalid object at offset %p\n", (uint32_t) imagePointer - (uint32_t) imageMap);
+            exit(1); 
+            break;
+        
         case ordinaryObject: {
             uint32_t fieldsCount = readWord();
+            fprintf(stderr, "Reading ordinaryObject with %d fields \n", fieldsCount);
+            
             TClass* objectClass  = (TClass*) readObject(); 
+            fprintf(stderr, "Object class is %p \n", (uint32_t) objectClass);
             
             // TODO allocate statically
-            TObject* newObject = new TObject(fieldsCount, objectClass);
+            void* slot = malloc(sizeof(TObject) + fieldsCount*4);
+            TObject* newObject = new(slot) TObject(fieldsCount, objectClass);
             indirects.push_back(newObject);
+            fprintf(stderr, "Allocated object %p indirect index %d\n", (uint32_t) newObject, indirects.size()-1);
             
             for (int i = 0; i < fieldsCount; i++)
                 newObject->putField(i, readObject());
@@ -103,6 +128,7 @@ TObject* Image::readObject()
         
         case inlineInteger: {
             uint32_t value = * reinterpret_cast<uint32_t*>(imagePointer);
+            fprintf(stderr, "Reading inline integer value %d\n", value);
             imagePointer += 4;
             TInteger newObject = newInteger(ntohs(value));
             return reinterpret_cast<TObject*>(newObject);
@@ -110,16 +136,22 @@ TObject* Image::readObject()
         
         case byteObject: {
             uint32_t dataSize = readWord();
+            fprintf(stderr, "Reading byte object of size %d\n", dataSize);
             
             // TODO allocate statically
-            TByteObject* newByteObject = new TByteObject(dataSize, 0); 
+            void* slot = malloc(sizeof(TByteObject) + dataSize);
+            TByteObject* newByteObject = new(slot) TByteObject(dataSize, 0); 
             indirects.push_back(newByteObject);
+            fprintf(stderr, "Allocated byte object %p indirect index %d\n", (uint32_t) newByteObject, indirects.size()-1);
             
             for (int i = 0; i < dataSize; i++)
                 newByteObject->putByte(i, (uint8_t) readWord());
+            std::string bytes((const char*)newByteObject->getBytes(), dataSize);
+            fprintf(stderr, "Byte object content: '%s'\n", bytes.c_str());
             
             TClass* objectClass = (TClass*) readObject();
             newByteObject->setClass(objectClass);
+            fprintf(stderr, "object %p has class %p\n", (uint32_t) newByteObject, (uint32_t) objectClass);
             
             return newByteObject;
         }
@@ -127,25 +159,37 @@ TObject* Image::readObject()
         case previousObject: {
             uint32_t index = readWord();
             TObject* newObject = indirects[index];
+            fprintf(stderr, "Reading link to previousObject index %d address %p\n", index, (uint32_t) newObject);
             return newObject;
         }
         
         case nilObject:
+            fprintf(stderr, "Reading nil Object address %p\n", (uint32_t) indirects[0]);
             return indirects[0]; // nilObject is always the first in the image
         
         default:
-            return 0; // TODO report error
+            fprintf(stderr, "Unknown record type %d\n", type);
+            exit(1); // TODO report error
     }
 }
 
 bool Image::loadImage(const char* fileName)
 {
+    fprintf(stderr, "Trying to open image file: %s\n", fileName);
+    
     if (!openImageFile(fileName))
+    {
+        fprintf(stderr, "could not open image file\n", fileName);
         return false;
+    }
+    
+    fprintf(stderr, "Reserving memory for indirects\n");
     
     indirects.reserve(4096);
     
+    fprintf(stderr, "Loading nilObject\n");
     globals.nilObject     = readObject();
+    
     globals.trueObject    = readObject();
     globals.falseObject   = readObject();
     globals.globalsObject = (TDictionary*) readObject();

@@ -15,5 +15,26 @@ ProjectRootRelative=./
 [CMake][CMake Build Directory 0]
 Build Directory Path=file:///home/korvin/projects/smalltalk/llst/build
 
+[Launch]
+Launch Configurations=Launch Configuration 0
+
+[Launch][Launch Configuration 0]
+Configured Launch Modes=execute
+Configured Launchers=nativeAppLauncher
+Name=New Native Application Configuration
+Type=Native Application
+
+[Launch][Launch Configuration 0][Data]
+Arguments=
+Dependencies=@Variant(\x00\x00\x00\t\x00\x00\x00\x00\x00)
+Dependency Action=Nothing
+EnvironmentGroup=default
+Executable=
+External Terminal=konsole --noclose --workdir %workdir -e %exe
+Project Target=llst,llst
+Use External Terminal=false
+Working Directory=
+isExecutable=false
+
 [MakeBuilder]
 Number Of Jobs=1
