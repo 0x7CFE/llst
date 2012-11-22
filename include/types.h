@@ -43,8 +43,8 @@ private:
         uint32_t getSize() const { return data >> 2; }
         bool isBinary() const { return data & FLAG_BINARY; }
         bool isRelocated() const { return data & FLAG_RELOCATED; }
-        void setBinary(bool value) { data &= (value << 1); }
-        void setRelocated(bool value) { data &= value; }
+        void setBinary(bool value) { data |= (value << 1); }
+        void setRelocated(bool value) { data |= value; }
     };
     
     TSize    size;
@@ -159,13 +159,13 @@ struct TBlock : public TContext {
 };
 
 struct TMethod : public TObject {
-    TObject*     name;
+    TSymbol*     name;
     TByteObject* byteCodes;
     TArray*      literals;
     TInteger     stackSize;
     TInteger     temporarySize;
     TClass*      klass;
-    TObject*     text;
+    TString*     text;
     TObject*     package;
     
     static const char* className() { return "Method"; }
