@@ -76,29 +76,27 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
         TInstruction instruction;
         instruction.low = (instruction.high = byteCodes[bytePointer++]) & 0x0F;
         instruction.high >>= 4;
-        if (instruction.high == 0) { // TODO extended constant
+        if (instruction.high == extended) {
             instruction.high = instruction.low;
             instruction.low = byteCodes[bytePointer++];
         }
         
-        switch (instruction.high) {
+        switch (instruction.high) { // 6 pushes, 2 assignes, 1 mark, 3 sendings, 2 do's
             case pushInstance:    stack[stackTop++] = instanceVariables[instruction.low]; break;
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
             case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
-            case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
-            
-            case assignInstance:
-                instanceVariables[instruction.low] = stack[stackTop - 1];
-                // TODO isDynamicMemory()
-                break;
-                
             case pushConstant: 
                 doPushConstant(instruction.low, TArray* stack, uint32_t& stackTop); 
                 break;
-                
             case pushBlock:
                 
+                break;
+                
+            case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
+            case assignInstance:
+                instanceVariables[instruction.low] = stack[stackTop - 1];
+                // TODO isDynamicMemory()
                 break;
                 
             case markArguments: {
@@ -112,12 +110,57 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                     args[index] = stack[--stackTop];
                 
                 stack[stackTop++] = args;
-            } break;
+                break;
+            }
                 
             case sendMessage: 
                 doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
                 break;
             
+            case sendUnary:
+                break;
+            
+            case sendBinary:
+                break;
+                
+            case doPrimitive:
+                break;
+                
+            case doSpecial:
+                switch(instruction.low) {
+                    case SelfReturn:
+                        returnedValue = instanceVariables;
+                        //goto doReturn; TODO ???
+                        break;
+                    case StackReturn:
+                        break;
+                    case BlockReturn:
+                        break;
+                    case Duplicate:
+                        returnedValue = stack[stackTop - 1];
+                        stack[stackTop++] = returnedValue;
+                        break;
+                    case PopTop:
+                        stackTop--;
+                        break;
+                    case Branch:
+                        break;
+                    case BranchIfTrue:
+                        break;
+                    case BranchIfFalse:
+                        break;
+                    case SendToSuper:
+                        instruction.low = byteCodes[bytePointer++];
+                        TObject* messageSelector = literals[instruction.low];
+                        TObject* receiverClass   = instanceVariables->Class;
+                        TMethod* method          = lookupMethodInCache(messageSelector, receiverClass);
+                        //TODO call
+                        break;
+                    case Breakpoint:
+                        break;
+                        
+                }
+                break;
         }
     }
 }
