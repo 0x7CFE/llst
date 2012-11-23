@@ -25,6 +25,8 @@ struct TObject {
 private:
     struct TSize {
     private:
+        // Raw value holder
+        // Do not edit this directly
         uint32_t  data;
         
         static const int FLAG_RELOCATED = 1;
@@ -33,7 +35,7 @@ private:
     public:
         TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
         { 
-            data = size & ~FLAGS_MASK; // masking lowest two bits
+            data = (size << 2); //) & ~FLAGS_MASK; // masking lowest two bits
             data |= (isBinary << 1); 
             data |= isRelocated; 
         }
@@ -55,10 +57,8 @@ private:
     // Descendants should provide own public className method
     static const char* className() { return ""; }
 protected:
-    TObject* data[0];
+    TObject* fields[0];
     
-//     friend class Image;
-//     friend TObject* Image::readObject();
 public:    
     // this should only be called from Image::readObject
     void setClass(TClass* aClass) { klass = aClass; } 
@@ -66,12 +66,13 @@ public:
     // By default objects subject to non binary specification
     static bool isBinary() { return false; } 
     
-    TObject(uint32_t dataCount, TClass* klass, bool isBinary = false) 
-        : size(dataCount), klass(klass) 
-    { 
-        size.setBinary(isBinary);
-        
-        // TODO Initialize all data as nilObject's
+    explicit TObject(uint32_t fieldsCount, TClass* klass, bool isObjectBinary = false) 
+        : size(fieldsCount, isBinary), klass(klass) 
+    {
+        // Zeroing all fields space
+        // Binary objects should manage this on their own
+        if (!isObjectBinary)
+            memset(fields, 0, fieldsCount * sizeof(TObject*));
     }
     
     uint32_t getSize() const { return size.getSize(); }
@@ -83,15 +84,15 @@ public:
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
-    TObject* getField(uint32_t index) { return data[index]; }
-    TObject*& operator [] (uint32_t index) { return data[index]; }
-    void putField(uint32_t index, TObject* value) { data[index] = value; }
-//     void operator [] (uint32_t index, TObject* value) { return putField(index, value); }
+    TObject* getField(uint32_t index) { return fields[index]; }
+    TObject*& operator [] (uint32_t index) { return fields[index]; }
+    void putField(uint32_t index, TObject* value) { fields[index] = value; }
 };
 
 
 // Descendants of this class store raw byte data instead of their instance variables
 // The only valid fields are size and class which are inherited from TObject
+// Fields space from the TObject is interprited here as raw byte array
 struct TByteObject : public TObject {
 private:
     // This class should not be instantinated directly
@@ -101,15 +102,18 @@ public:
     // Byte objects are said to be binary
     static bool isBinary() { return true; } 
     
-    TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
+    explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
+    {
+        // Zeroing data
+        memset(fields, 0, dataSize);
+    }
     
-    uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(data); }
+    uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }
     
-    uint8_t getByte(uint32_t index) { return reinterpret_cast<uint8_t*>(data)[index]; }
-    uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(data)[index]; }
+    uint8_t  getByte(uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
+    uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
     
-    void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(data)[index] = value; }
-    //uint8_t operator [] (uint32_t index, uint8_t value)  { return putByte(index, value); }
+    void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(fields)[index] = value; }
 };
 
 struct TByteArray : public TByteObject { 

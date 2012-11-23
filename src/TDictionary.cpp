@@ -62,9 +62,9 @@ TObject* TDictionary::find(TSymbol* key)
             return values[mid];
         
         if (compareSymbols(candidate, key) < 0)
-            high = mid;
-        else 
             low = mid + 1;
+        else 
+            high = mid;
     }
     
     return 0;
@@ -88,9 +88,9 @@ TObject* TDictionary::find(const char* key)
         int comparison = compareSymbols(candidate, key);
         
         if (comparison < 0)
-            high = mid;
-        else if (comparison > 0)
             low = mid + 1;
+        else if (comparison > 0)
+            high = mid;
         else
             return values[mid];
     }

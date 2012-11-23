@@ -192,7 +192,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     
     // FIXME compute size correctly depending on object type
     size_t baseSize = sizeof(T);
-    void* objectSlot = malloc(baseSize + objectSize * 4); // TODO llvm_gc_allocate
+    void* objectSlot = malloc(baseSize + objectSize * sizeof(T*)); // TODO llvm_gc_allocate
     if (!objectSlot)
         return (T*) globals.nilObject;
     

@@ -41,7 +41,7 @@ public:
     // GLobal VM objects
 };
 
-static struct{
+struct TGlobals {
     TObject* nilObject;
     TObject* trueObject;
     TObject* falseObject;
@@ -55,7 +55,9 @@ static struct{
     TObject* binaryMessages[3]; // NOTE
     TClass*  integerClass;
     TObject* badMethodSymbol;
-} globals;
+};
+
+extern TGlobals globals;
 
 class SmalltalkVM {
 public:

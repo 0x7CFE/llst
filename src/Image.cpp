@@ -12,6 +12,10 @@
 #include <stdlib.h>
 #include <string>
 
+// Placeholder for root objects
+TGlobals globals;
+
+
 TObject* Image::getGlobal(const char* name)
 {
     TDictionary* globalsDictionary = globals.globalsObject;
@@ -109,10 +113,10 @@ TObject* Image::readObject()
         
         case ordinaryObject: {
             uint32_t fieldsCount = readWord();
-            fprintf(stderr, "Reading ordinaryObject with %d fields \n", fieldsCount);
+            fprintf(stderr, "(will be %d) Reading ordinaryObject with %d fields \n", indirects.size(), fieldsCount);
             
             // TODO allocate statically
-            void* slot = malloc(sizeof(TObject) + fieldsCount*4);
+            void* slot = malloc(sizeof(TObject) + fieldsCount * sizeof(TObject*));
             TObject* newObject = new(slot) TObject(fieldsCount, 0);
             indirects.push_back(newObject);
             fprintf(stderr, "Allocated object %p indirect index %d\n", (uint32_t) newObject, indirects.size()-1);
@@ -130,7 +134,7 @@ TObject* Image::readObject()
         case inlineInteger: {
             uint32_t value = * reinterpret_cast<uint32_t*>(imagePointer);
             fprintf(stderr, "Reading inline integer value %d\n", value);
-            imagePointer += 4;
+            imagePointer += sizeof(uint32_t);
             TInteger newObject = newInteger(ntohs(value));
             return reinterpret_cast<TObject*>(newObject);
         }
@@ -146,8 +150,8 @@ TObject* Image::readObject()
             fprintf(stderr, "Allocated byte object %p indirect index %d\n", (uint32_t) newByteObject, indirects.size()-1);
             
             for (int i = 0; i < dataSize; i++)
-                newByteObject->putByte(i, (uint8_t) readWord());
-            std::string bytes((const char*)newByteObject->getBytes(), dataSize);
+                (*newByteObject)[i] = (uint8_t) readWord();
+            std::string bytes((const char*)newByteObject->getBytes(), newByteObject->getSize());
             fprintf(stderr, "Byte object content: '%s'\n", bytes.c_str());
             
             TClass* objectClass = (TClass*) readObject();
