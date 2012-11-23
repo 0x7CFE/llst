@@ -105,7 +105,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
             case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
             case pushConstant: 
-                doPushConstant(instruction.low, TArray* stack, uint32_t& stackTop); 
+                doPushConstant(instruction.low, stack, stackTop); 
                 break;
             case pushBlock:
                 
@@ -146,7 +146,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
             case doSpecial:
                 switch(instruction.low) {
                     case SelfReturn:
-                        returnedValue = instanceVariables;
+                        //returnedValue = instanceVariables;
                         //goto doReturn; TODO ???
                         break;
                     case StackReturn:
@@ -166,13 +166,13 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                         break;
                     case BranchIfFalse:
                         break;
-                    case SendToSuper:
+                    case SendToSuper: {
                         instruction.low = byteCodes[bytePointer++];
-                        TObject* messageSelector = literals[instruction.low];
-                        TObject* receiverClass   = instanceVariables->Class;
-                        TMethod* method          = lookupMethodInCache(messageSelector, receiverClass);
+                        TSymbol* l_messageSelector = literals[instruction.low];
+                        TClass* l_receiverClass    = instanceVariables.getClass();
+                        TMethod* l_method          = lookupMethod(l_messageSelector, l_receiverClass);
                         //TODO call
-                        break;
+                    } break;
                     case Breakpoint:
                         break;
                         
@@ -204,19 +204,6 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t
         case falseConst: stack[stackTop++] = globals.falseObject; break;
         default:
             /* TODO unknown push constant */ ;
-    }
-}
-
-TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
-{
-    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
-    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
-    if (entry.methodName == selector && entry.receiverClass == klass) {
-        m_cacheHits++;
-        return entry.method;
-    } else {
-        m_cacheMisses++;
-        return 0;
     }
 }
 
