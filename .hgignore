@@ -1,0 +1,7 @@
+syntax: glob
+cmake_install.cmake
+CMakeFiles/*
+Makefile
+CMakeCache.txt
+llst
+*.kdev4
