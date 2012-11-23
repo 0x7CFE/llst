@@ -99,24 +99,22 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
             instruction.low = byteCodes[bytePointer++];
         }
         
-        switch (instruction.high) {
+        switch (instruction.high) { // 6 pushes, 2 assignes, 1 mark, 3 sendings, 2 do's
             case pushInstance:    stack[stackTop++] = instanceVariables[instruction.low]; break;
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
             case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
+            case pushConstant: 
+                doPushConstant(instruction.low, TArray* stack, uint32_t& stackTop); 
+                break;
+            case pushBlock:
+                
+                break;
+                
             case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
-            
             case assignInstance:
                 instanceVariables[instruction.low] = stack[stackTop - 1];
                 // TODO isDynamicMemory()
-                break;
-                
-            case pushConstant: 
-                doPushConstant(instruction.low, stack, stackTop); 
-                break;
-                
-            case pushBlock:
-                
                 break;
                 
             case markArguments: {
@@ -136,6 +134,50 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 //                 doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
                 break;
             
+            case sendUnary:
+                break;
+            
+            case sendBinary:
+                break;
+                
+            case doPrimitive:
+                break;
+                
+            case doSpecial:
+                switch(instruction.low) {
+                    case SelfReturn:
+                        returnedValue = instanceVariables;
+                        //goto doReturn; TODO ???
+                        break;
+                    case StackReturn:
+                        break;
+                    case BlockReturn:
+                        break;
+                    case Duplicate:
+                        returnedValue = stack[stackTop - 1];
+                        stack[stackTop++] = returnedValue;
+                        break;
+                    case PopTop:
+                        stackTop--;
+                        break;
+                    case Branch:
+                        break;
+                    case BranchIfTrue:
+                        break;
+                    case BranchIfFalse:
+                        break;
+                    case SendToSuper:
+                        instruction.low = byteCodes[bytePointer++];
+                        TObject* messageSelector = literals[instruction.low];
+                        TObject* receiverClass   = instanceVariables->Class;
+                        TMethod* method          = lookupMethodInCache(messageSelector, receiverClass);
+                        //TODO call
+                        break;
+                    case Breakpoint:
+                        break;
+                        
+                }
+                break;
         }
     }
 }
@@ -162,6 +204,19 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t
         case falseConst: stack[stackTop++] = globals.falseObject; break;
         default:
             /* TODO unknown push constant */ ;
+    }
+}
+
+TMethod* SmalltalkVM::lookupMethodInCache(TObject* selector, TClass* klass)
+{
+    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
+    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
+    if (entry.methodName == selector && entry.receiverClass == klass) {
+        m_cacheHits++;
+        return entry.method;
+    } else {
+        m_cacheMisses++;
+        return 0;
     }
 }
 

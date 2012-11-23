@@ -80,6 +80,19 @@ private:
         doSpecial       
     };
     
+    enum Special {
+        SelfReturn = 1,
+        StackReturn,
+        BlockReturn,
+        Duplicate,
+        PopTop,
+        Branch,
+        BranchIfTrue,
+        BranchIfFalse,
+        SendToSuper = 11,
+        Breakpoint = 12
+    };
+    
     enum {
         nilConst = 10,
         trueConst,
