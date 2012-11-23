@@ -43,8 +43,8 @@ int TDictionary::compareSymbols(TSymbol* left, const char* right)
 
 TObject* TDictionary::find(TSymbol* key)
 {
-    TArray& keys   = * this->keys;
-    TArray& values = * this->values;
+    TSymbolArray& keys   = * this->keys;
+    TObjectArray& values = * this->values;
     
     // keys are stored in order
     // thus we may apply binary search
@@ -72,8 +72,8 @@ TObject* TDictionary::find(TSymbol* key)
 
 TObject* TDictionary::find(const char* key)
 {
-    TArray& keys   = * this->keys;
-    TArray& values = * this->values;
+    TSymbolArray& keys   = * this->keys;
+    TObjectArray& values = * this->values;
     
     // Keys are stored in order
     // Thus we may apply binary search

@@ -84,7 +84,7 @@ public:
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
-    TObject* getField(uint32_t index) { return fields[index]; }
+    TObject* getField(uint32_t index) { return (TObject*) fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
 };
@@ -136,54 +136,60 @@ struct TString : public TByteObject {
     static const char* className() { return "String"; }
 };
 
+template <typename Element>
 struct TArray : public TObject { 
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* className() { return "Array"; }
+    Element& operator [] (uint32_t index) { return reinterpret_cast<Element*>(fields)[index]; }
 };
 
 struct TMethod;
+typedef TArray<TObject*> TObjectArray;
+typedef TArray<TSymbol*> TSymbolArray;
+typedef TArray<TMethod*> TMethodArray;
+
 struct TContext : public TObject {
-    TMethod*     method;
-    TArray*      arguments;
-    TArray*      temporaries;
-    TArray*      stack;
-    TInteger     bytePointer;
-    TInteger     stackTop;
-    TContext*    previousContext;
+    TMethod*      method;
+    TObjectArray* arguments;
+    TObjectArray* temporaries;
+    TObjectArray* stack;
+    TInteger      bytePointer;
+    TInteger      stackTop;
+    TContext*     previousContext;
     
     static const char* className() { return "Context"; }
 };
 
 struct TBlock : public TContext {
-    TObject*     argumentLocation;
-    TContext*    creatingContext;
-    TInteger     oldBytePointer;
+    TObject*      argumentLocation;
+    TContext*     creatingContext;
+    TInteger      oldBytePointer;
 
     static const char* className() { return "Block"; }
 };
 
 struct TMethod : public TObject {
-    TSymbol*     name;
-    TByteObject* byteCodes;
-    TArray*      literals;
-    TInteger     stackSize;
-    TInteger     temporarySize;
-    TClass*      klass;
-    TString*     text;
-    TObject*     package;
+    TSymbol*      name;
+    TByteObject*  byteCodes;
+    TSymbolArray* literals;
+    TInteger      stackSize;
+    TInteger      temporarySize;
+    TClass*       klass;
+    TString*      text;
+    TObject*      package;
     
     static const char* className() { return "Method"; }
 };
 
 struct TDictionary : public TObject {
-    TArray*      keys;
-    TArray*      values;
-    static const char* className() { return "Dictionary"; }
+    TSymbolArray* keys;
+    TObjectArray* values;
+    static const char*  className() { return "Dictionary"; }
     
     // Find a value associated with a key
     // Returns NULL if nothing was found
-    TObject*     find(TSymbol* key);
-    TObject*     find(const char* key);
+    TObject*      find(TSymbol* key);
+    TObject*      find(const char* key);
 private:    
     static int compareSymbols(TSymbol* left, TSymbol* right);
     static int compareSymbols(TSymbol* left, const char* right);
@@ -191,28 +197,28 @@ private:
 };
 
 struct TClass : public TObject {
-    TObject*     name;
-    TClass*      parentClass;
-    TDictionary* methods;
-    TInteger     instanceSize;
-    TArray*      variables;
-    TObject*     package;
+    TSymbol*      name;
+    TClass*       parentClass;
+    TDictionary*  methods;
+    TInteger      instanceSize;
+    TSymbolArray* variables;
+    TObject*      package;
     
-    static const char* className() { return "Class"; }
+    static const char*  className() { return "Class"; }
 };
 
 struct TNode : public TObject {
-    TObject*     value;
-    TNode*       left;
-    TNode*       right;
+    TObject*      value;
+    TNode*        left;
+    TNode*        right;
     
     static const char* className() { return "Node"; }
 };
     
 struct TProcess : public TObject {
-    TContext*    context;
-    TObject*     state;
-    TObject*     result;
+    TContext*     context;
+    TObject*      state;
+    TObject*      result;
     
     static const char* className() { return "Process"; }
 };

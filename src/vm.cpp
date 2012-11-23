@@ -69,13 +69,13 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
     TByteObject& byteCodes   = *method->byteCodes;
     uint32_t     bytePointer = getIntegerValue(context->bytePointer);
     
-    TArray&  stack    = *context->stack;
+    TObjectArray&  stack    = *context->stack;
     uint32_t stackTop = getIntegerValue(context->stackTop);
-    
-    TArray& temporaries       = *context->temporaries;
-    TArray& arguments         = *context->arguments;
-    TArray& instanceVariables = (TArray&) *arguments[0];
-    TArray& literals          = *method->literals;
+
+    TObjectArray& temporaries       = *context->temporaries;
+    TObjectArray& arguments         = *context->arguments;
+    TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
+    TSymbolArray& literals          = *method->literals;
     
     TObject* returnedValue = globals.nilObject;
     
@@ -124,7 +124,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 // from the top of the stack and creates new array with them
                 
                 m_rootStack.push_back(context);
-                TArray* args = newObject<TArray>(instruction.low);
+                TObjectArray* args = newObject<TObjectArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
                     (*args)[index] = stack[--stackTop];
@@ -141,7 +141,7 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 }
 
 
-void SmalltalkVM::doPushConstant(uint8_t constant, TArray& stack, uint32_t& stackTop)
+void SmalltalkVM::doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop)
 {
     switch (constant) {
         case 0: 
@@ -165,7 +165,7 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TArray& stack, uint32_t& stac
     }
 }
 
-void SmalltalkVM::doSendMessage(TSymbol* selector, TArray& arguments, TContext* context, uint32_t& stackTop)
+void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop)
 {
     TClass*  receiverClass    = (TClass*) arguments[0];
     

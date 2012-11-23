@@ -135,8 +135,8 @@ private:
     void flushCache();
     
     int execute(TProcess* process, uint32_t ticks);
-    void doPushConstant(uint8_t constant, TArray& stack, uint32_t& stackTop);
-    void doSendMessage(TSymbol* selector, TArray& arguments, TContext* context, uint32_t& stackTop);
+    void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
+    void doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop);
     
     template<class T> T* newObject(size_t objectSize = 0);
 public:
