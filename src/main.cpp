@@ -22,7 +22,7 @@ int main(int argc, char **argv) {
     cout << "Object has " << methodNames.getSize() << " methods" << endl;
     for (int i = 0; i < methodNames.getSize(); i++)
     {
-        TSymbol* name = (TSymbol*) methodNames[i]; 
+        TSymbol* name = methodNames[i]; 
         std::string sname((const char*) name->getBytes(), name->getSize());
         cout << sname << endl;
     }

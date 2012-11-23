@@ -84,7 +84,7 @@ public:
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
-    TObject* getField(uint32_t index) { return (TObject*) fields[index]; }
+    TObject* getField(uint32_t index) { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
 };
@@ -109,7 +109,6 @@ public:
     }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }
-    
     uint8_t  getByte(uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
     uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
     
