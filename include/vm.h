@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <types.h>
+#include "memory.h"
 
 inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
 inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
@@ -32,8 +33,12 @@ private:
     bool     openImageFile(const char* fileName);
     void     closeImageFile();
     
+    IMemoryAllocator* m_memoryAllocator;
 public:
-    Image() : imageFileFD(-1), imageFileSize(0), imagePointer(0) {}
+    Image(IMemoryAllocator* allocator) 
+        : imageFileFD(-1), imageFileSize(0), 
+          imagePointer(0), m_memoryAllocator(allocator) 
+    {}
     
     bool loadImage(const char* fileName);
     TObject* getGlobal(const char* name);

@@ -1,4 +1,5 @@
 #include <vm.h>
+#include <memory.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -117,9 +118,10 @@ TObject* Image::readObject()
         case ordinaryObject: {
             uint32_t fieldsCount = readWord();
             
-            // TODO allocate statically
-            void* slot = malloc(sizeof(TObject) + fieldsCount * sizeof(TObject*));
-            TObject* newObject = new(slot) TObject(fieldsCount, 0);
+            size_t slotSize   = sizeof(TObject) + fieldsCount * sizeof(TObject*);
+            void*  objectSlot = m_memoryAllocator->allocateMemory(slotSize);
+            
+            TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
             indirects.push_back(newObject);
             
             TClass* objectClass  = (TClass*) readObject(); 
@@ -141,9 +143,14 @@ TObject* Image::readObject()
         case byteObject: {
             uint32_t dataSize = readWord();
             
-            // TODO allocate statically
-            void* slot = malloc(sizeof(TByteObject) + dataSize);
-            TByteObject* newByteObject = new(slot) TByteObject(dataSize, 0); 
+            size_t slotSize   = sizeof(TByteObject) + dataSize;
+            
+            // We need to align memory by even addresses so that 
+            // normal pointers will always have the lowest bit 0
+            slotSize = (slotSize + sizeof(TObject*) - 1) & ~0x3;
+            
+            void*  objectSlot = m_memoryAllocator->allocateMemory(slotSize);
+            TByteObject* newByteObject = new(objectSlot) TByteObject(dataSize, 0); 
             indirects.push_back(newByteObject);
             
             for (int i = 0; i < dataSize; i++)

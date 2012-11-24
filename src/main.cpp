@@ -2,7 +2,7 @@
 #include <vm.h>
 
 int main(int argc, char **argv) {
-    Image testImage;
+    Image testImage(0); // TODO
     testImage.loadImage("../image/testImage");
 
 //     TArray& keys = *globals.globalsObject->keys;
