@@ -145,25 +145,39 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
             case doPrimitive:
                 break;
                 
-            case doSpecial:
-                break;
+            case doSpecial: {
+                TExecuteResult result = doDoSpecial(
+                    instruction, 
+                    context, 
+                    stackTop, 
+                    method, 
+                    bytePointer, 
+                    process, 
+                    returnedValue);
+                
+                if (result != returnNoReturn)
+                    return result;
+            } break;
         }
     }
 }
 
 
-void SmalltalkVM::doSpecial(
+SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
     TInstruction instruction, 
     TContext* context, 
-    TObjectArray& arguments,
-    TObjectArray& stack,
     uint32_t& stackTop,
     TMethod*& method,
-    TByteObject& byteCodes,
     uint32_t& bytePointer,
     TProcess*& process,
     TObject*& returnedValue)
 {
+    TByteObject& byteCodes          = *method->byteCodes;
+    TObjectArray&  stack            = *context->stack;
+    TObjectArray& temporaries       = *context->temporaries;
+    TObjectArray& arguments         = *context->arguments;
+    TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
+    TSymbolArray& literals          = *method->literals;
     
     switch(instruction.low) {
         case SelfReturn:
@@ -242,6 +256,8 @@ void SmalltalkVM::doSpecial(
         } break;
         
     }
+    
+    return returnNoReturn;
 }
 
 void SmalltalkVM::doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop)
@@ -309,7 +325,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 }
 
 
-void SmalltalkVM::executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue)
+void SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue)
 {
     switch(opcode)
     {

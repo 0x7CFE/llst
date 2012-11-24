@@ -117,7 +117,9 @@ private:
         returnBadMethod,
         returnReturned,
         returnTimeExpired,
-        returnBreak
+        returnBreak,
+        
+        returnNoReturn = 255
     }; 
     
     std::list<TObject*> m_rootStack;
@@ -149,17 +151,24 @@ private:
     
     int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
-    void doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop);
-    void executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue);
     
-    void doSpecial(
+    void doSendMessage(
+        TSymbol* selector, 
+        TObjectArray& arguments, 
+        TContext* context, 
+        uint32_t& stackTop);
+    
+    void doExecutePrimitive(
+        uint8_t opcode, 
+        TObjectArray& stack, 
+        uint32_t& stackTop, 
+        TObject& returnedValue);
+    
+    TExecuteResult doDoSpecial(
         TInstruction instruction, 
         TContext* context, 
-        TObjectArray& arguments,
-        TObjectArray& stack,
         uint32_t& stackTop,
         TMethod*& method,
-        TByteObject& byteCodes,
         uint32_t& bytePointer,
         TProcess*& process,
         TObject*& returnedValue);
