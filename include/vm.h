@@ -150,6 +150,7 @@ private:
     int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
     void doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop);
+    void executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue);
     
     template<class T> T* newObject(size_t objectSize = 0);
 public:
