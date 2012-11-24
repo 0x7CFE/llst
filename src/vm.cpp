@@ -61,7 +61,7 @@ TInstruction decodeInstruction(TByteObject* byteCodes, uint32_t bytePointer)
 
 #define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
 
-int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
+SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 {
     m_rootStack.push_back(process);
     

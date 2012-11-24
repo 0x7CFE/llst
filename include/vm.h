@@ -67,6 +67,19 @@ extern TGlobals globals;
 
 class SmalltalkVM {
 public:
+    enum TExecuteResult {
+        returnError = 2,
+        returnBadMethod,
+        returnReturned,
+        returnTimeExpired,
+        returnBreak,
+        
+        returnNoReturn = 255
+    }; 
+    
+    TExecuteResult execute(TProcess* process, uint32_t ticks);
+    SmalltalkVM() : m_image(0) {}
+    
 private:
     enum {
         extended = 0,
@@ -118,18 +131,9 @@ private:
     
     TClass* getRootClass(TClassID id);
     
-    enum TExecuteResult {
-        returnError = 2,
-        returnBadMethod,
-        returnReturned,
-        returnTimeExpired,
-        returnBreak,
-        
-        returnNoReturn = 255
-    }; 
-    
     std::list<TObject*> m_rootStack;
-    Image m_image;
+    //HeapMemoryManager staticMemoryManager(); TODO
+    Image m_image; //TODO
     
     struct TMethodCacheEntry
     {
@@ -155,12 +159,7 @@ private:
     // flush the method lookup cache
     void flushCache();
     
-    int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
-    
-    template<class T> T* newObject(size_t objectSize = 0);
-    TObject* newObject(TSymbol* className, size_t objectSize);
-    TObject* newObject(TClass* klass);
     
     void doSendMessage(
         TSymbol* selector, 
@@ -182,9 +181,11 @@ private:
         TProcess*& process,
         TObject*& returnedValue);
     
-public:
+public:    
+    template<class T> T* newObject(size_t objectSize = 0);
+    TObject* newObject(TSymbol* className, size_t objectSize);
+    TObject* newObject(TClass* klass);
     
-
 };
 
 #endif
