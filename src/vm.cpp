@@ -148,9 +148,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case doPrimitive: {
                 uint8_t primitiveNumber = byteCodes[bytePointer++];
                 m_rootStack.push_back(context);
-                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, process);
-                if(returnedValue == returnError) //FIXME !!!111
-                    return returnedValue;
+                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, *process);
+                //if(returnedValue == returnError) //FIXME !!!111
+                //    return returnedValue;
             } break;
                 
             case doSpecial: {
@@ -451,7 +451,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         
         case 9:
         {
-            uint32_t input = getchar();
+            int32_t input = getchar();
             if(input == EOF)
                 return globals.nilObject;
             else
@@ -523,9 +523,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         {
             m_rootStack.pop_back();
             TContext* context = process.context;
-            process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-            process->context = context;
-            return returnError;
+            process = *(TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+            process.context = context;
+            //return returnError; TODO cast 
         } break;
         
         case 20:
