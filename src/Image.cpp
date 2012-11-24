@@ -23,6 +23,13 @@ TObject* Image::getGlobal(const char* name)
     return result;
 }
 
+TObject* Image::getGlobal(TSymbol* name)
+{
+    TDictionary* globalsDictionary = globals.globalsObject;
+    TObject* result = globalsDictionary->find(name);
+    return result;
+}
+
 bool Image::openImageFile(const char* fileName)
 {
     // Opening file for reading 

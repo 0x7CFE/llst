@@ -1,6 +1,7 @@
 #include <vm.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
@@ -326,6 +327,52 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
         return (T*) globals.nilObject;
     
     T* instance = (T*) new (objectSlot) T(objectSize, klass);
+    if (! T::InstancesAreBinary())     
+    {
+        for (int i = 0; i < objectSize; i++)
+            instance->putField(i, globals.nilObject);
+    }
+    
+    return instance;
+}
+
+TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
+{
+    // TODO fast access to common classes
+    TClass* klass = (TClass*) m_image.getGlobal(className);
+    if (!klass)
+        return globals.nilObject;
+    
+    // Slot size is computed depending on the object type
+    size_t slotSize = 0;
+//     if (T::InstancesAreBinary())    
+//         slotSize = sizeof(T) + objectSize;
+//     else 
+        slotSize = sizeof(TObject) + objectSize * sizeof(TObject*);
+    
+    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+    if (!objectSlot)
+        return globals.nilObject;
+    
+    TObject* instance = new (objectSlot) TObject(objectSize, klass);
+    for (int i = 0; i < objectSize; i++)
+        instance->putField(i, globals.nilObject);
+    
+    return instance;
+}
+
+TObject* SmalltalkVM::newObject(TClass* klass)
+{
+    uint32_t instanceSize = getIntegerValue(klass->instanceSize);
+    
+    void* objectSlot = malloc(instanceSize); // TODO llvm_gc_allocate
+    if (!objectSlot)
+        return globals.nilObject;
+    
+    TObject* instance = new (objectSlot) TObject(instanceSize, klass);
+    for (int i = 0; i < instanceSize; i++)
+        instance->putField(i, globals.nilObject);
+    
     return instance;
 }
 
@@ -336,10 +383,10 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
     {
         case 1: // operator ==
         {
-            TObject* top        = stack[--stackTop];
-            TObject* previous   = stack[--stackTop];
+            TObject* arg2   = stack[--stackTop];
+            TObject* arg1   = stack[--stackTop];
             
-            if(top == previous)
+            if(arg1 == arg2)
                 return globals.trueObject;
             else
                 return globals.falseObject;
@@ -348,25 +395,24 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         case 2: // return class
         {
             TObject* top = stack[--stackTop];
-            return top->getClass();
+            bool isSmallInt = (reinterpret_cast<uint32_t>(top) & 1);
+            return isSmallInt ? globals.smallIntClass : top->getClass();
         } break;
         
         case 3:
         {
             TInteger top = reinterpret_cast<TInteger>(stack[--stackTop]);
-            u_int32_t tempInt = getIntegerValue(top);
-            //putchar(tempInt); //TODO putchar
+            uint8_t  charValue = getIntegerValue(top);
+            //putc(charValue, stdout);
+            putchar(charValue);
             return globals.nilObject;
         } break;
         
         case 4: // return size of object
         {
             TObject* top = stack[--stackTop];
-            uint32_t returnedSize = 
-                (top->getClass() == globals.smallIntClass)
-                    ? 0
-                    : top->getSize();
-
+            bool isSmallInt = (reinterpret_cast<uint32_t>(top) & 1);
+            uint32_t returnedSize = isSmallInt ? 0 : top->getSize();
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
@@ -380,13 +426,28 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             TInteger top = reinterpret_cast<TInteger>(stack[--stackTop]);
             uint32_t ticks = getIntegerValue(top);
             TProcess* newProcess = (TProcess*) stack[--stackTop];
-            int result = this->execute(newProcess, ticks); //FIXME different types
+            
+            // FIXME possible stack overflow due to recursive call
+            int result = this->execute(newProcess, ticks);
             return reinterpret_cast<TObject*>(newInteger(result));
         } break;
         
         case 7:
         {
+            TObject* size  = stack[--stackTop];
+            TClass*  klass = (TClass*) stack[--stackTop];
+            uint32_t instanceSize = getIntegerValue(reinterpret_cast<TInteger>(size));
             
+            // TODO rewrite using proper newObject()
+            void* objectSlot = malloc(instanceSize); // TODO llvm_gc_allocate
+            if (!objectSlot)
+                return globals.nilObject;
+            
+            TObject* instance = new (objectSlot) TObject(instanceSize, klass);
+            for (int i = 0; i < instanceSize; i++)
+                instance->putField(i, globals.nilObject);
+            
+            return newObject(klass);
         } break;
         
         case 8:

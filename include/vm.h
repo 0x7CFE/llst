@@ -37,6 +37,7 @@ public:
     
     bool loadImage(const char* fileName);
     TObject* getGlobal(const char* name);
+    TObject* getGlobal(TSymbol* name);
     
     // GLobal VM objects
 };
@@ -152,6 +153,10 @@ private:
     int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
     
+    template<class T> T* newObject(size_t objectSize = 0);
+    TObject* newObject(TSymbol* className, size_t objectSize);
+    TObject* newObject(TClass* klass);
+    
     void doSendMessage(
         TSymbol* selector, 
         TObjectArray& arguments, 
@@ -172,7 +177,6 @@ private:
         TProcess*& process,
         TObject*& returnedValue);
     
-    template<class T> T* newObject(size_t objectSize = 0);
 public:
     
 
