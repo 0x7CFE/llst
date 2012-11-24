@@ -206,7 +206,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     if (!objectSlot)
         return (T*) globals.nilObject;
     
-    T* instance = (T*) new (objectSlot) T(objectSize, klass);
+    T* instance = (T*) new (objectSlot) TObject(objectSize, klass);
     if (! T::InstancesAreBinary())     
     {
         for (int i = 0; i < objectSize; i++)
