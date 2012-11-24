@@ -148,7 +148,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case doPrimitive: {
                 uint8_t primitiveNumber = byteCodes[bytePointer++];
                 m_rootStack.push_back(context);
-                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop);
+                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, process);
+                if(returnedValue == returnError) //FIXME !!!111
+                    return returnedValue;
             } break;
                 
             case doSpecial: {
@@ -327,7 +329,7 @@ TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
         return globals.nilObject;
     
     TObject* instance = new (objectSlot) TObject(objectSize, klass);
-    for (int i = 0; i < objectSize; i++)
+    for (uint32_t i = 0; i < objectSize; i++)
         instance->putField(i, globals.nilObject);
     
     return instance;
@@ -343,14 +345,32 @@ TObject* SmalltalkVM::newObject(TClass* klass)
         return globals.nilObject;
     
     TObject* instance = new (objectSlot) TObject(slotSize, klass);
-    for (int i = 0; i < fieldsCount; i++)
+    for (uint32_t i = 0; i < fieldsCount; i++)
         instance->putField(i, globals.nilObject);
     
     return instance;
 }
 
+#define Get2SmallIntsFromStack                                          \
+    /* keeps uint32_t lhs and rhs in the current scope */               \
+            uint32_t lhs, rhs;                                          \
+            {                                                           \
+                TObject* arg1   = stack[--stackTop];                    \
+                if(! ((reinterpret_cast<uint32_t>(arg1) & 1))) {        \
+                    --stackTop;                                         \
+                    stack[stackTop++] = globals.nilObject;              \
+                    break;                                              \
+                }                                                       \
+                TObject* arg2   = stack[--stackTop];                    \
+                if(! ((reinterpret_cast<uint32_t>(arg2) & 1))) {        \
+                    stack[stackTop++] = globals.nilObject;              \
+                    break;                                              \
+                }                                                       \
+                rhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));\
+                lhs = getIntegerValue(reinterpret_cast<TInteger>(arg2));\
+            }
 
-TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop)
+TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TProcess& process)
 {
     switch(opcode)
     {
@@ -363,7 +383,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 return globals.trueObject;
             else
                 return globals.falseObject;
-        } break;
+        } break; // TODO remove usless breaks?
         
         case 2: // return class
         {
@@ -418,13 +438,190 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 return globals.nilObject;
             
             TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
-            for (int i = 0; i < fieldsCount; i++)
+            for (uint32_t i = 0; i < fieldsCount; i++)
                 instance->putField(i, globals.nilObject);
             
             return newObject(klass);
         } break;
         
         case 8:
+        {
+            //TODO
+        } break;
+        
+        case 9:
+        {
+            uint32_t input = getchar();
+            if(input == EOF)
+                return globals.nilObject;
+            else
+                return reinterpret_cast<TObject*>(newInteger(input));
+        } break;
+        
+        case 10: // small int +
+        {
+            Get2SmallIntsFromStack;
+            return reinterpret_cast<TObject*>(newInteger(lhs + rhs)); //FIXME possible overflow
+        } break;
+        
+        case 11: // small int /
+        {
+            Get2SmallIntsFromStack;
+            if (rhs == 0) {
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            return reinterpret_cast<TObject*>(newInteger(lhs / rhs));
+        } break;
+        
+        case 12: // small int %
+        {
+            Get2SmallIntsFromStack;
+            if (rhs == 0) {
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            return reinterpret_cast<TObject*>(newInteger(lhs % rhs));
+        } break;
+        
+        case 13: // small int <
+        {
+            Get2SmallIntsFromStack;
+            if (lhs < rhs)
+                return globals.trueObject;
+            else
+                return globals.falseObject;
+        } break;
+        
+        case 14: // small int ==
+        {
+            Get2SmallIntsFromStack;
+            if (lhs == rhs)
+                return globals.trueObject;
+            else
+                return globals.falseObject;
+        } break;
+        
+        case 15: // small int *
+        {
+            Get2SmallIntsFromStack;
+            return reinterpret_cast<TObject*>(newInteger(lhs * rhs)); //FIXME possible overflow
+        } break;
+        
+        case 16: // small int -
+        {
+            Get2SmallIntsFromStack;
+            return reinterpret_cast<TObject*>(newInteger(lhs - rhs)); //FIXME possible overflow
+        } break;
+        
+        case 18: // turn on debugging
+        {
+            //TODO
+        } break;
+        
+        case 19: // error
+        {
+            m_rootStack.pop_back();
+            TContext* context = process.context;
+            process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+            process->context = context;
+            return returnError;
+        } break;
+        
+        case 20:
+        {
+
+        } break;
+        
+        case 21:
+        {
+
+        } break;
+        
+        case 22:
+        {
+
+        } break;
+        
+        case 23:
+        {
+
+        } break;
+        
+        case 24:
+        {
+
+        } break;
+        
+        case 25: // Integer /
+        case 26: // Integer %
+        case 27: // Integer +
+        case 28: // Integer *
+        case 29: // Integer -
+        case 30: // Integer <
+        case 31: // Integer ==
+        {
+            //TODO
+        } break;
+        
+        case 32: // Integer new
+        {
+            TObject* top = stack[--stackTop];
+            TInteger integer = reinterpret_cast<TInteger>(top);
+            bool isSmallInt = integer & 1;
+            if(!isSmallInt)
+            {
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            uint32_t value = getIntegerValue(integer);
+            return reinterpret_cast<TObject*>(newInteger(value));
+        } break;
+        
+        case 33:
+        {
+            
+        } break;
+        
+        case 34:
+        {
+            flushCache();
+            //FIXME returnedValue is not to be globals.nilObject
+        } break;
+        
+        case 35:
+        {
+            
+        } break;
+        
+        case 36: // bit or
+        {
+            Get2SmallIntsFromStack;
+            return reinterpret_cast<TObject*>(newInteger(lhs | rhs));
+        } break;
+        
+        case 37: // bit and
+        {
+            Get2SmallIntsFromStack;
+            return reinterpret_cast<TObject*>(newInteger(lhs & rhs));
+        } break;
+        
+        case 38:
+        {
+            
+        } break;
+        
+        case 39:
+        {
+            
+        } break;
+        
+        case 40:
+        {
+            
+        } break;
+        
+        default:
         {
             
         } break;

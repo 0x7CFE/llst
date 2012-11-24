@@ -170,7 +170,8 @@ private:
     TObject* doExecutePrimitive(
         uint8_t opcode, 
         TObjectArray& stack, 
-        uint32_t& stackTop);
+        uint32_t& stackTop,
+        TProcess& process);
     
     TExecuteResult doDoSpecial(
         TInstruction instruction, 
