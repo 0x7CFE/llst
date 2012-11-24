@@ -5,6 +5,7 @@
 #include <vector>
 
 #include <types.h>
+#include "memory.h"
 
 inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
 inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
@@ -32,11 +33,16 @@ private:
     bool     openImageFile(const char* fileName);
     void     closeImageFile();
     
+    IMemoryAllocator* m_memoryAllocator;
 public:
-    Image() : imageFileFD(-1), imageFileSize(0), imagePointer(0) {}
+    Image(IMemoryAllocator* allocator) 
+        : imageFileFD(-1), imageFileSize(0), 
+          imagePointer(0), m_memoryAllocator(allocator) 
+    {}
     
     bool loadImage(const char* fileName);
     TObject* getGlobal(const char* name);
+    TObject* getGlobal(TSymbol* name);
     
     // GLobal VM objects
 };
@@ -61,6 +67,19 @@ extern TGlobals globals;
 
 class SmalltalkVM {
 public:
+    enum TExecuteResult {
+        returnError = 2,
+        returnBadMethod,
+        returnReturned,
+        returnTimeExpired,
+        returnBreak,
+        
+        returnNoReturn = 255
+    }; 
+    
+    TExecuteResult execute(TProcess* process, uint32_t ticks);
+    SmalltalkVM() : m_image(0) {}
+    
 private:
     enum {
         extended = 0,
@@ -112,16 +131,9 @@ private:
     
     TClass* getRootClass(TClassID id);
     
-    enum TExecuteResult {
-        returnError = 2,
-        returnBadMethod,
-        returnReturned,
-        returnTimeExpired,
-        returnBreak
-    }; 
-    
     std::list<TObject*> m_rootStack;
-    Image m_image;
+    //HeapMemoryManager staticMemoryManager(); TODO
+    Image m_image; //TODO
     
     struct TMethodCacheEntry
     {
@@ -147,15 +159,33 @@ private:
     // flush the method lookup cache
     void flushCache();
     
-    int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
-    void doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop);
-    void executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue);
     
+    void doSendMessage(
+        TSymbol* selector, 
+        TObjectArray& arguments, 
+        TContext* context, 
+        uint32_t& stackTop);
+    
+    TObject* doExecutePrimitive(
+        uint8_t opcode, 
+        TObjectArray& stack, 
+        uint32_t& stackTop);
+    
+    TExecuteResult doDoSpecial(
+        TInstruction instruction, 
+        TContext* context, 
+        uint32_t& stackTop,
+        TMethod*& method,
+        uint32_t& bytePointer,
+        TProcess*& process,
+        TObject*& returnedValue);
+    
+public:    
     template<class T> T* newObject(size_t objectSize = 0);
-public:
+    TObject* newObject(TSymbol* className, size_t objectSize);
+    TObject* newObject(TClass* klass);
     
-
 };
 
 #endif
