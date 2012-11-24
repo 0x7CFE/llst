@@ -186,18 +186,22 @@ void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TCon
 template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 {
     // TODO fast access to common classes
-    TClass* klass = (TClass*) m_image.getGlobal(T::className());
+    TClass* klass = (TClass*) m_image.getGlobal(T::InstanceClassName());
     if (!klass)
         return (T*) globals.nilObject;
     
-    // FIXME compute size correctly depending on object type
-    size_t baseSize = sizeof(T);
-    void* objectSlot = malloc(baseSize + objectSize * sizeof(T*)); // TODO llvm_gc_allocate
+    // Slot size is computed depending on the object type
+    size_t slotSize = 0;
+    if (T::InstancesAreBinary())    
+        slotSize = sizeof(T) + objectSize;
+    else 
+        slotSize = sizeof(T) + objectSize * sizeof(T*);
+        
+    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
     if (!objectSlot)
         return (T*) globals.nilObject;
     
-    uint32_t trueSize = baseSize + objectSize;
-    T* instance = (T*) new (objectSlot) T(trueSize, klass);
+    T* instance = (T*) new (objectSlot) T(objectSize, klass);
     return instance;
 }
 

@@ -21,8 +21,14 @@ struct TInstruction {
 };
 
 struct TClass;
+
+// TObject is the base class for all objects in smalltalk.
+// Every object in the system starts with two fields. 
+// One holds data size and the other is the pointer to the object's class.
 struct TObject {
 private:
+    // Helper struct used to hold object size and special status flags
+    // packed in a 4 bytes space
     struct TSize {
     private:
         // Raw value holder
@@ -48,28 +54,40 @@ private:
         void setBinary(bool value) { data |= (value << 1); }
         void setRelocated(bool value) { data |= value; }
     };
-    
+
+    // First field of any object is the specially aligned size struct.
+    // Two lowest bits determine object binary status (see TByteObject)
+    // and relocated status which is used during garbage collection procedure.
+    // Depending on the binary status size holds either number of fields
+    // or size of objects "tail" which in this case holds raw bytes.
     TSize    size;
+    
+    // Second field is the pointer to the class which instantinated the object.
+    // Every object has a class. Even nil has one. Moreover every class itself
+    // is an object too. And yes, it has a class too.
     TClass*  klass;
     
-    
-    // This class should not be instantinated explicitly
-    // Descendants should provide own public className method
-    static const char* className() { return ""; }
 protected:
+    // Actual space allocated for object is larger than sizeof(TObject).
+    // Remaining space is used to hold user data. For ordinary objects
+    // it contains pointers to other objects. For raw binary objects 
+    // it is accessed directly as a raw byte array.
+    // Actual size is stored in the TSize field and accessed using getSize()
     TObject* fields[0];
     
+private:    
+    // This class should not be instantinated explicitly
+    // Descendants should provide own public InstanceClassName method
+    // static const char* InstanceClassName() { return ""; }
 public:    
     // this should only be called from Image::readObject
     void setClass(TClass* aClass) { klass = aClass; } 
     
     // By default objects subject to non binary specification
-    static bool isBinary() { return false; } 
-    
     explicit TObject(uint32_t fieldsCount, TClass* klass, bool isObjectBinary = false) 
-        : size(fieldsCount, isBinary), klass(klass) 
+        : size(fieldsCount, isObjectBinary), klass(klass) 
     {
-        // Zeroing all fields space
+        // Zeroing the fields space
         // Binary objects should manage this on their own
         if (!isObjectBinary)
             memset(fields, 0, fieldsCount * sizeof(TObject*));
@@ -79,7 +97,7 @@ public:
     TClass*  getClass() const { return klass; } 
     
     // delegated methods from TSize
-//     bool isBinary() const { return size.isBinary(); }
+    bool isBinary() const { return size.isBinary(); }
     bool isRelocated() const { return size.isRelocated(); }
     void setRelocated(bool value) { size.setRelocated(value); }
     
@@ -87,6 +105,9 @@ public:
     TObject* getField(uint32_t index) { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
+    
+    // Helper function for template instantination
+    static bool InstancesAreBinary() { return false; } 
 };
 
 
@@ -96,12 +117,10 @@ public:
 struct TByteObject : public TObject {
 private:
     // This class should not be instantinated directly
-    // Descendants should provide own public className method
-    static const char* className() { return ""; } 
+    // Descendants should provide own public InstanceClassName method
+    // static const char* InstanceClassName() { return ""; } 
 public:
     // Byte objects are said to be binary
-    static bool isBinary() { return true; } 
-    
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
     {
         // Zeroing data
@@ -113,14 +132,17 @@ public:
     uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
     
     void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(fields)[index] = value; }
+    
+    // Helper function for template instantination
+    static bool InstancesAreBinary() { return true; } 
 };
 
 struct TByteArray : public TByteObject { 
-    static const char* className() { return "ByteArray"; }
+    static const char* InstanceClassName() { return "ByteArray"; }
 };
 
 struct TSymbol : public TByteObject { 
-    static const char* className() { return "Symbol"; }
+    static const char* InstanceClassName() { return "Symbol"; }
     bool equalsTo(const char* value) { 
         if (!value)
             return false;
@@ -132,13 +154,13 @@ struct TSymbol : public TByteObject {
 };
 
 struct TString : public TByteObject { 
-    static const char* className() { return "String"; }
+    static const char* InstanceClassName() { return "String"; }
 };
 
 template <typename Element>
 struct TArray : public TObject { 
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
-    static const char* className() { return "Array"; }
+    static const char* InstanceClassName() { return "Array"; }
     Element& operator [] (uint32_t index) { return reinterpret_cast<Element*>(fields)[index]; }
 };
 
@@ -156,7 +178,7 @@ struct TContext : public TObject {
     TInteger      stackTop;
     TContext*     previousContext;
     
-    static const char* className() { return "Context"; }
+    static const char* InstanceClassName() { return "Context"; }
 };
 
 struct TBlock : public TContext {
@@ -164,7 +186,7 @@ struct TBlock : public TContext {
     TContext*     creatingContext;
     TInteger      oldBytePointer;
 
-    static const char* className() { return "Block"; }
+    static const char* InstanceClassName() { return "Block"; }
 };
 
 struct TMethod : public TObject {
@@ -177,13 +199,13 @@ struct TMethod : public TObject {
     TString*      text;
     TObject*      package;
     
-    static const char* className() { return "Method"; }
+    static const char* InstanceClassName() { return "Method"; }
 };
 
 struct TDictionary : public TObject {
     TSymbolArray* keys;
     TObjectArray* values;
-    static const char*  className() { return "Dictionary"; }
+    static const char*  InstanceClassName() { return "Dictionary"; }
     
     // Find a value associated with a key
     // Returns NULL if nothing was found
@@ -203,7 +225,7 @@ struct TClass : public TObject {
     TSymbolArray* variables;
     TObject*      package;
     
-    static const char*  className() { return "Class"; }
+    static const char*  InstanceClassName() { return "Class"; }
 };
 
 struct TNode : public TObject {
@@ -211,7 +233,7 @@ struct TNode : public TObject {
     TNode*        left;
     TNode*        right;
     
-    static const char* className() { return "Node"; }
+    static const char* InstanceClassName() { return "Node"; }
 };
     
 struct TProcess : public TObject {
@@ -219,7 +241,7 @@ struct TProcess : public TObject {
     TObject*      state;
     TObject*      result;
     
-    static const char* className() { return "Process"; }
+    static const char* InstanceClassName() { return "Process"; }
 };
 
 #endif
