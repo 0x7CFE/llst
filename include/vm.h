@@ -158,11 +158,10 @@ private:
         TContext* context, 
         uint32_t& stackTop);
     
-    void doExecutePrimitive(
+    TObject* doExecutePrimitive(
         uint8_t opcode, 
         TObjectArray& stack, 
-        uint32_t& stackTop, 
-        TObject& returnedValue);
+        uint32_t& stackTop);
     
     TExecuteResult doDoSpecial(
         TInstruction instruction, 

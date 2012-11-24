@@ -132,9 +132,11 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 stack[stackTop++] = args;
             } break;
                 
-            case sendMessage: 
-//                 doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
-                break;
+            case sendMessage: {
+                TSymbol* messageSelector = literals[instruction.low];
+                TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
+                doSendMessage(messageSelector, *messageArguments, context, stackTop); 
+            } break;
             
             case sendUnary:
                 break;
@@ -142,8 +144,11 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
             case sendBinary:
                 break;
                 
-            case doPrimitive:
-                break;
+            case doPrimitive: {
+                uint8_t primitiveNumber = byteCodes[bytePointer++];
+                m_rootStack.push_back(context);
+                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop);
+            } break;
                 
             case doSpecial: {
                 TExecuteResult result = doDoSpecial(
@@ -325,7 +330,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 }
 
 
-void SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue)
+TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop)
 {
     switch(opcode)
     {
@@ -335,24 +340,23 @@ void SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32
             TObject* previous   = stack[--stackTop];
             
             if(top == previous)
-                returnedValue = *globals.trueObject;
+                return globals.trueObject;
             else
-                returnedValue = *globals.falseObject;
-            
+                return globals.falseObject;
         } break;
         
         case 2: // return class
         {
             TObject* top = stack[--stackTop];
-            returnedValue = *top->getClass();
+            return top->getClass();
         } break;
         
         case 3:
         {
-            TInteger top = *(TInteger*) stack[--stackTop];
+            TInteger top = reinterpret_cast<TInteger>(stack[--stackTop]);
             u_int32_t tempInt = getIntegerValue(top);
             //putchar(tempInt); //TODO putchar
-            returnedValue = *globals.nilObject;
+            return globals.nilObject;
         } break;
         
         case 4: // return size of object
@@ -363,7 +367,7 @@ void SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32
                     ? 0
                     : top->getSize();
 
-            returnedValue = *(TObject*) newInteger(returnedSize);
+            return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
         case 5:
@@ -373,11 +377,11 @@ void SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32
         
         case 6: // start new process
         {
-            TInteger top = *(TInteger*) stack[--stackTop];
+            TInteger top = reinterpret_cast<TInteger>(stack[--stackTop]);
             uint32_t ticks = getIntegerValue(top);
             TProcess* newProcess = (TProcess*) stack[--stackTop];
             int result = this->execute(newProcess, ticks); //FIXME different types
-            returnedValue = *(TObject*) newInteger(result);
+            return reinterpret_cast<TObject*>(newInteger(result));
         } break;
         
         case 7:
@@ -390,4 +394,6 @@ void SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32
             
         } break;
     }
+    
+    return globals.nilObject;
 }
