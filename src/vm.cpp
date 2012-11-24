@@ -58,6 +58,8 @@ TInstruction decodeInstruction(TByteObject* byteCodes, uint32_t bytePointer)
 //    result.low = (result.high = byteCodes[bytePointer++])
 }
 
+#define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
+
 int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 {
     m_rootStack.push_back(process);
@@ -94,29 +96,27 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
         TInstruction instruction;
         instruction.low = (instruction.high = byteCodes[bytePointer++]) & 0x0F;
         instruction.high >>= 4;
-        if (instruction.high == 0) { // TODO extended constant
+        if (instruction.high == extended) {
             instruction.high = instruction.low;
             instruction.low = byteCodes[bytePointer++];
         }
         
-        switch (instruction.high) {
+        switch (instruction.high) { // 6 pushes, 2 assignes, 1 mark, 3 sendings, 2 do's
             case pushInstance:    stack[stackTop++] = instanceVariables[instruction.low]; break;
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
             case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
-            case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
-            
-            case assignInstance:
-                instanceVariables[instruction.low] = stack[stackTop - 1];
-                // TODO isDynamicMemory()
-                break;
-                
             case pushConstant: 
                 doPushConstant(instruction.low, stack, stackTop); 
                 break;
-                
             case pushBlock:
                 
+                break;
+                
+            case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
+            case assignInstance:
+                instanceVariables[instruction.low] = stack[stackTop - 1];
+                // TODO isDynamicMemory()
                 break;
                 
             case markArguments: {
@@ -136,6 +136,93 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 //                 doSendMessage(method->literals[instruction.low], stack[--stackTop], context, stackTop); 
                 break;
             
+            case sendUnary:
+                break;
+            
+            case sendBinary:
+                break;
+                
+            case doPrimitive:
+                break;
+                
+            case doSpecial:
+                switch(instruction.low) {
+                    case SelfReturn:
+                        returnedValue = arguments[0];
+                        goto doReturn;
+
+                    case StackReturn:
+                    {
+                        returnedValue = stack[--stackTop];
+                        
+                        doReturn:
+                            context = context->previousContext;
+                            goto doReturn2;
+                        
+                        doReturn2:
+                            if(context == 0 || context == globals.nilObject) {
+                                process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+                                process->context = context;
+                                process->result = returnedValue;
+                                return returnReturned;
+                            }
+                            stack       = *context->stack;
+                            stackTop    = getIntegerValue(context->stackTop);
+                            stack[stackTop++] = returnedValue;
+                            method      = context->method;
+                            byteCodes   = *method->byteCodes;
+                            bytePointer = getIntegerValue(context->bytePointer);
+                    } break;
+                    
+                    case BlockReturn: //TODO
+                        break;
+                        
+                    case Duplicate: {
+                        TObject* duplicate = stack[stackTop - 1];
+                        stack[stackTop++] = duplicate;
+                    } break;
+                    
+                    case PopTop: stackTop--; break;
+                    case Branch: bytePointer = IP_VALUE; break;
+
+                    case BranchIfTrue: {
+                        returnedValue = stack[--stackTop];
+                        
+                        if(returnedValue == globals.trueObject)
+                            bytePointer = IP_VALUE;
+                        else
+                            bytePointer += 2;
+                    } break;
+                    
+                    case BranchIfFalse: {
+                        returnedValue = stack[--stackTop];
+                        
+                        if(returnedValue == globals.falseObject)
+                            bytePointer = IP_VALUE;
+                        else
+                            bytePointer += 2;
+                    } break;
+                    
+                    case SendToSuper: {
+                        instruction.low = byteCodes[bytePointer++];
+                        TSymbol* l_messageSelector = literals[instruction.low];
+                        TClass* l_receiverClass    = instanceVariables.getClass();
+                        TMethod* l_method          = lookupMethod(l_messageSelector, l_receiverClass);
+                        //TODO call
+                    } break;
+                    case Breakpoint: {
+                        bytePointer -= 1;
+
+                        process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+                        process->context = context;
+                        process->result = returnedValue;
+                        context->bytePointer = getIntegerValue(bytePointer);
+                        context->stackTop = getIntegerValue(stackTop);
+                        return returnBreak;
+                    } break;
+                        
+                }
+                break;
         }
     }
 }
@@ -206,3 +293,69 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 }
 
 
+void SmalltalkVM::executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue)
+{
+    switch(opcode)
+    {
+        case 1: // operator ==
+        {
+            TObject* top        = stack[--stackTop];
+            TObject* previous   = stack[--stackTop];
+            
+            if(top == previous)
+                returnedValue = *globals.trueObject;
+            else
+                returnedValue = *globals.falseObject;
+            
+        } break;
+        
+        case 2: // return class
+        {
+            TObject* top = stack[--stackTop];
+            returnedValue = *top->getClass();
+        } break;
+        
+        case 3:
+        {
+            TInteger top = *(TInteger*) stack[--stackTop];
+            u_int32_t tempInt = getIntegerValue(top);
+            //putchar(tempInt); //TODO putchar
+            returnedValue = *globals.nilObject;
+        } break;
+        
+        case 4: // return size of object
+        {
+            TObject* top = stack[--stackTop];
+            uint32_t returnedSize = 
+                (top->getClass() == globals.smallIntClass)
+                    ? 0
+                    : top->getSize();
+
+            returnedValue = *(TObject*) newInteger(returnedSize);
+        } break;
+        
+        case 5:
+        {
+            //TODO
+        } break;
+        
+        case 6: // start new process
+        {
+            TInteger top = *(TInteger*) stack[--stackTop];
+            uint32_t ticks = getIntegerValue(top);
+            TProcess* newProcess = (TProcess*) stack[--stackTop];
+            int result = this->execute(newProcess, ticks); //FIXME different types
+            returnedValue = *(TObject*) newInteger(result);
+        } break;
+        
+        case 7:
+        {
+            
+        } break;
+        
+        case 8:
+        {
+            
+        } break;
+    }
+}

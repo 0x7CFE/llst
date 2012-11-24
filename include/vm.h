@@ -80,6 +80,19 @@ private:
         doSpecial       
     };
     
+    enum Special {
+        SelfReturn = 1,
+        StackReturn,
+        BlockReturn,
+        Duplicate,
+        PopTop,
+        Branch,
+        BranchIfTrue,
+        BranchIfFalse,
+        SendToSuper = 11,
+        Breakpoint = 12
+    };
+    
     enum {
         nilConst = 10,
         trueConst,
@@ -137,6 +150,7 @@ private:
     int execute(TProcess* process, uint32_t ticks);
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
     void doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop);
+    void executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue);
     
     template<class T> T* newObject(size_t objectSize = 0);
 public:
