@@ -308,34 +308,6 @@ void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TCon
     
 }
 
-template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
-{
-    // TODO fast access to common classes
-    TClass* klass = (TClass*) m_image.getGlobal(T::InstanceClassName());
-    if (!klass)
-        return (T*) globals.nilObject;
-    
-    // Slot size is computed depending on the object type
-    size_t slotSize = 0;
-    if (T::InstancesAreBinary())    
-        slotSize = sizeof(T) + objectSize;
-    else 
-        slotSize = sizeof(T) + objectSize * sizeof(T*);
-        
-    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
-    if (!objectSlot)
-        return (T*) globals.nilObject;
-    
-    T* instance = (T*) new (objectSlot) T(objectSize, klass);
-    if (! T::InstancesAreBinary())     
-    {
-        for (int i = 0; i < objectSize; i++)
-            instance->putField(i, globals.nilObject);
-    }
-    
-    return instance;
-}
-
 TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
 {
     // TODO fast access to common classes
