@@ -152,6 +152,18 @@ private:
     void doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop);
     void executePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TObject& returnedValue);
     
+    void doSpecial(
+        TInstruction instruction, 
+        TContext* context, 
+        TObjectArray& arguments,
+        TObjectArray& stack,
+        uint32_t& stackTop,
+        TMethod*& method,
+        TByteObject& byteCodes,
+        uint32_t& bytePointer,
+        TProcess*& process,
+        TObject*& returnedValue);
+    
     template<class T> T* newObject(size_t objectSize = 0);
 public:
     

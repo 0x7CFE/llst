@@ -146,87 +146,103 @@ int SmalltalkVM::execute(TProcess* process, uint32_t ticks)
                 break;
                 
             case doSpecial:
-                switch(instruction.low) {
-                    case SelfReturn:
-                        returnedValue = arguments[0];
-                        goto doReturn;
-
-                    case StackReturn:
-                    {
-                        returnedValue = stack[--stackTop];
-                        
-                        doReturn:
-                            context = context->previousContext;
-                            goto doReturn2;
-                        
-                        doReturn2:
-                            if(context == 0 || context == globals.nilObject) {
-                                process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-                                process->context = context;
-                                process->result = returnedValue;
-                                return returnReturned;
-                            }
-                            stack       = *context->stack;
-                            stackTop    = getIntegerValue(context->stackTop);
-                            stack[stackTop++] = returnedValue;
-                            method      = context->method;
-                            byteCodes   = *method->byteCodes;
-                            bytePointer = getIntegerValue(context->bytePointer);
-                    } break;
-                    
-                    case BlockReturn: //TODO
-                        break;
-                        
-                    case Duplicate: {
-                        TObject* duplicate = stack[stackTop - 1];
-                        stack[stackTop++] = duplicate;
-                    } break;
-                    
-                    case PopTop: stackTop--; break;
-                    case Branch: bytePointer = IP_VALUE; break;
-
-                    case BranchIfTrue: {
-                        returnedValue = stack[--stackTop];
-                        
-                        if(returnedValue == globals.trueObject)
-                            bytePointer = IP_VALUE;
-                        else
-                            bytePointer += 2;
-                    } break;
-                    
-                    case BranchIfFalse: {
-                        returnedValue = stack[--stackTop];
-                        
-                        if(returnedValue == globals.falseObject)
-                            bytePointer = IP_VALUE;
-                        else
-                            bytePointer += 2;
-                    } break;
-                    
-                    case SendToSuper: {
-                        instruction.low = byteCodes[bytePointer++];
-                        TSymbol* l_messageSelector = literals[instruction.low];
-                        TClass* l_receiverClass    = instanceVariables.getClass();
-                        TMethod* l_method          = lookupMethod(l_messageSelector, l_receiverClass);
-                        //TODO call
-                    } break;
-                    case Breakpoint: {
-                        bytePointer -= 1;
-
-                        process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-                        process->context = context;
-                        process->result = returnedValue;
-                        context->bytePointer = getIntegerValue(bytePointer);
-                        context->stackTop = getIntegerValue(stackTop);
-                        return returnBreak;
-                    } break;
-                        
-                }
                 break;
         }
     }
 }
 
+
+void SmalltalkVM::doSpecial(
+    TInstruction instruction, 
+    TContext* context, 
+    TObjectArray& arguments,
+    TObjectArray& stack,
+    uint32_t& stackTop,
+    TMethod*& method,
+    TByteObject& byteCodes,
+    uint32_t& bytePointer,
+    TProcess*& process,
+    TObject*& returnedValue)
+{
+    
+    switch(instruction.low) {
+        case SelfReturn:
+            returnedValue = arguments[0];
+            goto doReturn;
+            
+        case StackReturn:
+        {
+            returnedValue = stack[--stackTop];
+            
+            doReturn:
+            context = context->previousContext;
+            goto doReturn2;
+            
+            doReturn2:
+            if(context == 0 || context == globals.nilObject) {
+                process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+                process->context = context;
+                process->result = returnedValue;
+                return returnReturned;
+            }
+            stack       = *context->stack;
+            stackTop    = getIntegerValue(context->stackTop);
+            stack[stackTop++] = returnedValue;
+            method      = context->method;
+            byteCodes   = *method->byteCodes;
+            bytePointer = getIntegerValue(context->bytePointer);
+        } break;
+        
+        case BlockReturn: //TODO
+                        break;
+                        
+        case Duplicate: {
+            TObject* duplicate = stack[stackTop - 1];
+            stack[stackTop++] = duplicate;
+        } break;
+        
+        case PopTop: stackTop--; break;
+        case Branch: bytePointer = IP_VALUE; break;
+        
+        case BranchIfTrue: {
+            returnedValue = stack[--stackTop];
+            
+            if(returnedValue == globals.trueObject)
+                bytePointer = IP_VALUE;
+            else
+                bytePointer += 2;
+        } break;
+        
+        case BranchIfFalse: {
+            returnedValue = stack[--stackTop];
+            
+            if(returnedValue == globals.falseObject)
+                bytePointer = IP_VALUE;
+            else
+                bytePointer += 2;
+        } break;
+        
+        case SendToSuper: {
+            instruction.low = byteCodes[bytePointer++];
+            TSymbol* l_messageSelector = literals[instruction.low];
+            TClass* l_receiverClass    = instanceVariables.getClass();
+            TMethod* l_method          = lookupMethod(l_messageSelector, l_receiverClass);
+            //TODO call
+        } break;
+        
+        case Breakpoint: {
+            bytePointer -= 1;
+            
+            process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+            process->context = context;
+            process->result = returnedValue;
+            context->bytePointer = getIntegerValue(bytePointer);
+            context->stackTop = getIntegerValue(stackTop);
+            return returnBreak;
+        } break;
+        
+    }
+}
 
 void SmalltalkVM::doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop)
 {
