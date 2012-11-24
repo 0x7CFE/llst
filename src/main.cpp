@@ -2,8 +2,6 @@
 #include <vm.h>
 
 int main(int argc, char **argv) {
-    cout << "sizeof(TObject*) = " << sizeof(TObject*) << endl;
-    
     Image testImage;
     testImage.loadImage("../image/testImage");
 

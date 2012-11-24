@@ -25,8 +25,6 @@ TObject* Image::getGlobal(const char* name)
 
 bool Image::openImageFile(const char* fileName)
 {
-    fprintf(stderr, "Opening file for reading: %s\n", fileName);
-    
     // Opening file for reading 
     imageFileFD = open(fileName, O_RDONLY);
     if (imageFileFD < 0)
@@ -65,8 +63,6 @@ bool Image::openImageFile(const char* fileName)
     
     // Initializing pointers
     imagePointer = (uint8_t*) imageMap;
-    
-    fprintf(stderr, "Image file was mmaped successfully!\n");
     return true;
 }
 
@@ -113,17 +109,14 @@ TObject* Image::readObject()
         
         case ordinaryObject: {
             uint32_t fieldsCount = readWord();
-            fprintf(stderr, "(will be %d) Reading ordinaryObject with %d fields \n", indirects.size(), fieldsCount);
             
             // TODO allocate statically
             void* slot = malloc(sizeof(TObject) + fieldsCount * sizeof(TObject*));
             TObject* newObject = new(slot) TObject(fieldsCount, 0);
             indirects.push_back(newObject);
-            fprintf(stderr, "Allocated object %p indirect index %d\n", (uint32_t) newObject, indirects.size()-1);
             
             TClass* objectClass  = (TClass*) readObject(); 
             newObject->setClass(objectClass);
-            fprintf(stderr, "Object class is %p \n", (uint32_t) objectClass);
             
             for (int i = 0; i < fieldsCount; i++)
                 newObject->putField(i, readObject());
@@ -133,7 +126,6 @@ TObject* Image::readObject()
         
         case inlineInteger: {
             uint32_t value = * reinterpret_cast<uint32_t*>(imagePointer);
-            fprintf(stderr, "Reading inline integer value %d\n", value);
             imagePointer += sizeof(uint32_t);
             TInteger newObject = newInteger(ntohs(value));
             return reinterpret_cast<TObject*>(newObject);
@@ -141,22 +133,18 @@ TObject* Image::readObject()
         
         case byteObject: {
             uint32_t dataSize = readWord();
-            fprintf(stderr, "Reading byte object of size %d\n", dataSize);
             
             // TODO allocate statically
             void* slot = malloc(sizeof(TByteObject) + dataSize);
             TByteObject* newByteObject = new(slot) TByteObject(dataSize, 0); 
             indirects.push_back(newByteObject);
-            fprintf(stderr, "Allocated byte object %p indirect index %d\n", (uint32_t) newByteObject, indirects.size()-1);
             
             for (int i = 0; i < dataSize; i++)
                 (*newByteObject)[i] = (uint8_t) readWord();
             std::string bytes((const char*)newByteObject->getBytes(), newByteObject->getSize());
-            fprintf(stderr, "Byte object content: '%s'\n", bytes.c_str());
             
             TClass* objectClass = (TClass*) readObject();
             newByteObject->setClass(objectClass);
-            fprintf(stderr, "object %p has class %p\n", (uint32_t) newByteObject, (uint32_t) objectClass);
             
             return newByteObject;
         }
@@ -164,12 +152,10 @@ TObject* Image::readObject()
         case previousObject: {
             uint32_t index = readWord();
             TObject* newObject = indirects[index];
-            fprintf(stderr, "Reading link to previousObject index %d address %p\n", index, (uint32_t) newObject);
             return newObject;
         }
         
         case nilObject:
-            fprintf(stderr, "Reading nilObject address %p\n", (uint32_t) indirects[0]);
             return indirects[0]; // nilObject is always the first in the image
         
         default:
@@ -180,15 +166,11 @@ TObject* Image::readObject()
 
 bool Image::loadImage(const char* fileName)
 {
-    fprintf(stderr, "Trying to open image file: %s\n", fileName);
-    
     if (!openImageFile(fileName))
     {
         fprintf(stderr, "could not open image file %s\n", fileName);
         return false;
     }
-    
-    fprintf(stderr, "Reserving memory for indirects\n");
     
     indirects.reserve(4096);
     
@@ -210,7 +192,7 @@ bool Image::loadImage(const char* fileName)
     
     globals.badMethodSymbol = readObject();
     
-    fprintf(stderr, "Image read complete. Loaded %d objects\n", indirects.size());
+    fprintf(stdout, "Image read complete. Loaded %d objects\n", indirects.size());
     indirects.clear();
     
     closeImageFile();
