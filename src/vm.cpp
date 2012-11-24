@@ -363,14 +363,15 @@ TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
 
 TObject* SmalltalkVM::newObject(TClass* klass)
 {
-    uint32_t instanceSize = getIntegerValue(klass->instanceSize);
+    uint32_t fieldsCount = getIntegerValue(klass->instanceSize);
+    uint32_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
     
-    void* objectSlot = malloc(instanceSize); // TODO llvm_gc_allocate
+    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
     if (!objectSlot)
         return globals.nilObject;
     
-    TObject* instance = new (objectSlot) TObject(instanceSize, klass);
-    for (int i = 0; i < instanceSize; i++)
+    TObject* instance = new (objectSlot) TObject(slotSize, klass);
+    for (int i = 0; i < fieldsCount; i++)
         instance->putField(i, globals.nilObject);
     
     return instance;
@@ -436,15 +437,16 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         {
             TObject* size  = stack[--stackTop];
             TClass*  klass = (TClass*) stack[--stackTop];
-            uint32_t instanceSize = getIntegerValue(reinterpret_cast<TInteger>(size));
+            uint32_t fieldsCount = getIntegerValue(reinterpret_cast<TInteger>(size));
             
             // TODO rewrite using proper newObject()
-            void* objectSlot = malloc(instanceSize); // TODO llvm_gc_allocate
+            uint32_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
+            void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
             if (!objectSlot)
                 return globals.nilObject;
             
-            TObject* instance = new (objectSlot) TObject(instanceSize, klass);
-            for (int i = 0; i < instanceSize; i++)
+            TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
+            for (int i = 0; i < fieldsCount; i++)
                 instance->putField(i, globals.nilObject);
             
             return newObject(klass);
