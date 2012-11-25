@@ -611,9 +611,23 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             
         } break;
         
-        case 39:
+        case 39: // bit shift
         {
-            
+            Get2SmallIntsFromStack; // hi = lhs
+            uint32_t result = 0;
+            int32_t signed_rhs = (int32_t) rhs;
+            if (signed_rhs < 0) {
+                //shift right 
+                result = lhs >> -signed_rhs;
+            } else {
+                // shift left ; catch overflow 
+                result = lhs << rhs;
+                if (lhs > result) {
+                    stack[stackTop++] = globals.nilObject;
+                    break;
+                }
+            }
+            return reinterpret_cast<TObject*>(newInteger( result ));
         } break;
         
         case 40:
