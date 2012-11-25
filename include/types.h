@@ -6,6 +6,12 @@
 #include <new>
 #include <string.h>
 
+struct TClass;
+struct TObject;
+
+//template<struct T> 
+inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
+
 // This is a special interpretation of Smalltalk's SmallInteger
 // VM handles the special case when object pointer has lowest bit set to 1
 // In that case pointer is treated as explicit 31 bit integer equal to (value >> 1)
@@ -13,48 +19,51 @@
 // Explicit type cast should be strictly avoided for the sake of design stability
 typedef uint32_t TInteger;
 
-using namespace std;
+inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
+inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
+inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
+
 
 struct TInstruction {
     uint8_t low;
     uint8_t high;
 };
 
-struct TClass;
+// Helper struct used to hold object size and special status flags
+// packed in a 4 bytes space
+struct TSize {
+private:
+    // Raw value holder
+    // Do not edit this directly
+    uint32_t  data;
+    
+    static const int FLAG_RELOCATED = 1;
+    static const int FLAG_BINARY    = 2;
+    static const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
+public:
+    TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
+    { 
+        data = (size << 2); //) & ~FLAGS_MASK; // masking lowest two bits
+        data |= (isBinary << 1); 
+        data |= isRelocated; 
+    }
+    
+    TSize(const TSize& size) : data(size.data) { }
+    
+    uint32_t getSize() const { return data >> 2; }
+    uint32_t setSize(uint32_t size) { return data = (data & 3) | (size << 2); }
+    bool isBinary() const { return data & FLAG_BINARY; }
+    bool isRelocated() const { return data & FLAG_RELOCATED; }
+    void setBinary(bool value) { data |= (value << 1); }
+    void setRelocated(bool value) { data |= value; }
+};
+
 
 // TObject is the base class for all objects in smalltalk.
 // Every object in the system starts with two fields. 
 // One holds data size and the other is the pointer to the object's class.
 struct TObject {
 private:
-    // Helper struct used to hold object size and special status flags
-    // packed in a 4 bytes space
-    struct TSize {
-    private:
-        // Raw value holder
-        // Do not edit this directly
-        uint32_t  data;
-        
-        static const int FLAG_RELOCATED = 1;
-        static const int FLAG_BINARY    = 2;
-        static const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
-    public:
-        TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
-        { 
-            data = (size << 2); //) & ~FLAGS_MASK; // masking lowest two bits
-            data |= (isBinary << 1); 
-            data |= isRelocated; 
-        }
-        
-        TSize(const TSize& size) : data(size.data) { }
-        
-        uint32_t getSize() const { return data >> 2; }
-        bool isBinary() const { return data & FLAG_BINARY; }
-        bool isRelocated() const { return data & FLAG_RELOCATED; }
-        void setBinary(bool value) { data |= (value << 1); }
-        void setRelocated(bool value) { data |= value; }
-    };
-
     // First field of any object is the specially aligned size struct.
     // Two lowest bits determine object binary status (see TByteObject)
     // and relocated status which is used during garbage collection procedure.

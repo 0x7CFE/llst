@@ -5,10 +5,8 @@
 #include <vector>
 
 #include <types.h>
-#include "memory.h"
+#include <memory.h>
 #include <stdlib.h>
-inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
-inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
 
 class Image {
 private:
