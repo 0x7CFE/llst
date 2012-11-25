@@ -139,8 +139,17 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 doSendMessage(messageSelector, *messageArguments, context, stackTop); 
             } break;
             
-            case sendUnary:
-                break;
+            case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
+                TObject* top      = stack[--stackTop];
+                TObject* cmpTrue  = instruction.low == 0 ? globals.trueObject  : globals.falseObject;
+                TObject* cmpFalse = instruction.low == 0 ? globals.falseObject : globals.trueObject;
+                if (top == globals.nilObject)
+                    returnedValue = cmpTrue;
+                else
+                    returnedValue = cmpFalse;
+                
+                stack[stackTop++] = returnedValue;
+            } break;
             
             case sendBinary:
                 break;
