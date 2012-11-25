@@ -180,7 +180,9 @@ private:
         TProcess*& process,
         TObject*& returnedValue);
     
-public:    
+    //template<class T> TClass* getClass(TObject* object);
+public:
+    
     template<class T> T* newObject(size_t objectSize = 0);
     TObject* newObject(TSymbol* className, size_t objectSize);
     TObject* newObject(TClass* klass);
@@ -214,5 +216,9 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     
     return instance;
 }
+
+// Specialization of newObject for array
+template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize /*= 0*/);
+
 
 #endif

@@ -52,17 +52,22 @@ struct TMovableObject {
 // 
 class BakerMemoryManager : public IMemoryAllocator {
 private:
-    size_t    heapSize;
+    uint32_t  m_gcCount;
+    size_t    m_heapSize;
     
-    uint8_t*  inactiveHeapBase;
-    uint8_t*  inactiveHeapPointer;
-    uint8_t*  activeHeapBase;
-    uint8_t*  activeHeapPointer;
+    uint8_t*  m_heapOne;
+    uint8_t*  m_heapTwo;
+    bool      m_activeHeapOne;
+    
+    uint8_t*  m_inactiveHeapBase;
+    uint8_t*  m_inactiveHeapPointer;
+    uint8_t*  m_activeHeapBase;
+    uint8_t*  m_activeHeapPointer;
     
     TMovableObject* moveObject(TMovableObject* object);
     void collectGarbage();
 public:
-    BakerMemoryManager(size_t heapSize);
+    BakerMemoryManager(size_t heapSize) : m_gcCount(0), m_activeHeapOne(true) {}
     virtual ~BakerMemoryManager();
     
     virtual void*  allocateMemory(size_t requestedSize);

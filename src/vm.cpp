@@ -629,3 +629,21 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
     
     return globals.nilObject;
 }
+
+template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize /*= 0*/)
+{
+    TClass* klass = globals.arrayClass;
+    
+    // Slot size is computed depending on the object type
+    size_t slotSize = sizeof(TObjectArray) + objectSize * sizeof(TObjectArray*);
+    
+    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+    if (!objectSlot)
+        return (TObjectArray*) globals.nilObject;
+    
+    TObjectArray* instance = (TObjectArray*) new (objectSlot) TObject(objectSize, klass);
+    for (int i = 0; i < objectSize; i++)
+        instance->putField(i, globals.nilObject);
+    
+    return instance;
+}

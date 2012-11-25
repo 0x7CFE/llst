@@ -5,13 +5,13 @@ void* BakerMemoryManager::allocateMemory(size_t requestedSize)
 {
     size_t attempts = 3;
     while (attempts-- > 0) {
-        if (activeHeapPointer - requestedSize < activeHeapBase) {
+        if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
             continue;
         }
         
-        activeHeapPointer -= requestedSize;
-        void* result = activeHeapPointer;
+        m_activeHeapPointer -= requestedSize;
+        void* result = m_activeHeapPointer;
         return result;
     }
     
@@ -43,8 +43,8 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
             }
             
             // Checking if object is not in old space
-            if ( (oldPlace < (TMovableObject*) inactiveHeapBase) 
-              || (oldPlace > (TMovableObject*) inactiveHeapPointer))
+            if ( (oldPlace < (TMovableObject*) m_inactiveHeapBase) 
+              || (oldPlace > (TMovableObject*) m_inactiveHeapPointer))
             {
                 replacement = oldPlace;
                 oldPlace = previousObject;
@@ -78,8 +78,8 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
                 uint32_t slotSize = correctPadding(dataSize); //(dataSize + padding) & ~padding;
                 
                 // Allocating copy in new space
-                activeHeapPointer -= slotSize + 2 * sizeof(TMovableObject*);
-                newPlace = (TMovableObject*) activeHeapPointer;
+                m_activeHeapPointer -= slotSize + 2 * sizeof(TMovableObject*);
+                newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(dataSize);
                 newPlace->size.setBinary();
                 
@@ -105,8 +105,8 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
                 // with fields that are either SmallIntegers or pointers to other objects
                 
                 uint32_t fieldsCount = oldPlace->size.getSize();
-                activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
-                newPlace = (TMovableObject*) activeHeapPointer;
+                m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
+                newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(fieldsCount);
                 oldPlace->size.setRelocated();
                 
@@ -174,6 +174,36 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
 
 void BakerMemoryManager::collectGarbage()
 {
+    m_gcCount++;
     
+    // First of all swapping the spaces
+    if (m_activeHeapOne)
+    {
+        m_activeHeapBase = m_heapTwo;
+        m_inactiveHeapBase = m_heapOne;
+    } else {
+        m_activeHeapBase = m_heapOne;
+        m_inactiveHeapBase = m_heapTwo;
+    }
+    
+    m_activeHeapOne = not m_activeHeapOne;
+    
+    m_inactiveHeapPointer = m_activeHeapPointer;
+    m_activeHeapPointer = m_activeHeapBase + m_heapSize;
+    
+    // Then, performing the collection. Seeking from the root
+    // objects down the hierarchy to find active objects. 
+    // Then moving them to the new active heap.
+    
+    /* TObject* rootStack;   
+    TObject* staticRoots;
+    
+    for (uint32_t i = 0; i < size; i++)
+        rootStack[i] = moveObject(rootStack[i]);
+    
+    for (uint32_t i = 0; i < staticRootSize; i++)
+        staticRoots[i] = moveObject(staticRoots[i]); */
+    
+    // TODO flush the method cache
 }
 
