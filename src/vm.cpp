@@ -399,9 +399,25 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
-        case 5:
+        case 5: // Array at put
         {
-            //TODO
+            TObject* arg1 = stack[--stackTop];
+            if (! isSmallInteger(arg1) ) {
+                stackTop -= 2;
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            uint32_t idx        = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
+            TObjectArray* array = (TObjectArray*) stack[--stackTop];
+            if (idx >= array->getSize()) {
+                stackTop -= 1;
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            TObject* val        = stack[--stackTop];
+            array[idx]; // = val; //FIXME
+            // TODO gc ?
+            return dynamic_cast<TObject*>(array);
         } break;
         
         case 6: // start new process
@@ -678,4 +694,5 @@ TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t lhs, uint32_t rhs)
         
         default: ; /* FIXME possible error */
     }
+    return globals.nilObject;
 }
