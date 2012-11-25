@@ -180,6 +180,11 @@ private:
         TProcess*& process,
         TObject*& returnedValue);
     
+    TObject* doSmallInt(
+        uint32_t opcode,
+        uint32_t lhs,
+        uint32_t rhs);
+    
     //template<class T> TClass* getClass(TObject* object);
 public:
     

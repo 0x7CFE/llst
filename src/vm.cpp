@@ -351,25 +351,6 @@ TObject* SmalltalkVM::newObject(TClass* klass)
     return instance;
 }
 
-#define Get2SmallIntsFromStack                                          \
-    /* keeps uint32_t lhs and rhs in the current scope */               \
-            uint32_t lhs, rhs;                                          \
-            {                                                           \
-                TObject* arg1   = stack[--stackTop];                    \
-                if(! ((reinterpret_cast<uint32_t>(arg1) & 1))) {        \
-                    --stackTop;                                         \
-                    stack[stackTop++] = globals.nilObject;              \
-                    break;                                              \
-                }                                                       \
-                TObject* arg2   = stack[--stackTop];                    \
-                if(! ((reinterpret_cast<uint32_t>(arg2) & 1))) {        \
-                    stack[stackTop++] = globals.nilObject;              \
-                    break;                                              \
-                }                                                       \
-                rhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));\
-                lhs = getIntegerValue(reinterpret_cast<TInteger>(arg2));\
-            }
-
 TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TProcess& process)
 {
     switch(opcode)
@@ -459,59 +440,38 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         } break;
         
         case 10: // small int +
-        {
-            Get2SmallIntsFromStack;
-            return reinterpret_cast<TObject*>(newInteger(lhs + rhs)); //FIXME possible overflow
-        } break;
-        
         case 11: // small int /
-        {
-            Get2SmallIntsFromStack;
-            if (rhs == 0) {
-                stack[stackTop++] = globals.nilObject;
-                break;
-            }
-            return reinterpret_cast<TObject*>(newInteger(lhs / rhs));
-        } break;
-        
         case 12: // small int %
+        case 13: // small int <
+        case 14: // small int ==
+        case 15: // small int *
+        case 16: // small int -
+        case 36: // bit or
+        case 37: // bit and
+        case 39: // bit shift
         {
-            Get2SmallIntsFromStack;
-            if (rhs == 0) {
+            uint32_t lhs, rhs;
+            {
+                TObject* arg1 = stack[--stackTop];
+                if (! isSmallInteger(arg1) ) {
+                    --stackTop;
+                    stack[stackTop++] = globals.nilObject;
+                    break;
+                }
+                TObject* arg2   = stack[--stackTop];
+                if (! isSmallInteger(arg2) ) {
+                    stack[stackTop++] = globals.nilObject;
+                    break;
+                }
+                rhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));
+                lhs = getIntegerValue(reinterpret_cast<TInteger>(arg2));
+            }
+            TObject* result = doSmallInt(opcode, lhs, rhs);
+            if (result == globals.nilObject) {
                 stack[stackTop++] = globals.nilObject;
                 break;
             }
-            return reinterpret_cast<TObject*>(newInteger(lhs % rhs));
-        } break;
-        
-        case 13: // small int <
-        {
-            Get2SmallIntsFromStack;
-            if (lhs < rhs)
-                return globals.trueObject;
-            else
-                return globals.falseObject;
-        } break;
-        
-        case 14: // small int ==
-        {
-            Get2SmallIntsFromStack;
-            if (lhs == rhs)
-                return globals.trueObject;
-            else
-                return globals.falseObject;
-        } break;
-        
-        case 15: // small int *
-        {
-            Get2SmallIntsFromStack;
-            return reinterpret_cast<TObject*>(newInteger(lhs * rhs)); //FIXME possible overflow
-        } break;
-        
-        case 16: // small int -
-        {
-            Get2SmallIntsFromStack;
-            return reinterpret_cast<TObject*>(newInteger(lhs - rhs)); //FIXME possible overflow
+            return result;
         } break;
         
         case 18: // turn on debugging
@@ -594,40 +554,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             
         } break;
         
-        case 36: // bit or
-        {
-            Get2SmallIntsFromStack;
-            return reinterpret_cast<TObject*>(newInteger(lhs | rhs));
-        } break;
-        
-        case 37: // bit and
-        {
-            Get2SmallIntsFromStack;
-            return reinterpret_cast<TObject*>(newInteger(lhs & rhs));
-        } break;
-        
         case 38:
         {
             
-        } break;
-        
-        case 39: // bit shift
-        {
-            Get2SmallIntsFromStack; // hi = lhs
-            uint32_t result = 0;
-            int32_t signed_rhs = (int32_t) rhs;
-            if (signed_rhs < 0) {
-                //shift right 
-                result = lhs >> -signed_rhs;
-            } else {
-                // shift left ; catch overflow 
-                result = lhs << rhs;
-                if (lhs > result) {
-                    stack[stackTop++] = globals.nilObject;
-                    break;
-                }
-            }
-            return reinterpret_cast<TObject*>(newInteger( result ));
         } break;
         
         case 40:
@@ -660,4 +589,84 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
         instance->putField(i, globals.nilObject);
     
     return instance;
+}
+
+TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t lhs, uint32_t rhs)
+{
+    switch(opcode)
+    {
+        case 10: // small int +
+        {
+            return reinterpret_cast<TObject*>(newInteger(lhs + rhs)); //FIXME possible overflow
+        }
+        
+        case 11: // small int /
+        {
+            if (rhs == 0)
+                return globals.nilObject;
+            return reinterpret_cast<TObject*>(newInteger(lhs / rhs));
+        }
+        
+        case 12: // small int %
+        {
+            if (rhs == 0)
+                return globals.nilObject;
+            return reinterpret_cast<TObject*>(newInteger(lhs % rhs));
+        }
+        
+        case 13: // small int <
+        {
+            if (lhs < rhs)
+                return globals.trueObject;
+            else
+                return globals.falseObject;
+        }
+        
+        case 14: // small int ==
+        {
+            if (lhs == rhs)
+                return globals.trueObject;
+            else
+                return globals.falseObject;
+        }
+        
+        case 15: // small int *
+        {
+            return reinterpret_cast<TObject*>(newInteger(lhs * rhs)); //FIXME possible overflow
+        }
+        
+        case 16: // small int -
+        {
+            return reinterpret_cast<TObject*>(newInteger(lhs - rhs)); //FIXME possible overflow
+        }
+        
+        case 36: // bit or
+        {
+            return reinterpret_cast<TObject*>(newInteger(lhs | rhs));
+        }
+        
+        case 37: // bit and
+        {
+            return reinterpret_cast<TObject*>(newInteger(lhs & rhs));
+        }
+        
+        case 39: // bit shift
+        {
+            uint32_t result = 0;
+            int32_t signed_rhs = (int32_t) rhs;
+            if (signed_rhs < 0) {
+                //shift right 
+                result = lhs >> -signed_rhs;
+            } else {
+                // shift left ; catch overflow 
+                result = lhs << rhs;
+                if (lhs > result) {
+                    return globals.nilObject;
+                }
+            }
+            return reinterpret_cast<TObject*>(newInteger( result ));
+        }
+        
+        default: ; /* FIXME possible error */
+    }
 }
