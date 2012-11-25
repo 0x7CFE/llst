@@ -6,7 +6,7 @@
 
 #include <types.h>
 #include "memory.h"
-
+#include <stdlib.h>
 inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
 inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
 
@@ -170,7 +170,8 @@ private:
     TObject* doExecutePrimitive(
         uint8_t opcode, 
         TObjectArray& stack, 
-        uint32_t& stackTop);
+        uint32_t& stackTop,
+        TProcess& process);
     
     TExecuteResult doDoSpecial(
         TInstruction instruction, 
@@ -187,5 +188,33 @@ public:
     TObject* newObject(TClass* klass);
     
 };
+
+template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
+{
+    // TODO fast access to common classes
+    TClass* klass = (TClass*) m_image.getGlobal(T::InstanceClassName());
+    if (!klass)
+        return (T*) globals.nilObject;
+    
+    // Slot size is computed depending on the object type
+    size_t slotSize = 0;
+    if (T::InstancesAreBinary())    
+        slotSize = sizeof(T) + objectSize;
+    else 
+        slotSize = sizeof(T) + objectSize * sizeof(T*);
+        
+    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+    if (!objectSlot)
+        return (T*) globals.nilObject;
+    
+    T* instance = (T*) new (objectSlot) TObject(objectSize, klass);
+    if (! T::InstancesAreBinary())     
+    {
+        for (int i = 0; i < objectSize; i++)
+            instance->putField(i, globals.nilObject);
+    }
+    
+    return instance;
+}
 
 #endif
