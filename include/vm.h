@@ -210,7 +210,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     T* instance = (T*) new (objectSlot) TObject(objectSize, klass);
     if (! T::InstancesAreBinary())     
     {
-        for (int i = 0; i < objectSize; i++)
+        for (uint32_t i = 0; i < objectSize; i++)
             instance->putField(i, globals.nilObject);
     }
     
