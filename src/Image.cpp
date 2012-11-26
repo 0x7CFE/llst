@@ -86,13 +86,13 @@ void Image::closeImageFile()
 
 uint32_t Image::readWord()
 {
-    if (imagePointer == (imageMap + imageFileSize) )
+    if (imagePointer == ((uint8_t*)imageMap + imageFileSize) )
         return 0; // Unexpected EOF TODO break
     
     uint32_t value = 0;
     uint8_t  byte  = 0;
     
-    // Very stupid yet simple multibyte encoding :-\
+    // Very stupid yet simple multibyte encoding
     // value = 255 + 255 + ... + x where x < 255
     while ( (byte = *imagePointer++) == 255 ) {
         value += byte; // adding 255 part
@@ -111,7 +111,7 @@ TObject* Image::readObject()
     //fprintf(stderr, "Reading record %d\n", (uint32_t) type);
     switch (type) {
         case invalidObject: 
-            fprintf(stderr, "Invalid object at offset %p\n", (uint32_t) imagePointer - (uint32_t) imageMap);
+            fprintf(stderr, "Invalid object at offset %p\n", (void*) (imagePointer - (uint8_t*)imageMap));
             exit(1); 
             break;
         
@@ -127,7 +127,7 @@ TObject* Image::readObject()
             TClass* objectClass  = (TClass*) readObject(); 
             newObject->setClass(objectClass);
             
-            for (int i = 0; i < fieldsCount; i++)
+            for (uint32_t i = 0; i < fieldsCount; i++)
                 newObject->putField(i, readObject());
             
             return newObject;
@@ -153,7 +153,7 @@ TObject* Image::readObject()
             TByteObject* newByteObject = new(objectSlot) TByteObject(dataSize, 0); 
             indirects.push_back(newByteObject);
             
-            for (int i = 0; i < dataSize; i++)
+            for (uint32_t i = 0; i < dataSize; i++)
                 (*newByteObject)[i] = (uint8_t) readWord();
             std::string bytes((const char*)newByteObject->getBytes(), newByteObject->getSize());
             

@@ -53,12 +53,6 @@ void SmalltalkVM::flushCache()
 //     }
 // }
 
-TInstruction decodeInstruction(TByteObject* byteCodes, uint32_t bytePointer)
-{
-    TInstruction result;
-//    result.low = (result.high = byteCodes[bytePointer++])
-}
-
 #define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
 
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t ticks)
@@ -594,7 +588,7 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
         return (TObjectArray*) globals.nilObject;
     
     TObjectArray* instance = (TObjectArray*) new (objectSlot) TObject(objectSize, klass);
-    for (int i = 0; i < objectSize; i++)
+    for (uint32_t i = 0; i < objectSize; i++)
         instance->putField(i, globals.nilObject);
     
     return instance;
