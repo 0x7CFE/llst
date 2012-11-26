@@ -25,15 +25,6 @@ int main(int argc, char **argv) {
     initContext->stack = vm.newObject<TObjectArray>(stackSize);
     initContext->stackTop = newInteger(0);
     initContext->method = globals.initialMethod;
-
-    
-    
-    //ptr<TSymbolArray, TSymbol*> 
-    PSymbolArray symbols = globals.globalsObject->keys;
-    TSymbol* symbol = symbols[1];
-    TSymbolArray& rsymbols = *symbols;
-    symbols[2] = (TSymbol*) globals.nilObject;
-    //(temps.ref())[1] = globals.nilObject;
     
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
     switch (result) {

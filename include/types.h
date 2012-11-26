@@ -173,40 +173,10 @@ struct TArray : public TObject {
     Element& operator [] (uint32_t index) { return reinterpret_cast<Element*>(fields)[index]; }
 };
 
-
-template <typename O, typename C = TObject*> class ptr {
-public:
-    typedef O Object;
-    typedef C Content;
-private:
-    Object* reference;
-public:
-    ptr(Object* reference) : reference(reference) {}
-    ptr(const ptr& pointer) : reference(pointer.reference) {}
-    
-    ptr* operator = (const ptr& pointer) { reference = pointer.reference; return this; }
-    ptr* operator = (const Object* object) { reference = object; return this; }
-    
-    Object* rawptr() const { return reference; }
-    Object* operator -> () const { return reference; }
-    Object& (operator*)() const { return *reference; }
-    operator Object*() const { return reference; }
-    
-    Content& operator [] (uint32_t index) const { return reference->operator[](index); }
-};
-
-// template<typename T> class ptr< TArray<T>, T> {
-//     T*& operator [] (uint32_t index) { return ; }
-// };
-
 struct TMethod;
 typedef TArray<TObject*> TObjectArray;
 typedef TArray<TSymbol*> TSymbolArray;
 typedef TArray<TMethod*> TMethodArray;
-
-typedef ptr<TObjectArray> PObjectArray;
-typedef ptr<TSymbolArray, TSymbol*> PSymbolArray;
-typedef ptr<TMethodArray, TMethod*> PMethodArray;
 
 struct TContext : public TObject {
     TMethod*      method;
@@ -242,8 +212,8 @@ struct TMethod : public TObject {
 };
 
 struct TDictionary : public TObject {
-    PSymbolArray keys;
-    PObjectArray values;
+    TSymbolArray* keys;
+    TObjectArray* values;
     static const char*  InstanceClassName() { return "Dictionary"; }
     
     // Find a value associated with a key

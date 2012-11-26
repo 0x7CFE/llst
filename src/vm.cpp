@@ -119,10 +119,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // from the top of the stack and creates new array with them
                 
                 m_rootStack.push_back(context);
-                PObjectArray args = newObject<TObjectArray>(instruction.low);
+                TObjectArray* args = newObject<TObjectArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
-                    args[index] = stack[--stackTop];
+                    (*args)[index] = stack[--stackTop];
                 
                 stack[stackTop++] = args;
             } break;
