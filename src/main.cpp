@@ -29,10 +29,10 @@ int main(int argc, char **argv) {
     
     
     //ptr<TSymbolArray, TSymbol*> 
-//     PSymbolArray symbols = globals.globalsObject->keys;
-//     TSymbol* symbol = symbols[1];
-//     TSymbolArray& rsymbols = *symbols;
-//     symbols[2] = (TSymbol*) globals.nilObject;
+    PSymbolArray symbols = globals.globalsObject->keys;
+    TSymbol* symbol = symbols[1];
+    TSymbolArray& rsymbols = *symbols;
+    symbols[2] = (TSymbol*) globals.nilObject;
     //(temps.ref())[1] = globals.nilObject;
     
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);

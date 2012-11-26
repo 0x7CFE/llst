@@ -66,7 +66,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     TByteObject& byteCodes   = *method->byteCodes;
     uint32_t     bytePointer = getIntegerValue(context->bytePointer);
     
-    TObjectArray&  stack    = *context->stack;
+    TObjectArray&  stack     = *context->stack;
     uint32_t stackTop = getIntegerValue(context->stackTop);
 
     TObjectArray& temporaries       = *context->temporaries;
@@ -119,10 +119,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // from the top of the stack and creates new array with them
                 
                 m_rootStack.push_back(context);
-                TObjectArray* args = newObject<TObjectArray>(instruction.low);
+                PObjectArray args = newObject<TObjectArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index > 0; index--)
-                    (*args)[index] = stack[--stackTop];
+                    args[index] = stack[--stackTop];
                 
                 stack[stackTop++] = args;
             } break;

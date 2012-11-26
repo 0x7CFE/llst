@@ -182,14 +182,15 @@ private:
     Object* reference;
 public:
     ptr(Object* reference) : reference(reference) {}
-    ptr(const ptr& _ptr) : reference(_ptr.reference) {}
+    ptr(const ptr& pointer) : reference(pointer.reference) {}
     
-    ptr* operator = (const ptr& _ptr) { reference = _ptr.reference; return this; }
+    ptr* operator = (const ptr& pointer) { reference = pointer.reference; return this; }
     ptr* operator = (const Object* object) { reference = object; return this; }
     
-    Object* ref() const { return reference; }
+    Object* rawptr() const { return reference; }
     Object* operator -> () const { return reference; }
     Object& (operator*)() const { return *reference; }
+    operator Object*() const { return reference; }
     
     Content& operator [] (uint32_t index) const { return reference->operator[](index); }
 };
@@ -241,8 +242,8 @@ struct TMethod : public TObject {
 };
 
 struct TDictionary : public TObject {
-    TSymbolArray* keys;
-    TObjectArray* values;
+    PSymbolArray keys;
+    PObjectArray values;
     static const char*  InstanceClassName() { return "Dictionary"; }
     
     // Find a value associated with a key
