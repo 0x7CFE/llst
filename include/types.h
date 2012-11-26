@@ -174,7 +174,7 @@ struct TArray : public TObject {
 };
 
 
-template <typename O, typename C = TObject> class ptr {
+template <typename O, typename C = TObject*> class ptr {
 public:
     typedef O Object;
     typedef C Content;
@@ -189,20 +189,23 @@ public:
     
     Object* ref() const { return reference; }
     Object* operator -> () const { return reference; }
-    Object& (operator*)() { return *reference; }
     Object& (operator*)() const { return *reference; }
     
-    Content*& operator [] (uint32_t index) { return reference->operator[](index); }
+    Content& operator [] (uint32_t index) const { return reference->operator[](index); }
 };
 
-// template<typename T> class ptr< TArray<T> > {
-//     T*& operator [] (uint32_t index) { return reference->operator[](index); }
+// template<typename T> class ptr< TArray<T>, T> {
+//     T*& operator [] (uint32_t index) { return ; }
 // };
 
 struct TMethod;
 typedef TArray<TObject*> TObjectArray;
 typedef TArray<TSymbol*> TSymbolArray;
 typedef TArray<TMethod*> TMethodArray;
+
+typedef ptr<TObjectArray> PObjectArray;
+typedef ptr<TSymbolArray, TSymbol*> PSymbolArray;
+typedef ptr<TMethodArray, TMethod*> PMethodArray;
 
 struct TContext : public TObject {
     TMethod*      method;
