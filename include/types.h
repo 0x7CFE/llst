@@ -173,6 +173,32 @@ struct TArray : public TObject {
     Element& operator [] (uint32_t index) { return reinterpret_cast<Element*>(fields)[index]; }
 };
 
+
+template <typename O, typename C = TObject> class ptr {
+public:
+    typedef O Object;
+    typedef C Content;
+private:
+    Object* reference;
+public:
+    ptr(Object* reference) : reference(reference) {}
+    ptr(const ptr& _ptr) : reference(_ptr.reference) {}
+    
+    ptr* operator = (const ptr& _ptr) { reference = _ptr.reference; return this; }
+    ptr* operator = (const Object* object) { reference = object; return this; }
+    
+    Object* ref() const { return reference; }
+    Object* operator -> () const { return reference; }
+    Object& (operator*)() { return *reference; }
+    Object& (operator*)() const { return *reference; }
+    
+    Content*& operator [] (uint32_t index) { return reference->operator[](index); }
+};
+
+// template<typename T> class ptr< TArray<T> > {
+//     T*& operator [] (uint32_t index) { return reference->operator[](index); }
+// };
+
 struct TMethod;
 typedef TArray<TObject*> TObjectArray;
 typedef TArray<TSymbol*> TSymbolArray;
