@@ -475,13 +475,12 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             {
                 TObject* arg1 = stack[--stackTop];
                 if (! isSmallInteger(arg1) ) {
-                    --stackTop;
-                    stack[stackTop++] = globals.nilObject;
+                    failPrimitive(--stack, stackTop);
                     break;
                 }
                 TObject* arg2   = stack[--stackTop];
                 if (! isSmallInteger(arg2) ) {
-                    stack[stackTop++] = globals.nilObject;
+                    failPrimitive(stack, stackTop);
                     break;
                 }
                 rhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));
@@ -489,7 +488,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             }
             TObject* result = doSmallInt(opcode, lhs, rhs);
             if (result == globals.nilObject) {
-                stack[stackTop++] = globals.nilObject;
+                failPrimitive(stack, stackTop);
                 break;
             }
             return result;
@@ -520,14 +519,13 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             TObject* arg1 = stack[--stackTop];
             if (! isSmallInteger(arg1) ) {
                 stackTop -= 2;
-                stack[stackTop++] = globals.nilObject;
+                failPrimitive(stack, stackTop);
                 break;
             }
             uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
             TString* string = (TObjectArray*) stack[--stackTop];
             if (idx >= string->getSize()) {
-                stackTop -= 1;
-                stack[stackTop++] = globals.nilObject;
+                failPrimitive(--stack, stackTop);
                 break;
             }
             
@@ -561,9 +559,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             TObject* top = stack[--stackTop];
             TInteger integer = reinterpret_cast<TInteger>(top);
             bool isSmallInt = integer & 1;
-            if(!isSmallInt)
-            {
-                stack[stackTop++] = globals.nilObject;
+            if(!isSmallInt) {
+                failPrimitive(stack, stackTop);
                 break;
             }
             uint32_t value = getIntegerValue(integer);
@@ -705,6 +702,5 @@ TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t lhs, uint32_t rhs)
 }
 
 void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
-    stackTop--;
     stack[stackTop++] = globals.nilObject;
 }
