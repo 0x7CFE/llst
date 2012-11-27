@@ -32,7 +32,7 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
         // until we find one that we can handle
         while (true) {
             // Checking whether this is inline integer
-            if (isSmallInteger(oldPlace)) {
+            if (isSmallInteger((TObject*) oldPlace)) {
                 // Yes it is. Because inline integers are stored
                 // directly in the pointer space all we need to do
                 // is just copy contents of the poiner to a new place
@@ -81,13 +81,13 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
                 m_activeHeapPointer -= slotSize + 2 * sizeof(TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(dataSize);
-                newPlace->size.setBinary();
+                newPlace->size.setBinary(true);
                 
                 // Copying byte data FIXME is it correct?
                 memcpy(newPlace->data, oldPlace->data, slotSize + 2 * sizeof(TMovableObject));
                 
                 // Marking original copy of object as relocated so it would not be processed again
-                oldPlace->size.setRelocated();
+                oldPlace->size.setRelocated(true);
                 
                 // During GC process temporarily using data[0] as indirection pointer
                 // This will be corrected on the next stage of current GC operation
@@ -108,7 +108,7 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
                 m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(fieldsCount);
-                oldPlace->size.setRelocated();
+                oldPlace->size.setRelocated(true);
                 
                 // FIXME What the heck is going on here?
                 //       What about copying object's fields?
@@ -160,7 +160,7 @@ TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
                 
                 // T_T
                 oldPlace->size.setSize(lastFieldIndex);
-                oldPlace->size.setRelocated();
+                oldPlace->size.setRelocated(true);
                 newPlace->data[lastFieldIndex] = previousObject;
                 previousObject = oldPlace;
                 oldPlace = oldPlace->data[lastFieldIndex];
