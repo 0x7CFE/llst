@@ -515,14 +515,30 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
 
         } break;
         
-        case 21:
+        case 21: // String:at
+        case 22: // String:at:put
         {
-
-        } break;
-        
-        case 22:
-        {
-
+            TObject* arg1 = stack[--stackTop];
+            if (! isSmallInteger(arg1) ) {
+                stackTop -= 2;
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
+            TString* string = (TObjectArray*) stack[--stackTop];
+            if (idx >= string->getSize()) {
+                stackTop -= 1;
+                stack[stackTop++] = globals.nilObject;
+                break;
+            }
+            
+            if(opcode == 21) // String:at
+                return reinterpret_cast<TObject*>(newInteger( (*string)[idx] ));
+            else {
+                TInteger val = reinterpret_cast<TInteger>(stack[--stackTop]);
+                (*string)[idx] = getIntegerValue(val);
+                return reinterpret_cast<TObject*>(string);
+            }
         } break;
         
         case 23:
