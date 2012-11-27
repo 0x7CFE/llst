@@ -394,16 +394,15 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         case 24: // Array at
         {
             TObject* arg1 = stack[--stackTop];
+            TObjectArray* array = (TObjectArray*) stack[--stackTop];
             if (! isSmallInteger(arg1) ) {
-                stackTop -= 2;
-                stack[stackTop++] = globals.nilObject;
+                failPrimitive(stack, stackTop);
                 break;
             }
+            
             uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
-            TObjectArray* array = (TObjectArray*) stack[--stackTop];
             if (idx >= array->getSize()) {
-                stackTop -= 1;
-                stack[stackTop++] = globals.nilObject;
+                failPrimitive(stack, stackTop);
                 break;
             }
             
@@ -703,4 +702,9 @@ TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t lhs, uint32_t rhs)
         default: ; /* FIXME possible error */
     }
     return globals.nilObject;
+}
+
+void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
+    stackTop--;
+    stack[stackTop++] = globals.nilObject;
 }
