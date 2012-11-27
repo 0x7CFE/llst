@@ -390,7 +390,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
-        case 5: // Array at put
+        case 5:  // Array at put
+        case 24: // Array at
         {
             TObject* arg1 = stack[--stackTop];
             if (! isSmallInteger(arg1) ) {
@@ -406,9 +407,13 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 break;
             }
             TObject* val = stack[--stackTop];
-            (*array)[idx] = val;
-            // TODO gc ?
-            return dynamic_cast<TObject*>(array);
+            if(opcode == 24) // Array at
+                return (*array)[idx];
+            else {
+                (*array)[idx] = val;
+                // TODO gc ?
+                return dynamic_cast<TObject*>(array);
+            }
         } break;
         
         case 6: // start new process
@@ -520,11 +525,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         } break;
         
         case 23:
-        {
-
-        } break;
-        
-        case 24:
         {
 
         } break;
