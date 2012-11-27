@@ -406,10 +406,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 stack[stackTop++] = globals.nilObject;
                 break;
             }
-            TObject* val = stack[--stackTop];
+            
             if(opcode == 24) // Array at
-                return (*array)[idx];
+                return &(*array)[idx];
             else {
+                TObject* val = stack[--stackTop];
                 (*array)[idx] = val;
                 // TODO gc ?
                 return dynamic_cast<TObject*>(array);
