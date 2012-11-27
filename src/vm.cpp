@@ -407,15 +407,15 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 stack[stackTop++] = globals.nilObject;
                 break;
             }
-            uint32_t idx        = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
+            uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
             TObjectArray* array = (TObjectArray*) stack[--stackTop];
             if (idx >= array->getSize()) {
                 stackTop -= 1;
                 stack[stackTop++] = globals.nilObject;
                 break;
             }
-            TObject* val        = stack[--stackTop];
-            array[idx]; // = val; //FIXME
+            TObject* val = stack[--stackTop];
+            (*array)[idx] = val;
             // TODO gc ?
             return dynamic_cast<TObject*>(array);
         } break;
