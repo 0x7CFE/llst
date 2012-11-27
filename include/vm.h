@@ -184,6 +184,10 @@ private:
         uint32_t opcode,
         uint32_t lhs,
         uint32_t rhs);
+        
+    void failPrimitive(
+        TObjectArray& stack,
+        uint32_t& stackTop);
     
     //template<class T> TClass* getClass(TObject* object);
 public:
