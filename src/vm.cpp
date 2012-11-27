@@ -53,12 +53,6 @@ void SmalltalkVM::flushCache()
 //     }
 // }
 
-TInstruction decodeInstruction(TByteObject* byteCodes, uint32_t bytePointer)
-{
-    TInstruction result;
-//    result.low = (result.high = byteCodes[bytePointer++])
-}
-
 #define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
 
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t ticks)
@@ -72,7 +66,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     TByteObject& byteCodes   = *method->byteCodes;
     uint32_t     bytePointer = getIntegerValue(context->bytePointer);
     
-    TObjectArray&  stack    = *context->stack;
+    TObjectArray&  stack     = *context->stack;
     uint32_t stackTop = getIntegerValue(context->stackTop);
 
     TObjectArray& temporaries       = *context->temporaries;
@@ -140,14 +134,11 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
             
             case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
-                TObject* top      = stack[--stackTop];
-                TObject* cmpTrue  = instruction.low == 0 ? globals.trueObject  : globals.falseObject;
-                TObject* cmpFalse = instruction.low == 0 ? globals.falseObject : globals.trueObject;
-                if (top == globals.nilObject)
-                    returnedValue = cmpTrue;
-                else
-                    returnedValue = cmpFalse;
-                
+                TObject* top = stack[--stackTop];
+                bool result = (top == globals.nilObject);
+                if (instruction.low != 0)
+                    result = not result;
+                returnedValue = result ? globals.trueObject : globals.falseObject;
                 stack[stackTop++] = returnedValue;
             } break;
             
@@ -610,7 +601,7 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
         return (TObjectArray*) globals.nilObject;
     
     TObjectArray* instance = (TObjectArray*) new (objectSlot) TObject(objectSize, klass);
-    for (int i = 0; i < objectSize; i++)
+    for (uint32_t i = 0; i < objectSize; i++)
         instance->putField(i, globals.nilObject);
     
     return instance;

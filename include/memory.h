@@ -71,7 +71,6 @@ public:
     virtual ~BakerMemoryManager();
     
     virtual void*  allocateMemory(size_t requestedSize);
-//     virtual size_t allocatedSize() { return (size_t)activeHeapPointer - (size_t)activeHeapBase; }
 };
 
 #endif
