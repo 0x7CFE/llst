@@ -235,8 +235,12 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
             bytePointer = getIntegerValue(context->bytePointer);
         } break;
         
-        case BlockReturn: //TODO
-                        break;
+        case BlockReturn: {
+            returnedValue = stack[--stackTop];
+            TBlock* ContextAsBlock = (TBlock*) context;
+            context = ContextAsBlock->creatingContext->previousContext;
+            goto doReturn2; // FIXME T_T
+        } break;
                         
         case Duplicate: {
             TObject* duplicate = stack[stackTop - 1];
