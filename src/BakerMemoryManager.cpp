@@ -53,6 +53,12 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     m_inactiveHeapBase = (uint8_t*) base + mediane;
     m_inactiveHeapPointer = (uint8_t*) base + heapSize;
     
+    // Allocating static roots. We could not set the class
+    // of this object because image is not loaded yet
+    void* slot = allocate(512 * sizeof(TObject*));
+    // m_staticRoots = new (slot) TObjectArray(512, 0);
+    
+    
     return true;
 }
 

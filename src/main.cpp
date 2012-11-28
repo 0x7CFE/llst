@@ -6,7 +6,7 @@
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(4096);
+    memoryManager->initializeHeap(65536);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     testImage->loadImage("../image/testImage");

@@ -47,6 +47,17 @@ private:
     size_t    m_staticHeapSize;
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
+
+    struct TRootPointers {
+        uint32_t size;
+        uint32_t top;
+        TObject* data[0];
+    };
+    
+    // This contains an array of pointers of objects from the
+    // static heap to the dynamic one. It is used during the GC
+    // as a root for pointer iteration.
+    TObjectArray* m_staticRoots;
     
     // During GC we need to treat all objects in a very simple manner, 
     // just as pointer holders. Class field is also a pointer so we
