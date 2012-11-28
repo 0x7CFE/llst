@@ -484,9 +484,16 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             //return returnError; TODO cast 
         } break;
         
-        case 20:
+        case 20: // ByteArray alloc
         {
-
+            uint32_t objectSize = getIntegerValue(reinterpret_cast<TInteger>(stack[--stackTop]));
+            TClass* klass = (TClass*) stack[--stackTop];
+            size_t slotSize = sizeof(TByteArray) + objectSize * sizeof(TByteArray*);
+            void* objectSlot = m_memoryManager->allocate(slotSize);
+            if (!objectSlot)
+                return globals.nilObject;
+            TByteArray* instance = (TByteArray*) new (objectSlot) TByteObject(objectSize, klass);
+            return reinterpret_cast<TObject*>(instance);
         } break;
         
         case 21: // String:at
