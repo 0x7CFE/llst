@@ -19,7 +19,7 @@ void* BakerMemoryManager::allocateMemory(size_t requestedSize)
     return 0;
 }
 
-TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
+BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
 {
     TMovableObject* oldPlace       = object;
     TMovableObject* previousObject = 0;

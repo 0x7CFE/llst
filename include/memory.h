@@ -4,38 +4,16 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <types.h>
-
-class IMemoryAllocator {
-public:
-    virtual void* allocateMemory(size_t size) = 0;
-};
+#include <vector>
 
 class IMemoryManager {
 public:
-    virtual void collectGarbage();
-};
-
-class HeapMemoryManager : public IMemoryAllocator {
-private:
-    uint8_t*  heapBase;
-    size_t    heapSize;
+    virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
+    virtual bool initializeStaticHeap(size_t staticHeapSize) = 0;
     
-    uint8_t*  heapPointer;
-public:
-    HeapMemoryManager(size_t heapSize);
-    virtual ~HeapMemoryManager();
-    
-    virtual void*  allocateMemory(size_t size);
-    virtual size_t allocatedSize() { return (size_t)heapPointer - (size_t)heapBase; }
-};
-
-
-// During GC we need to treat all objects in a very simple manner, 
-// just as pointer holders. Class field is also a pointer so we
-// treat it just as one more object field
-struct TMovableObject {
-    TSize size;
-    TMovableObject* data[0];
+    virtual void* allocateMemory(size_t size) = 0;
+    virtual void  addStaticRoot(TObject* rootObject) = 0;
+    virtual void  collectGarbage() = 0;
 };
 
 // Simple memory manager implementing classic baker two space algorithm.
@@ -50,10 +28,11 @@ struct TMovableObject {
 // All objects that were not moved during the collection are said to be disposed,
 // so thier space may be reused by newly allocated ones.
 // 
-class BakerMemoryManager : public IMemoryAllocator {
+class BakerMemoryManager : public IMemoryManager {
 private:
     uint32_t  m_gcCount;
     size_t    m_heapSize;
+    size_t    m_maxHeapSize;
     
     uint8_t*  m_heapOne;
     uint8_t*  m_heapTwo;
@@ -64,13 +43,88 @@ private:
     uint8_t*  m_activeHeapBase;
     uint8_t*  m_activeHeapPointer;
     
+    size_t    m_staticHeapSize;
+    uint8_t*  m_staticHeapBase;
+    uint8_t*  m_staticHeapPointer;
+    
+    // During GC we need to treat all objects in a very simple manner, 
+    // just as pointer holders. Class field is also a pointer so we
+    // treat it just as one more object field
+    struct TMovableObject {
+        TSize size;
+        TMovableObject* data[0];
+    };
     TMovableObject* moveObject(TMovableObject* object);
-    void collectGarbage();
 public:
-    BakerMemoryManager(size_t heapSize) : m_gcCount(0), m_activeHeapOne(true) {}
+    BakerMemoryManager() : 
+        m_gcCount(0), m_heapSize(0), m_maxHeapSize(0), m_activeHeapOne(true),
+        m_heapOne(0), m_heapTwo(0), m_inactiveHeapBase(0), m_inactiveHeapPointer(0), 
+        m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
+        m_staticHeapBase(0), m_staticHeapPointer(0)
+    { }
+    
     virtual ~BakerMemoryManager();
     
-    virtual void*  allocateMemory(size_t requestedSize);
+    virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
+    virtual bool  initializeStaticHeap(size_t staticHeapSize) = 0;
+    virtual void* allocateMemory(size_t requestedSize);
+    virtual void  collectGarbage();
 };
+
+
+class Image {
+private:
+    int    imageFileFD;
+    size_t imageFileSize;
+    
+    void*    imageMap;     // pointer to the map base
+    uint8_t* imagePointer; // sliding pointer
+    std::vector<TObject*> indirects;
+    
+    enum TImageRecordType {
+        invalidObject = 0,
+        ordinaryObject,
+        inlineInteger,  // inline 32 bit integer in network byte order
+        byteObject,     // 
+        previousObject, // link to previously loaded object
+        nilObject       // uninitialized (nil) field
+    };
+    
+    uint32_t readWord();
+    TObject* readObject();
+    bool     openImageFile(const char* fileName);
+    void     closeImageFile();
+    
+    IMemoryManager* m_memoryManager;
+public:
+    Image(IMemoryManager* manager) 
+        : imageFileFD(-1), imageFileSize(0), 
+          imagePointer(0), m_memoryManager(manager) 
+    {}
+    
+    bool     loadImage(const char* fileName);
+    TObject* getGlobal(const char* name);
+    TObject* getGlobal(TSymbol* name);
+    
+    // GLobal VM objects
+};
+
+struct TGlobals {
+    TObject* nilObject;
+    TObject* trueObject;
+    TObject* falseObject;
+    TClass*  smallIntClass;
+    TClass*  arrayClass;
+    TClass*  blockClass;
+    TClass*  contextClass;
+    TClass*  stringClass;
+    TDictionary* globalsObject;
+    TMethod* initialMethod;
+    TObject* binaryMessages[3];
+    TClass*  integerClass;
+    TObject* badMethodSymbol;
+};
+
+extern TGlobals globals;
 
 #endif

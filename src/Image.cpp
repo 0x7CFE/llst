@@ -119,7 +119,7 @@ TObject* Image::readObject()
             uint32_t fieldsCount = readWord();
             
             size_t slotSize   = sizeof(TObject) + fieldsCount * sizeof(TObject*);
-            void*  objectSlot = m_memoryAllocator->allocateMemory(slotSize);
+            void*  objectSlot = m_memoryManager->allocateMemory(slotSize);
             
             TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
             indirects.push_back(newObject);
@@ -149,7 +149,7 @@ TObject* Image::readObject()
             // normal pointers will always have the lowest bit 0
             slotSize = (slotSize + sizeof(TObject*) - 1) & ~0x3;
             
-            void*  objectSlot = m_memoryAllocator->allocateMemory(slotSize);
+            void*  objectSlot = m_memoryManager->allocateMemory(slotSize);
             TByteObject* newByteObject = new(objectSlot) TByteObject(dataSize, 0); 
             indirects.push_back(newByteObject);
             

@@ -3,8 +3,6 @@
 #include <stdio.h>
 
 int main(int argc, char **argv) {
-    //HeapMemoryManager staticHeap(80000);
-    
     Image testImage(0);
     testImage.loadImage("../image/testImage");
     

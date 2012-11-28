@@ -2,66 +2,10 @@
 #define LLST_VM_H_INCLUDED
 
 #include <list>
-#include <vector>
 
 #include <types.h>
 #include <memory.h>
 #include <stdlib.h>
-
-class Image {
-private:
-    int    imageFileFD;
-    size_t imageFileSize;
-    
-    void*    imageMap;     // pointer to the map base
-    uint8_t* imagePointer; // sliding pointer
-    std::vector<TObject*> indirects; // TODO preallocate space
-    
-    enum TImageRecordType {
-        invalidObject = 0,
-        ordinaryObject,
-        inlineInteger,  // inline 32 bit integer in network byte order
-        byteObject,     // 
-        previousObject, // link to previously loaded object
-        nilObject       // uninitialized (nil) field
-    };
-    
-    uint32_t readWord();
-    TObject* readObject();
-    bool     openImageFile(const char* fileName);
-    void     closeImageFile();
-    
-    IMemoryAllocator* m_memoryAllocator;
-public:
-    Image(IMemoryAllocator* allocator) 
-        : imageFileFD(-1), imageFileSize(0), 
-          imagePointer(0), m_memoryAllocator(allocator) 
-    {}
-    
-    bool loadImage(const char* fileName);
-    TObject* getGlobal(const char* name);
-    TObject* getGlobal(TSymbol* name);
-    
-    // GLobal VM objects
-};
-
-struct TGlobals {
-    TObject* nilObject;
-    TObject* trueObject;
-    TObject* falseObject;
-    TClass*  smallIntClass;
-    TClass*  arrayClass;
-    TClass*  blockClass;
-    TClass*  contextClass;
-    TClass*  stringClass;
-    TDictionary* globalsObject;
-    TMethod* initialMethod;
-    TObject* binaryMessages[3]; // NOTE
-    TClass*  integerClass;
-    TObject* badMethodSymbol;
-};
-
-extern TGlobals globals;
 
 class SmalltalkVM {
 public:
@@ -185,6 +129,8 @@ private:
         uint32_t lhs,
         uint32_t rhs);
     
+    IMemoryManager* m_memoryManager;
+    
     //template<class T> TClass* getClass(TObject* object);
 public:
     
@@ -208,7 +154,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     else 
         slotSize = sizeof(T) + objectSize * sizeof(T*);
         
-    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+    void* objectSlot = m_memoryManager->allocateMemory(slotSize);
     if (!objectSlot)
         return (T*) globals.nilObject;
     

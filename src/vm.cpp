@@ -580,7 +580,7 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
     // Slot size is computed depending on the object type
     size_t slotSize = sizeof(TObjectArray) + objectSize * sizeof(TObjectArray*);
     
-    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+    void* objectSlot = m_memoryManager->allocateMemory(slotSize);
     if (!objectSlot)
         return (TObjectArray*) globals.nilObject;
     
