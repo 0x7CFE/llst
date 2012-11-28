@@ -131,8 +131,36 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 stack[stackTop++] = returnedValue;
             } break;
             
-            case sendBinary:
-                break;
+            case sendBinary: {
+                TObject* arg2 = stack[--stackTop],
+                         arg1 = stack[--stackTop];
+                if( isSmallInteger(arg1) && isSmallInteger(arg2) )
+                {
+                    uint32_t rhs = getIntegerValue(reinterpret_cast<TInteger*>(arg2)),
+                             lhs = getIntegerValue(reinterpret_cast<TInteger*>(arg1));
+                    switch(instruction.low)
+                    {
+                        case 0: // operator <
+                            returnedValue = (lhs < rhs) ? globals.trueObject : globals.falseObject;
+                        break;
+                        
+                        case 1: // operator <=
+                            returnedValue = (lhs <= rhs) ? globals.trueObject : globals.falseObject;
+                        break;
+                        
+                        case 2: // operator +
+                            returnedValue = reinterpret_cast<TObject*>(newInteger(lhs+rhs)); //FIXME possible overflow?
+                        break;
+                    }
+                    stack[stackTop++] = returnedValue;
+                } else
+                {
+                    TObjectArray* args = newObject<TObjectArray>(2);
+                    (*args)[1] = arg2;
+                    (*args)[0] = arg1;
+                    //TODO call
+                }
+            } break;
                 
             case doPrimitive: {
                 uint8_t primitiveNumber = byteCodes[bytePointer++];
@@ -140,6 +168,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, *process);
                 //if(returnedValue == returnError) //FIXME !!!111
                 //    return returnedValue;
+                context = m_rootStack.back(); m_rootStack.pop_back();
+                goto doReturn; //FIXME T_T
             } break;
                 
             case doSpecial: {
@@ -179,15 +209,15 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
     switch(instruction.low) {
         case SelfReturn:
             returnedValue = arguments[0];
-            goto doReturn;
+            goto doReturn; //FIXME T_T
             
         case StackReturn:
         {
             returnedValue = stack[--stackTop];
             
-            doReturn:
+            doReturn: //FIXME T_T
             context = context->previousContext;
-            goto doReturn2;
+            goto doReturn2; //FIXME T_T
             
             doReturn2:
             if(context == 0 || context == globals.nilObject) {
