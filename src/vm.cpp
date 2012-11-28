@@ -209,6 +209,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
     switch(instruction.low) {
         case SelfReturn:
             returnedValue = arguments[0]; // FIXME why instanceVariables? bug?
+                                          // Have a look at interp.c: 605 and 1434
             goto doReturn; //FIXME T_T
             
         case StackReturn:
@@ -409,32 +410,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
-        case 5:  // Array at put
-        case 24: // Array at
-        {
-            TObject* arg1 = stack[--stackTop];
-            TObjectArray* array = (TObjectArray*) stack[--stackTop];
-            TObject* val = opcode == 5 ? stack[--stackTop] : globals.nilObject; 
-            if (! isSmallInteger(arg1) ) {
-                failPrimitive(stack, stackTop);
-                break;
-            }
-            
-            uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
-            if (idx >= array->getSize()) {
-                failPrimitive(stack, stackTop);
-                break;
-            }
-            
-            if(opcode == 24) // Array at
-                return (*array)[idx];
-            else {
-                (*array)[idx] = val;
-                // TODO gc ?
-                return (TObject*) array;
-            }
-        } break;
-        
         case 6: // start new process
         {
             TInteger value = reinterpret_cast<TInteger>(stack[--stackTop]);
@@ -479,20 +454,20 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         case 37: // bit and
         case 39: // bit shift
         {
-            uint32_t lhs, rhs;
+            uint32_t leftOperand, rightOperand;
             {
-                TObject* arg1 = stack[--stackTop];
                 TObject* arg2 = stack[--stackTop];
+                TObject* arg1 = stack[--stackTop];
                 
                 if ( !isSmallInteger(arg1) || !isSmallInteger(arg2) ) {
                     failPrimitive(stack, stackTop);
                     break;
                 }
                 
-                rhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));
-                lhs = getIntegerValue(reinterpret_cast<TInteger>(arg2));
+                rightOperand = getIntegerValue(reinterpret_cast<TInteger>(arg2));
+                leftOperand = getIntegerValue(reinterpret_cast<TInteger>(arg1));
             }
-            TObject* result = doSmallInt(opcode, lhs, rhs);
+            TObject* result = doSmallInt(opcode, leftOperand, rightOperand);
             if (result == globals.nilObject) {
                 failPrimitive(stack, stackTop);
                 break;
@@ -526,28 +501,60 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(instance);
         } break;
         
-        case 21: // String:at
-        case 22: // String:at:put
+        case 5:  // Array:at:put
+        case 24: // Array:at
         {
-            TObject* arg1 = stack[--stackTop];
-            TString* string = (TString*) stack[--stackTop];
-            TObject* arg3 = opcode == 22 ? stack[--stackTop] : globals.nilObject;
-            if (! isSmallInteger(arg1) ) {
+            TObject* indexObject        = stack[--stackTop];
+            TObjectArray* array         = (TObjectArray*) stack[--stackTop];
+            TObject* valueObject;
+            if (opcode == 5) // if the method is Array:at:put then pop a value from the stack
+                valueObject = stack[--stackTop];
+            
+            if (! isSmallInteger(indexObject) ) {
                 failPrimitive(stack, stackTop);
                 break;
             }
             
-            uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
-            if (idx >= string->getSize()) {
+            uint32_t index = getIntegerValue(reinterpret_cast<TInteger>(indexObject)) - 1; // -1 because in Smalltalk arrays are indexed from 1, not from 0
+            if (index >= array->getSize()) { //boundary check
+                failPrimitive(stack, stackTop);
+                break;
+            }
+            
+            if(opcode == 24) // Array:at
+                return (*array)[index];
+            else { // Array:at:put
+                (*array)[index] = valueObject;
+                // TODO gc ?
+                return (TObject*) array;
+            }
+        } break;
+        
+        case 21: // String:at
+        case 22: // String:at:put
+        {
+            TObject* indexObject        = stack[--stackTop];
+            TString* string             = (TString*) stack[--stackTop];
+            TObject* valueObject;
+            if (opcode == 22) // if the method is String:at:put then pop a value from the stack
+                valueObject = stack[--stackTop];
+            
+            if ( !isSmallInteger(indexObject) ) {
+                failPrimitive(stack, stackTop);
+                break;
+            }
+            
+            uint32_t index = getIntegerValue(reinterpret_cast<TInteger>(indexObject)) - 1;
+            if (index >= string->getSize()) {
                 failPrimitive(stack, stackTop);
                 break;
             }
             
             if(opcode == 21) // String:at
-                return reinterpret_cast<TObject*>(newInteger( string->getByte(idx) ));
-            else {
-                TInteger val = reinterpret_cast<TInteger>(arg3);
-                string->putByte(idx, getIntegerValue(val));
+                return reinterpret_cast<TObject*>(newInteger( string->getByte(index) ));
+            else { // String:at:put
+                TInteger value = reinterpret_cast<TInteger>(valueObject);
+                string->putByte(index, getIntegerValue(value));
                 return (TObject*) string;
             }
         } break;
@@ -578,12 +585,12 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         
         case 32: // Integer new
         {
-            TObject* top = stack[--stackTop];
-            if( !isSmallInteger(top) ) {
+            TObject* object = stack[--stackTop];
+            if( !isSmallInteger(object) ) {
                 failPrimitive(stack, stackTop);
                 break;
             }
-            TInteger integer = reinterpret_cast<TInteger>(top);
+            TInteger integer = reinterpret_cast<TInteger>(object);
             uint32_t value = getIntegerValue(integer);
             return reinterpret_cast<TObject*>(newInteger(value));
         } break;
@@ -641,76 +648,76 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
     return instance;
 }
 
-TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t lhs, uint32_t rhs)
+TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t leftOperand, uint32_t rightOperand)
 {
     switch(opcode)
     {
-        case 10: // small int +
+        case 10: // operator +
         {
-            return reinterpret_cast<TObject*>(newInteger(lhs + rhs)); //FIXME possible overflow
+            return reinterpret_cast<TObject*>(newInteger( leftOperand + rightOperand )); //FIXME possible overflow
         }
         
-        case 11: // small int /
+        case 11: // operator /
         {
-            if (rhs == 0)
+            if (rightOperand == 0)
                 return globals.nilObject;
-            return reinterpret_cast<TObject*>(newInteger(lhs / rhs));
+            return reinterpret_cast<TObject*>(newInteger( leftOperand / rightOperand ));
         }
         
-        case 12: // small int %
+        case 12: // operator %
         {
-            if (rhs == 0)
+            if (rightOperand == 0)
                 return globals.nilObject;
-            return reinterpret_cast<TObject*>(newInteger(lhs % rhs));
+            return reinterpret_cast<TObject*>(newInteger( leftOperand % rightOperand ));
         }
         
-        case 13: // small int <
+        case 13: // operator <
         {
-            if (lhs < rhs)
+            if (leftOperand < rightOperand)
                 return globals.trueObject;
             else
                 return globals.falseObject;
         }
         
-        case 14: // small int ==
+        case 14: // operator ==
         {
-            if (lhs == rhs)
+            if (leftOperand == rightOperand)
                 return globals.trueObject;
             else
                 return globals.falseObject;
         }
         
-        case 15: // small int *
+        case 15: // operator *
         {
-            return reinterpret_cast<TObject*>(newInteger(lhs * rhs)); //FIXME possible overflow
+            return reinterpret_cast<TObject*>(newInteger( leftOperand * rightOperand )); //FIXME possible overflow
         }
         
-        case 16: // small int -
+        case 16: // operator -
         {
-            return reinterpret_cast<TObject*>(newInteger(lhs - rhs)); //FIXME possible overflow
+            return reinterpret_cast<TObject*>(newInteger( leftOperand - rightOperand )); //FIXME possible overflow
         }
         
-        case 36: // bit or
+        case 36: // operator |
         {
-            return reinterpret_cast<TObject*>(newInteger(lhs | rhs));
+            return reinterpret_cast<TObject*>(newInteger( leftOperand | rightOperand ));
         }
         
-        case 37: // bit and
+        case 37: // operator &
         {
-            return reinterpret_cast<TObject*>(newInteger(lhs & rhs));
+            return reinterpret_cast<TObject*>(newInteger( leftOperand & rightOperand ));
         }
         
-        case 39: // bit shift
+        case 39: // operator << if rightOperand < 0, operator >> if rightOperand >= 0
         {
             uint32_t result = 0;
-            int32_t signed_rhs = (int32_t) rhs;
-            if (signed_rhs < 0) {
+            int32_t signedRightOperand = (int32_t) rightOperand;
+            if (signedRightOperand < 0) {
                 //shift right 
-                result = lhs >> -signed_rhs;
+                result = leftOperand >> -signedRightOperand;
             } else {
                 // shift left ; catch overflow 
-                result = lhs << rhs;
-                if (lhs > result) {
+                result = leftOperand << rightOperand;
+                if (leftOperand > result) {
                     return globals.nilObject;
                 }
             }

@@ -114,10 +114,11 @@ private:
         TProcess*& process,
         TObject*& returnedValue);
     
+    // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(
         uint32_t opcode,
-        uint32_t lhs,
-        uint32_t rhs);
+        uint32_t leftOperand,
+        uint32_t rightOperand);
         
     void failPrimitive(
         TObjectArray& stack,
