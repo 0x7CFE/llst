@@ -1,9 +1,50 @@
 #include <memory.h>
 #include <stdio.h>
+#include <stdlib.h>
+
+bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
+{
+    void* heap = malloc(heapSize);
+    if (!heap)
+        return false;
+
+    memset(heap, 0, heapSize);
+    
+    m_staticHeapBase = (uint8_t*) heap;
+    m_staticHeapPointer = (uint8_t*) heap + heapSize;
+    return true;
+}
+
+bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
+{
+    if (heapSize % 2 != 0)
+        heapSize++;
+    
+    void* base = malloc(heapSize);
+    if (!base)
+        return false;
+
+    memset(base, 0, heapSize);
+    
+    m_heapSize = heapSize;
+    m_maxHeapSize = maxHeapSize;
+    
+    uint32_t mediane = heapSize / 2;
+    m_heapOne = (uint8_t*) base;
+    m_heapTwo = (uint8_t*) base + mediane;
+    
+    m_activeHeapOne = true;
+    m_activeHeapBase = m_heapOne;
+    m_activeHeapPointer = (uint8_t*) base + mediane;
+    m_inactiveHeapBase = (uint8_t*) base + mediane;
+    m_inactiveHeapPointer = (uint8_t*) base + heapSize;
+    
+    return true;
+}
 
 void* BakerMemoryManager::allocate(size_t requestedSize)
 {
-    size_t attempts = 3;
+    size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
@@ -15,13 +56,22 @@ void* BakerMemoryManager::allocate(size_t requestedSize)
         return result;
     }
     
-    fprintf(stderr, "Could not allocate %d bytes in heap after 3 attempts\n", requestedSize);
+    // TODO Grow the heap if object still not fits
+    
+    fprintf(stderr, "Could not allocate %d bytes in heap\n", requestedSize);
     return 0;
 }
 
 void* BakerMemoryManager::staticAllocate(size_t requestedSize)
 {
-    return 0; // TODO
+    uint8_t* newPointer = m_staticHeapPointer - requestedSize;
+    if (newPointer < m_staticHeapBase)
+    {
+        fprintf(stderr, "Could not allocate %d bytes in static heaps\n", requestedSize);
+        return 0; // TODO Report memory allocation error
+    }
+    m_staticHeapPointer = newPointer;
+    return newPointer;
 }
 
 BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
@@ -194,7 +244,7 @@ void BakerMemoryManager::collectGarbage()
     m_activeHeapOne = not m_activeHeapOne;
     
     m_inactiveHeapPointer = m_activeHeapPointer;
-    m_activeHeapPointer = m_activeHeapBase + m_heapSize;
+    m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2; // FIXME
     
     // Then, performing the collection. Seeking from the root
     // objects down the hierarchy to find active objects. 
