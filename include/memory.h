@@ -67,7 +67,7 @@ public:
     virtual ~BakerMemoryManager();
     
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
-    virtual bool  initializeStaticHeap(size_t staticHeapSize) = 0;
+    virtual bool  initializeStaticHeap(size_t staticHeapSize);
     virtual void* allocate(size_t requestedSize);
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  addStaticRoot(TObject* rootObject);

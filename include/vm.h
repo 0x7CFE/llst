@@ -18,10 +18,6 @@ public:
         
         returnNoReturn = 255
     }; 
-    
-    TExecuteResult execute(TProcess* process, uint32_t ticks);
-    SmalltalkVM() : m_image(0) {}
-    
 private:
     enum {
         extended = 0,
@@ -70,12 +66,6 @@ private:
         Dictionary,
         Block,
     };
-    
-    TClass* getRootClass(TClassID id);
-    
-    std::list<TObject*> m_rootStack;
-    //HeapMemoryManager staticMemoryManager(); TODO
-    Image m_image; //TODO
     
     struct TMethodCacheEntry
     {
@@ -129,10 +119,15 @@ private:
         uint32_t lhs,
         uint32_t rhs);
     
+    std::list<TObject*> m_rootStack;
+    
+    Image*          m_image;
     IMemoryManager* m_memoryManager;
     
-    //template<class T> TClass* getClass(TObject* object);
-public:
+public:    
+    TExecuteResult execute(TProcess* process, uint32_t ticks);
+    SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
+        : m_image(image), m_memoryManager(m_memoryManager) {}
     
     template<class T> T* newObject(size_t objectSize = 0);
     TObject* newObject(TSymbol* className, size_t objectSize);
@@ -143,7 +138,7 @@ public:
 template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
 {
     // TODO fast access to common classes
-    TClass* klass = (TClass*) m_image.getGlobal(T::InstanceClassName());
+    TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
     if (!klass)
         return (T*) globals.nilObject;
     

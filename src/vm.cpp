@@ -313,7 +313,7 @@ void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TCon
 TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
 {
     // TODO fast access to common classes
-    TClass* klass = (TClass*) m_image.getGlobal(className);
+    TClass* klass = (TClass*) m_image->getGlobal(className);
     if (!klass)
         return globals.nilObject;
     
