@@ -1,14 +1,17 @@
 #include <iostream>
-#include <vm.h>
 #include <stdio.h>
+#include <memory>
+
+#include <vm.h>
 
 int main(int argc, char **argv) {
-    //HeapMemoryManager staticHeap(80000);
+    std::auto_ptr<IMemoryManager> bakerMemoryManager(new BakerMemoryManager());
+    bakerMemoryManager->initializeHeap(4096);
     
-    Image testImage(0);
-    testImage.loadImage("../image/testImage");
+    std::auto_ptr<Image> testImage(new Image(bakerMemoryManager.get()));
+    testImage->loadImage("../image/testImage");
     
-    SmalltalkVM vm;
+    SmalltalkVM vm(testImage.get(), bakerMemoryManager.get());
     
     // Creating runtime context
     TProcess* initProcess = vm.newObject<TProcess>();
@@ -26,7 +29,10 @@ int main(int argc, char **argv) {
     initContext->stackTop = newInteger(0);
     initContext->method = globals.initialMethod;
     
+    // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
+    
+    // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:
             printf("User defined return");

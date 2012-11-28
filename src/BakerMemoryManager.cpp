@@ -1,7 +1,7 @@
 #include <memory.h>
 #include <stdio.h>
 
-void* BakerMemoryManager::allocateMemory(size_t requestedSize)
+void* BakerMemoryManager::allocate(size_t requestedSize)
 {
     size_t attempts = 3;
     while (attempts-- > 0) {
@@ -19,7 +19,12 @@ void* BakerMemoryManager::allocateMemory(size_t requestedSize)
     return 0;
 }
 
-TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
+void* BakerMemoryManager::staticAllocate(size_t requestedSize)
+{
+    return 0; // TODO
+}
+
+BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
 {
     TMovableObject* oldPlace       = object;
     TMovableObject* previousObject = 0;
