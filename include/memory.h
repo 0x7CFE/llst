@@ -57,13 +57,7 @@ private:
     };
     TMovableObject* moveObject(TMovableObject* object);
 public:
-    BakerMemoryManager() : 
-        m_gcCount(0), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0), 
-        m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0), 
-        m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
-        m_staticHeapBase(0), m_staticHeapPointer(0)
-    { }
-    
+    BakerMemoryManager();
     virtual ~BakerMemoryManager();
     
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);

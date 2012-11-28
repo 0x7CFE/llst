@@ -2,6 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+BakerMemoryManager::BakerMemoryManager() : 
+    m_gcCount(0), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0), 
+    m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0), 
+    m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
+    m_staticHeapBase(0), m_staticHeapPointer(0)
+{ 
+    
+}
+
+BakerMemoryManager::~BakerMemoryManager()
+{
+    
+}
+
 bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
 {
     void* heap = malloc(heapSize);
@@ -260,5 +274,10 @@ void BakerMemoryManager::collectGarbage()
         staticRoots[i] = moveObject(staticRoots[i]); */
     
     // TODO flush the method cache
+}
+
+void BakerMemoryManager::addStaticRoot(TObject* rootObject)
+{
+    // TODO
 }
 
