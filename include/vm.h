@@ -124,6 +124,17 @@ private:
         TObjectArray& stack,
         uint32_t& stackTop);
     
+    void initVariablesFromContext(TContext* context,
+                                    TMethod& method,
+                                    TByteObject& byteCodes,
+                                    uint32_t& bytePointer,
+                                    TObjectArray& stack,
+                                    uint32_t& stackTop,
+                                    TObjectArray& temporaries,
+                                    TObjectArray& arguments,
+                                    TObjectArray& instanceVariables,
+                                    TSymbolArray& literals);
+    
     std::list<TObject*> m_rootStack;
     
     Image*          m_image;

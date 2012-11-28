@@ -62,7 +62,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     TObjectArray& arguments         = *context->arguments;
     TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
     TSymbolArray& literals          = *method->literals;
-    
+    //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
     TObject* returnedValue = globals.nilObject;
     
     while (true) {
@@ -169,7 +169,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 //if(returnedValue == returnError) //FIXME !!!111
                 //    return returnedValue;
                 context = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
-                //goto doReturn; //FIXME T_T
+                context = context->previousContext;
+                //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+                stack[stackTop++] = returnedValue;
             } break;
                 
             case doSpecial: {
@@ -207,39 +209,46 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
     TSymbolArray& literals          = *method->literals;
     
     switch(instruction.low) {
-        case SelfReturn:
+        case SelfReturn: {
             returnedValue = arguments[0]; // FIXME why instanceVariables? bug?
                                           // Have a look at interp.c: 605 and 1434
-            goto doReturn; //FIXME T_T
-            
+            context = context->previousContext;
+            //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+            stack[stackTop++] = returnedValue;
+        } break;
+        
         case StackReturn:
         {
             returnedValue = stack[--stackTop];
-            
-            doReturn: //FIXME T_T
             context = context->previousContext;
-            goto doReturn2; //FIXME T_T
-            
-            doReturn2:
-            if(context == 0 || context == globals.nilObject) {
-                process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-                process->context = context;
-                process->result = returnedValue;
-                return returnReturned;
-            }
-            stack       = *context->stack;
-            stackTop    = getIntegerValue(context->stackTop);
+            //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
             stack[stackTop++] = returnedValue;
-            method      = context->method;
-            byteCodes   = *method->byteCodes;
-            bytePointer = getIntegerValue(context->bytePointer);
+            
+//             doReturn:
+//             context = context->previousContext;
+//             goto doReturn2;
+//             
+//             doReturn2:
+//             if(context == 0 || context == globals.nilObject) {
+//                 process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+//                 process->context = context;
+//                 process->result = returnedValue;
+//                 return returnReturned;
+//             }
+//             stack       = *context->stack;
+//             stackTop    = getIntegerValue(context->stackTop);
+//             stack[stackTop++] = returnedValue;
+//             method      = context->method;
+//             byteCodes   = *method->byteCodes;
+//             bytePointer = getIntegerValue(context->bytePointer);
         } break;
         
         case BlockReturn: {
             returnedValue = stack[--stackTop];
             TBlock* ContextAsBlock = (TBlock*) context;
             context = ContextAsBlock->creatingContext->previousContext;
-            goto doReturn2; // FIXME T_T
+            //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+            stack[stackTop++] = returnedValue;
         } break;
                         
         case Duplicate: {
@@ -736,4 +745,27 @@ TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t leftOperand, uint32_
 
 void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
     stack[stackTop++] = globals.nilObject;
+}
+
+void SmalltalkVM::initVariablesFromContext(TContext* context,
+                                    TMethod& method,
+                                    TByteObject& byteCodes,
+                                    uint32_t& bytePointer,
+                                    TObjectArray& stack,
+                                    uint32_t& stackTop,
+                                    TObjectArray& temporaries,
+                                    TObjectArray& arguments,
+                                    TObjectArray& instanceVariables,
+                                    TSymbolArray& literals)
+{
+    method          = *context->method;
+    byteCodes       = *method.byteCodes;
+    bytePointer     = getIntegerValue(context->bytePointer);
+    stack           = *context->stack;
+    stackTop        = getIntegerValue(context->stackTop);
+    
+    temporaries       = *context->temporaries;
+    arguments         = *context->arguments;
+    instanceVariables = *(TObjectArray*) arguments[0];
+    literals          = *method.literals;
 }
