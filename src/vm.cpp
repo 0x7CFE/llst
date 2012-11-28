@@ -132,12 +132,12 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
             
             case sendBinary: {
-                TObject* arg2 = stack[--stackTop],
-                         arg1 = stack[--stackTop];
+                TObject* arg2 = stack[--stackTop];
+                TObject* arg1 = stack[--stackTop];
                 if( isSmallInteger(arg1) && isSmallInteger(arg2) )
                 {
-                    uint32_t rhs = getIntegerValue(reinterpret_cast<TInteger*>(arg2)),
-                             lhs = getIntegerValue(reinterpret_cast<TInteger*>(arg1));
+                    uint32_t rhs = getIntegerValue(reinterpret_cast<TInteger>(arg2));
+                    uint32_t lhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));
                     switch(instruction.low)
                     {
                         case 0: // operator <
@@ -168,8 +168,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, *process);
                 //if(returnedValue == returnError) //FIXME !!!111
                 //    return returnedValue;
-                context = m_rootStack.back(); m_rootStack.pop_back();
-                goto doReturn; //FIXME T_T
+                context = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
+                //goto doReturn; //FIXME T_T
             } break;
                 
             case doSpecial: {
@@ -557,7 +557,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             TClass* klass       = (TClass*) stack[--stackTop];
             TByteObject* obj    = (TByteObject*) stack[--stackTop];
             uint32_t size       = obj->getSize();
-            TByteObject* clone  = newObject(klass->name, size);
+            TByteObject* clone  = (TByteObject*) newObject(klass->name, size);
             uint32_t i          = size;
             while(i-- > 0)
                 (*clone)[i] = (*obj)[i];
