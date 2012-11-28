@@ -5,29 +5,29 @@
 #include <vm.h>
 
 int main(int argc, char **argv) {
-    std::auto_ptr<IMemoryManager> bakerMemoryManager(new BakerMemoryManager());
-    bakerMemoryManager->initializeHeap(4096);
+    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
+    memoryManager->initializeHeap(65536);
     
-    std::auto_ptr<Image> testImage(new Image(bakerMemoryManager.get()));
+    std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     testImage->loadImage("../image/testImage");
     
-    SmalltalkVM vm(testImage.get(), bakerMemoryManager.get());
+    SmalltalkVM vm(testImage.get(), memoryManager.get());
     
     // Creating runtime context
-    TProcess* initProcess = vm.newObject<TProcess>();
     TContext* initContext = vm.newObject<TContext>();
-    
+    TProcess* initProcess = vm.newObject<TProcess>();
     initProcess->context = initContext;
     
     initContext->arguments = (TObjectArray*) globals.nilObject;
-    initContext->temporaries = vm.newObject<TObjectArray>(20); //TODO
     initContext->bytePointer = newInteger(0);
     initContext->previousContext = (TContext*) globals.nilObject;
     
-    uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
+    const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
     initContext->stack = vm.newObject<TObjectArray>(stackSize);
     initContext->stackTop = newInteger(0);
+    
     initContext->method = globals.initialMethod;
+    initContext->temporaries = vm.newObject<TObjectArray>(initContext->method->temporarySize);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
