@@ -580,7 +580,7 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
     // Slot size is computed depending on the object type
     size_t slotSize = sizeof(TObjectArray) + objectSize * sizeof(TObjectArray*);
     
-    void* objectSlot = m_memoryManager->allocateMemory(slotSize);
+    void* objectSlot = m_memoryManager->allocate(slotSize);
     if (!objectSlot)
         return (TObjectArray*) globals.nilObject;
     
@@ -667,6 +667,7 @@ TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t lhs, uint32_t rhs)
             return reinterpret_cast<TObject*>(newInteger( result ));
         }
         
-        default: ; /* FIXME possible error */
+        default: 
+            return globals.nilObject; /* FIXME possible error */
     }
 }

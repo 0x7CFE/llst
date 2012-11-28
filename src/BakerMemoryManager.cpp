@@ -1,7 +1,7 @@
 #include <memory.h>
 #include <stdio.h>
 
-void* BakerMemoryManager::allocateMemory(size_t requestedSize)
+void* BakerMemoryManager::allocate(size_t requestedSize)
 {
     size_t attempts = 3;
     while (attempts-- > 0) {
@@ -17,6 +17,11 @@ void* BakerMemoryManager::allocateMemory(size_t requestedSize)
     
     fprintf(stderr, "Could not allocate %d bytes in heap after 3 attempts\n", requestedSize);
     return 0;
+}
+
+void* BakerMemoryManager::staticAllocate(size_t requestedSize)
+{
+    return 0; // TODO
 }
 
 BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)

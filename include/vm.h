@@ -154,7 +154,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     else 
         slotSize = sizeof(T) + objectSize * sizeof(T*);
         
-    void* objectSlot = m_memoryManager->allocateMemory(slotSize);
+    void* objectSlot = m_memoryManager->allocate(slotSize);
     if (!objectSlot)
         return (T*) globals.nilObject;
     

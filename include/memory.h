@@ -11,7 +11,8 @@ public:
     virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
     virtual bool initializeStaticHeap(size_t staticHeapSize) = 0;
     
-    virtual void* allocateMemory(size_t size) = 0;
+    virtual void* allocate(size_t size) = 0;
+    virtual void* staticAllocate(size_t size) = 0;
     virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
 };
@@ -57,8 +58,8 @@ private:
     TMovableObject* moveObject(TMovableObject* object);
 public:
     BakerMemoryManager() : 
-        m_gcCount(0), m_heapSize(0), m_maxHeapSize(0), m_activeHeapOne(true),
-        m_heapOne(0), m_heapTwo(0), m_inactiveHeapBase(0), m_inactiveHeapPointer(0), 
+        m_gcCount(0), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0), 
+        m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0), 
         m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
         m_staticHeapBase(0), m_staticHeapPointer(0)
     { }
@@ -67,19 +68,21 @@ public:
     
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
     virtual bool  initializeStaticHeap(size_t staticHeapSize) = 0;
-    virtual void* allocateMemory(size_t requestedSize);
+    virtual void* allocate(size_t requestedSize);
+    virtual void* staticAllocate(size_t requestedSize);
+    virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
 };
 
 
 class Image {
 private:
-    int    imageFileFD;
-    size_t imageFileSize;
+    int      m_imageFileFD;
+    size_t   m_imageFileSize;
     
-    void*    imageMap;     // pointer to the map base
-    uint8_t* imagePointer; // sliding pointer
-    std::vector<TObject*> indirects;
+    void*    m_imageMap;     // pointer to the map base
+    uint8_t* m_imagePointer; // sliding pointer
+    std::vector<TObject*> m_indirects;
     
     enum TImageRecordType {
         invalidObject = 0,
@@ -98,8 +101,8 @@ private:
     IMemoryManager* m_memoryManager;
 public:
     Image(IMemoryManager* manager) 
-        : imageFileFD(-1), imageFileSize(0), 
-          imagePointer(0), m_memoryManager(manager) 
+        : m_imageFileFD(-1), m_imageFileSize(0), 
+          m_imagePointer(0), m_memoryManager(manager) 
     {}
     
     bool     loadImage(const char* fileName);
