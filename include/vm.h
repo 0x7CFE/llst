@@ -118,6 +118,10 @@ private:
         uint32_t opcode,
         uint32_t lhs,
         uint32_t rhs);
+        
+    void failPrimitive(
+        TObjectArray& stack,
+        uint32_t& stackTop);
     
     std::list<TObject*> m_rootStack;
     
