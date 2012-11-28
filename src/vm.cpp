@@ -42,17 +42,6 @@ void SmalltalkVM::flushCache()
         m_lookupCache[i].methodName = 0;
 }
 
-// uint32_t getIntegerValue(const TInteger* value)
-// {
-//     uint32_t integer = reinterpret_cast<uint32_t>(value);
-//     if (integer & 1 == 1)
-//         return integer >> 1;
-//     else {
-//         // TODO get the value from boxed object
-//         return 0;
-//     }
-// }
-
 #define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
 
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t ticks)
@@ -395,6 +384,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         {
             TObject* arg1 = stack[--stackTop];
             TObjectArray* array = (TObjectArray*) stack[--stackTop];
+            TObject* val = opcode == 5 ? stack[--stackTop] : globals.nilObject; 
             if (! isSmallInteger(arg1) ) {
                 failPrimitive(stack, stackTop);
                 break;
@@ -409,7 +399,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             if(opcode == 24) // Array at
                 return (*array)[idx];
             else {
-                TObject* val = stack[--stackTop];
                 (*array)[idx] = val;
                 // TODO gc ?
                 return reinterpret_cast<TObject*>(array);
@@ -427,23 +416,12 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(newInteger(result));
         } break;
         
-        case 7:
+        case 7: // allocate new object
         {
             TObject* size  = stack[--stackTop];
             TClass*  klass = (TClass*) stack[--stackTop];
             uint32_t fieldsCount = getIntegerValue(reinterpret_cast<TInteger>(size));
-            
-            // TODO rewrite using proper newObject()
-            uint32_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
-            void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
-            if (!objectSlot)
-                return globals.nilObject;
-            
-            TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
-            for (uint32_t i = 0; i < fieldsCount; i++)
-                instance->putField(i, globals.nilObject);
-            
-            return newObject(klass);
+            return newObject(klass->name, fieldsCount);
         } break;
         
         case 8:
@@ -474,15 +452,13 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             uint32_t lhs, rhs;
             {
                 TObject* arg1 = stack[--stackTop];
-                if (! isSmallInteger(arg1) ) {
-                    failPrimitive(stack, --stackTop);
-                    break;
-                }
-                TObject* arg2   = stack[--stackTop];
-                if (! isSmallInteger(arg2) ) {
+                TObject* arg2 = stack[--stackTop];
+                
+                if ( !isSmallInteger(arg1) || !isSmallInteger(arg2) ) {
                     failPrimitive(stack, stackTop);
                     break;
                 }
+                
                 rhs = getIntegerValue(reinterpret_cast<TInteger>(arg1));
                 lhs = getIntegerValue(reinterpret_cast<TInteger>(arg2));
             }
@@ -517,13 +493,14 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         case 22: // String:at:put
         {
             TObject* arg1 = stack[--stackTop];
+            TString* string = (TString*) stack[--stackTop];
+            TObject* arg3 = opcode == 22 ? stack[--stackTop] : globals.nilObject;
             if (! isSmallInteger(arg1) ) {
-                stackTop -= 2;
                 failPrimitive(stack, stackTop);
                 break;
             }
+            
             uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
-            TString* string = (TString*) stack[--stackTop];
             if (idx >= string->getSize()) {
                 failPrimitive(stack, --stackTop);
                 break;
@@ -532,7 +509,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             if(opcode == 21) // String:at
                 return reinterpret_cast<TObject*>(newInteger( (*string)[idx] ));
             else {
-                TInteger val = reinterpret_cast<TInteger>(stack[--stackTop]);
+                TInteger val = reinterpret_cast<TInteger>(arg3);
                 (*string)[idx] = getIntegerValue(val);
                 return reinterpret_cast<TObject*>(string);
             }
