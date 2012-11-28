@@ -34,8 +34,8 @@ TObject* Image::getGlobal(TSymbol* name)
 bool Image::openImageFile(const char* fileName)
 {
     // Opening file for reading 
-    imageFileFD = open(fileName, O_RDONLY);
-    if (imageFileFD < 0)
+    m_imageFileFD = open(fileName, O_RDONLY);
+    if (m_imageFileFD < 0)
     {
         fprintf(stderr, "Failed to open file %s : %s\n", fileName, strerror(errno));
         return false;
@@ -43,50 +43,50 @@ bool Image::openImageFile(const char* fileName)
     
     // Reading file size in bytes
     struct stat st;
-    if (fstat(imageFileFD, &st) < 0) {
-        close(imageFileFD);
-        imageFileFD = -1;
+    if (fstat(m_imageFileFD, &st) < 0) {
+        close(m_imageFileFD);
+        m_imageFileFD = -1;
         fprintf(stderr, "Failed to get file size : %s\n", strerror(errno));
         return false;
     }
-    imageFileSize = st.st_size;
+    m_imageFileSize = st.st_size;
 
     // Mapping the image file to the memory
-    imageMap = mmap(
+    m_imageMap = mmap(
         0,              // let the kernel provide the address
-        imageFileSize,  // map the entire image file
+        m_imageFileSize,  // map the entire image file
         PROT_READ,      // read only access
         MAP_PRIVATE,    // private mapping only for us
-        imageFileFD,    // map this file
+        m_imageFileFD,    // map this file
         0);             // from the very beginning (zero offset)
         
-    if (!imageMap) {
+    if (!m_imageMap) {
         fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
         
         // Something goes wrong
-        close(imageFileFD);
-        imageFileFD = -1;
+        close(m_imageFileFD);
+        m_imageFileFD = -1;
         return false;
     }
     
     // Initializing pointers
-    imagePointer = (uint8_t*) imageMap;
+    m_imagePointer = (uint8_t*) m_imageMap;
     return true;
 }
 
 void Image::closeImageFile()
 {
-    munmap(imageMap, imageFileSize);
-    close(imageFileFD);
+    munmap(m_imageMap, m_imageFileSize);
+    close(m_imageFileFD);
     
-    imagePointer = 0;
-    imageMap = 0;
-    imageFileSize = 0;
+    m_imagePointer = 0;
+    m_imageMap = 0;
+    m_imageFileSize = 0;
 }
 
 uint32_t Image::readWord()
 {
-    if (imagePointer == ((uint8_t*)imageMap + imageFileSize) )
+    if (m_imagePointer == ((uint8_t*)m_imageMap + m_imageFileSize) )
         return 0; // Unexpected EOF TODO break
     
     uint32_t value = 0;
@@ -94,7 +94,7 @@ uint32_t Image::readWord()
     
     // Very stupid yet simple multibyte encoding
     // value = 255 + 255 + ... + x where x < 255
-    while ( (byte = *imagePointer++) == 255 ) {
+    while ( (byte = *m_imagePointer++) == 255 ) {
         value += byte; // adding 255 part
     }
     value += byte; // adding remaining part
@@ -111,7 +111,7 @@ TObject* Image::readObject()
     //fprintf(stderr, "Reading record %d\n", (uint32_t) type);
     switch (type) {
         case invalidObject: 
-            fprintf(stderr, "Invalid object at offset %p\n", (void*) (imagePointer - (uint8_t*)imageMap));
+            fprintf(stderr, "Invalid object at offset %p\n", (void*) (m_imagePointer - (uint8_t*)m_imageMap));
             exit(1); 
             break;
         
@@ -119,10 +119,10 @@ TObject* Image::readObject()
             uint32_t fieldsCount = readWord();
             
             size_t slotSize   = sizeof(TObject) + fieldsCount * sizeof(TObject*);
-            void*  objectSlot = m_memoryAllocator->allocateMemory(slotSize);
+            void*  objectSlot = m_memoryManager->staticAllocate(slotSize);
             
             TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
-            indirects.push_back(newObject);
+            m_indirects.push_back(newObject);
             
             TClass* objectClass  = (TClass*) readObject(); 
             newObject->setClass(objectClass);
@@ -134,8 +134,8 @@ TObject* Image::readObject()
         }
         
         case inlineInteger: {
-            uint32_t value = * reinterpret_cast<uint32_t*>(imagePointer);
-            imagePointer += sizeof(uint32_t);
+            uint32_t value = * reinterpret_cast<uint32_t*>(m_imagePointer);
+            m_imagePointer += sizeof(uint32_t);
             TInteger newObject = newInteger(ntohs(value));
             return reinterpret_cast<TObject*>(newObject);
         }
@@ -149,13 +149,12 @@ TObject* Image::readObject()
             // normal pointers will always have the lowest bit 0
             slotSize = (slotSize + sizeof(TObject*) - 1) & ~0x3;
             
-            void*  objectSlot = m_memoryAllocator->allocateMemory(slotSize);
+            void*  objectSlot = m_memoryManager->staticAllocate(slotSize);
             TByteObject* newByteObject = new(objectSlot) TByteObject(dataSize, 0); 
-            indirects.push_back(newByteObject);
+            m_indirects.push_back(newByteObject);
             
             for (uint32_t i = 0; i < dataSize; i++)
                 (*newByteObject)[i] = (uint8_t) readWord();
-            std::string bytes((const char*)newByteObject->getBytes(), newByteObject->getSize());
             
             TClass* objectClass = (TClass*) readObject();
             newByteObject->setClass(objectClass);
@@ -165,12 +164,12 @@ TObject* Image::readObject()
         
         case previousObject: {
             uint32_t index = readWord();
-            TObject* newObject = indirects[index];
+            TObject* newObject = m_indirects[index];
             return newObject;
         }
         
         case nilObject:
-            return indirects[0]; // nilObject is always the first in the image
+            return m_indirects[0]; // nilObject is always the first in the image
         
         default:
             fprintf(stderr, "Unknown record type %d\n", type);
@@ -186,7 +185,16 @@ bool Image::loadImage(const char* fileName)
         return false;
     }
     
-    indirects.reserve(4096);
+    // TODO Check whether heap is already initialized
+    
+    // Multiplier of 1.5 of imageFileSize should be a good estimation for static heap size
+    if (!m_memoryManager->initializeStaticHeap(m_imageFileSize + m_imageFileSize / 2) )
+    {
+        closeImageFile();
+        return false;
+    }
+    
+    m_indirects.reserve(4096);
     
     globals.nilObject     = readObject();
     
@@ -206,8 +214,8 @@ bool Image::loadImage(const char* fileName)
     
     globals.badMethodSymbol = readObject();
     
-    fprintf(stdout, "Image read complete. Loaded %d objects\n", indirects.size());
-    indirects.clear();
+    fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
+    m_indirects.clear();
     
     closeImageFile();
     
