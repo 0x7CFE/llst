@@ -502,7 +502,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             
             uint32_t idx = getIntegerValue(reinterpret_cast<TInteger>(arg1)) - 1;
             if (idx >= string->getSize()) {
-                failPrimitive(stack, --stackTop);
+                failPrimitive(stack, stackTop);
                 break;
             }
             
@@ -515,9 +515,17 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             }
         } break;
         
-        case 23:
+        case 23: // ByteObject clone
         {
-
+            TClass* klass       = (TClass*) stack[--stackTop];
+            TByteObject* obj    = (TByteObject*) stack[--stackTop];
+            uint32_t size       = obj->getSize();
+            TByteObject* clone  = newObject(klass->name, size);
+            uint32_t i          = size;
+            while(i-- > 0)
+                (*clone)[i] = (*obj)[i];
+            clone->setClass(klass);
+            return (TObject*) clone;
         } break;
         
         case 25: // Integer /
@@ -534,12 +542,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         case 32: // Integer new
         {
             TObject* top = stack[--stackTop];
-            TInteger integer = reinterpret_cast<TInteger>(top);
-            bool isSmallInt = integer & 1;
-            if(!isSmallInt) {
+            if( !isSmallInteger(top) ) {
                 failPrimitive(stack, stackTop);
                 break;
             }
+            TInteger integer = reinterpret_cast<TInteger>(top);
             uint32_t value = getIntegerValue(integer);
             return reinterpret_cast<TObject*>(newInteger(value));
         } break;
