@@ -220,10 +220,10 @@ struct TDictionary : public TObject {
     // Returns NULL if nothing was found
     TObject*      find(TSymbol* key);
     TObject*      find(const char* key);
+    
 private:    
     static int compareSymbols(TSymbol* left, TSymbol* right);
     static int compareSymbols(TSymbol* left, const char* right);
-    
 };
 
 struct TClass : public TObject {

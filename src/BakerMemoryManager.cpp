@@ -26,11 +26,13 @@ bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
     
     m_staticHeapBase = (uint8_t*) heap;
     m_staticHeapPointer = (uint8_t*) heap + heapSize;
+    
     return true;
 }
 
 bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
 {
+    // To initialize properly we need a heap with an even size
     if (heapSize % 2 != 0)
         heapSize++;
     
