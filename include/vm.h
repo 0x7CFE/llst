@@ -142,54 +142,36 @@ private:
     IMemoryManager* m_memoryManager;
     
     void onCollectionOccured();
+    
+    TObject* newBinaryObject(TClass* klass, size_t slotSize);
+    TObject* newOrdinaryObject(TClass* klass, size_t slotSize);
 public:    
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_image(image), m_memoryManager(memoryManager) {}
     
-    
-    
     template<class T> T* newObject(size_t objectSize = 0);
-    TObject* newObject(TSymbol* className, size_t objectSize);
-    TObject* newObject(TClass* klass);
-    
 };
 
-template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
+template<class T> T* SmalltalkVM::newObject(size_t dataSize /*= 0*/)
 {
     // TODO fast access to common classes
     TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
     if (!klass)
         return (T*) globals.nilObject;
     
-    // Slot size is computed depending on the object type
-    size_t slotSize = 0;
-    if (T::InstancesAreBinary())    
-        slotSize = sizeof(T) + correctPadding(objectSize);
-    else 
-        slotSize = sizeof(T) + objectSize * sizeof(T*);
-
-    bool gcOccured = false;
-    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
-    if (!objectSlot)
-        return (T*) globals.nilObject;
-    
-    if (gcOccured)
-        onCollectionOccured();
-    
-    size_t sizeInPointers = slotSize / sizeof(TObject*);
-    T* instance = (T*) new (objectSlot) TObject(sizeInPointers, klass);
-    if (! T::InstancesAreBinary())     
-    {
-        for (uint32_t i = 0; i < sizeInPointers; i++)
-            instance->putField(i, globals.nilObject);
+    if (T::InstancesAreBinary()) {   
+        uint32_t slotSize = sizeof(T) + correctPadding(dataSize);
+        return (T*) newBinaryObject(klass, slotSize);
+    } else {
+        size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
+        return (T*) newOrdinaryObject(klass, slotSize);
     }
-    
-    return instance;
 }
 
-// Specialization of newObject for array
-template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize /*= 0*/);
+// Specializations of newObject for known types
+template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t dataSize /*= 0*/);
+template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize /*= 0*/);
 
 
 #endif

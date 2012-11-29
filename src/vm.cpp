@@ -3,6 +3,50 @@
 #include <stdlib.h>
 #include <stdio.h>
 
+TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
+{
+    bool gcOccured = false;
+    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
+    if (!objectSlot)
+        return globals.nilObject;
+    
+    if (gcOccured)
+        onCollectionOccured();
+    
+    size_t sizeInPointers = slotSize / sizeof(TObject*);
+    TObject* instance = new (objectSlot) TObject(sizeInPointers, klass);
+    return instance;
+}
+
+TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t slotSize)
+{
+    bool gcOccured = false;
+    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
+    if (!objectSlot)
+        return globals.nilObject;
+    
+    if (gcOccured)
+        onCollectionOccured();
+    
+    size_t sizeInPointers = slotSize / sizeof(TObject*);
+    TObject* instance = new (objectSlot) TObject(sizeInPointers, klass);
+    
+    return instance;
+}
+
+template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t dataSize)
+{
+    TClass* klass = globals.arrayClass;
+    return (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
+}
+
+template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize)
+{
+    TClass* klass = globals.contextClass;
+    return (TContext*) newOrdinaryObject(klass, sizeof(TContext));
+}
+
+
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
@@ -362,55 +406,6 @@ void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TCon
     
 }
 
-TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
-{
-    // TODO fast access to common classes
-    TClass* klass = (TClass*) m_image->getGlobal(className);
-    if (!klass)
-        return globals.nilObject;
-    
-    // Slot size is computed depending on the object type
-    size_t slotSize = 0;
-//     if (T::InstancesAreBinary())    
-//         slotSize = sizeof(T) + objectSize;
-//     else 
-        slotSize = sizeof(TObject) + objectSize * sizeof(TObject*);
-
-    bool gcOccured = false;
-    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured); 
-    if (!objectSlot)
-        return globals.nilObject;
-    
-    if (gcOccured)
-        onCollectionOccured();
-    
-    TObject* instance = new (objectSlot) TObject(objectSize, klass);
-    for (uint32_t i = 0; i < objectSize; i++)
-        instance->putField(i, globals.nilObject);
-    
-    return instance;
-}
-
-TObject* SmalltalkVM::newObject(TClass* klass)
-{
-    uint32_t fieldsCount = getIntegerValue(klass->instanceSize);
-    uint32_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
-    
-    bool gcOccured = false;
-    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured); 
-    if (!objectSlot)
-        return globals.nilObject;
-    
-    if (gcOccured)
-        onCollectionOccured();
-    
-    TObject* instance = new (objectSlot) TObject(slotSize, klass);
-    for (uint32_t i = 0; i < fieldsCount; i++)
-        instance->putField(i, globals.nilObject);
-    
-    return instance;
-}
-
 TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TProcess& process)
 {
     switch(opcode)
@@ -462,8 +457,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         {
             TObject* size  = stack[--stackTop];
             TClass*  klass = (TClass*) stack[--stackTop];
-            uint32_t fieldsCount = getIntegerValue(reinterpret_cast<TInteger>(size));
-            return newObject(klass->name, fieldsCount);
+            uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
+            return newOrdinaryObject(klass, sizeInPointers * sizeof(TObject*)); 
         } break;
         
         case 8:
@@ -622,8 +617,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             
             // Creating clone
             uint32_t dataSize  = original->getSize();
-            TByteObject* clone = (TByteObject*) newObject(klass->name, dataSize); // FIXME direct method
-            clone->setClass(klass);
+            TByteObject* clone = (TByteObject*) newBinaryObject(klass, dataSize * sizeof(TObject*));
             
             // Cloning data
             for (uint32_t i = 0; i < dataSize; i++)
@@ -690,24 +684,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
     }
     
     return globals.nilObject;
-}
-
-template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize /*= 0*/)
-{
-    TClass* klass = globals.arrayClass;
-    
-    // Slot size is computed depending on the object type
-    size_t slotSize = sizeof(TObjectArray) + objectSize * sizeof(TObjectArray*);
-    
-    void* objectSlot = m_memoryManager->allocate(slotSize);
-    if (!objectSlot)
-        return (TObjectArray*) globals.nilObject;
-    
-    TObjectArray* instance = (TObjectArray*) new (objectSlot) TObject(objectSize, klass);
-    for (uint32_t i = 0; i < objectSize; i++)
-        instance->putField(i, globals.nilObject);
-    
-    return instance;
 }
 
 TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t leftOperand, uint32_t rightOperand)
