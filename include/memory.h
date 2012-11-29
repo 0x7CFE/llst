@@ -5,13 +5,14 @@
 #include <stdint.h>
 #include <types.h>
 #include <vector>
+#include <hash_map>
 
 class IMemoryManager {
 public:
     virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
     virtual bool initializeStaticHeap(size_t staticHeapSize) = 0;
     
-    virtual void* allocate(size_t size) = 0;
+    virtual void* allocate(size_t size, bool* collectionOccured = 0) = 0;
     virtual void* staticAllocate(size_t size) = 0;
     virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
@@ -54,11 +55,6 @@ private:
         TObject* data[0];
     };
     
-    // This contains an array of pointers of objects from the
-    // static heap to the dynamic one. It is used during the GC
-    // as a root for pointer iteration.
-    TObjectArray* m_staticRoots;
-    
     // During GC we need to treat all objects in a very simple manner, 
     // just as pointer holders. Class field is also a pointer so we
     // treat it just as one more object field
@@ -67,13 +63,23 @@ private:
         TMovableObject* data[0];
     };
     TMovableObject* moveObject(TMovableObject* object);
+    
+    // This contains an array of pointers of objects from the
+    // static heap to the dynamic one. It is used during the GC
+    // as a root for pointer iteration.
+    //TObjectArray* m_staticRoots;
+    
+    // FIXME temporary solution before GC will prove it's working
+    std::vector<TMovableObject*> m_staticRoots;
+    //std::hash_map<TObject*, TObject*> m_staticRoots;
+    
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
     
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
-    virtual void* allocate(size_t requestedSize);
+    virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();

@@ -19,7 +19,7 @@ public:
         returnNoReturn = 255
     }; 
 private:
-    enum {
+    enum Opcode {
         extended = 0,
         pushInstance,
         pushArgument,    
@@ -38,16 +38,16 @@ private:
     };
     
     enum Special {
-        SelfReturn = 1,
-        StackReturn,
-        BlockReturn,
-        Duplicate,
-        PopTop,
-        Branch,
-        BranchIfTrue,
-        BranchIfFalse,
-        SendToSuper = 11,
-        Breakpoint = 12
+        selfReturn = 1,
+        stackReturn,
+        blockReturn,
+        duplicate,
+        popTop,
+        branch,
+        branchIfTrue,
+        branchIfFalse,
+        sendToSuper = 11,
+        breakpoint = 12
     };
     
     enum {
@@ -89,7 +89,7 @@ private:
     TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
     
     // flush the method lookup cache
-    void flushCache();
+    void flushMethodCache();
     
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
     
@@ -135,15 +135,19 @@ private:
                                     TObjectArray& instanceVariables,
                                     TSymbolArray& literals);
     
-    std::list<TObject*> m_rootStack;
+    // TODO Think about other memory organization
+    std::vector<TObject*> m_rootStack;
     
     Image*          m_image;
     IMemoryManager* m_memoryManager;
     
+    void onCollectionOccured();
 public:    
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_image(image), m_memoryManager(memoryManager) {}
+    
+    
     
     template<class T> T* newObject(size_t objectSize = 0);
     TObject* newObject(TSymbol* className, size_t objectSize);
@@ -161,18 +165,23 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     // Slot size is computed depending on the object type
     size_t slotSize = 0;
     if (T::InstancesAreBinary())    
-        slotSize = sizeof(T) + objectSize;
+        slotSize = sizeof(T) + correctPadding(objectSize);
     else 
         slotSize = sizeof(T) + objectSize * sizeof(T*);
-        
-    void* objectSlot = m_memoryManager->allocate(slotSize);
+
+    bool gcOccured = false;
+    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
     if (!objectSlot)
         return (T*) globals.nilObject;
     
-    T* instance = (T*) new (objectSlot) TObject(objectSize, klass);
+    if (gcOccured)
+        onCollectionOccured();
+    
+    size_t sizeInPointers = slotSize / sizeof(TObject*);
+    T* instance = (T*) new (objectSlot) TObject(sizeInPointers, klass);
     if (! T::InstancesAreBinary())     
     {
-        for (uint32_t i = 0; i < objectSize; i++)
+        for (uint32_t i = 0; i < sizeInPointers; i++)
             instance->putField(i, globals.nilObject);
     }
     

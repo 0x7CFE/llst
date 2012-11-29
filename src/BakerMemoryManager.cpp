@@ -26,11 +26,13 @@ bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
     
     m_staticHeapBase = (uint8_t*) heap;
     m_staticHeapPointer = (uint8_t*) heap + heapSize;
+    
     return true;
 }
 
 bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
 {
+    // To initialize properly we need a heap with an even size
     if (heapSize % 2 != 0)
         heapSize++;
     
@@ -55,19 +57,24 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     
     // Allocating static roots. We could not set the class
     // of this object because image is not loaded yet
-    void* slot = allocate(512 * sizeof(TObject*));
+    // void* slot = allocate(512 * sizeof(TObject*));
     // m_staticRoots = new (slot) TObjectArray(512, 0);
     
     
     return true;
 }
 
-void* BakerMemoryManager::allocate(size_t requestedSize)
+void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
+    if (gcOccured)
+        *gcOccured = false;
+    
     size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
+            if (gcOccured)
+                *gcOccured = true;
             continue;
         }
         
@@ -269,21 +276,25 @@ void BakerMemoryManager::collectGarbage()
     // Then, performing the collection. Seeking from the root
     // objects down the hierarchy to find active objects. 
     // Then moving them to the new active heap.
+
     
-    /* TObject* rootStack;   
-    TObject* staticRoots;
-    
-    for (uint32_t i = 0; i < size; i++)
-        rootStack[i] = moveObject(rootStack[i]);
-    
-    for (uint32_t i = 0; i < staticRootSize; i++)
-        staticRoots[i] = moveObject(staticRoots[i]); */
+
+    // TODO This container should be garbage collected too
+    std::vector<TMovableObject*>::iterator iRoot = m_staticRoots.begin();
+    for (; iRoot != m_staticRoots.end(); ++iRoot)
+        *iRoot = moveObject(*iRoot);
     
     // TODO flush the method cache
 }
 
 void BakerMemoryManager::addStaticRoot(TObject* rootObject)
 {
-    // TODO
+    // Checking whether root is already present in the list
+    std::vector<TMovableObject*>::iterator iRoot = m_staticRoots.begin();
+    for (; iRoot != m_staticRoots.end(); ++iRoot)
+        if (*iRoot == (TMovableObject*) rootObject)
+            return;
+    
+    m_staticRoots.push_back((TMovableObject*) rootObject);
 }
 

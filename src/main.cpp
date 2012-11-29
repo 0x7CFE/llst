@@ -27,7 +27,9 @@ int main(int argc, char **argv) {
     initContext->stackTop = newInteger(0);
     
     initContext->method = globals.initialMethod;
-    initContext->temporaries = vm.newObject<TObjectArray>( getIntegerValue(initContext->method->temporarySize) );
+    
+    // TODO load value from getIntegerValue(initContext->method->temporarySize)
+    initContext->temporaries = vm.newObject<TObjectArray>(42);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
