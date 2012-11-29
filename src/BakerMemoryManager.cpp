@@ -64,17 +64,17 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     return true;
 }
 
-void* BakerMemoryManager::allocate(size_t requestedSize, bool* collectionOccured /*= 0*/ )
+void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
-    if (collectionOccured)
-        *collectionOccured = false;
+    if (gcOccured)
+        *gcOccured = false;
     
     size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
-            if (collectionOccured)
-                *collectionOccured = true;
+            if (gcOccured)
+                *gcOccured = true;
             continue;
         }
         

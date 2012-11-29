@@ -79,7 +79,7 @@ public:
     
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
-    virtual void* allocate(size_t requestedSize, bool* collectionOccured = 0);
+    virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
