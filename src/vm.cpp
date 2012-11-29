@@ -111,7 +111,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 m_rootStack.push_back(context);
                 TObjectArray* args = newObject<TObjectArray>(instruction.low);
                 
-                for (int index = instruction.low - 1; index > 0; index--)
+                for (int index = instruction.low - 1; index >= 0; index--)
                     (*args)[index] = stack[--stackTop];
                 
                 stack[stackTop++] = args;
@@ -346,7 +346,8 @@ void SmalltalkVM::doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t
 
 void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TContext* context, uint32_t& stackTop)
 {
-    TClass*  receiverClass    = (TClass*) arguments[0];
+    TObject* receiver      = arguments[0];
+    TClass*  receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
     
     TMethod* method = lookupMethod(selector, receiverClass);
     if (! method) {
