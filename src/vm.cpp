@@ -162,9 +162,26 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
                 
             case sendMessage: {
-                TSymbol* messageSelector = literals[instruction.low];
+                TSymbol* messageSelector       = literals[instruction.low];
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
-                doSendMessage(messageSelector, *messageArguments, context, stackTop); 
+                
+                TObject* receiver      = (*messageArguments)[0];
+                TClass*  receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+                TMethod* method        = lookupMethod(messageSelector, receiverClass);
+                
+                context->bytePointer = newInteger(bytePointer);
+                context->stackTop    = newInteger(stackTop);
+                
+                TContext* newContext            = newObject<TContext>();
+                newContext->arguments           = messageArguments;
+                newContext->method              = method;
+                newContext->previousContext     = context;
+                newContext->stack               = newObject<TObjectArray>(method->stackSize);
+                newContext->temporaries         = newObject<TObjectArray>(method->temporarySize);
+                
+                context = newContext;
+                initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+                //doSendMessage(messageSelector, *messageArguments, context, stackTop); 
             } break;
             
             case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
