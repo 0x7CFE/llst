@@ -37,7 +37,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     return 0;
 }
 
-void SmalltalkVM::flushCache()
+void SmalltalkVM::flushMethodCache()
 {
     for (size_t i = 0; i < LOOKUP_CACHE_SIZE; i++)
         m_lookupCache[i].methodName = 0;
@@ -375,10 +375,14 @@ TObject* SmalltalkVM::newObject(TSymbol* className, size_t objectSize)
 //         slotSize = sizeof(T) + objectSize;
 //     else 
         slotSize = sizeof(TObject) + objectSize * sizeof(TObject*);
-    
-    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+
+    bool gcOccured = false;
+    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured); 
     if (!objectSlot)
         return globals.nilObject;
+    
+    if (gcOccured)
+        onCollectionOccured();
     
     TObject* instance = new (objectSlot) TObject(objectSize, klass);
     for (uint32_t i = 0; i < objectSize; i++)
@@ -392,9 +396,13 @@ TObject* SmalltalkVM::newObject(TClass* klass)
     uint32_t fieldsCount = getIntegerValue(klass->instanceSize);
     uint32_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
     
-    void* objectSlot = malloc(slotSize); // TODO llvm_gc_allocate
+    bool gcOccured = false;
+    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured); 
     if (!objectSlot)
         return globals.nilObject;
+    
+    if (gcOccured)
+        onCollectionOccured();
     
     TObject* instance = new (objectSlot) TObject(slotSize, klass);
     for (uint32_t i = 0; i < fieldsCount; i++)
@@ -656,7 +664,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         
         case 34:
         {
-            flushCache();
+            flushMethodCache();
             //FIXME returnedValue is not to be globals.nilObject
         } break;
         
@@ -792,4 +800,12 @@ void SmalltalkVM::initVariablesFromContext(TContext* context,
     arguments         = *context->arguments;
     instanceVariables = *(TObjectArray*) arguments[0];
     literals          = *method.literals;
+}
+
+void SmalltalkVM::onCollectionOccured()
+{
+    // Here we need to handle the GC collection event
+    flushMethodCache();
+    
+    // TODO During the VM execution we may need to reload the context
 }

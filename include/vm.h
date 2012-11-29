@@ -89,7 +89,7 @@ private:
     TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
     
     // flush the method lookup cache
-    void flushCache();
+    void flushMethodCache();
     
     void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
     
@@ -135,15 +135,19 @@ private:
                                     TObjectArray& instanceVariables,
                                     TSymbolArray& literals);
     
-    std::list<TObject*> m_rootStack;
+    // TODO Think about other memory organization
+    std::vector<TObject*> m_rootStack;
     
     Image*          m_image;
     IMemoryManager* m_memoryManager;
     
+    void onCollectionOccured();
 public:    
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_image(image), m_memoryManager(memoryManager) {}
+    
+    
     
     template<class T> T* newObject(size_t objectSize = 0);
     TObject* newObject(TSymbol* className, size_t objectSize);
@@ -164,10 +168,14 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
         slotSize = sizeof(T) + objectSize;
     else 
         slotSize = sizeof(T) + objectSize * sizeof(T*);
-        
-    void* objectSlot = m_memoryManager->allocate(slotSize);
+
+    bool gcOccured = false;
+    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
     if (!objectSlot)
         return (T*) globals.nilObject;
+    
+    if (gcOccured);
+        onCollectionOccured();
     
     T* instance = (T*) new (objectSlot) TObject(objectSize, klass);
     if (! T::InstancesAreBinary())     
