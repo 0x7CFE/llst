@@ -38,16 +38,16 @@ private:
     };
     
     enum Special {
-        SelfReturn = 1,
-        StackReturn,
-        BlockReturn,
-        Duplicate,
-        PopTop,
-        Branch,
-        BranchIfTrue,
-        BranchIfFalse,
-        SendToSuper = 11,
-        Breakpoint = 12
+        selfReturn = 1,
+        stackReturn,
+        blockReturn,
+        duplicate,
+        popTop,
+        branch,
+        branchIfTrue,
+        branchIfFalse,
+        sendToSuper = 11,
+        breakpoint = 12
     };
     
     enum {
