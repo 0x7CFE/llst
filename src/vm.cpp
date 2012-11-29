@@ -704,65 +704,47 @@ template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t objectSize 
 
 TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t leftOperand, uint32_t rightOperand)
 {
-    switch(opcode)
-    {
+    switch(opcode) {
         case 10: // operator +
-        {
             return reinterpret_cast<TObject*>(newInteger( leftOperand + rightOperand )); //FIXME possible overflow
-        }
         
         case 11: // operator /
-        {
             if (rightOperand == 0)
                 return globals.nilObject;
             return reinterpret_cast<TObject*>(newInteger( leftOperand / rightOperand ));
-        }
         
         case 12: // operator %
-        {
             if (rightOperand == 0)
                 return globals.nilObject;
             return reinterpret_cast<TObject*>(newInteger( leftOperand % rightOperand ));
-        }
         
         case 13: // operator <
-        {
             if (leftOperand < rightOperand)
                 return globals.trueObject;
             else
                 return globals.falseObject;
-        }
         
         case 14: // operator ==
-        {
             if (leftOperand == rightOperand)
                 return globals.trueObject;
             else
                 return globals.falseObject;
-        }
         
         case 15: // operator *
-        {
             return reinterpret_cast<TObject*>(newInteger( leftOperand * rightOperand )); //FIXME possible overflow
-        }
         
         case 16: // operator -
-        {
             return reinterpret_cast<TObject*>(newInteger( leftOperand - rightOperand )); //FIXME possible overflow
-        }
         
         case 36: // operator |
-        {
             return reinterpret_cast<TObject*>(newInteger( leftOperand | rightOperand ));
-        }
         
         case 37: // operator &
-        {
             return reinterpret_cast<TObject*>(newInteger( leftOperand & rightOperand ));
-        }
         
-        case 39: // operator << if rightOperand < 0, operator >> if rightOperand >= 0
-        {
+        case 39: { 
+            // operator << if rightOperand < 0, operator >> if rightOperand >= 0
+            
             uint32_t result = 0;
             int32_t  signedRightOperand = (int32_t) rightOperand;
             
@@ -783,7 +765,6 @@ TObject* SmalltalkVM::doSmallInt( uint32_t opcode, uint32_t leftOperand, uint32_
         default: 
             return globals.nilObject; /* FIXME possible error */
     }
-    return globals.nilObject;
 }
 
 void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
