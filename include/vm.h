@@ -67,6 +67,50 @@ private:
         Block,
     };
     
+    enum SmallIntOpcode {
+        smallIntAdd = 10,
+        smallIntDiv,
+        smallIntMod,
+        smallIntLess,
+        smallIntEqual,
+        smallIntMul,
+        smallIntSub,
+        smallIntBitOr = 36,
+        smallIntBitAnd = 37,
+        smallIntBitShift = 39
+    };
+    
+    enum {
+        ioGetChar = 9,
+        ioPutChar = 3
+    };
+    
+    enum {
+        stringAt        = 21,
+        stringAtPut     = 22,
+        arrayAt         = 24,
+        arrayAtPut      = 5
+    };
+    
+    enum IntegerOpcode {
+        integerDiv = 25,
+        integerMod,
+        integerAdd,
+        integerMul,
+        integerSub,
+        integerLess,
+        integerEqual,
+    };
+    
+    enum {
+        returnIsEqual     = 1,
+        returnClass       = 2,
+        returnSize        = 4,
+        allocateObject    = 7,
+        allocateByteArray = 20,
+        cloneByteObject   = 23
+    };
+    
     struct TMethodCacheEntry
     {
         TObject* methodName;
@@ -116,7 +160,7 @@ private:
     
     // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(
-        uint32_t opcode,
+        SmallIntOpcode opcode,
         uint32_t leftOperand,
         uint32_t rightOperand);
         
