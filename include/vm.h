@@ -165,7 +165,7 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     // Slot size is computed depending on the object type
     size_t slotSize = 0;
     if (T::InstancesAreBinary())    
-        slotSize = sizeof(T) + objectSize;
+        slotSize = sizeof(T) + correctPadding(objectSize);
     else 
         slotSize = sizeof(T) + objectSize * sizeof(T*);
 
@@ -174,13 +174,14 @@ template<class T> T* SmalltalkVM::newObject(size_t objectSize /*= 0*/)
     if (!objectSlot)
         return (T*) globals.nilObject;
     
-    if (gcOccured);
+    if (gcOccured)
         onCollectionOccured();
     
-    T* instance = (T*) new (objectSlot) TObject(objectSize, klass);
+    size_t sizeInPointers = slotSize / sizeof(TObject*);
+    T* instance = (T*) new (objectSlot) TObject(sizeInPointers, klass);
     if (! T::InstancesAreBinary())     
     {
-        for (uint32_t i = 0; i < objectSize; i++)
+        for (uint32_t i = 0; i < sizeInPointers; i++)
             instance->putField(i, globals.nilObject);
     }
     
