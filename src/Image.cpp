@@ -129,6 +129,7 @@ TObject* Image::readObject()
             
             for (uint32_t i = 0; i < fieldsCount; i++)
                 newObject->putField(i, readObject());
+                //FIXME ? globals.initialMethod.temporarySize pointing to nilObject. i == 4
             
             return newObject;
         }

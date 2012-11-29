@@ -143,7 +143,7 @@ private:
 public:    
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
-        : m_image(image), m_memoryManager(m_memoryManager) {}
+        : m_image(image), m_memoryManager(memoryManager) {}
     
     template<class T> T* newObject(size_t objectSize = 0);
     TObject* newObject(TSymbol* className, size_t objectSize);
