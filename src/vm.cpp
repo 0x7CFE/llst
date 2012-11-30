@@ -13,13 +13,24 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     if (gcOccured)
         onCollectionOccured();
     
-    size_t sizeInPointers = slotSize / sizeof(TObject*);
-    TObject* instance = new (objectSlot) TObject(sizeInPointers, klass);
+    // Object size stored in the TSize field of any ordinary object contains
+    // number of pointers except for the first two fields
+    size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
+    
+    TObject* instance = new (objectSlot) TObject(fieldsCount - 2, klass);
+
+    for (uint32_t index = 0; index < fieldsCount; index++)
+        instance->putField(index, globals.nilObject);
+    
     return instance;
 }
 
-TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t slotSize)
+TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
 {
+    // All binary objects are descendants of ByteObject
+    // They could not have ordinary fields, so we may use it 
+    uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
+    
     bool gcOccured = false;
     void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
     if (!objectSlot)
@@ -28,8 +39,7 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t slotSize)
     if (gcOccured)
         onCollectionOccured();
     
-    size_t sizeInPointers = slotSize / sizeof(TObject*);
-    TObject* instance = new (objectSlot) TObject(sizeInPointers, klass);
+    TObject* instance = new (objectSlot) TObject(dataSize, klass);
     
     return instance;
 }
@@ -491,7 +501,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             TObject* size  = stack[--stackTop];
             TClass*  klass = (TClass*) stack[--stackTop];
             uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
-            return newOrdinaryObject(klass, sizeInPointers * sizeof(TObject*)); 
+            return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
         case 8:

@@ -187,14 +187,14 @@ private:
     
     void onCollectionOccured();
     
-    TObject* newBinaryObject(TClass* klass, size_t slotSize);
+    TObject* newBinaryObject(TClass* klass, size_t dataSize);
     TObject* newOrdinaryObject(TClass* klass, size_t slotSize);
 public:    
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_image(image), m_memoryManager(memoryManager) {}
     
-    template<class T> T* newObject(size_t objectSize = 0);
+    template<class T> T* newObject(size_t dataSize = 0);
 };
 
 template<class T> T* SmalltalkVM::newObject(size_t dataSize /*= 0*/)
@@ -205,8 +205,7 @@ template<class T> T* SmalltalkVM::newObject(size_t dataSize /*= 0*/)
         return (T*) globals.nilObject;
     
     if (T::InstancesAreBinary()) {   
-        uint32_t slotSize = sizeof(T) + correctPadding(dataSize);
-        return (T*) newBinaryObject(klass, slotSize);
+        return (T*) newBinaryObject(klass, dataSize);
     } else {
         size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
         return (T*) newOrdinaryObject(klass, slotSize);
