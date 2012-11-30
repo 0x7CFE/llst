@@ -107,20 +107,21 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     TContext* context = process->context;
     TMethod*  method  = context->method;
     
-    TByteObject& byteCodes   = *method->byteCodes;
-    uint32_t     bytePointer = getIntegerValue(context->bytePointer);
-    
-    TObjectArray&  stack     = *context->stack;
-    uint32_t       stackTop  = getIntegerValue(context->stackTop);
+    uint32_t  bytePointer = getIntegerValue(context->bytePointer);
+    uint32_t    stackTop  = getIntegerValue(context->stackTop);
 
-    TObjectArray& temporaries       = *context->temporaries;
-    TObjectArray& arguments         = *context->arguments;
-    TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
-    TSymbolArray& literals          = *method->literals;
     //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
     TObject* returnedValue = globals.nilObject;
     
     while (true) {
+        TByteObject&  byteCodes = *method->byteCodes;
+        TObjectArray& stack     = *context->stack;
+        
+        TObjectArray& temporaries       = *context->temporaries;
+        TObjectArray& arguments         = *context->arguments;
+        TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
+        TSymbolArray& literals          = *method->literals;
+        
         if (ticks && (--ticks == 0)) {
             // Time frame expired
             TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
@@ -175,9 +176,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TSymbol* messageSelector       = literals[instruction.low];
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
                 
-                TObject* receiver      = (*messageArguments)[0];
-                TClass*  receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
-                TMethod* method        = lookupMethod(messageSelector, receiverClass);
+                TObject* receiver       = (*messageArguments)[0];
+                TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+                TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
                 
                 // Save stack and opcode pointers
                 context->bytePointer = newInteger(bytePointer);
@@ -186,17 +187,21 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // Create a new context from the giving method and arguments
                 TContext* newContext            = newObject<TContext>();
                 newContext->arguments           = messageArguments;
-                newContext->method              = method;
+                newContext->method              = receiverMethod;
                 newContext->previousContext     = context;
-                newContext->stack               = newObject<TObjectArray>(getIntegerValue(method->stackSize));
-                newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+                newContext->stack               = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
+                newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
                 newContext->stackTop            = newInteger(0);
                 newContext->bytePointer         = newInteger(0);
                 
                 // Replace our context with the new one
                 context = newContext;
+                method  = newContext->method;
+                bytePointer  = getIntegerValue(newContext->bytePointer);
+                stackTop     = getIntegerValue(newContext->stackTop);
+                
                 // And init variables
-                initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+                //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
                 //doSendMessage(messageSelector, *messageArguments, context, stackTop); 
             } break;
             
