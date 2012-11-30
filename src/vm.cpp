@@ -17,7 +17,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     // number of pointers except for the first two fields
     size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
     
-    TObject* instance = new (objectSlot) TObject(fieldsCount - 2, klass);
+    TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
 
     for (uint32_t index = 0; index < fieldsCount; index++)
         instance->putField(index, globals.nilObject);

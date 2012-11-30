@@ -18,6 +18,9 @@ BakerMemoryManager::~BakerMemoryManager()
 
 bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
 {
+    if (heapSize % 2 != 0)
+        heapSize++;
+    
     void* heap = malloc(heapSize);
     if (!heap)
         return false;
