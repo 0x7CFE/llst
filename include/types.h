@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <new>
+#include <string>
 #include <string.h>
 
 struct TClass;
@@ -103,7 +104,7 @@ public:
     }
     
     uint32_t getSize() const { return size.getSize(); }
-    TClass*  getClass() const { return klass; } //TODO check whether the object is smallint?
+    TClass*  getClass() const { return klass; }
     
     // delegated methods from TSize
     bool isBinary() const { return size.isBinary(); }
@@ -160,6 +161,7 @@ struct TSymbol : public TByteObject {
             return false;
         return (memcmp(getBytes(), value, getSize()) == 0);
     }
+    std::string toString() { return std::string((const char*)fields, getSize()); }
 };
 
 struct TString : public TByteObject { 

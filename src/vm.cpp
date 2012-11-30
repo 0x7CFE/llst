@@ -13,13 +13,24 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     if (gcOccured)
         onCollectionOccured();
     
-    size_t sizeInPointers = slotSize / sizeof(TObject*);
-    TObject* instance = new (objectSlot) TObject(sizeInPointers, klass);
+    // Object size stored in the TSize field of any ordinary object contains
+    // number of pointers except for the first two fields
+    size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
+    
+    TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
+
+    for (uint32_t index = 0; index < fieldsCount; index++)
+        instance->putField(index, globals.nilObject);
+    
     return instance;
 }
 
-TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t slotSize)
+TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
 {
+    // All binary objects are descendants of ByteObject
+    // They could not have ordinary fields, so we may use it 
+    uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
+    
     bool gcOccured = false;
     void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
     if (!objectSlot)
@@ -28,8 +39,7 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t slotSize)
     if (gcOccured)
         onCollectionOccured();
     
-    size_t sizeInPointers = slotSize / sizeof(TObject*);
-    TObject* instance = new (objectSlot) TObject(sizeInPointers, klass);
+    TObject* instance = new (objectSlot) TObject(dataSize, klass);
     
     return instance;
 }
@@ -97,20 +107,22 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     TContext* context = process->context;
     TMethod*  method  = context->method;
     
-    TByteObject& byteCodes   = *method->byteCodes;
-    uint32_t     bytePointer = getIntegerValue(context->bytePointer);
-    
-    TObjectArray&  stack     = *context->stack;
-    uint32_t       stackTop  = getIntegerValue(context->stackTop);
+    uint32_t  bytePointer = getIntegerValue(context->bytePointer);
+    uint32_t    stackTop  = getIntegerValue(context->stackTop);
 
-    TObjectArray& temporaries       = *context->temporaries;
-    TObjectArray& arguments         = *context->arguments;
-    TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
-    TSymbolArray& literals          = *method->literals;
     //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
     TObject* returnedValue = globals.nilObject;
+    TClass* lastReceiver = (TClass*) globals.nilObject;
     
     while (true) {
+        TByteObject&  byteCodes = *method->byteCodes;
+        TObjectArray& stack     = *context->stack;
+        
+        TObjectArray& temporaries       = *context->temporaries;
+        TObjectArray& arguments         = *context->arguments;
+        TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
+        TSymbolArray& literals          = *method->literals;
+        
         if (ticks && (--ticks == 0)) {
             // Time frame expired
             TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
@@ -130,7 +142,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             instruction.low = byteCodes[bytePointer++];
         }
         
-        switch (instruction.high) { // 6 pushes, 2 assignes, 1 mark, 3 sendings, 2 do's
+        switch (instruction.high) { // 6 pushes, 2 assignments, 1 mark, 3 sendings, 2 do's
             case pushInstance:    stack[stackTop++] = instanceVariables[instruction.low]; break;
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
@@ -165,9 +177,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TSymbol* messageSelector       = literals[instruction.low];
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
                 
-                TObject* receiver      = (*messageArguments)[0];
-                TClass*  receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
-                TMethod* method        = lookupMethod(messageSelector, receiverClass);
+                TObject* receiver       = (*messageArguments)[0];
+                TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+                TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
                 
                 // Save stack and opcode pointers
                 context->bytePointer = newInteger(bytePointer);
@@ -176,17 +188,22 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // Create a new context from the giving method and arguments
                 TContext* newContext            = newObject<TContext>();
                 newContext->arguments           = messageArguments;
-                newContext->method              = method;
+                newContext->method              = receiverMethod;
                 newContext->previousContext     = context;
-                newContext->stack               = newObject<TObjectArray>(method->stackSize);
-                newContext->temporaries         = newObject<TObjectArray>(method->temporarySize);
+                newContext->stack               = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
+                newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
                 newContext->stackTop            = newInteger(0);
                 newContext->bytePointer         = newInteger(0);
                 
                 // Replace our context with the new one
                 context = newContext;
+                method  = newContext->method;
+                bytePointer  = getIntegerValue(newContext->bytePointer);
+                stackTop     = getIntegerValue(newContext->stackTop);
+                lastReceiver = receiverClass;
+                
                 // And init variables
-                initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+                //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
                 //doSendMessage(messageSelector, *messageArguments, context, stackTop); 
             } break;
             
@@ -270,6 +287,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 if (result != returnNoReturn)
                     return result;
             } break;
+            
+            default:
+                fprintf(stderr, "Invalid opcode %d at offset %d in method ", instruction.high, bytePointer);
+                fprintf(stderr, "'%s' of class '%s' \n", 
+                        method->name->toString().c_str(), 
+                        lastReceiver == globals.nilObject ? "unknown" : lastReceiver->name->toString().c_str());
+                exit(1);
         }
     }
 }
@@ -491,7 +515,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             TObject* size  = stack[--stackTop];
             TClass*  klass = (TClass*) stack[--stackTop];
             uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
-            return newOrdinaryObject(klass, sizeInPointers * sizeof(TObject*)); 
+            return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
         case 8:
