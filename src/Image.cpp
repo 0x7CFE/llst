@@ -197,7 +197,7 @@ bool Image::loadImage(const char* fileName)
     
     m_indirects.reserve(4096);
     
-    globals.nilObject     = readObject(); // FIXME bug: isSmallInteger(globals.nilObject) == true
+    globals.nilObject     = readObject();
     
     globals.trueObject    = readObject();
     globals.falseObject   = readObject();

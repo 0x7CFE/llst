@@ -103,7 +103,7 @@ public:
     }
     
     uint32_t getSize() const { return size.getSize(); }
-    TClass*  getClass() const { return klass; } //TODO check whether the object is smallint?
+    TClass*  getClass() const { return klass; }
     
     // delegated methods from TSize
     bool isBinary() const { return size.isBinary(); }
