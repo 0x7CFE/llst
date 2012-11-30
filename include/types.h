@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <new>
+#include <string>
 #include <string.h>
 
 struct TClass;
@@ -160,6 +161,7 @@ struct TSymbol : public TByteObject {
             return false;
         return (memcmp(getBytes(), value, getSize()) == 0);
     }
+    std::string toString() { return std::string((const char*)fields, getSize()); }
 };
 
 struct TString : public TByteObject { 

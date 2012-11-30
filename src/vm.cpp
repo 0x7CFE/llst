@@ -112,6 +112,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
 
     //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
     TObject* returnedValue = globals.nilObject;
+    TClass* lastReceiver = (TClass*) globals.nilObject;
     
     while (true) {
         TByteObject&  byteCodes = *method->byteCodes;
@@ -141,7 +142,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             instruction.low = byteCodes[bytePointer++];
         }
         
-        switch (instruction.high) { // 6 pushes, 2 assignes, 1 mark, 3 sendings, 2 do's
+        switch (instruction.high) { // 6 pushes, 2 assignments, 1 mark, 3 sendings, 2 do's
             case pushInstance:    stack[stackTop++] = instanceVariables[instruction.low]; break;
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
@@ -199,6 +200,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 method  = newContext->method;
                 bytePointer  = getIntegerValue(newContext->bytePointer);
                 stackTop     = getIntegerValue(newContext->stackTop);
+                lastReceiver = receiverClass;
                 
                 // And init variables
                 //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
@@ -285,6 +287,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 if (result != returnNoReturn)
                     return result;
             } break;
+            
+            default:
+                fprintf(stderr, "Invalid opcode %d at offset %d in method ", instruction.high, bytePointer);
+                fprintf(stderr, "'%s' of class '%s' \n", 
+                        method->name->toString().c_str(), 
+                        lastReceiver == globals.nilObject ? "unknown" : lastReceiver->name->toString().c_str());
+                exit(1);
         }
     }
 }
