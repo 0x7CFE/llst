@@ -188,8 +188,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 newContext->arguments           = messageArguments;
                 newContext->method              = method;
                 newContext->previousContext     = context;
-                newContext->stack               = newObject<TObjectArray>(method->stackSize);
-                newContext->temporaries         = newObject<TObjectArray>(method->temporarySize);
+                newContext->stack               = newObject<TObjectArray>(getIntegerValue(method->stackSize));
+                newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(method->temporarySize));
                 newContext->stackTop            = newInteger(0);
                 newContext->bytePointer         = newInteger(0);
                 
