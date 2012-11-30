@@ -169,17 +169,23 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TClass*  receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
                 TMethod* method        = lookupMethod(messageSelector, receiverClass);
                 
+                // Save stack and opcode pointers
                 context->bytePointer = newInteger(bytePointer);
                 context->stackTop    = newInteger(stackTop);
                 
+                // Create a new context from the giving method and arguments
                 TContext* newContext            = newObject<TContext>();
                 newContext->arguments           = messageArguments;
                 newContext->method              = method;
                 newContext->previousContext     = context;
                 newContext->stack               = newObject<TObjectArray>(method->stackSize);
                 newContext->temporaries         = newObject<TObjectArray>(method->temporarySize);
+                newContext->stackTop            = newInteger(0);
+                newContext->bytePointer         = newInteger(0);
                 
+                // Replace our context with the new one
                 context = newContext;
+                // And init variables
                 initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
                 //doSendMessage(messageSelector, *messageArguments, context, stackTop); 
             } break;
