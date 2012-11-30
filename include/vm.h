@@ -34,7 +34,7 @@ private:
         sendBinary,      
         pushBlock,       
         doPrimitive,     
-        doSpecial       
+        doSpecial = 15
     };
     
     enum Special {
