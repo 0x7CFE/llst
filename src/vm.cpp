@@ -147,12 +147,46 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
             case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
-            case pushConstant: 
-                doPushConstant(instruction.low, stack, stackTop); 
-                break;
-            case pushBlock:
+            case pushConstant:    doPushConstant(instruction.low, stack, stackTop);       break;
+            
+            case pushBlock: {
+                // Reading new byte pointer that points to the code right after the inline block
+                uint16_t newBytePointer = byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8);
+                bytePointer += 2;
                 
-                break;
+                // Storing current context
+                m_rootStack.push_back(context);
+                
+                // Creating block object
+                TBlock* block = newObject<TBlock>();
+                
+                // Allocating block's stack
+                uint32_t stackSize = getIntegerValue(method->stackSize);
+                block->stack = newObject<TObjectArray>(stackSize);
+                
+                // FIXME WTF? Why not newInteger(0) ?
+                block->bytePointer = 0;
+                block->stackTop = 0;
+                block->previousContext =  0; // Why not nilObject?
+                
+                block->blockBytePointer = newInteger(bytePointer);
+                block->argumentLocation = newInteger(instruction.low);
+                block->stack = (TObjectArray*) m_rootStack.back(); m_rootStack.pop_back();
+                
+                context = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
+                
+                // Assigning creatingContext depending on the hierarchy
+                // Nested blocks inherit the outer creating context
+                if (context->getClass() == globals.blockClass)
+                    block->creatingContext = static_cast<TBlock*>(context)->creatingContext;
+                else
+                    block->creatingContext = context;
+                
+                block->method = context->method;
+                method = context->method;
+                
+                // args, temps, stack and other will be reloaded automatically on the text iteration
+            } break;
                 
             case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
             case assignInstance:

@@ -193,9 +193,9 @@ struct TContext : public TObject {
 };
 
 struct TBlock : public TContext {
-    TObject*      argumentLocation;
+    TInteger      argumentLocation;
     TContext*     creatingContext;
-    TInteger      oldBytePointer;
+    TInteger      blockBytePointer;
 
     static const char* InstanceClassName() { return "Block"; }
 };
