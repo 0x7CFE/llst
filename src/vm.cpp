@@ -573,8 +573,8 @@ TObject* SmalltalkVM::doExecutePrimitive(
             
             // Checking the passed temps size
             TObjectArray* blockTemps = block->temporaries;
-            uint32_t argCount = loArgument;
-            if (argCount - 2 >=  (blockTemps ? blockTemps->getSize() : 0) ) {
+            uint32_t argCount = loArgument - 2;
+            if (argCount >=  (blockTemps ? blockTemps->getSize() : 0) ) {
                 stackTop -= (argCount  + 1); // unrolling stack
                 
                 /* TODO correct primitive failing
@@ -597,7 +597,7 @@ TObject* SmalltalkVM::doExecutePrimitive(
             }
                 
             // Loading temporaries array
-            for (uint32_t i = 0; i < argCount; i++)
+            for (uint32_t i = argCount; i >= 0; i--)
                 (*blockTemps)[argumentLocation + i] = stack[stackTop--];
 
             // Switching execution context to the invoking block
