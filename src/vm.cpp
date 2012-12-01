@@ -104,32 +104,32 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     m_rootStack.push_back(process);
     
     // current execution context and the executing method
-    TContext* context = process->context;
-    TMethod*  method  = context->method;
+    TContext* currentContext = process->context;
+    TMethod*  currentMethod  = currentContext->method;
     
-    uint32_t  bytePointer = getIntegerValue(context->bytePointer);
-    uint32_t    stackTop  = getIntegerValue(context->stackTop);
+    uint32_t  bytePointer = getIntegerValue(currentContext->bytePointer);
+    uint32_t    stackTop  = getIntegerValue(currentContext->stackTop);
 
     //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
     TObject* returnedValue = globals.nilObject;
     TClass* lastReceiver = (TClass*) globals.nilObject;
     
     while (true) {
-        TByteObject&  byteCodes = *method->byteCodes;
-        TObjectArray& stack     = *context->stack;
+        TByteObject&  byteCodes = *currentMethod->byteCodes;
+        TObjectArray& stack     = *currentContext->stack;
         
-        TObjectArray& temporaries       = *context->temporaries;
-        TObjectArray& arguments         = *context->arguments;
+        TObjectArray& temporaries       = *currentContext->temporaries;
+        TObjectArray& arguments         = *currentContext->arguments;
         TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
-        TSymbolArray& literals          = *method->literals;
+        TSymbolArray& literals          = *currentMethod->literals;
         
         if (ticks && (--ticks == 0)) {
             // Time frame expired
             TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-            newProcess->context = context;
+            newProcess->context = currentContext;
             newProcess->result = returnedValue;
-            context->bytePointer = newInteger(bytePointer);
-            context->stackTop = newInteger(stackTop);
+            currentContext->bytePointer = newInteger(bytePointer);
+            currentContext->stackTop = newInteger(stackTop);
             return returnTimeExpired;
         }
             
@@ -155,13 +155,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 bytePointer += 2;
                 
                 // Storing current context
-                m_rootStack.push_back(context);
+                // FIXME why do we need to push it? we're getting it out in (*)
+                m_rootStack.push_back(currentContext); 
                 
                 // Creating block object
                 TBlock* newBlock = newObject<TBlock>();
                 
                 // Allocating block's stack
-                uint32_t stackSize = getIntegerValue(method->stackSize);
+                uint32_t stackSize = getIntegerValue(currentMethod->stackSize);
                 newBlock->stack = newObject<TObjectArray>(stackSize);
                 
                 // FIXME WTF? Why not newInteger(0) ?
@@ -173,17 +174,18 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 newBlock->argumentLocation = newInteger(instruction.low);
                 newBlock->stack = (TObjectArray*) m_rootStack.back(); m_rootStack.pop_back();
                 
-                context = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
+                // FIXME (*)
+                currentContext = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
                 
                 // Assigning creatingContext depending on the hierarchy
                 // Nested blocks inherit the outer creating context
-                if (context->getClass() == globals.blockClass)
-                    newBlock->creatingContext = static_cast<TBlock*>(context)->creatingContext;
+                if (currentContext->getClass() == globals.blockClass)
+                    newBlock->creatingContext = static_cast<TBlock*>(currentContext)->creatingContext;
                 else
-                    newBlock->creatingContext = context;
+                    newBlock->creatingContext = currentContext;
                 
-                newBlock->method = context->method;
-                method = context->method;
+                newBlock->method = currentContext->method;
+                currentMethod = currentContext->method;
                 bytePointer = instruction.high;
                 stack[stackTop++] = newBlock;
                 
@@ -217,22 +219,22 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
                 
                 // Save stack and opcode pointers
-                context->bytePointer = newInteger(bytePointer);
-                context->stackTop    = newInteger(stackTop);
+                currentContext->bytePointer = newInteger(bytePointer);
+                currentContext->stackTop    = newInteger(stackTop);
                 
                 // Create a new context from the giving method and arguments
                 TContext* newContext            = newObject<TContext>();
                 newContext->arguments           = messageArguments;
                 newContext->method              = receiverMethod;
-                newContext->previousContext     = context;
+                newContext->previousContext     = currentContext;
                 newContext->stack               = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
                 newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
                 newContext->stackTop            = newInteger(0);
                 newContext->bytePointer         = newInteger(0);
                 
                 // Replace our context with the new one
-                context = newContext;
-                method  = newContext->method;
+                currentContext = newContext;
+                currentMethod  = newContext->method;
                 bytePointer  = getIntegerValue(newContext->bytePointer);
                 stackTop     = getIntegerValue(newContext->stackTop);
                 lastReceiver = receiverClass;
@@ -304,27 +306,27 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 // We have executed a primitive. Now we have to reject the current context execution
                 // and push the result onto the previous context's stack
-                context = context->previousContext;
-                method  = context->method; // We will get byteCodes from the method in the next iteration
+                currentContext = currentContext->previousContext;
+                currentMethod  = currentContext->method; // We will get byteCodes from the method in the next iteration
                 
                 // Inject the result...
-                stackTop = getIntegerValue(context->stackTop);
-                (*context->stack)[stackTop++] = returnedValue;
+                stackTop = getIntegerValue(currentContext->stackTop);
+                (*currentContext->stack)[stackTop++] = returnedValue;
                 
                 // Save the stack pointer
-                context->stackTop = newInteger(stackTop);
+                currentContext->stackTop = newInteger(stackTop);
                 
-                bytePointer = getIntegerValue(context->bytePointer);
+                bytePointer = getIntegerValue(currentContext->bytePointer);
                 
-                lastReceiver = (*context->arguments)[0][0].getClass();
+                lastReceiver = (*currentContext->arguments)[0][0].getClass();
             } break;
                 
             case doSpecial: {
                 TExecuteResult result = doDoSpecial(
                     instruction, 
-                    context, 
+                    currentContext, 
                     stackTop, 
-                    method, 
+                    currentMethod, 
                     bytePointer, 
                     process, 
                     returnedValue);
@@ -336,7 +338,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             default:
                 fprintf(stderr, "Invalid opcode %d at offset %d in method ", instruction.high, bytePointer);
                 fprintf(stderr, "'%s' of class '%s' \n", 
-                        method->name->toString().c_str(), 
+                        currentMethod->name->toString().c_str(), 
                         lastReceiver == globals.nilObject ? "unknown" : lastReceiver->name->toString().c_str());
                 exit(1);
         }
