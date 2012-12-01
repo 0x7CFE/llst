@@ -164,7 +164,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // This operation takes instruction.low arguments 
                 // from the top of the stack and creates new array with them
                 
-                m_rootStack.push_back(context);
                 TObjectArray* args = newObject<TObjectArray>(instruction.low);
                 
                 for (int index = instruction.low - 1; index >= 0; index--)
@@ -201,10 +200,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 bytePointer  = getIntegerValue(newContext->bytePointer);
                 stackTop     = getIntegerValue(newContext->stackTop);
                 lastReceiver = receiverClass;
-                
-                // And init variables
-                //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
-                //doSendMessage(messageSelector, *messageArguments, context, stackTop); 
             } break;
             
             case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
@@ -260,18 +255,32 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
                 
             case doPrimitive: {
+                //DoPrimitive is a hack. The interpretator never reaches opcodes after this one,
+                // albeit the compiler generates opcodes. But there are expections to the rules...
+                
                 uint8_t primitiveNumber = byteCodes[bytePointer++];
-                m_rootStack.push_back(context);
                 
                 returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, *process);
-                //if(returnedValue == returnError) //FIXME !!!111
-                //    return returnedValue;
+                // FIXME primitiveNumber exceptions:
+                // 19 - error trap
+                // 8  - block invocation
+                // 34 - flush method cache
                 
-                context = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
+                // We have executed a primitive. Now we have to reject the current context execution
+                // and push the result onto the previous context's stack
                 context = context->previousContext;
-                //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
+                method  = context->method; // We will get byteCodes from the method in the next iteration
                 
-                stack[stackTop++] = returnedValue;
+                // Inject the result...
+                stackTop = getIntegerValue(context->stackTop);
+                (*context->stack)[stackTop++] = returnedValue;
+                
+                // Save the stack pointer
+                context->stackTop = newInteger(stackTop);
+                
+                bytePointer = getIntegerValue(context->bytePointer);
+                
+                lastReceiver = (*context->arguments)[0][0].getClass();
             } break;
                 
             case doSpecial: {
@@ -331,23 +340,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
             //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
             stack[stackTop++] = returnedValue;
             
-//             doReturn:
-//             context = context->previousContext;
-//             goto doReturn2;
-//             
-//             doReturn2:
-//             if(context == 0 || context == globals.nilObject) {
-//                 process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-//                 process->context = context;
-//                 process->result = returnedValue;
-//                 return returnReturned;
-//             }
-//             stack       = *context->stack;
-//             stackTop    = getIntegerValue(context->stackTop);
-//             stack[stackTop++] = returnedValue;
-//             method      = context->method;
-//             byteCodes   = *method->byteCodes;
-//             bytePointer = getIntegerValue(context->bytePointer);
+
         } break;
         
         case blockReturn: {
@@ -800,31 +793,12 @@ TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, uint32_t leftOperand, u
     }
 }
 
+//TODO replace it later with a proper implementation.
+//failPrimitive should push nil into the stack(but it is a normal behaviour(doExecutePrimitive should put the result of execution into the stack)
+//but we need to handle situations like error trapping etc
+//we may put nil outside of doExecutePrimitive function and handle special situations by arg-ptr
 void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
     stack[stackTop++] = globals.nilObject;
-}
-
-void SmalltalkVM::initVariablesFromContext(TContext* context,
-                                    TMethod& method,
-                                    TByteObject& byteCodes,
-                                    uint32_t& bytePointer,
-                                    TObjectArray& stack,
-                                    uint32_t& stackTop,
-                                    TObjectArray& temporaries,
-                                    TObjectArray& arguments,
-                                    TObjectArray& instanceVariables,
-                                    TSymbolArray& literals)
-{
-    method            = *context->method;
-    byteCodes         = *method.byteCodes;
-    bytePointer       = getIntegerValue(context->bytePointer);
-    stack             = *context->stack;
-    stackTop          = getIntegerValue(context->stackTop);
-    
-    temporaries       = *context->temporaries;
-    arguments         = *context->arguments;
-    instanceVariables = *(TObjectArray*) arguments[0];
-    literals          = *method.literals;
 }
 
 void SmalltalkVM::onCollectionOccured()
