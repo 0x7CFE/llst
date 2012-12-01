@@ -27,22 +27,22 @@ initialize
     0008 SendMessage new:
     0009 AssignInstance 6               chars = Array new: 257
     0010 DoSpecial popTop
-    0011 PushConstant 1
-    0012 PushLiteral 3                  new:
+    0011 PushConstant 1                 1
+    0012 PushLiteral 3                  257
     0013 PushBlock
     0016     PushInstance 6             chars
     0017     PushTemporary 0
-    0018     PushLiteral 4              257
+    0018     PushLiteral 4              Char
     0019     PushTemporary 0            :idx                                                                                                                      
-    0020     PushConstant 1                                                                                                                                  
-    0021     MarkArguments 2                                                                                                                                 
+    0020     PushConstant 1             1                                                                                                                     
+    0021     MarkArguments 2            #(:idx 1)
     0022     SendMessage -              :(idx - 1) SmallInt ?
     0023     MarkArguments 2                                                                                                                                 
     0024     SendMessage basicNew:                                                                                                                           
     0025     MarkArguments 3                                                                                                                                 
     0026     SendMessage at:put:                                                                                                                             
     0027     DoSpecial stackReturn                                                                                                                           
-    0028 MarkArguments 3                                                                                                                                     
+    0028 MarkArguments 3                 #(1 257 block)                                                                                                                    
     0029 SendMessage to:do:
     0030 DoSpecial branch 34
     0033 PushConstant nil
