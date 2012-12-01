@@ -597,7 +597,7 @@ TObject* SmalltalkVM::doExecutePrimitive(
             }
                 
             // Loading temporaries array
-            for (uint32_t i = argCount; i >= 0; i--)
+            for (uint32_t i = argCount; i > 0; i--)
                 (*blockTemps)[argumentLocation + i] = stack[stackTop--];
 
             // Switching execution context to the invoking block
