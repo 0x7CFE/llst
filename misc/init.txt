@@ -1,0 +1,125 @@
+initialMethod
+    pushConstant    10 (nil)
+    markArguments   1
+    sendMessage     main
+    
+nil>>main
+    0000 PushLiteral 0              MetaChar
+    0001 MarkArguments 1            #(Char)
+    0002 SendMessage initialize     Char initialize
+    ...
+
+MetaChar
+initialize
+    0000 PushInstance 6
+    0001 SendUnary isNil
+    0002 DoSpecial branchIfFalse 33
+    0005 PushLiteral 0                  Array
+    0006 PushLiteral 1                  257
+    0007 MarkArguments 2                #(Array 257)
+    0008 SendMessage new:
+    0009 AssignInstance 6               chars = Array new: 257
+    0010 DoSpecial popTop
+    0011 PushConstant 1
+    0012 PushLiteral 3                  new:
+    0013 PushBlock
+    0016     PushInstance 6             chars
+    0017     PushTemporary 0
+    0018     PushLiteral 4              257
+    0019     PushTemporary 0            :idx                                                                                                                      
+    0020     PushConstant 1                                                                                                                                  
+    0021     MarkArguments 2                                                                                                                                 
+    0022     SendMessage -              :idx - 1 SmallInt ?                                                                                                                      
+    0023     MarkArguments 2                                                                                                                                 
+    0024     SendMessage basicNew:                                                                                                                           
+    0025     MarkArguments 3                                                                                                                                 
+    0026     SendMessage at:put:                                                                                                                             
+    0027     DoSpecial stackReturn                                                                                                                           
+    0028 MarkArguments 3                                                                                                                                     
+    0029 SendMessage to:do:
+    0030 DoSpecial branch 34
+    0033 PushConstant nil
+    0034 DoSpecial popTop
+    0035 DoSpecial selfReturn
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    0003 DoSpecial popTop
+    0004 PushArgument 0
+    0005 MarkArguments 1
+    0006 SendMessage initSingletons
+    0007 DoSpecial popTop
+    0008 PushBlock
+    0011     PushLiteral 3
+    0012     MarkArguments 1
+    0013     SendMessage print
+    0014     DoSpecial popTop
+    0015     PushLiteral 5
+    0016     MarkArguments 1
+    0017     SendMessage input
+    0018     AssignTemporary 0
+    0019     DoSpecial popTop                                                                                                                                           
+    0020     PushTemporary 0                                                                                                                                            
+    0021     SendUnary notNil                                                                                                                                           
+    0022     DoSpecial stackReturn                                                                                                                                      
+    0023 PushLiteral 7                                                                                                                                           
+    0024 MarkArguments 1                                                                                                                                                
+    0025 SendMessage print                                                                                                                                              
+    0026 DoSpecial popTop                                                                                                                                               
+    0027 PushLiteral 9                                                                                                                                                  
+    0028 MarkArguments 1                                                                                                                                                
+    0029 SendMessage input                                                                                                                                              
+    0030 AssignTemporary 0                                                                                                                                              
+    0031 DoSpecial popTop                                                                                                                                               
+    0032 PushTemporary 0
+    0033 SendUnary notNil
+    0034 DoSpecial branchIfFalse 56
+    0037 PushTemporary 0
+    0038 MarkArguments 1
+    0039 SendMessage isEmpty
+    0040 DoSpecial branchIfTrue 51
+    0043 PushTemporary 0
+    0044 MarkArguments 1
+    0045 SendMessage doIt
+    0046 MarkArguments 1
+    0047 SendMessage printNl
+    0048 DoSpecial branch 52
+    0051 PushConstant nil
+    0052 DoSpecial popTop
+    0053 DoSpecial branch 23
+    0056 PushConstant 0
+    0057 DoSpecial popTop
+    0058 DoSpecial selfReturn
