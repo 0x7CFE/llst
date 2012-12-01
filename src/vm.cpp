@@ -225,6 +225,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
                 TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
                 
+                if (receiverMethod == 0) {
+                    fprintf(stderr, "Failed to lookup selector '%s' of class '%s' ", 
+                            messageSelector->toString().c_str(), receiverClass->name->toString().c_str());
+                    fprintf(stderr, "at offset %d in method '%s' \n", 
+                            bytePointer - 1, currentMethod->name->toString().c_str());
+                    exit(1);
+                }
+                
                 // Save stack and opcode pointers
                 currentContext->bytePointer = newInteger(bytePointer);
                 currentContext->stackTop    = newInteger(stackTop);
