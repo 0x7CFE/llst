@@ -11,9 +11,9 @@ nil>>main
 
 MetaChar
 initialize
-    0000 PushInstance 6
-    0001 SendUnary isNil
-    0002 DoSpecial branchIfFalse 33
+    0000 PushInstance 6                 chars
+    0001 SendUnary isNil                chars isNil
+    0002 DoSpecial branchIfFalse 33     ifTrue:
     0005 PushLiteral 0                  Array
     0006 PushLiteral 1                  257
     0007 MarkArguments 2                #(Array 257)
@@ -29,7 +29,7 @@ initialize
     0019     PushTemporary 0            :idx                                                                                                                      
     0020     PushConstant 1                                                                                                                                  
     0021     MarkArguments 2                                                                                                                                 
-    0022     SendMessage -              :idx - 1 SmallInt ?                                                                                                                      
+    0022     SendMessage -              :(idx - 1) SmallInt ?
     0023     MarkArguments 2                                                                                                                                 
     0024     SendMessage basicNew:                                                                                                                           
     0025     MarkArguments 3                                                                                                                                 
