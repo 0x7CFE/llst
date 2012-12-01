@@ -107,6 +107,7 @@ private:
         returnClass       = 2,
         returnSize        = 4,
         allocateObject    = 7,
+        blockInvoke       = 8,
         allocateByteArray = 20,
         cloneByteObject   = 23
     };
@@ -144,9 +145,13 @@ private:
         uint32_t& stackTop);
     
     TObject* doExecutePrimitive(
-        uint8_t opcode, 
+        uint8_t opcode,
+        uint8_t loArgument,
+        TContext*& currentContext,
+        TMethod*& currentMethod,
         TObjectArray& stack, 
         uint32_t& stackTop,
+        uint32_t& bytePointer,
         TProcess& process);
     
     TExecuteResult doDoSpecial(

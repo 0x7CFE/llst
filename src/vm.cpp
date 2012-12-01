@@ -179,7 +179,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 newBlock->blockBytePointer = newInteger(bytePointer);
                 newBlock->argumentLocation = newInteger(instruction.low);
-                newBlock->method = currentContext->method;
                 
                 // Assigning creatingContext depending on the hierarchy
                 // Nested blocks inherit the outer creating context
@@ -187,6 +186,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                     newBlock->creatingContext = static_cast<TBlock*>(currentContext)->creatingContext;
                 else
                     newBlock->creatingContext = currentContext;
+                
+                newBlock->method = currentContext->method;
+                newBlock->arguments = currentContext->arguments;
+                newBlock->temporaries = currentContext->temporaries;
                 
                 // Setting the execution point to a place right after the inlined block,
                 // leaving the block object on top of the stack:
@@ -302,27 +305,36 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 uint8_t primitiveNumber = byteCodes[bytePointer++];
                 
-                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, *process);
-                // FIXME primitiveNumber exceptions:
-                // 19 - error trap
+                returnedValue = doExecutePrimitive(
+                    primitiveNumber, instruction.low, 
+                    currentContext, currentMethod, 
+                    stack, stackTop, bytePointer, *process);
+
+                // primitiveNumber exceptions:
+                // 19 - error trap            TODO
                 // 8  - block invocation
-                // 34 - flush method cache
-                
-                // We have executed a primitive. Now we have to reject the current context execution
-                // and push the result onto the previous context's stack
-                currentContext = currentContext->previousContext;
-                currentMethod  = currentContext->method; // We will get byteCodes from the method in the next iteration
-                
-                // Inject the result...
-                stackTop = getIntegerValue(currentContext->stackTop);
-                (*currentContext->stack)[stackTop++] = returnedValue;
-                
-                // Save the stack pointer
-                currentContext->stackTop = newInteger(stackTop);
-                
-                bytePointer = getIntegerValue(currentContext->bytePointer);
-                
-                lastReceiver = (*currentContext->arguments)[0][0].getClass();
+                // 34 - flush method cache    TODO
+                        
+                switch (primitiveNumber) {
+                    case blockInvoke:
+                        break;
+                        
+                    default:
+                        // We have executed a primitive. Now we have to reject the current context execution
+                        // and push the result onto the previous context's stack
+                        currentContext = currentContext->previousContext;
+                        currentMethod  = currentContext->method; // We will get byteCodes from the method in the next iteration
+                        
+                        // Inject the result...
+                        stackTop = getIntegerValue(currentContext->stackTop);
+                        (*currentContext->stack)[stackTop++] = returnedValue;
+                        
+                        // Save the stack pointer
+                        currentContext->stackTop = newInteger(stackTop);
+                        
+                        bytePointer = getIntegerValue(currentContext->bytePointer);
+                        // TODO lastReceiver = (*currentContext->arguments)[0][0].getClass();
+                }
             } break;
                 
             case doSpecial: {
@@ -489,7 +501,9 @@ void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TCon
     
 }
 
-TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TProcess& process)
+TObject* SmalltalkVM::doExecutePrimitive(
+    uint8_t opcode, uint8_t loArgument, TContext*& currentContext, TMethod*& currentMethod, 
+    TObjectArray& stack, uint32_t& stackTop, uint32_t& bytePointer, TProcess& process)
 {
     switch(opcode) {
         case returnIsEqual: {
@@ -545,7 +559,52 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
-        case 8: { // block invoke
+        case blockInvoke: { 
+            TBlock* block = (TBlock*) stack[--stackTop];
+            uint32_t argumentLocation = getIntegerValue(block->argumentLocation);
+            
+            // Checking the passed temps size
+            TObjectArray* blockTemps = block->temporaries;
+            uint32_t argCount = loArgument;
+            if (argCount - 2 >=  (blockTemps ? blockTemps->getSize() : 0) ) {
+                stackTop -= (argCount  + 1); // unrolling stack
+                
+                /* TODO correct primitive failing
+                 * Since we're continuing execution from a failed
+                 * primitive, re-fetch context if a GC had occurred
+                 * during the failed execution.  Supply a return value
+                 * for the failed primitive.
+                 *
+                //returnedValue = nilObject;
+                if(context != rootStack[--rootTop])
+                {
+                    context = rootStack[rootTop];
+                    method = context->data[methodInContext];
+                    stack = context->data[stackInContext];
+                    bp = bytePtr(method->data[byteCodesInMethod]);
+                    arguments = temporaries = literals = instanceVariables = 0;
+                } */
+                stack[stackTop++] = globals.nilObject;
+                return globals.nilObject;
+            }
+                
+            // Loading temporaries array
+            for (uint32_t i = 0; i < argCount; i++)
+                (*blockTemps)[argumentLocation + i] = stack[stackTop--];
+
+            // Switching execution context to the invoking block
+            block->previousContext = currentContext;
+            currentContext = block;
+            currentMethod  = block->method;
+            stackTop = 0; // resetting stack
+            
+            // Block is bound to the method's bytecodes, so it's
+            // first bytecode will not be zero but the value specified 
+            bytePointer = getIntegerValue(block->blockBytePointer);
+            
+            // Popping block object from the stack
+            m_rootStack.pop_back();
+            return block;
         } break;
         
         case smallIntAdd:
