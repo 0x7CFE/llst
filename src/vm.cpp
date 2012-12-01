@@ -150,13 +150,20 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case pushConstant:    doPushConstant(instruction.low, stack, stackTop);       break;
             
             case pushBlock: {
+                // Block objects are usually inlined in the wrapping method code
+                // pushBlock operation creates a block object initialized
+                // with the proper bytecode, stack, arguments and the wrapping context.
+                
+                // Blocks are not executed directly. Instead they should be invoking
+                // by calling the value method. Thus, all we need to do here is initialize 
+                // the block object and then skip the block body by incrementing the bytePointer
+                // to the block's bytecode' size. After that bytePointer will direct to the place 
+                // right after the block's body. There we'll probably find the actual invoking code
+                // such as sendMessage to a receiver with our block as a parameter or something similar.
+                
                 // Reading new byte pointer that points to the code right after the inline block
                 uint16_t newBytePointer = byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8);
                 bytePointer += 2;
-                
-                // Storing current context
-                // FIXME why do we need to push it? we're getting it out in (*)
-                m_rootStack.push_back(currentContext); 
                 
                 // Creating block object
                 TBlock* newBlock = newObject<TBlock>();
@@ -172,10 +179,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 newBlock->blockBytePointer = newInteger(bytePointer);
                 newBlock->argumentLocation = newInteger(instruction.low);
-                newBlock->stack = (TObjectArray*) m_rootStack.back(); m_rootStack.pop_back();
-                
-                // FIXME (*)
-                currentContext = (TContext*) m_rootStack.back(); m_rootStack.pop_back();
                 
                 // Assigning creatingContext depending on the hierarchy
                 // Nested blocks inherit the outer creating context
@@ -186,7 +189,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 newBlock->method = currentContext->method;
                 currentMethod = currentContext->method;
-                bytePointer = instruction.high;
+                
+                // Setting execution point to the place after the inlined block 
+                // leaving the block object on top of the stack:
+                bytePointer = newBytePointer;
                 stack[stackTop++] = newBlock;
                 
                 // args, temps, stack and other will be reloaded automatically on the text iteration
