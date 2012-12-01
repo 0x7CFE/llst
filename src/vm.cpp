@@ -163,7 +163,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 // Reading new byte pointer that points to the code right after the inline block
                 uint16_t newBytePointer = byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8);
-                bytePointer += 2;
+                bytePointer += 2; // skipping the newBytePointer's data
                 
                 // Creating block object
                 TBlock* newBlock = newObject<TBlock>();
@@ -179,6 +179,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 newBlock->blockBytePointer = newInteger(bytePointer);
                 newBlock->argumentLocation = newInteger(instruction.low);
+                newBlock->method = currentContext->method;
                 
                 // Assigning creatingContext depending on the hierarchy
                 // Nested blocks inherit the outer creating context
@@ -187,10 +188,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 else
                     newBlock->creatingContext = currentContext;
                 
-                newBlock->method = currentContext->method;
-                currentMethod = currentContext->method;
-                
-                // Setting execution point to the place after the inlined block 
+                // Setting the execution point to a place right after the inlined block,
                 // leaving the block object on top of the stack:
                 bytePointer = newBytePointer;
                 stack[stackTop++] = newBlock;
@@ -217,7 +215,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
                 
             case sendMessage: {
-                TSymbol* messageSelector       = literals[instruction.low];
+                TSymbol*      messageSelector  = literals[instruction.low];
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
                 
                 TObject* receiver       = (*messageArguments)[0];
@@ -229,21 +227,21 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 currentContext->stackTop    = newInteger(stackTop);
                 
                 // Create a new context from the giving method and arguments
-                TContext* newContext            = newObject<TContext>();
-                newContext->arguments           = messageArguments;
-                newContext->method              = receiverMethod;
-                newContext->previousContext     = currentContext;
-                newContext->stack               = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
-                newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
-                newContext->stackTop            = newInteger(0);
-                newContext->bytePointer         = newInteger(0);
+                TContext* newContext        = newObject<TContext>();
+                newContext->arguments       = messageArguments;
+                newContext->method          = receiverMethod;
+                newContext->previousContext = currentContext;
+                newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
+                newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
+                newContext->stackTop        = newInteger(0);
+                newContext->bytePointer     = newInteger(0);
                 
-                // Replace our context with the new one
+                // Replace current context with the new one
                 currentContext = newContext;
                 currentMethod  = newContext->method;
-                bytePointer  = getIntegerValue(newContext->bytePointer);
-                stackTop     = getIntegerValue(newContext->stackTop);
-                lastReceiver = receiverClass;
+                bytePointer    = getIntegerValue(newContext->bytePointer);
+                stackTop       = getIntegerValue(newContext->stackTop);
+                lastReceiver   = receiverClass;
             } break;
             
             case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
