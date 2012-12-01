@@ -31,7 +31,7 @@ initialize
     0012 PushLiteral 3                  257
     0013 PushBlock
     0016     PushInstance 6             chars
-    0017     PushTemporary 0
+    0017     PushTemporary 0            :idx
     0018     PushLiteral 4              Char
     0019     PushTemporary 0            :idx                                                                                                                      
     0020     PushConstant 1             1                                                                                                                     
@@ -48,3 +48,33 @@ initialize
     0033 PushConstant nil
     0034 DoSpecial popTop
     0035 DoSpecial selfReturn
+
+Number to: limit do: aBlock   
+    0000 PushArgument 0                  self
+    0001 AssignTemporary 0               | i | i <- self
+    0002 DoSpecial popTop
+    0003 PushBlock
+    0006     PushTemporary 0             i
+    0007     PushArgument 1              limit
+    0008     SendBinary <=
+    0009     DoSpecial stackReturn
+    0010 PushTemporary 0                 value of self
+    0011 PushArgument 1                  limit
+    0012 SendBinary <=
+    0013 DoSpecial branchIfFalse 29
+    0016 PushArgument 2                  aBlock
+    0017 PushTemporary 0                 i
+    0018 MarkArguments 2                 #(block i)
+    0019 SendMessage value:              aBlock value: i
+    0020 DoSpecial popTop
+    0021 PushTemporary 0                 i
+    0022 PushConstant 1                  1
+    0023 SendBinary +                    i + 1
+    0024 AssignTemporary 0               i <- i + 1
+    0025 DoSpecial popTop
+    0026 DoSpecial branch 10
+    0029 PushConstant 0
+    0030 DoSpecial popTop
+    0031 DoSpecial selfReturn
+    
+    
