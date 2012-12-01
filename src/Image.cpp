@@ -135,7 +135,9 @@ TObject* Image::readObject()
         }
         
         case inlineInteger: {
-            uint32_t value = * reinterpret_cast<uint32_t*>(m_imagePointer);
+            //uint32_t value = * reinterpret_cast<uint32_t*>(m_imagePointer);
+            uint32_t value = m_imagePointer[0] | (m_imagePointer[1] << 8) | 
+                            (m_imagePointer[2] << 16) | (m_imagePointer[3] << 24);
             m_imagePointer += sizeof(uint32_t);
             TInteger newObject = newInteger(value); // FIXME endianness
             return reinterpret_cast<TObject*>(newObject);

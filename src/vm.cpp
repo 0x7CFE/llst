@@ -104,32 +104,32 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     m_rootStack.push_back(process);
     
     // current execution context and the executing method
-    TContext* context = process->context;
-    TMethod*  method  = context->method;
+    TContext* currentContext = process->context;
+    TMethod*  currentMethod  = currentContext->method;
     
-    uint32_t  bytePointer = getIntegerValue(context->bytePointer);
-    uint32_t    stackTop  = getIntegerValue(context->stackTop);
+    uint32_t  bytePointer = getIntegerValue(currentContext->bytePointer);
+    uint32_t    stackTop  = getIntegerValue(currentContext->stackTop);
 
     //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
     TObject* returnedValue = globals.nilObject;
     TClass* lastReceiver = (TClass*) globals.nilObject;
     
     while (true) {
-        TByteObject&  byteCodes = *method->byteCodes;
-        TObjectArray& stack     = *context->stack;
+        TByteObject&  byteCodes = *currentMethod->byteCodes;
+        TObjectArray& stack     = *currentContext->stack;
         
-        TObjectArray& temporaries       = *context->temporaries;
-        TObjectArray& arguments         = *context->arguments;
+        TObjectArray& temporaries       = *currentContext->temporaries;
+        TObjectArray& arguments         = *currentContext->arguments;
         TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
-        TSymbolArray& literals          = *method->literals;
+        TSymbolArray& literals          = *currentMethod->literals;
         
         if (ticks && (--ticks == 0)) {
             // Time frame expired
             TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
-            newProcess->context = context;
+            newProcess->context = currentContext;
             newProcess->result = returnedValue;
-            context->bytePointer = newInteger(bytePointer);
-            context->stackTop = newInteger(stackTop);
+            currentContext->bytePointer = newInteger(bytePointer);
+            currentContext->stackTop = newInteger(stackTop);
             return returnTimeExpired;
         }
             
@@ -147,12 +147,57 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case pushArgument:    stack[stackTop++] = arguments[instruction.low];         break;
             case pushTemporary:   stack[stackTop++] = temporaries[instruction.low];       break;
             case pushLiteral:     stack[stackTop++] = literals[instruction.low];          break;
-            case pushConstant: 
-                doPushConstant(instruction.low, stack, stackTop); 
-                break;
-            case pushBlock:
+            case pushConstant:    doPushConstant(instruction.low, stack, stackTop);       break;
+            
+            case pushBlock: {
+                // Block objects are usually inlined in the wrapping method code
+                // pushBlock operation creates a block object initialized
+                // with the proper bytecode, stack, arguments and the wrapping context.
                 
-                break;
+                // Blocks are not executed directly. Instead they should be invoking
+                // by calling the value method. Thus, all we need to do here is initialize 
+                // the block object and then skip the block body by incrementing the bytePointer
+                // to the block's bytecode' size. After that bytePointer will direct to the place 
+                // right after the block's body. There we'll probably find the actual invoking code
+                // such as sendMessage to a receiver with our block as a parameter or something similar.
+                
+                // Reading new byte pointer that points to the code right after the inline block
+                uint16_t newBytePointer = byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8);
+                bytePointer += 2; // skipping the newBytePointer's data
+                
+                // Creating block object
+                TBlock* newBlock = newObject<TBlock>();
+                
+                // Allocating block's stack
+                uint32_t stackSize = getIntegerValue(currentMethod->stackSize);
+                newBlock->stack = newObject<TObjectArray>(stackSize);
+                
+                // FIXME WTF? Why not newInteger(0) ?
+                newBlock->bytePointer = 0;
+                newBlock->stackTop = 0;
+                newBlock->previousContext =  0; // Why not nilObject?
+                
+                newBlock->blockBytePointer = newInteger(bytePointer);
+                newBlock->argumentLocation = newInteger(instruction.low);
+                
+                // Assigning creatingContext depending on the hierarchy
+                // Nested blocks inherit the outer creating context
+                if (currentContext->getClass() == globals.blockClass)
+                    newBlock->creatingContext = static_cast<TBlock*>(currentContext)->creatingContext;
+                else
+                    newBlock->creatingContext = currentContext;
+                
+                newBlock->method = currentContext->method;
+                newBlock->arguments = currentContext->arguments;
+                newBlock->temporaries = currentContext->temporaries;
+                
+                // Setting the execution point to a place right after the inlined block,
+                // leaving the block object on top of the stack:
+                bytePointer = newBytePointer;
+                stack[stackTop++] = newBlock;
+                
+                // args, temps, stack and other will be reloaded automatically on the text iteration
+            } break;
                 
             case assignTemporary: temporaries[instruction.low] = stack[stackTop - 1];     break;
             case assignInstance:
@@ -173,33 +218,41 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
                 
             case sendMessage: {
-                TSymbol* messageSelector       = literals[instruction.low];
+                TSymbol*      messageSelector  = literals[instruction.low];
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
                 
                 TObject* receiver       = (*messageArguments)[0];
                 TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
                 TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
                 
+                if (receiverMethod == 0) {
+                    fprintf(stderr, "Failed to lookup selector '%s' of class '%s' ", 
+                            messageSelector->toString().c_str(), receiverClass->name->toString().c_str());
+                    fprintf(stderr, "at offset %d in method '%s' \n", 
+                            bytePointer - 1, currentMethod->name->toString().c_str());
+                    exit(1);
+                }
+                
                 // Save stack and opcode pointers
-                context->bytePointer = newInteger(bytePointer);
-                context->stackTop    = newInteger(stackTop);
+                currentContext->bytePointer = newInteger(bytePointer);
+                currentContext->stackTop    = newInteger(stackTop);
                 
                 // Create a new context from the giving method and arguments
-                TContext* newContext            = newObject<TContext>();
-                newContext->arguments           = messageArguments;
-                newContext->method              = receiverMethod;
-                newContext->previousContext     = context;
-                newContext->stack               = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
-                newContext->temporaries         = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
-                newContext->stackTop            = newInteger(0);
-                newContext->bytePointer         = newInteger(0);
+                TContext* newContext        = newObject<TContext>();
+                newContext->arguments       = messageArguments;
+                newContext->method          = receiverMethod;
+                newContext->previousContext = currentContext;
+                newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
+                newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
+                newContext->stackTop        = newInteger(0);
+                newContext->bytePointer     = newInteger(0);
                 
-                // Replace our context with the new one
-                context = newContext;
-                method  = newContext->method;
-                bytePointer  = getIntegerValue(newContext->bytePointer);
-                stackTop     = getIntegerValue(newContext->stackTop);
-                lastReceiver = receiverClass;
+                // Replace current context with the new one
+                currentContext = newContext;
+                currentMethod  = newContext->method;
+                bytePointer    = getIntegerValue(newContext->bytePointer);
+                stackTop       = getIntegerValue(newContext->stackTop);
+                lastReceiver   = receiverClass;
             } break;
             
             case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
@@ -260,35 +313,44 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 uint8_t primitiveNumber = byteCodes[bytePointer++];
                 
-                returnedValue = doExecutePrimitive(primitiveNumber, stack, stackTop, *process);
-                // FIXME primitiveNumber exceptions:
-                // 19 - error trap
+                returnedValue = doExecutePrimitive(
+                    primitiveNumber, instruction.low, 
+                    currentContext, currentMethod, 
+                    stack, stackTop, bytePointer, *process);
+
+                // primitiveNumber exceptions:
+                // 19 - error trap            TODO
                 // 8  - block invocation
-                // 34 - flush method cache
-                
-                // We have executed a primitive. Now we have to reject the current context execution
-                // and push the result onto the previous context's stack
-                context = context->previousContext;
-                method  = context->method; // We will get byteCodes from the method in the next iteration
-                
-                // Inject the result...
-                stackTop = getIntegerValue(context->stackTop);
-                (*context->stack)[stackTop++] = returnedValue;
-                
-                // Save the stack pointer
-                context->stackTop = newInteger(stackTop);
-                
-                bytePointer = getIntegerValue(context->bytePointer);
-                
-                lastReceiver = (*context->arguments)[0][0].getClass();
+                // 34 - flush method cache    TODO
+                        
+                switch (primitiveNumber) {
+                    case blockInvoke:
+                        break;
+                        
+                    default:
+                        // We have executed a primitive. Now we have to reject the current context execution
+                        // and push the result onto the previous context's stack
+                        currentContext = currentContext->previousContext;
+                        currentMethod  = currentContext->method; // We will get byteCodes from the method in the next iteration
+                        
+                        // Inject the result...
+                        stackTop = getIntegerValue(currentContext->stackTop);
+                        (*currentContext->stack)[stackTop++] = returnedValue;
+                        
+                        // Save the stack pointer
+                        currentContext->stackTop = newInteger(stackTop);
+                        
+                        bytePointer = getIntegerValue(currentContext->bytePointer);
+                        // TODO lastReceiver = (*currentContext->arguments)[0][0].getClass();
+                }
             } break;
                 
             case doSpecial: {
                 TExecuteResult result = doDoSpecial(
                     instruction, 
-                    context, 
+                    currentContext, 
                     stackTop, 
-                    method, 
+                    currentMethod, 
                     bytePointer, 
                     process, 
                     returnedValue);
@@ -300,7 +362,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             default:
                 fprintf(stderr, "Invalid opcode %d at offset %d in method ", instruction.high, bytePointer);
                 fprintf(stderr, "'%s' of class '%s' \n", 
-                        method->name->toString().c_str(), 
+                        currentMethod->name->toString().c_str(), 
                         lastReceiver == globals.nilObject ? "unknown" : lastReceiver->name->toString().c_str());
                 exit(1);
         }
@@ -447,12 +509,12 @@ void SmalltalkVM::doSendMessage(TSymbol* selector, TObjectArray& arguments, TCon
     
 }
 
-TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, uint32_t& stackTop, TProcess& process)
+TObject* SmalltalkVM::doExecutePrimitive(
+    uint8_t opcode, uint8_t loArgument, TContext*& currentContext, TMethod*& currentMethod, 
+    TObjectArray& stack, uint32_t& stackTop, uint32_t& bytePointer, TProcess& process)
 {
-    switch(opcode)
-    {
-        case returnIsEqual:
-        {
+    switch(opcode) {
+        case returnIsEqual: {
             TObject* arg2   = stack[--stackTop];
             TObject* arg1   = stack[--stackTop];
             
@@ -462,22 +524,19 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 return globals.falseObject;
         } break;
         
-        case returnClass:
-        {
+        case returnClass: {
             TObject* object = stack[--stackTop];
             return isSmallInteger(object) ? globals.smallIntClass : object->getClass();
         } break;
         
-        case ioPutChar:
-        {
+        case ioPutChar: {
             TInteger charObject = reinterpret_cast<TInteger>(stack[--stackTop]);
             uint8_t  charValue = getIntegerValue(charObject);
             putchar(charValue);
             return globals.nilObject;
         } break;
         
-        case ioGetChar:
-        {
+        case ioGetChar: {
             int32_t input = getchar();
             if(input == EOF)
                 return globals.nilObject;
@@ -485,15 +544,13 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
                 return reinterpret_cast<TObject*>(newInteger(input));
         } break;
         
-        case returnSize:
-        {
+        case returnSize: {
             TObject* object = stack[--stackTop];
             uint32_t returnedSize = isSmallInteger(object) ? 0 : object->getSize();
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
-        case 6: // start new process
-        {
+        case 6: { // start new process
             TInteger value = reinterpret_cast<TInteger>(stack[--stackTop]);
             uint32_t ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--stackTop];
@@ -503,17 +560,59 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(newInteger(result));
         } break;
         
-        case allocateObject:
-        {
+        case allocateObject: {
             TObject* size  = stack[--stackTop];
             TClass*  klass = (TClass*) stack[--stackTop];
             uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
             return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
-        case 8:
-        {
-            //TODO
+        case blockInvoke: { 
+            TBlock* block = (TBlock*) stack[--stackTop];
+            uint32_t argumentLocation = getIntegerValue(block->argumentLocation);
+            
+            // Checking the passed temps size
+            TObjectArray* blockTemps = block->temporaries;
+            uint32_t argCount = loArgument - 2;
+            if (argCount >=  (blockTemps ? blockTemps->getSize() : 0) ) {
+                stackTop -= (argCount  + 1); // unrolling stack
+                
+                /* TODO correct primitive failing
+                 * Since we're continuing execution from a failed
+                 * primitive, re-fetch context if a GC had occurred
+                 * during the failed execution.  Supply a return value
+                 * for the failed primitive.
+                 *
+                //returnedValue = nilObject;
+                if(context != rootStack[--rootTop])
+                {
+                    context = rootStack[rootTop];
+                    method = context->data[methodInContext];
+                    stack = context->data[stackInContext];
+                    bp = bytePtr(method->data[byteCodesInMethod]);
+                    arguments = temporaries = literals = instanceVariables = 0;
+                } */
+                stack[stackTop++] = globals.nilObject;
+                return globals.nilObject;
+            }
+                
+            // Loading temporaries array
+            for (uint32_t i = argCount; i > 0; i--)
+                (*blockTemps)[argumentLocation + i] = stack[stackTop--];
+
+            // Switching execution context to the invoking block
+            block->previousContext = currentContext;
+            currentContext = block;
+            currentMethod  = block->method;
+            stackTop = 0; // resetting stack
+            
+            // Block is bound to the method's bytecodes, so it's
+            // first bytecode will not be zero but the value specified 
+            bytePointer = getIntegerValue(block->blockBytePointer);
+            
+            // Popping block object from the stack
+            m_rootStack.pop_back();
+            return block;
         } break;
         
         case smallIntAdd:
@@ -525,8 +624,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         case smallIntSub:
         case smallIntBitOr:
         case smallIntBitAnd:
-        case smallIntBitShift:
-        {
+        case smallIntBitShift: {
             // Loading operand objects
             TObject* rightObject = stack[--stackTop];
             TObject* leftObject  = stack[--stackTop];
@@ -548,13 +646,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return result;
         } break;
         
-        case 18: // turn on debugging
-        {
-            //TODO
-        } break;
+        // TODO case 18 // turn on debugging
         
-        case 19: // error
-        {
+        case 19: { // error
             m_rootStack.pop_back();
             TContext* context = process.context;
             process = *(TProcess*) m_rootStack.back(); m_rootStack.pop_back();
@@ -562,8 +656,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             //return returnError; TODO cast 
         } break;
         
-        case allocateByteArray:
-        {
+        case allocateByteArray: {
             uint32_t objectSize = getIntegerValue(reinterpret_cast<TInteger>(stack[--stackTop]));
             TClass*  klass = (TClass*) stack[--stackTop];
             
@@ -577,8 +670,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         } break;
         
         case arrayAt:
-        case arrayAtPut:
-        {
+        case arrayAtPut: {
             TObject* indexObject = stack[--stackTop];
             TObjectArray* array  = (TObjectArray*) stack[--stackTop];
             TObject* valueObject;
@@ -616,8 +708,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
         } break;
         
         case stringAt:
-        case stringAtPut:
-        {
+        case stringAtPut: {
             TObject* indexObject        = stack[--stackTop];
             TString* string             = (TString*) stack[--stackTop];
             TObject* valueObject;
@@ -652,8 +743,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             }
         } break;
         
-        case cloneByteObject:
-        {
+        case cloneByteObject: {
             TClass* klass = (TClass*) stack[--stackTop];
             TByteObject* original = (TByteObject*) stack[--stackTop];
             
@@ -668,19 +758,17 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return (TObject*) clone;
         } break;
         
-        case integerDiv: // Integer /
-        case integerMod: // Integer %
-        case integerAdd: // Integer +
-        case integerMul: // Integer *
-        case integerSub: // Integer -
-        case integerLess: // Integer <
-        case integerEqual: // Integer ==
-        {
-            //TODO
-        } break;
+//         case integerDiv:   // Integer /
+//         case integerMod:   // Integer %
+//         case integerAdd:   // Integer +
+//         case integerMul:   // Integer *
+//         case integerSub:   // Integer -
+//         case integerLess:  // Integer <
+//         case integerEqual: // Integer ==
+//             //TODO integer operations
+//             break;
         
-        case 32: // Integer new
-        {
+        case 32: { // Integer new
             TObject* object = stack[--stackTop];
             if (! isSmallInteger(object)) {
                 failPrimitive(stack, stackTop);
@@ -693,36 +781,18 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TObjectArray& stack, ui
             return reinterpret_cast<TObject*>(newInteger(value)); // FIXME long integer
         } break;
         
-        case 33:
-        {
-            
-        } break;
+        // TODO case 33:
         
         case 34:
-        {
-            flushMethodCache();
             //FIXME returnedValue is not to be globals.nilObject
-        } break;
+            flushMethodCache();
+            break;
         
-        case 35:
-        {
+        // TODO cases 35, 38, 40
             
-        } break;
-        
-        case 38:
-        {
-            
-        } break;
-        
-        case 40:
-        {
-            
-        } break;
-        
         default:
-        {
-            
-        } break;
+            fprintf(stderr, "unimplemented or invalid primitive %d ", opcode);
+            break;
     }
     
     return globals.nilObject;
