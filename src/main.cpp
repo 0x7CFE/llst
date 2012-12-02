@@ -28,7 +28,8 @@ int main(int argc, char **argv) {
     
     initContext->method = globals.initialMethod;
     
-    // TODO load value from getIntegerValue(initContext->method->temporarySize)
+    // TODO load value from 
+    //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42);
     
     // And starting the image execution!
