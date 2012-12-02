@@ -20,6 +20,7 @@ Block value: arg
     0000 PushArgument 1                  i
     0001 PushArgument 0                  block
     0002 DoPrimitive block invoke
+         TOS : 
     0004 DoSpecial popTop
     0005 PushArgument 0
     0006 MarkArguments 1
@@ -27,6 +28,10 @@ Block value: arg
     0008 DoSpecial popTop
     0009 DoSpecial selfReturn
     
+
+???
+    0000 PushArgument 1                 1
+    0001 PushArgument 0 
     
 MetaChar
 initialize
@@ -50,9 +55,11 @@ initialize
     0021     MarkArguments 2            #(:idx 1)
     0022     SendMessage -              :(idx - 1) SmallInt ?
     0023     MarkArguments 2                                                                                                                                 
-    0024     SendMessage basicNew:                                                                                                                           
-    0025     MarkArguments 3                                                                                                                                 
+    0024     SendMessage basicNew:      new_char 
+             TOS : instance of char
+    0025     MarkArguments 3            #(chars idx new_char)
     0026     SendMessage at:put:                                                                                                                             
+             TOS : chars
     0027     DoSpecial stackReturn                                                                                                                           
     0028 MarkArguments 3                 #(1 257 block)                                                                                                                    
     0029 SendMessage to:do:
@@ -94,39 +101,67 @@ SmallInt -
     0001 PushArgument 1                  1
     0002 DoPrimitive SmallInt -          1 - 1
     0004 DoSpecial popTop                this should not be executed
-    0005 PushArgument 1
-    0006 PushLiteral 0
-    0007 MarkArguments 2
-    0008 SendMessage isMemberOf:
-    0009 DoSpecial branchIfTrue 22
-    0012 PushArgument 0
-    0013 PushArgument 1
-    0014 MarkArguments 1
-    0015 SendMessage asSmallInt
-    0016 MarkArguments 2
-    0017 SendMessage -
-    0018 DoSpecial stackReturn
-    0019 DoSpecial branch 23
-    0022 PushConstant nil
-    0023 DoSpecial popTop
-    0024 PushArgument 0
-    0025 MarkArguments 1
-    0026 SendMessage primitiveFailed
-    0027 DoSpecial popTop
-    0028 DoSpecial selfReturn
     
 
 MetaChar basicNew:    
-    0000 PushArgument 0
-    0001 PushArgument 0
+    0000 PushArgument 0                  MetaChar
+    0001 PushArgument 0                  MetaChar
     0002 MarkArguments 1
-    0003 SendMessage new
-    0004 PushConstant 1
-    0005 PushArgument 1
-    0006 MarkArguments 4
+    0003 SendMessage new                 MetaChar new
+    
+         TOS: instance of Char
+    
+    0004 PushConstant 1                  1
+    0005 PushArgument 1                  0
+    0006 MarkArguments 4                 #(MetaChar new_char 1 0)
     0007 SendMessage in:at:put:
+         
+         TOS: instance of Char
+         
     0008 DoSpecial stackReturn
     0009 DoSpecial popTop
     0010 DoSpecial selfReturn
     
+Char new  
+    0000 PushArgument 0                 Char
+    0001 PushInstance 3                 1
+    0002 DoPrimitive new
+    0004 DoSpecial popTop               should not be executed
+    0005 DoSpecial selfReturn
+
+MetaObject in:at:put:
+    0000 PushArgument 3                 0
+    0001 PushArgument 1                 new_char
+    0002 PushArgument 2                 1
+    0003 DoPrimitive at:put:            <5>
+    
+    0005 DoSpecial popTop
+    0006 DoSpecial selfReturn
+
+Array at: index put: value   
+    0000 PushArgument 2                 char
+    0001 PushArgument 0                 chars
+    0002 PushArgument 1                 1
+    0003 DoPrimitive at:put:            chars at: idx put: (Char basicNew: idx-1)
+    
+         TOS : chars
+    
+    0005 DoSpecial popTop
+    0006 PushArgument 0
+    0007 PushArgument 1
+    0008 MarkArguments 2
+    0009 SendMessage includesKey:
+    0010 DoSpecial branchIfTrue 19
+    0013 PushArgument 0
+    0014 MarkArguments 1
+    0015 SendMessage badIndex
+    0016 DoSpecial branch 20
+
+    0019 PushConstant nil
+    0020 DoSpecial popTop
+    0021 PushArgument 0
+    0022 MarkArguments 1
+    0023 SendMessage primitiveFailed
+    0024 DoSpecial popTop
+    0025 DoSpecial selfReturn
     

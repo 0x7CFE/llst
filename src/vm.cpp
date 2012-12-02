@@ -222,7 +222,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case sendMessage: {
                 TSymbol*      messageSelector  = literals[instruction.low];
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
-                
                 TObject* receiver       = (*messageArguments)[0];
                 TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
                 TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
@@ -618,7 +617,7 @@ TObject* SmalltalkVM::doExecutePrimitive(
 //             }
 
             // Switching execution context to the invoking block
-            block->previousContext = currentContext;
+            block->previousContext = currentContext->previousContext;
             currentContext = block;
             currentMethod  = block->method;
             stackTop = 0; // resetting stack
