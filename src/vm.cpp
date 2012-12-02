@@ -374,7 +374,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
 
 SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
     TInstruction instruction, 
-    TContext* context, 
+    TContext*& context, 
     uint32_t& stackTop,
     TMethod*& method,
     uint32_t& bytePointer,
@@ -403,8 +403,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
         case stackReturn:
         {
             returnedValue = stack[--stackTop];
-            context = context->previousContext;
-
             context = context->previousContext;
             method  = context->method;
             bytePointer = getIntegerValue(context->bytePointer);
@@ -557,10 +555,6 @@ TObject* SmalltalkVM::doExecutePrimitive(
             TObject* object = stack[--stackTop];
             uint32_t returnedSize = isSmallInteger(object) ? 0 : object->getSize();
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
-        } break;
-        
-        case inAtPut: { // 5   in: at: put:
-            
         } break;
         
         case 6: { // start new process
