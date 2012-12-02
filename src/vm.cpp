@@ -154,8 +154,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // pushBlock operation creates a block object initialized
                 // with the proper bytecode, stack, arguments and the wrapping context.
                 
-                // Blocks are not executed directly. Instead they should be invoking
-                // by calling the value method. Thus, all we need to do here is initialize 
+                // Blocks are not executed directly. Instead they should be invoked
+                // by sending them a 'value' method. Thus, all we need to do here is initialize 
                 // the block object and then skip the block body by incrementing the bytePointer
                 // to the block's bytecode' size. After that bytePointer will direct to the place 
                 // right after the block's body. There we'll probably find the actual invoking code
@@ -211,8 +211,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 TObjectArray* args = newObject<TObjectArray>(instruction.low);
                 
-                for (int index = instruction.low - 1; index >= 0; index--)
-                    (*args)[index] = stack[--stackTop];
+                uint32_t index = instruction.low;
+                //for (int index = instruction.low - 1; index >= 0; index--)
+                while (index > 0)
+                    (*args)[--index] = stack[--stackTop];
                 
                 stack[stackTop++] = args;
             } break;
@@ -550,6 +552,10 @@ TObject* SmalltalkVM::doExecutePrimitive(
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
+        case inAtPut: { // 5   in: at: put:
+            
+        } break;
+        
         case 6: { // start new process
             TInteger value = reinterpret_cast<TInteger>(stack[--stackTop]);
             uint32_t ticks = getIntegerValue(value);
@@ -573,8 +579,11 @@ TObject* SmalltalkVM::doExecutePrimitive(
             
             // Checking the passed temps size
             TObjectArray* blockTemps = block->temporaries;
-            uint32_t argCount = loArgument - 2;
-            if (argCount >=  (blockTemps ? blockTemps->getSize() : 0) ) {
+            
+            // Amount of arguments stored on the stack except the block itself
+            uint32_t argCount = loArgument - 1;
+            
+            if (argCount >  (blockTemps ? blockTemps->getSize() : 0) ) {
                 stackTop -= (argCount  + 1); // unrolling stack
                 
                 /* TODO correct primitive failing
@@ -596,9 +605,16 @@ TObject* SmalltalkVM::doExecutePrimitive(
                 return globals.nilObject;
             }
                 
+                
             // Loading temporaries array
-            for (uint32_t i = argCount; i > 0; i--)
-                (*blockTemps)[argumentLocation + i] = stack[stackTop--];
+            for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
+                (*blockTemps)[argumentLocation + index] = stack[--stackTop];
+
+//             uint32_t index = argCount;
+//             while (index > 0) {
+//                 (*blockTemps)[argumentLocation + index] = stack[--stackTop];
+//                 index--;
+//             }
 
             // Switching execution context to the invoking block
             block->previousContext = currentContext;
