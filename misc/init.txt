@@ -15,6 +15,18 @@ Array new: size
     0002 DoPrimitive new                <7 self 257>
     0004 DoSpecial popTop               nil? кого вытаскиваем?
     0005 DoSpecial selfReturn
+
+Block value: arg
+    0000 PushArgument 1                  i
+    0001 PushArgument 0                  block
+    0002 DoPrimitive block invoke
+    0004 DoSpecial popTop
+    0005 PushArgument 0
+    0006 MarkArguments 1
+    0007 SendMessage argCount
+    0008 DoSpecial popTop
+    0009 DoSpecial selfReturn
+    
     
 MetaChar
 initialize
@@ -76,5 +88,45 @@ Number to: limit do: aBlock
     0029 PushConstant 0
     0030 DoSpecial popTop
     0031 DoSpecial selfReturn
+    
+SmallInt -
+    0000 PushArgument 0                  1
+    0001 PushArgument 1                  1
+    0002 DoPrimitive SmallInt -          1 - 1
+    0004 DoSpecial popTop                this should not be executed
+    0005 PushArgument 1
+    0006 PushLiteral 0
+    0007 MarkArguments 2
+    0008 SendMessage isMemberOf:
+    0009 DoSpecial branchIfTrue 22
+    0012 PushArgument 0
+    0013 PushArgument 1
+    0014 MarkArguments 1
+    0015 SendMessage asSmallInt
+    0016 MarkArguments 2
+    0017 SendMessage -
+    0018 DoSpecial stackReturn
+    0019 DoSpecial branch 23
+    0022 PushConstant nil
+    0023 DoSpecial popTop
+    0024 PushArgument 0
+    0025 MarkArguments 1
+    0026 SendMessage primitiveFailed
+    0027 DoSpecial popTop
+    0028 DoSpecial selfReturn
+    
+
+MetaChar basicNew:    
+    0000 PushArgument 0
+    0001 PushArgument 0
+    0002 MarkArguments 1
+    0003 SendMessage new
+    0004 PushConstant 1
+    0005 PushArgument 1
+    0006 MarkArguments 4
+    0007 SendMessage in:at:put:
+    0008 DoSpecial stackReturn
+    0009 DoSpecial popTop
+    0010 DoSpecial selfReturn
     
     

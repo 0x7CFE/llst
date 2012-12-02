@@ -106,6 +106,7 @@ private:
         returnIsEqual     = 1,
         returnClass       = 2,
         returnSize        = 4,
+        inAtPut           = 5,
         allocateObject    = 7,
         blockInvoke       = 8,
         allocateByteArray = 20,
