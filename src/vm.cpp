@@ -372,7 +372,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
 
 SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
     TInstruction instruction, 
-    TContext* context, 
+    TContext*& context, 
     uint32_t& stackTop,
     TMethod*& method,
     uint32_t& bytePointer,
@@ -391,17 +391,24 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(
             returnedValue = arguments[0]; // FIXME why instanceVariables? bug?
                                           // Have a look at interp.c: 605 and 1434
             context = context->previousContext;
-            //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
-            stack[stackTop++] = returnedValue;
+            method  = context->method;
+            bytePointer = getIntegerValue(context->bytePointer);
+            stackTop = getIntegerValue(context->stackTop);
+            (*context->stack)[stackTop++] = returnedValue;
+            context->stackTop = newInteger(stackTop);
         } break;
         
         case stackReturn:
         {
             returnedValue = stack[--stackTop];
             context = context->previousContext;
-            //initVariablesFromContext(context, *method, byteCodes, bytePointer, stack, stackTop, temporaries, arguments, instanceVariables, literals);
-            stack[stackTop++] = returnedValue;
-            
+
+            context = context->previousContext;
+            method  = context->method;
+            bytePointer = getIntegerValue(context->bytePointer);
+            stackTop = getIntegerValue(context->stackTop);
+            (*context->stack)[stackTop++] = returnedValue;
+            context->stackTop = newInteger(stackTop);
 
         } break;
         
@@ -574,7 +581,7 @@ TObject* SmalltalkVM::doExecutePrimitive(
             // Checking the passed temps size
             TObjectArray* blockTemps = block->temporaries;
             uint32_t argCount = loArgument - 2;
-            if (argCount >=  (blockTemps ? blockTemps->getSize() : 0) ) {
+            if (argCount >=  (blockTemps ? ( blockTemps->getSize() - argumentLocation ) : 0) ) {
                 stackTop -= (argCount  + 1); // unrolling stack
                 
                 /* TODO correct primitive failing
@@ -597,11 +604,11 @@ TObject* SmalltalkVM::doExecutePrimitive(
             }
                 
             // Loading temporaries array
-            for (uint32_t i = argCount; i > 0; i--)
+            for (int32_t i = argCount; i >= 0; i--)
                 (*blockTemps)[argumentLocation + i] = stack[stackTop--];
 
             // Switching execution context to the invoking block
-            block->previousContext = currentContext;
+            block->previousContext = currentContext->previousContext;
             currentContext = block;
             currentMethod  = block->method;
             stackTop = 0; // resetting stack

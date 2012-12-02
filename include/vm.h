@@ -156,7 +156,7 @@ private:
     
     TExecuteResult doDoSpecial(
         TInstruction instruction, 
-        TContext* context, 
+        TContext*& context, 
         uint32_t& stackTop,
         TMethod*& method,
         uint32_t& bytePointer,
