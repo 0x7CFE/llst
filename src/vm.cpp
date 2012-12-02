@@ -309,6 +309,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
             case sendMessage: {
                 TSymbol*      messageSelector  = literals[instruction.low];
+                
+                if(messageSelector->toString() == "basicNew:") {
+                    printf("\n stack before MetaChar >> basicNew: stackTop = %d\n", stackTop);
+                    for (uint32_t i = 0; i < 5; i++)
+                        printValue(i, stack[i]);
+                }
+                
                 TObjectArray* messageArguments = (TObjectArray*) stack[--stackTop];
                 TObject* receiver       = (*messageArguments)[0];
                 TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
@@ -984,6 +991,6 @@ void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
     flushMethodCache();
-    
+    printf("gc occurred <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<\n");
     // TODO During the VM execution we may need to reload the context
 }
