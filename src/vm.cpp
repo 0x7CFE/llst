@@ -618,7 +618,7 @@ TObject* SmalltalkVM::doExecutePrimitive(
 //             }
 
             // Switching execution context to the invoking block
-            block->previousContext = currentContext->previousContext;
+            block->previousContext = currentContext;
             currentContext = block;
             currentMethod  = block->method;
             stackTop = 0; // resetting stack
