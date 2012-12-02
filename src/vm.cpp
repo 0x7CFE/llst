@@ -99,6 +99,94 @@ void SmalltalkVM::flushMethodCache()
 
 #define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
 
+void SmalltalkVM::printByteObject(TByteObject* value) {
+    std::string data((const char*) value->getBytes(), value->getSize());
+    printf("'%s' ", data.c_str());
+}
+
+void SmalltalkVM::printValue(uint32_t index, TObject* value) {
+    if (isSmallInteger(value))
+        printf("\t\t%.3d %d (SmallInt)\n", index, getIntegerValue(reinterpret_cast<TInteger>(value)));
+    else if (value == globals.nilObject)
+        printf("\t\t%.3d nil\n", index);
+    else if (value == globals.trueObject)
+        printf("\t\t%.3d true\n", index);
+    else if (value == globals.falseObject)
+        printf("\t\t%.3d false\n", index);
+    else {
+        std::string className = value->getClass()->name->toString();
+        
+        printf("\t\t%.3d ", index);
+        if (className == "Symbol") {
+            printByteObject((TByteObject*) value);
+        } else if (className == "String") {
+            printByteObject((TByteObject*) value);
+        }
+        
+        printf("(%s)\n", className.c_str());
+    }
+}
+
+void SmalltalkVM::printContents(TObjectArray& array) {
+    if (isSmallInteger(&array))
+        return;
+    
+    for (uint32_t i = 0; i < array.getSize(); i++)
+        printValue(i, array[i]);
+}
+
+void SmalltalkVM::backTraceContext(TContext* context)
+{
+    TContext* currentContext = context;
+    for (; currentContext != globals.nilObject; currentContext = currentContext->previousContext) {
+        TMethod* currentMethod  = currentContext->method;
+        TByteObject&  byteCodes = *currentMethod->byteCodes;
+        TObjectArray& stack     = *currentContext->stack;
+        
+        TObjectArray& temporaries       = *currentContext->temporaries;
+        TObjectArray& arguments         = *currentContext->arguments;
+        TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
+        TSymbolArray& literals          = *currentMethod->literals;
+        
+        if (currentContext->getClass() == globals.blockClass)
+            printf("Block context %p:\n", currentContext);
+        else 
+            printf("Context %p:\n", currentContext);
+        
+        printf("\tMethod: %s>>%s bytePointer %d\n", 
+               currentMethod->klass->name->toString().c_str(), 
+               currentMethod->name->toString().c_str(),
+               context->bytePointer);
+        
+        if (&instanceVariables) {
+            printf("\n\tInstance variables:\n");
+            printContents(instanceVariables);
+        }
+        
+        if (&arguments) {
+            printf("\n\tArguments:\n");
+            printContents(arguments);
+        }
+        
+        if (&temporaries) {
+            printf("\n\tTemporaries:\n");
+            printContents(temporaries);
+        }
+        
+        if (&literals) {
+            printf("\n\tLiterals:\n");
+            printContents((TObjectArray&) literals);
+        }
+        
+        if (&stack) {
+            printf("\n\tStack (top %d):\n", getIntegerValue(context->stackTop));
+            printContents(stack);
+        }
+        
+        printf("\n\n");
+    }
+}
+
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 {
     m_rootStack.push_back(process);
@@ -231,6 +319,11 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                             messageSelector->toString().c_str(), receiverClass->name->toString().c_str());
                     fprintf(stderr, "at offset %d in method '%s' \n", 
                             bytePointer - 1, currentMethod->name->toString().c_str());
+                    
+                    currentContext->bytePointer = newInteger(bytePointer);
+                    currentContext->stackTop = newInteger(stackTop);
+                    backTraceContext(currentContext);
+                    
                     exit(1);
                 }
                 

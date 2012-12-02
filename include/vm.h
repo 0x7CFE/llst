@@ -184,6 +184,12 @@ private:
     
     TObject* newBinaryObject(TClass* klass, size_t dataSize);
     TObject* newOrdinaryObject(TClass* klass, size_t slotSize);
+    
+    // Helper functions for backTraceContext()
+    void printByteObject(TByteObject* value);
+    void printValue(uint32_t index, TObject* value);
+    void printContents(TObjectArray& array);
+    void backTraceContext(TContext* context);
 public:    
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
