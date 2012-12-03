@@ -241,20 +241,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 break;
                 
             case markArguments: doMarkArguments(ec); break; 
-            case sendMessage:   doSendMessage(ec); break;
-            
-            case sendUnary: { // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
-                TObject* top = stack[--ec.stackTop];
-                bool result = (top == globals.nilObject);
-                
-                if (ec.instruction.low != 0)
-                    result = not result;
-                
-                ec.returnedValue = result ? globals.trueObject : globals.falseObject;
-                stack[ec.stackTop++] = ec.returnedValue;
-            } break;
-            
-            case sendBinary: doSendBinary(ec); break; // Sending a binary operator to an object
+            case sendMessage:   doSendMessage(ec);   break;
+            case sendUnary:     doSendUnary(ec);     break;
+            case sendBinary:    doSendBinary(ec);    break;
                 
             case doPrimitive: {
                 //DoPrimitive is a hack. The interpretator never reaches opcodes after this one,
@@ -418,6 +407,22 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     ec.currentContext = newContext;
     ec.loadPointers();
     ec.lastReceiver   = receiverClass;
+}
+
+void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
+{ 
+    TObjectArray& stack = *ec.currentContext->stack;
+    
+    // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
+    
+    TObject* top = stack[--ec.stackTop];
+    bool result = (top == globals.nilObject);
+
+    if (ec.instruction.low != 0)
+        result = not result;
+
+    ec.returnedValue = result ? globals.trueObject : globals.falseObject;
+    stack[ec.stackTop++] = ec.returnedValue;
 }
 
 void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)

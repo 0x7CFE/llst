@@ -161,6 +161,7 @@ private:
     void doPushBlock(TVMExecutionContext& ec);
     void doMarkArguments(TVMExecutionContext& ec);
     void doSendMessage(TVMExecutionContext& ec);
+    void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
     TObject* doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec);
