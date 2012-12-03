@@ -267,9 +267,11 @@ void BakerMemoryManager::collectGarbage()
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
+        printf("\n heap one \n");
         m_activeHeapBase = m_heapTwo;
         m_inactiveHeapBase = m_heapOne;
     } else {
+        printf("\n heap two \n");
         m_activeHeapBase = m_heapOne;
         m_inactiveHeapBase = m_heapTwo;
     }
