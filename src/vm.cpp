@@ -5,6 +5,8 @@
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
+    //m_rootStack.push_back(ec);
+    
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot)
         return globals.nilObject;
@@ -13,7 +15,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
         onCollectionOccured();
     
     // Object size stored in the TSize field of any ordinary object contains
-    // number of pointers except for the first two fields
+    // number of pointers except for the first two fields           
     size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
     
     TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
@@ -192,7 +194,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
 {
     m_rootStack.push_back(process);
 
-    TVMExecutionContext ec;
     ec.currentContext = process->context;
     ec.loadPointers(); //load bytePointer & stackTop
     

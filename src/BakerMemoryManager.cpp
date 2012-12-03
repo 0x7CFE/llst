@@ -283,14 +283,12 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects. 
     // Then moving them to the new active heap.
 
-    
+    // Here we need to check the rootStack, staticRoots and the VM execution context
 
     // TODO This container should be garbage collected too
     std::vector<TMovableObject*>::iterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
         *iRoot = moveObject(*iRoot);
-    
-    // TODO flush the method cache
 }
 
 void BakerMemoryManager::addStaticRoot(TObject* rootObject)

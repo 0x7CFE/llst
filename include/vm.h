@@ -119,6 +119,8 @@ private:
         TInstruction instruction;
         uint32_t     bytePointer;
         uint32_t     stackTop;
+        
+        // NOTE these will be invalidated during the GC
         TObject*     returnedValue;
         TClass*      lastReceiver;
         
@@ -184,6 +186,7 @@ private:
     Image*          m_image;
     IMemoryManager* m_memoryManager;
     
+    bool m_lastGCOccured;
     void onCollectionOccured();
     
     TObject* newBinaryObject(TClass* klass, size_t dataSize);
@@ -195,7 +198,8 @@ private:
     void printContents(TObjectArray& array);
     void backTraceContext(TContext* context);
     
-    bool m_lastGCOccured;
+    // Name without m_ to be short because it is widely used
+    TVMExecutionContext ec;
 public:    
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
