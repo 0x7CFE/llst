@@ -191,7 +191,7 @@ private:
     
     // Helper functions for backTraceContext()
     void printByteObject(TByteObject* value);
-    void printValue(uint32_t index, TObject* value);
+    void printValue(uint32_t index, TObject* value, TObject* previousValue = 0);
     void printContents(TObjectArray& array);
     void backTraceContext(TContext* context);
 public:    

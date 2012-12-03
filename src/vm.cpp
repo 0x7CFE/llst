@@ -104,7 +104,7 @@ void SmalltalkVM::printByteObject(TByteObject* value) {
     printf("'%s' ", data.c_str());
 }
 
-void SmalltalkVM::printValue(uint32_t index, TObject* value) {
+void SmalltalkVM::printValue(uint32_t index, TObject* value, TObject* previousValue) {
     if (isSmallInteger(value))
         printf("\t\t%.3d %d (SmallInt)\n", index, getIntegerValue(reinterpret_cast<TInteger>(value)));
     else if (value == globals.nilObject)
@@ -131,8 +131,11 @@ void SmalltalkVM::printContents(TObjectArray& array) {
     if (isSmallInteger(&array))
         return;
     
-    for (uint32_t i = 0; i < array.getSize(); i++)
-        printValue(i, array[i]);
+    TObject* previousValue = 0;
+    for (uint32_t i = 0; i < array.getSize(); i++) {
+        printValue(i, array[i], previousValue);
+        previousValue = array[i];
+    }
 }
 
 void SmalltalkVM::backTraceContext(TContext* context)
@@ -158,27 +161,27 @@ void SmalltalkVM::backTraceContext(TContext* context)
                currentMethod->name->toString().c_str(),
                context->bytePointer);
         
-        if (&instanceVariables) {
+        if (&instanceVariables && instanceVariables.getSize()) {
             printf("\n\tInstance variables:\n");
             printContents(instanceVariables);
         }
         
-        if (&arguments) {
+        if (&arguments && arguments.getSize()) {
             printf("\n\tArguments:\n");
             printContents(arguments);
         }
         
-        if (&temporaries) {
+        if (&temporaries && temporaries.getSize()) {
             printf("\n\tTemporaries:\n");
             printContents(temporaries);
         }
         
-        if (&literals) {
+        if (&literals && literals.getSize()) {
             printf("\n\tLiterals:\n");
             printContents((TObjectArray&) literals);
         }
         
-        if (&stack) {
+        if (&stack && stack.getSize()) {
             printf("\n\tStack (top %d):\n", getIntegerValue(context->stackTop));
             printContents(stack);
         }
@@ -259,6 +262,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         
                 switch (primitiveNumber) {
                     case blockInvoke:
+                        // We do not want to leave the block context which was just loaded
+                        // So we're continuing without context switching
                         break;
                         
                     default:
@@ -289,6 +294,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 fprintf(stderr, "'%s' of class '%s' \n", 
                         ec.currentContext->method->name->toString().c_str(), 
                         ec.lastReceiver == globals.nilObject ? "unknown" : ec.lastReceiver->name->toString().c_str());
+                ec.storePointers();
+                backTraceContext(ec.currentContext);
                 exit(1);
         }
     }
