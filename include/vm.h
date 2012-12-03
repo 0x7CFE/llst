@@ -157,7 +157,7 @@ private:
     // flush the method lookup cache
     void flushMethodCache();
     
-    void doPushConstant(uint8_t constant, TVMExecutionContext& ec);
+    void doPushConstant(TVMExecutionContext& ec);
     void doPushBlock(TVMExecutionContext& ec);
     void doMarkArguments(TVMExecutionContext& ec);
     void doSendMessage(TVMExecutionContext& ec);

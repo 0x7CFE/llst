@@ -228,18 +228,15 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
         }
         
         switch (ec.instruction.high) { // 6 pushes, 2 assignments, 1 mark, 3 sendings, 2 do's
-            case pushInstance:    stack[ec.stackTop++] = instanceVariables[ec.instruction.low]; break;
-            case pushArgument:    stack[ec.stackTop++] = arguments[ec.instruction.low];         break;
-            case pushTemporary:   stack[ec.stackTop++] = temporaries[ec.instruction.low];       break;
-            case pushLiteral:     stack[ec.stackTop++] = literals[ec.instruction.low];          break;
-            case pushConstant:    doPushConstant(ec.instruction.low, ec);                       break;
+            case pushInstance:    stack[ec.stackTop++] = instanceVariables[ec.instruction.low];     break;
+            case pushArgument:    stack[ec.stackTop++] = arguments[ec.instruction.low];             break;
+            case pushTemporary:   stack[ec.stackTop++] = temporaries[ec.instruction.low];           break;
+            case pushLiteral:     stack[ec.stackTop++] = literals[ec.instruction.low];              break;
+            case pushConstant:    doPushConstant(ec);                                               break;
             
-            case pushBlock:       doPushBlock(ec); break; 
-            case assignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];     break;
-            case assignInstance:
-                instanceVariables[ec.instruction.low] = stack[ec.stackTop - 1];
-                // TODO isDynamicMemory()
-                break;
+            case pushBlock:       doPushBlock(ec);                                                  break; 
+            case assignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];         break;
+            case assignInstance:  instanceVariables[ec.instruction.low] = stack[ec.stackTop - 1];   break;
                 
             case markArguments: doMarkArguments(ec); break; 
             case sendMessage:   doSendMessage(ec);   break;
@@ -318,8 +315,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     
     // Reading new byte pointer that points to the code right after the inline block
     uint16_t newBytePointer = byteCodes[ec.bytePointer] | (byteCodes[ec.bytePointer+1] << 8);
-    ec.bytePointer += 2; // skipping the newBytePointer's data
-    
+
     // Creating block object
     TBlock* newBlock = newObject<TBlock>();
     
@@ -327,12 +323,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     uint32_t stackSize = getIntegerValue(ec.currentContext->method->stackSize);
     newBlock->stack = newObject<TObjectArray>(stackSize);
     
-    // FIXME WTF? Why not newInteger(0) ?
-    newBlock->bytePointer = 0;
-    newBlock->stackTop = 0;
-    newBlock->previousContext =  0; // Why not nilObject?
-    
-    newBlock->blockBytePointer = newInteger(ec.bytePointer);
+    newBlock->blockBytePointer = newInteger(ec.bytePointer + 2); // skipping the newBytePointer's data
     newBlock->argumentLocation = newInteger(ec.instruction.low);
     
     // Assigning creatingContext depending on the hierarchy
@@ -350,8 +341,6 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     // leaving the block object on top of the stack:
     ec.bytePointer = newBytePointer;
     stack[ec.stackTop++] = newBlock;
-    
-    // args, temps, stack and other will be reloaded automatically on the text iteration
 }
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
@@ -364,7 +353,7 @@ void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec)
     TObjectArray* args = newObject<TObjectArray>(ec.instruction.low);
     
     uint32_t index = ec.instruction.low;
-    //for (int index = instruction.low - 1; index >= 0; index--)
+    
     while (index > 0)
         (*args)[--index] = stack[--ec.stackTop];
     
@@ -483,13 +472,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
     
     switch(ec.instruction.low) {
         case selfReturn: {
-            ec.returnedValue = arguments[0]; // FIXME why instanceVariables? bug?
-                                          // Have a look at interp.c: 605 and 1434
+            ec.returnedValue = arguments[0]; // self
             ec.currentContext = ec.currentContext->previousContext;
             ec.loadPointers();
-            
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
-            ec.currentContext->stackTop = newInteger(ec.stackTop);
         } break;
         
         case stackReturn:
@@ -497,18 +483,15 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
             ec.returnedValue = stack[--ec.stackTop];
             ec.currentContext = ec.currentContext->previousContext;
             ec.loadPointers();
-            
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
-            ec.currentContext->stackTop = newInteger(ec.stackTop);
-
         } break;
         
         case blockReturn: {
             ec.returnedValue = stack[--ec.stackTop];
             TBlock* contextAsBlock = (TBlock*) ec.currentContext;
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
-            //initVariablesFromContext(ec.currentContext, *method, byteCodes, ec.bytePointer, stack, ec.stackTop, temporaries, arguments, instanceVariables, literals);
-            stack[ec.stackTop++] = ec.returnedValue;
+            ec.loadPointers();
+            (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
         } break;
                         
         case duplicate: {
@@ -564,10 +547,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
     return returnNoReturn;
 }
 
-void SmalltalkVM::doPushConstant(uint8_t constant, TVMExecutionContext& ec)
+void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
 {
     TObjectArray& stack = *ec.currentContext->stack;
-    
+    uint8_t    constant = ec.instruction.low;
     switch (constant) {
         case 0: 
         case 1: 
@@ -686,13 +669,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             // Loading temporaries array
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
                 (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
-
-//             uint32_t index = argCount;
-//             while (index > 0) {
-//                 (*blockTemps)[argumentLocation + index] = stack[--stackTop];
-//                 index--;
-//             }
-
+            
             // Switching execution context to the invoking block
             block->previousContext = ec.currentContext->previousContext;
             ec.currentContext = block;
@@ -806,7 +783,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* valueObject;
             
             // If the method is String:at:put then pop a value from the stack
-            if (opcode == 22) 
+            if (opcode == stringAtPut) 
                 valueObject = stack[--ec.stackTop];
             
             if ( !isSmallInteger(indexObject) ) {
@@ -824,7 +801,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 break;
             }
             
-            if(opcode == 21) 
+            if(opcode == stringAt) 
                 // String:at
                 return reinterpret_cast<TObject*>(newInteger( string->getByte(actualIndex) ));
             else { 
