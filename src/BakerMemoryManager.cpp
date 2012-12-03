@@ -3,7 +3,7 @@
 #include <stdlib.h>
 
 BakerMemoryManager::BakerMemoryManager() : 
-    m_gcCount(0), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0), 
+    m_gcCount(0), m_allocsBeyondGC(0), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0), 
     m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0), 
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
     m_staticHeapBase(0), m_staticHeapPointer(0)
@@ -83,6 +83,9 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
         
         m_activeHeapPointer -= requestedSize;
         void* result = m_activeHeapPointer;
+        
+        if (!gcOccured)
+            m_allocsBeyondGC++;
         return result;
     }
     

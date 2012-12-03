@@ -194,11 +194,15 @@ private:
     void printValue(uint32_t index, TObject* value, TObject* previousValue = 0);
     void printContents(TObjectArray& array);
     void backTraceContext(TContext* context);
-public:    
-    TExecuteResult execute(TProcess* process, uint32_t ticks);
-    SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
-        : m_cacheHits(0), m_cacheMisses(0), m_image(image), m_memoryManager(memoryManager) {}
     
+    bool m_lastGCOccured;
+public:    
+    SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
+        : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
+        m_memoryManager(memoryManager), m_lastGCOccured(false) 
+    {}
+    
+    TExecuteResult execute(TProcess* process, uint32_t ticks);
     template<class T> T* newObject(size_t dataSize = 0);
 };
 

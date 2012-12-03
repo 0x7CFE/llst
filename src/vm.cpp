@@ -5,12 +5,11 @@
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
-    bool gcOccured = false;
-    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
+    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot)
         return globals.nilObject;
     
-    if (gcOccured)
+    if (m_lastGCOccured)
         onCollectionOccured();
     
     // Object size stored in the TSize field of any ordinary object contains
@@ -31,12 +30,11 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     // They could not have ordinary fields, so we may use it 
     uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
     
-    bool gcOccured = false;
-    void* objectSlot = m_memoryManager->allocate(slotSize, &gcOccured);
+    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot)
         return globals.nilObject;
     
-    if (gcOccured)
+    if (m_lastGCOccured)
         onCollectionOccured();
     
     TObject* instance = new (objectSlot) TObject(dataSize, klass);

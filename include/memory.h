@@ -16,6 +16,8 @@ public:
     virtual void* staticAllocate(size_t size) = 0;
     virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
+    
+    virtual uint32_t allocsBeyondCollection() = 0;
 };
 
 // Simple memory manager implementing classic baker two space algorithm.
@@ -33,6 +35,8 @@ public:
 class BakerMemoryManager : public IMemoryManager {
 private:
     uint32_t  m_gcCount;
+    uint32_t  m_allocsBeyondGC;
+    
     size_t    m_heapSize;
     size_t    m_maxHeapSize;
     
@@ -83,6 +87,10 @@ public:
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
+    
+    // Returns amount of allocations that were done after last GC
+    // May be used as a flag that GC had just took place
+    virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
 };
 
 
