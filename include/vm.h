@@ -113,6 +113,26 @@ private:
         cloneByteObject   = 23
     };
     
+    struct TVMExecutionContext {
+        TContext*    currentContext;
+        
+        TInstruction instruction;
+        uint32_t     bytePointer;
+        uint32_t     stackTop;
+        TObject*     returnedValue;
+        TClass*      lastReceiver;
+        
+        void loadPointers() {
+            bytePointer = getIntegerValue(currentContext->bytePointer);
+            stackTop    = getIntegerValue(currentContext->stackTop);
+        }
+        
+        void storePointers() {
+            currentContext->bytePointer = newInteger(bytePointer);
+            currentContext->stackTop    = newInteger(stackTop);
+        }
+    };
+    
     struct TMethodCacheEntry
     {
         TObject* methodName;
@@ -137,32 +157,15 @@ private:
     // flush the method lookup cache
     void flushMethodCache();
     
-    void doPushConstant(uint8_t constant, TObjectArray& stack, uint32_t& stackTop);
+    void doPushConstant(uint8_t constant, TVMExecutionContext& ec);
+    void doPushBlock(TVMExecutionContext& ec);
+    void doMarkArguments(TVMExecutionContext& ec);
+    void doSendMessage(TVMExecutionContext& ec);
+    void doSendBinary(TVMExecutionContext& ec);
     
-    void doSendMessage(
-        TSymbol* selector, 
-        TObjectArray& arguments, 
-        TContext* context, 
-        uint32_t& stackTop);
+    TObject* doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(
-        uint8_t opcode,
-        uint8_t loArgument,
-        TContext*& currentContext,
-        TMethod*& currentMethod,
-        TObjectArray& stack, 
-        uint32_t& stackTop,
-        uint32_t& bytePointer,
-        TProcess& process);
-    
-    TExecuteResult doDoSpecial(
-        TInstruction instruction, 
-        TContext*& context, 
-        uint32_t& stackTop,
-        TMethod*& method,
-        uint32_t& bytePointer,
-        TProcess*& process,
-        TObject*& returnedValue);
+    TExecuteResult doDoSpecial(TProcess*& process, TVMExecutionContext& ec);
     
     // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(
