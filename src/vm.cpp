@@ -95,8 +95,6 @@ void SmalltalkVM::flushMethodCache()
         m_lookupCache[i].methodName = 0;
 }
 
-#define IP_VALUE (byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8))
-
 void SmalltalkVM::printByteObject(TByteObject* value) {
     std::string data((const char*) value->getBytes(), value->getSize());
     printf("'%s' ", data.c_str());
@@ -452,12 +450,13 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         stack[ec.stackTop++] = ec.returnedValue;
     } else {
         // This binary operator is performed on an ordinary object.
-        // We do not know how to handle it, so sending the operation to the receiver
+        // We do not know how to handle it, thus send the message to the receiver
         
         TObjectArray* args = newObject<TObjectArray>(2);
         (*args)[1] = rightObject;
         (*args)[0] = leftObject;
-        //TODO do the call
+        stack[ec.stackTop++] = args;
+        doSendMessage(ec);
     }
 } 
 
@@ -860,6 +859,15 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO cases 35, 38, 40
             
         default:
+            uint32_t argCount = ec.instruction.low;
+            TObjectArray* args = newObject<TObjectArray>(argCount);
+            
+            uint32_t i = argCount;
+            
+            while (i > 0)
+                (*args)[--i] = stack[--ec.stackTop];
+            
+            //TODO call primitive
             fprintf(stderr, "unimplemented or invalid primitive %d ", opcode);
             break;
     }
