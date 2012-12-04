@@ -417,8 +417,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
     
-//     hptr<TSymbolArray> pArray = newObject<TSymbolArray>(2);
-//     pArray[1] =  messageSelector;
+    hptr<TSymbolArray> pArray = newObject<TSymbolArray>(2);
+    pArray[1] =  messageSelector;
     
     // Replace current context with the new one
     ec.currentContext = newContext;

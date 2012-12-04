@@ -7,6 +7,7 @@
 #include <vector>
 #include <hash_map>
 #include <list>
+#include <boost/typeof/typeof.hpp>
 
 class IMemoryManager {
 public:
@@ -25,10 +26,10 @@ public:
     virtual uint32_t allocsBeyondCollection() = 0;
 };
 
-template <typename O, typename C = TObject*> class hptr {
+template <typename O> class hptr {
 public:
     typedef O Object;
-    typedef C Content;
+    //typedef C Content;
 private:
     Object* target;
     IMemoryManager* mm;
@@ -38,7 +39,7 @@ public:
         if (mm) mm->registerExternalPointer((TObject**) &object);
     }
     
-    hptr(const hptr<O, C>& pointer) : target(pointer.target), mm(pointer.mm) 
+    hptr(const hptr<O>& pointer) : target(pointer.target), mm(pointer.mm) 
     {
         if (mm) mm->registerExternalPointer((TObject**) &target);
     }
@@ -53,8 +54,14 @@ public:
     Object& (operator*)() const { return *target; }
     operator Object*() const { return target; }
 
+//     template<typename I>
+//     BOOST_TYPEOF(target->operator[](index)) operator [] (I index) const { return target->operator[](index); }
+
     template<typename I>
-    Content& operator [] (I index) const { return target->operator[](index); }
+    typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
+    
+//     template<typename I, typename R>
+//     R operator [] (I index) const { return target->operator[](index); }
 };
 
 
