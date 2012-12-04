@@ -19,11 +19,44 @@ public:
     virtual void  collectGarbage() = 0;
     
     // External pointer handling
-    virtual void  addExternalPointer(TObject** pointer) = 0;
+    virtual void  registerExternalPointer(TObject** pointer) = 0;
     virtual void  releaseExternalPointer(TObject** pointer) = 0;
     
     virtual uint32_t allocsBeyondCollection() = 0;
 };
+
+template <typename O, typename C = TObject*> class hptr {
+public:
+    typedef O Object;
+    typedef C Content;
+private:
+    Object* target;
+    IMemoryManager* mm;
+public:
+    hptr(Object* object, IMemoryManager* mm = 0, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr<O, C>& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr* operator = (const hptr& pointer) { target = pointer.target; return this; }
+    hptr* operator = (const Object* object) { target = object; return this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+
+    template<typename I>
+    Content& operator [] (I index) const { return target->operator[](index); }
+};
+
 
 // Simple memory manager implementing classic baker two space algorithm.
 // Each time two separate heaps are allocated but only one is active.
@@ -98,14 +131,13 @@ public:
     virtual void  collectGarbage();
     
     // External pointer handling
-    virtual void  addExternalPointer(TObject** pointer);
+    virtual void  registerExternalPointer(TObject** pointer);
     virtual void  releaseExternalPointer(TObject** pointer);
     
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
 };
-
 
 class Image {
 private:

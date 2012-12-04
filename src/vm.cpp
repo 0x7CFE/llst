@@ -42,23 +42,23 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     return instance;
 }
 
-template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t dataSize)
+/*template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize)
 {
     TClass* klass = globals.arrayClass;
     return (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
 }
 
-template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize)
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize)
 {
     TClass* klass = globals.contextClass;
     return (TContext*) newOrdinaryObject(klass, sizeof(TContext));
 }
 
-template<> TBlock* SmalltalkVM::newObject<TBlock>(size_t dataSize)
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize)
 {
     TClass* klass = globals.blockClass;
     return (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
-}
+} */
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
@@ -406,7 +406,9 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     
     
     // Create a new context from the giving method and arguments
-    TContext* newContext        = newObject<TContext>();
+    hptr<TContext> newContext(newObject<TContext>(), m_memoryManager);
+    
+    //TContext* newContext        = newObject<TContext>();
     newContext->arguments       = messageArguments;
     newContext->method          = receiverMethod;
     newContext->previousContext = ec.currentContext;
@@ -414,6 +416,10 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
+    newContext[1] = globals.nilObject;
+    
+//     hptr<TSymbolArray> pArray = newObject<TSymbolArray>(2);
+//     pArray[1] =  messageSelector;
     
     // Replace current context with the new one
     ec.currentContext = newContext;

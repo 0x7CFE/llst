@@ -308,7 +308,7 @@ void BakerMemoryManager::addStaticRoot(TObject* rootObject)
     m_staticRoots.push_back((TMovableObject*) rootObject);
 }
 
-void BakerMemoryManager::addExternalPointer(TObject** pointer) 
+void BakerMemoryManager::registerExternalPointer(TObject** pointer) 
 {
     m_externalPointers.push_front((TMovableObject**) pointer);
 }
@@ -316,11 +316,10 @@ void BakerMemoryManager::addExternalPointer(TObject** pointer)
 void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
 {
     TPointerIterator iPointer = m_externalPointers.begin();
-    while (iPointer != m_externalPointers.end()) {
+    for (; iPointer != m_externalPointers.end(); ++iPointer) {
         if (*iPointer == (TMovableObject**) pointer) {
             m_externalPointers.erase(iPointer);
             return;
         }
-        ++iPointer;
     }
 }
