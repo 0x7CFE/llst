@@ -283,12 +283,16 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects. 
     // Then moving them to the new active heap.
 
-    
-
     // TODO This container should be garbage collected too
     std::vector<TMovableObject*>::iterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
         *iRoot = moveObject(*iRoot);
+
+    // Updating external references
+    TPointerIterator iExternalPointer = m_externalPointers.begin();
+    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+        **iExternalPointer = moveObject(**iExternalPointer);
+    }
     
     // TODO flush the method cache
 }
@@ -304,3 +308,19 @@ void BakerMemoryManager::addStaticRoot(TObject* rootObject)
     m_staticRoots.push_back((TMovableObject*) rootObject);
 }
 
+void BakerMemoryManager::addExternalPointer(TObject** pointer) 
+{
+    m_externalPointers.push_front((TMovableObject**) pointer);
+}
+
+void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
+{
+    TPointerIterator iPointer = m_externalPointers.begin();
+    while (iPointer != m_externalPointers.end()) {
+        if (*iPointer == (TMovableObject**) pointer) {
+            m_externalPointers.erase(iPointer);
+            return;
+        }
+        ++iPointer;
+    }
+}

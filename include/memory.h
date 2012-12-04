@@ -6,6 +6,7 @@
 #include <types.h>
 #include <vector>
 #include <hash_map>
+#include <list>
 
 class IMemoryManager {
 public:
@@ -16,6 +17,10 @@ public:
     virtual void* staticAllocate(size_t size) = 0;
     virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
+    
+    // External pointer handling
+    virtual void  addExternalPointer(TObject** pointer) = 0;
+    virtual void  releaseExternalPointer(TObject** pointer) = 0;
     
     virtual uint32_t allocsBeyondCollection() = 0;
 };
@@ -77,6 +82,10 @@ private:
     std::vector<TMovableObject*> m_staticRoots;
     //std::hash_map<TObject*, TObject*> m_staticRoots;
     
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
+    TPointerList m_externalPointers;
+    
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
@@ -87,6 +96,10 @@ public:
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
+    
+    // External pointer handling
+    virtual void  addExternalPointer(TObject** pointer);
+    virtual void  releaseExternalPointer(TObject** pointer);
     
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
