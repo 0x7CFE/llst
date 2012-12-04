@@ -54,6 +54,11 @@ template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize)
     return (TContext*) newOrdinaryObject(klass, sizeof(TContext));
 }
 
+template<> TBlock* SmalltalkVM::newObject<TBlock>(size_t dataSize)
+{
+    TClass* klass = globals.blockClass;
+    return (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
+}
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {

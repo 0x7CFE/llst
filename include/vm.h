@@ -224,6 +224,7 @@ template<class T> T* SmalltalkVM::newObject(size_t dataSize /*= 0*/)
 // Specializations of newObject for known types
 template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t dataSize /*= 0*/);
 template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize /*= 0*/);
+template<> TBlock* SmalltalkVM::newObject<TBlock>(size_t dataSize /*= 0*/);
 
 
 #endif
