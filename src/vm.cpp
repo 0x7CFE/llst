@@ -44,18 +44,23 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     return instance;
 }
 
-template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t dataSize)
+/*template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize)
 {
     TClass* klass = globals.arrayClass;
     return (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
 }
 
-template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize)
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize)
 {
     TClass* klass = globals.contextClass;
     return (TContext*) newOrdinaryObject(klass, sizeof(TContext));
 }
 
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize)
+{
+    TClass* klass = globals.blockClass;
+    return (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
+} */
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
@@ -357,12 +362,11 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
+    TObjectArray* args = newObject<TObjectArray>(ec.instruction.low);
     TObjectArray& stack = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
     // from the top of the stack and creates new array with them
-    
-    TObjectArray* args = newObject<TObjectArray>(ec.instruction.low);
     
     uint32_t index = ec.instruction.low;
     //for (int index = instruction.low - 1; index >= 0; index--)
@@ -399,8 +403,13 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     // Save stack and opcode pointers
     ec.storePointers();
     
+    //hptr<TContext> newContext = newObject<TContext>();
+    
+    
     // Create a new context from the giving method and arguments
-    TContext* newContext        = newObject<TContext>();
+    hptr<TContext> newContext = newObject<TContext>();
+    
+    //TContext* newContext        = newObject<TContext>();
     newContext->arguments       = messageArguments;
     newContext->method          = receiverMethod;
     newContext->previousContext = ec.currentContext;
@@ -408,6 +417,9 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
+    
+    hptr<TSymbolArray> pArray = newObject<TSymbolArray>(2);
+    pArray[1] =  messageSelector;
     
     // Replace current context with the new one
     ec.currentContext = newContext;
@@ -422,7 +434,7 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
     // isNil notNil //TODO in the future: catch instruction.low != 0 or 1
     
     TObject* top = stack[--ec.stackTop];
-    bool result = (top == globals.nilObject);
+    bool result  = (top == globals.nilObject);
 
     if (ec.instruction.low != 0)
         result = not result;
@@ -437,7 +449,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
     
     // Loading operand objects
     TObject* rightObject = stack[--ec.stackTop];
-    TObject* leftObject = stack[--ec.stackTop];
+    TObject* leftObject  = stack[--ec.stackTop];
     
     // If operands are both small integers, we need to handle it ourselves
     if (isSmallInteger(leftObject) && isSmallInteger(rightObject)) {

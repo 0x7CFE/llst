@@ -207,27 +207,30 @@ public:
     {}
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
-    template<class T> T* newObject(size_t dataSize = 0);
+    template<class T> hptr<T> newObject(size_t dataSize = 0);
 };
 
-template<class T> T* SmalltalkVM::newObject(size_t dataSize /*= 0*/)
+template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/)
 {
     // TODO fast access to common classes
     TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
     if (!klass)
-        return (T*) globals.nilObject;
+        return hptr<T>((T*) globals.nilObject, m_memoryManager, true);
     
     if (T::InstancesAreBinary()) {   
-        return (T*) newBinaryObject(klass, dataSize);
+        return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, true);
+        // return (T*) newBinaryObject(klass, dataSize);
     } else {
         size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
-        return (T*) newOrdinaryObject(klass, slotSize);
+        return hptr<T>((T*) newOrdinaryObject(klass, slotSize), m_memoryManager, true);
+        //return (T*) newOrdinaryObject(klass, slotSize);
     }
 }
 
 // Specializations of newObject for known types
-template<> TObjectArray* SmalltalkVM::newObject<TObjectArray>(size_t dataSize /*= 0*/);
-template<> TContext* SmalltalkVM::newObject<TContext>(size_t dataSize /*= 0*/);
+// template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize /*= 0*/);
+// template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize /*= 0*/);
+// template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize /*= 0*/);
 
 
 #endif

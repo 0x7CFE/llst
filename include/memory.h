@@ -6,6 +6,8 @@
 #include <types.h>
 #include <vector>
 #include <hash_map>
+#include <list>
+#include <boost/typeof/typeof.hpp>
 
 class IMemoryManager {
 public:
@@ -17,8 +19,51 @@ public:
     virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
     
+    // External pointer handling
+    virtual void  registerExternalPointer(TObject** pointer) = 0;
+    virtual void  releaseExternalPointer(TObject** pointer) = 0;
+    
     virtual uint32_t allocsBeyondCollection() = 0;
 };
+
+template <typename O> class hptr {
+public:
+    typedef O Object;
+    //typedef C Content;
+private:
+    Object* target;
+    IMemoryManager* mm;
+public:
+    hptr(Object* object, IMemoryManager* mm = 0, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr<O>& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr* operator = (const hptr& pointer) { target = pointer.target; return this; }
+    hptr* operator = (const Object* object) { target = object; return this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+
+//     template<typename I>
+//     BOOST_TYPEOF(target->operator[](index)) operator [] (I index) const { return target->operator[](index); }
+
+    template<typename I>
+    typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
+    
+//     template<typename I, typename R>
+//     R operator [] (I index) const { return target->operator[](index); }
+};
+
 
 // Simple memory manager implementing classic baker two space algorithm.
 // Each time two separate heaps are allocated but only one is active.
@@ -77,6 +122,10 @@ private:
     std::vector<TMovableObject*> m_staticRoots;
     //std::hash_map<TObject*, TObject*> m_staticRoots;
     
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
+    TPointerList m_externalPointers;
+    
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
@@ -88,11 +137,14 @@ public:
     virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
     
+    // External pointer handling
+    virtual void  registerExternalPointer(TObject** pointer);
+    virtual void  releaseExternalPointer(TObject** pointer);
+    
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
 };
-
 
 class Image {
 private:
