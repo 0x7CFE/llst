@@ -406,7 +406,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     
     
     // Create a new context from the giving method and arguments
-    hptr<TContext> newContext(newObject<TContext>(), m_memoryManager);
+    hptr<TContext> newContext = newObject<TContext>();
     
     //TContext* newContext        = newObject<TContext>();
     newContext->arguments       = messageArguments;
@@ -416,7 +416,6 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
-    newContext[1] = globals.nilObject;
     
 //     hptr<TSymbolArray> pArray = newObject<TSymbolArray>(2);
 //     pArray[1] =  messageSelector;
