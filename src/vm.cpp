@@ -955,3 +955,29 @@ void SmalltalkVM::onCollectionOccured()
     
     // TODO During the VM execution we may need to reload the context
 }
+
+bool bulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
+    
+    if ( ! isSmallInteger(sourceStartOffset) || ! isSmallInteger(destinationStartOffset) || ! isSmallInteger(destinationStopOffset) )
+        return false;
+    
+    int32_t iSourceStartOffset      = getIntegerValue(reinterpret_cast<TInteger>( sourceStartOffset )) - 1; // - 1 because in Smalltalk arrays are indexed from 1
+    int32_t iDestinationStartOffset = getIntegerValue(reinterpret_cast<TInteger>( destinationStartOffset )) - 1;
+    int32_t iDestinationStopOffset  = getIntegerValue(reinterpret_cast<TInteger>( destinationStopOffset )) - 1;
+    int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset + 1;
+    
+    if ( iSourceStartOffset < 0 || iDestinationStartOffset < 0 || iDestinationStopOffset < 0 || iCount < 1)
+        return false;
+    
+    if (destination->getSize() < iDestinationStopOffset || source->getSize() < (iSourceStartOffset + iCount) )
+        return false;
+    
+    if ( source->isBinary() && destination->isBinary() ) {
+        bcopy(&*source->getField(iSourceStartOffset), &*destination->getField(iDestinationStartOffset), iCount * sizeof(TObject));
+        //TODO is it OK?
+        //FIXME what about GC?
+        return true;
+    }
+    
+    return false;
+}
