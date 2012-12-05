@@ -285,9 +285,9 @@ void BakerMemoryManager::collectGarbage()
 
     // Here we need to check the rootStack, staticRoots and the VM execution context
     // TODO This container should be garbage collected too
-    std::vector<TMovableObject*>::iterator iRoot = m_staticRoots.begin();
+    TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
-        *iRoot = moveObject(*iRoot);
+        *iRoot = moveObject( (TMovableObject*) *iRoot);
 
     // Updating external references
     TPointerIterator iExternalPointer = m_externalPointers.begin();
@@ -297,15 +297,30 @@ void BakerMemoryManager::collectGarbage()
     
 }
 
-void BakerMemoryManager::addStaticRoot(TObject* rootObject)
+void BakerMemoryManager::addStaticRoot(void* location)
 {
     // Checking whether root is already present in the list
-    std::vector<TMovableObject*>::iterator iRoot = m_staticRoots.begin();
+    TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
-        if (*iRoot == (TMovableObject*) rootObject)
+        if (*iRoot == location)
             return;
     
-    m_staticRoots.push_back((TMovableObject*) rootObject);
+    m_staticRoots.push_front(location);
+}
+
+void BakerMemoryManager::removeStaticRoot(void* location)
+{
+    // Checking whether root is already present in the list
+    
+    TStaticRootsIterator iRoot = m_staticRoots.begin();
+    for (; iRoot != m_staticRoots.end(); ++iRoot)
+        if (*iRoot == location)
+            m_staticRoots.erase(iRoot);
+}
+
+bool BakerMemoryManager::isInStaticHeap(void* location)
+{
+    
 }
 
 void BakerMemoryManager::registerExternalPointer(TObject** pointer) 

@@ -14,8 +14,11 @@ public:
     
     virtual void* allocate(size_t size, bool* collectionOccured = 0) = 0;
     virtual void* staticAllocate(size_t size) = 0;
-    virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
+    
+    virtual void  addStaticRoot(void* location) = 0;
+    virtual void  removeStaticRoot(void* location) = 0;
+    virtual bool  isInStaticHeap(void* location) = 0;
     
     // External pointer handling
     virtual void  registerExternalPointer(TObject** pointer) = 0;
@@ -180,8 +183,9 @@ private:
     //TObjectArray* m_staticRoots;
     
     // FIXME temporary solution before GC will prove it's working
-    std::vector<TMovableObject*> m_staticRoots;
-    //std::hash_map<TObject*, TObject*> m_staticRoots;
+    typedef std::list<void*> TStaticRoots;
+    typedef std::list<void*>::iterator TStaticRootsIterator;
+    TStaticRoots m_staticRoots;
     
     typedef std::list<TMovableObject**> TPointerList;
     typedef std::list<TMovableObject**>::iterator TPointerIterator;
@@ -195,8 +199,11 @@ public:
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
     virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
-    virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
+    
+    virtual void  addStaticRoot(void* location);
+    virtual void  removeStaticRoot(void* location);
+    virtual bool  isInStaticHeap(void* location);
     
     // External pointer handling
     virtual void  registerExternalPointer(TObject** pointer);

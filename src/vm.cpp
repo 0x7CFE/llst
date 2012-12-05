@@ -246,10 +246,26 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             
             case pushBlock:       doPushBlock(ec); break; 
             case assignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];     break;
-            case assignInstance:
-                instanceVariables[ec.instruction.low] = stack[ec.stackTop - 1];
-                // TODO isDynamicMemory()
-                break;
+            case assignInstance: {
+                TObject* value = stack[ec.stackTop - 1];
+                instanceVariables[ec.instruction.low] = value;
+                
+                bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
+                bool slotIsStatic  = m_memoryManager->isInStaticHeap(&instanceVariables);
+                
+                // If adding a dynamic value to a static slot, 
+                // then add this slot as a GC root
+                if (slotIsStatic && !valueIsStatic) {
+                    // If old value wasn't staic either, 
+                    // current slot is already in the lists
+                    bool oldValueIsStatic = m_memoryManager->isInStaticHeap(instanceVariables[ec.instruction.low]);
+                    if (! oldValueIsStatic) {
+                        m_memoryManager->removeStaticRoot(& instanceVariables[ec.instruction.low]);
+                        m_memoryManager->addStaticRoot(& instanceVariables[ec.instruction.low]);
+                    }
+                }
+                
+            } break;
                 
             case markArguments: doMarkArguments(ec); break; 
             case sendMessage:   doSendMessage(ec);   break;
