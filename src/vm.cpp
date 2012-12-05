@@ -973,9 +973,7 @@ bool bulkReplace( TObject* destination, TObject* destinationStartOffset, TObject
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {
-        bcopy(&*source->getField(iSourceStartOffset), &*destination->getField(iDestinationStartOffset), iCount * sizeof(TObject));
-        //TODO is it OK?
-        //FIXME what about GC?
+        memcpy((void*) source->getField(iSourceStartOffset), (void*) destination->getField(iDestinationStartOffset), iCount * sizeof(TObject));
         return true;
     }
     
