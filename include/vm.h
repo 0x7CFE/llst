@@ -200,7 +200,12 @@ private:
     
     // Name without m_ to be short because it is widely used
     TVMExecutionContext ec;
-public:    
+    
+    static SmalltalkVM* s_instance;
+public:
+//    void Initialize() { s_instance = new SmalltalkVM(); }
+    SmalltalkVM* GetInstance() { return s_instance; }
+    
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) 
@@ -208,6 +213,7 @@ public:
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0);
+    template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager, true); }
 };
 
 template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/)

@@ -5,7 +5,6 @@
 #include <stdint.h>
 #include <types.h>
 #include <vector>
-#include <hash_map>
 #include <list>
 
 class IMemoryManager {
@@ -28,12 +27,11 @@ public:
 template <typename O> class hptr {
 public:
     typedef O Object;
-    //typedef C Content;
 private:
     Object* target;
     IMemoryManager* mm;
 public:
-    hptr(Object* object, IMemoryManager* mm = 0, bool notRegister = false) : target(object), mm(mm) 
+    hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
     {
         if (mm) mm->registerExternalPointer((TObject**) &object);
     }
@@ -45,22 +43,85 @@ public:
     
     ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
     
-    hptr* operator = (const hptr& pointer) { target = pointer.target; return this; }
-    hptr* operator = (const Object* object) { target = object; return this; }
+    hptr* operator = (const hptr<O>& pointer) { target = pointer.target; return this; }
+    //hptr* operator = (const Object* object) { target = object; return this; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }
     Object& (operator*)() const { return *target; }
     operator Object*() const { return target; }
-
-//     template<typename I>
-//     BOOST_TYPEOF(target->operator[](index)) operator [] (I index) const { return target->operator[](index); }
-
-    template<typename I>
-    typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
     
-//     template<typename I, typename R>
-//     R operator [] (I index) const { return target->operator[](index); }
+   // template<typename T> T cast() {  }
+
+//      template<typename I>
+//      typeof(target->operator[](I()))& operator [] (I index) const { return target->operator[](index); }
+     
+//     template<typename I>
+//     typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
+};
+
+template<typename T> class hptr< TArray<T> >
+{
+public:
+    typedef TArray<T> Object;
+private:
+    Object* target;
+    IMemoryManager* mm;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
+    //hptr* operator = (const Object* object) { target = object; return this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    template<typename I>
+    T& operator [] (I index) const { return target->operator[](index); }
+};
+
+template<> class hptr<TByteObject>
+{
+public:
+    typedef TByteObject Object;
+private:
+    Object* target;
+    IMemoryManager* mm;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
+    //hptr* operator = (const Object* object) { target = object; return this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    //template<typename I>
+    uint8_t& operator [] (uint32_t index) const { return target->operator[](index); }
 };
 
 

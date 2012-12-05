@@ -308,8 +308,11 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
 
 void SmalltalkVM::doPushBlock(TVMExecutionContext& ec) 
 {
-    TByteObject&  byteCodes = * ec.currentContext->method->byteCodes;
-    TObjectArray& stack     = * ec.currentContext->stack;
+    hptr<TByteObject> byteCodes = newPointer(ec.currentContext->method->byteCodes);
+    //TByteObject&  byteCodes = * ec.currentContext->method->byteCodes;
+    
+    hptr<TObjectArray> stack = newPointer(ec.currentContext->stack);
+    //TObjectArray& stack     = * ec.currentContext->stack;
         
     // Block objects are usually inlined in the wrapping method code
     // pushBlock operation creates a block object initialized
@@ -327,7 +330,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     ec.bytePointer += 2; // skipping the newBytePointer's data
     
     // Creating block object
-    TBlock* newBlock = newObject<TBlock>();
+    hptr<TBlock> newBlock = newObject<TBlock>();
     
     // Allocating block's stack
     uint32_t stackSize = getIntegerValue(ec.currentContext->method->stackSize);
@@ -378,11 +381,12 @@ void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec)
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
 {
-    TObjectArray& stack = *ec.currentContext->stack;
-    TSymbolArray& literals = *ec.currentContext->method->literals;
+    hptr<TObjectArray> stack    = newPointer(ec.currentContext->stack);
+    hptr<TSymbolArray> literals = newPointer(ec.currentContext->method->literals);
     
-    TSymbol*      messageSelector  = literals[ec.instruction.low];
-    TObjectArray* messageArguments = (TObjectArray*) stack[--ec.stackTop];
+    hptr<TSymbol> messageSelector = newPointer(literals[ec.instruction.low]);
+    hptr<TObjectArray> messageArguments = newPointer((TObjectArray*) stack[--ec.stackTop]);
+    
     TObject* receiver       = (*messageArguments)[0];
     TClass*  receiverClass  = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
     TMethod* receiverMethod = lookupMethod(messageSelector, receiverClass);
@@ -403,11 +407,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     // Save stack and opcode pointers
     ec.storePointers();
     
-    //hptr<TContext> newContext = newObject<TContext>();
-    
-    
     // Create a new context from the giving method and arguments
-    hptr<TContext> newContext = newObject<TContext>();
+    TContext* newContext = newObject<TContext>();
     
     //TContext* newContext        = newObject<TContext>();
     newContext->arguments       = messageArguments;
@@ -417,9 +418,6 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
-    
-    hptr<TSymbolArray> pArray = newObject<TSymbolArray>(2);
-    pArray[1] =  messageSelector;
     
     // Replace current context with the new one
     ec.currentContext = newContext;
