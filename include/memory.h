@@ -43,15 +43,16 @@ public:
     
     ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
     
-    hptr* operator = (const hptr<O>& pointer) { target = pointer.target; return this; }
-    //hptr* operator = (const Object* object) { target = object; return this; }
+    hptr<Object>& operator = (hptr<Object>& pointer) { target = pointer.target; return *this; }
+    Object* operator = (Object* object) { target = object; return object; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }
     Object& (operator*)() const { return *target; }
     operator Object*() const { return target; }
     
-   // template<typename T> T cast() {  }
+    template<typename T> 
+    T* cast() { return (T*) target; }
 
 //      template<typename I>
 //      typeof(target->operator[](I()))& operator [] (I index) const { return target->operator[](index); }
@@ -73,15 +74,15 @@ public:
         if (mm) mm->registerExternalPointer((TObject**) &object);
     }
     
-    hptr(const hptr& pointer) : target(pointer.target), mm(pointer.mm) 
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
     {
         if (mm) mm->registerExternalPointer((TObject**) &target);
     }
     
     ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
     
-    hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
-    //hptr* operator = (const Object* object) { target = object; return this; }
+   // hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
+   // hptr* operator = (const Object* object) { target = object; return this; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }

@@ -114,15 +114,14 @@ private:
     };
     
     struct TVMExecutionContext {
-        TContext*    currentContext;
+        hptr<TContext> currentContext;
         
-        TInstruction instruction;
-        uint32_t     bytePointer;
-        uint32_t     stackTop;
+        TInstruction   instruction;
+        uint32_t       bytePointer;
+        uint32_t       stackTop;
         
-        // NOTE these will be invalidated during the GC
-        TObject*     returnedValue;
-        TClass*      lastReceiver;
+        hptr<TObject>  returnedValue;
+        hptr<TClass>   lastReceiver;
         
         void loadPointers() {
             bytePointer = getIntegerValue(currentContext->bytePointer);
@@ -133,6 +132,11 @@ private:
             currentContext->bytePointer = newInteger(bytePointer);
             currentContext->stackTop    = newInteger(stackTop);
         }
+        TVMExecutionContext(IMemoryManager* mm) : 
+            currentContext((TContext*) globals.nilObject, mm),
+            returnedValue(globals.nilObject, mm),
+            lastReceiver((TClass*)globals.nilObject, mm) 
+        { }
     };
     
     struct TMethodCacheEntry
@@ -163,6 +167,7 @@ private:
     void doPushBlock(TVMExecutionContext& ec);
     void doMarkArguments(TVMExecutionContext& ec);
     void doSendMessage(TVMExecutionContext& ec);
+    void doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments);
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
@@ -199,7 +204,7 @@ private:
     void backTraceContext(TContext* context);
     
     // Name without m_ to be short because it is widely used
-    TVMExecutionContext ec;
+    //TVMExecutionContext ec;
     
     static SmalltalkVM* s_instance;
 public:
@@ -208,7 +213,7 @@ public:
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
-        m_memoryManager(memoryManager), m_lastGCOccured(false) 
+        m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
     {}
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
