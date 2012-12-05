@@ -110,7 +110,8 @@ private:
         allocateObject    = 7,
         blockInvoke       = 8,
         allocateByteArray = 20,
-        cloneByteObject   = 23
+        cloneByteObject   = 23,
+        bulkReplace       = 38
     };
     
     struct TVMExecutionContext {
@@ -194,6 +195,8 @@ private:
     void printValue(uint32_t index, TObject* value, TObject* previousValue = 0);
     void printContents(TObjectArray& array);
     void backTraceContext(TContext* context);
+    
+    TObject* doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
     bool m_lastGCOccured;
 public:    

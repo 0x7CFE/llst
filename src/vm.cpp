@@ -849,15 +849,24 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             return reinterpret_cast<TObject*>(newInteger(value)); // FIXME long integer
         } break;
         
-        // TODO case 33:
-        
         case 34:
             //FIXME returnedValue is not to be globals.nilObject
             flushMethodCache();
             break;
         
-        // TODO cases 35, 38, 40
+        case bulkReplace: {
+            //Implementation of replaceFrom:to:with:startingAt: as a primitive
+            TObject* destination            = stack[--ec.stackTop];
+            TObject* destinationStartOffset = stack[--ec.stackTop];
+            TObject* destinationStopOffset  = stack[--ec.stackTop];
+            TObject* source                 = stack[--ec.stackTop];
+            TObject* sourceStartOffset      = stack[--ec.stackTop];
             
+            return doBulkReplace(destination, destinationStartOffset, destinationStopOffset, source, sourceStartOffset);
+        } break;
+        
+        // TODO cases 33, 35, 40
+        
         default:
             uint32_t argCount = ec.instruction.low;
             TObjectArray* args = newObject<TObjectArray>(argCount);
@@ -956,7 +965,7 @@ void SmalltalkVM::onCollectionOccured()
     // TODO During the VM execution we may need to reload the context
 }
 
-bool bulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
+TObject* SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
     
     if ( ! isSmallInteger(sourceStartOffset) || ! isSmallInteger(destinationStartOffset) || ! isSmallInteger(destinationStopOffset) )
         return false;
@@ -974,13 +983,13 @@ bool bulkReplace( TObject* destination, TObject* destinationStartOffset, TObject
     
     if ( source->isBinary() && destination->isBinary() ) {
         //TODO memcpy
-        return true;
+        return destination;
     }
     
     if ( ! source->isBinary() && ! destination->isBinary() ) {
         //TODO memcpy
-        return true;
+        return destination;
     }
     
-    return false;
+    return globals.nilObject;
 }
