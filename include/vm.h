@@ -196,7 +196,7 @@ private:
     void printContents(TObjectArray& array);
     void backTraceContext(TContext* context);
     
-    TObject* doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
+    bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
     bool m_lastGCOccured;
 public:    

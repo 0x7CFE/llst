@@ -862,7 +862,12 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* source                 = stack[--ec.stackTop];
             TObject* sourceStartOffset      = stack[--ec.stackTop];
             
-            return doBulkReplace(destination, destinationStartOffset, destinationStopOffset, source, sourceStartOffset);
+            bool succeeded  = doBulkReplace(destination, destinationStartOffset, destinationStopOffset, source, sourceStartOffset);
+            if(!succeeded) {
+                failPrimitive(stack, ec.stackTop);
+                break;
+            }
+            return destination;
         } break;
         
         // TODO cases 33, 35, 40
@@ -965,7 +970,7 @@ void SmalltalkVM::onCollectionOccured()
     // TODO During the VM execution we may need to reload the context
 }
 
-TObject* SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
+bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
     
     if ( ! isSmallInteger(sourceStartOffset) || ! isSmallInteger(destinationStartOffset) || ! isSmallInteger(destinationStopOffset) )
         return false;
@@ -983,13 +988,13 @@ TObject* SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationS
     
     if ( source->isBinary() && destination->isBinary() ) {
         //TODO memcpy
-        return destination;
+        return true;
     }
     
     if ( ! source->isBinary() && ! destination->isBinary() ) {
         //TODO memcpy
-        return destination;
+        return true;
     }
     
-    return globals.nilObject;
+    return false;
 }
