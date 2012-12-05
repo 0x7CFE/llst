@@ -973,7 +973,12 @@ bool bulkReplace( TObject* destination, TObject* destinationStartOffset, TObject
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {
-        memcpy((void*) source->getField(iSourceStartOffset), (void*) destination->getField(iDestinationStartOffset), iCount * sizeof(TObject));
+        //TODO memcpy
+        return true;
+    }
+    
+    if ( ! source->isBinary() && ! destination->isBinary() ) {
+        //TODO memcpy
         return true;
     }
     
