@@ -174,7 +174,7 @@ struct TArray : public TObject {
     static const char* InstanceClassName() { return "Array"; }
     
     template<typename I>
-    Element& operator [] (I index) { return reinterpret_cast<Element*>(fields)[index]; }
+    Element& operator [] (I index) { return (Element&) *(fields[index]); }
 };
 
 struct TMethod;

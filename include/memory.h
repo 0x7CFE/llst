@@ -7,7 +7,6 @@
 #include <vector>
 #include <hash_map>
 #include <list>
-#include <boost/typeof/typeof.hpp>
 
 class IMemoryManager {
 public:
