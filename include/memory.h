@@ -31,8 +31,8 @@ template <typename O> class hptr {
 public:
     typedef O Object;
 private:
-    Object* target;
-    IMemoryManager* mm;
+    Object* target; // TODO volatile
+    IMemoryManager* mm; // TODO assign on copy operators
 public:
     hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
     {
