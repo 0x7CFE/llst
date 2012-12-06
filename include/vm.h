@@ -111,6 +111,8 @@ private:
         blockInvoke       = 8,
         allocateByteArray = 20,
         cloneByteObject   = 23,
+        integerNew        = 32,
+        flushCache        = 34,
         bulkReplace       = 38
     };
     
