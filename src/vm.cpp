@@ -342,7 +342,8 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     
     // Reading new byte pointer that points to the code right after the inline block
     uint16_t newBytePointer = byteCodes[ec.bytePointer] | (byteCodes[ec.bytePointer+1] << 8);
-    // skipping the newBytePointer's data
+    
+    // Skipping the newBytePointer's data
     ec.bytePointer += 2;
     
     // Creating block object
@@ -353,11 +354,9 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     newBlock->stack    = newObject<TObjectArray>(stackSize);
     
     newBlock->blockBytePointer = newInteger(ec.bytePointer);
-    newBlock->bytePointer = 0;
-    newBlock->stackTop = 0;
-    newBlock->previousContext =  0;
-    
-    newBlock->blockBytePointer = newInteger(ec.bytePointer);
+    newBlock->bytePointer      = 0;
+    newBlock->stackTop         = 0;
+    newBlock->previousContext  = 0;
     newBlock->argumentLocation = newInteger(ec.instruction.low);
     
     // Assigning creatingContext depending on the hierarchy
@@ -367,8 +366,8 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     else
         newBlock->creatingContext = ec.currentContext;
     
-    newBlock->method = ec.currentContext->method;
-    newBlock->arguments = ec.currentContext->arguments;
+    newBlock->method      = ec.currentContext->method;
+    newBlock->arguments   = ec.currentContext->arguments;
     newBlock->temporaries = ec.currentContext->temporaries;
     
     // Setting the execution point to a place right after the inlined block,
