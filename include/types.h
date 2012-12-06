@@ -172,7 +172,9 @@ template <typename Element>
 struct TArray : public TObject { 
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* InstanceClassName() { return "Array"; }
-    Element& operator [] (uint32_t index) { return reinterpret_cast<Element*>(fields)[index]; }
+    
+    template<typename I>
+    Element& operator [] (I index) { return (Element&) fields[index]; }
 };
 
 struct TMethod;

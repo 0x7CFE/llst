@@ -14,8 +14,8 @@ int main(int argc, char **argv) {
     SmalltalkVM vm(testImage.get(), memoryManager.get());
     
     // Creating runtime context
-    TContext* initContext = vm.newObject<TContext>();
-    TProcess* initProcess = vm.newObject<TProcess>();
+    hptr<TContext> initContext = vm.newObject<TContext>();
+    hptr<TProcess> initProcess = vm.newObject<TProcess>();
     initProcess->context = initContext;
     
     initContext->arguments = (TObjectArray*) globals.nilObject;

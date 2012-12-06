@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include <types.h>
 #include <vector>
-#include <hash_map>
+#include <list>
 
 class IMemoryManager {
 public:
@@ -14,11 +14,120 @@ public:
     
     virtual void* allocate(size_t size, bool* collectionOccured = 0) = 0;
     virtual void* staticAllocate(size_t size) = 0;
-    virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
+    
+    virtual void  addStaticRoot(void* location) = 0;
+    virtual void  removeStaticRoot(void* location) = 0;
+    virtual bool  isInStaticHeap(void* location) = 0;
+    
+    // External pointer handling
+    virtual void  registerExternalPointer(TObject** pointer) = 0;
+    virtual void  releaseExternalPointer(TObject** pointer) = 0;
     
     virtual uint32_t allocsBeyondCollection() = 0;
 };
+
+template <typename O> class hptr {
+public:
+    typedef O Object;
+private:
+    Object* target; // TODO volatile
+    IMemoryManager* mm; // TODO assign on copy operators
+public:
+    hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr<O>& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr<Object>& operator = (hptr<Object>& pointer) { target = pointer.target; return *this; }
+    Object* operator = (Object* object) { target = object; return object; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    template<typename T> 
+    T* cast() { return (T*) target; }
+
+//      template<typename I>
+//      typeof(target->operator[](I()))& operator [] (I index) const { return target->operator[](index); }
+     
+//     template<typename I>
+//     typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
+};
+
+template<typename T> class hptr< TArray<T> >
+{
+public:
+    typedef TArray<T> Object;
+private:
+    Object* target;
+    IMemoryManager* mm;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+   // hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
+   // hptr* operator = (const Object* object) { target = object; return this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    template<typename I>
+    T& operator [] (I index) const { return target->operator[](index); }
+};
+
+template<> class hptr<TByteObject>
+{
+public:
+    typedef TByteObject Object;
+private:
+    Object* target;
+    IMemoryManager* mm;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &object);
+    }
+    
+    hptr(const hptr& pointer) : target(pointer.target), mm(pointer.mm) 
+    {
+        if (mm) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
+    //hptr* operator = (const Object* object) { target = object; return this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    //template<typename I>
+    uint8_t& operator [] (uint32_t index) const { return target->operator[](index); }
+};
+
 
 // Simple memory manager implementing classic baker two space algorithm.
 // Each time two separate heaps are allocated but only one is active.
@@ -74,8 +183,13 @@ private:
     //TObjectArray* m_staticRoots;
     
     // FIXME temporary solution before GC will prove it's working
-    std::vector<TMovableObject*> m_staticRoots;
-    //std::hash_map<TObject*, TObject*> m_staticRoots;
+    typedef std::list<void*> TStaticRoots;
+    typedef std::list<void*>::iterator TStaticRootsIterator;
+    TStaticRoots m_staticRoots;
+    
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
+    TPointerList m_externalPointers;
     
 public:
     BakerMemoryManager();
@@ -85,14 +199,20 @@ public:
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
     virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
-    virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
+    
+    virtual void  addStaticRoot(void* location);
+    virtual void  removeStaticRoot(void* location);
+    virtual bool  isInStaticHeap(void* location);
+    
+    // External pointer handling
+    virtual void  registerExternalPointer(TObject** pointer);
+    virtual void  releaseExternalPointer(TObject** pointer);
     
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
 };
-
 
 class Image {
 private:
