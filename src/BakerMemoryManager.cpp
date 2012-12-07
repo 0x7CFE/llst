@@ -337,7 +337,6 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
     TPointerIterator iPointer = m_externalPointers.begin();
     for (; iPointer != m_externalPointers.end(); ++iPointer) {
         if (*iPointer == (TMovableObject**) pointer) {
-            printf("Released external pointer %p\n", pointer);
             m_externalPointers.erase(iPointer);
             return;
         }

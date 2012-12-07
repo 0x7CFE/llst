@@ -222,23 +222,23 @@ public:
     {}
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
-    template<class T> hptr<T> newObject(size_t dataSize = 0);
-    template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager, true); }
+    template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
+    template<class T> hptr<T> newPointer(T* object, bool registerPointer = true) { return hptr<T>(object, m_memoryManager, registerPointer); }
 };
 
-template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/)
+template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
 {
     // TODO fast access to common classes
     TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
     if (!klass)
-        return hptr<T>((T*) globals.nilObject, m_memoryManager, true);
+        return hptr<T>((T*) globals.nilObject, m_memoryManager);
     
     if (T::InstancesAreBinary()) {   
-        return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, true);
+        return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, registerPointer);
         // return (T*) newBinaryObject(klass, dataSize);
     } else {
         size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
-        return hptr<T>((T*) newOrdinaryObject(klass, slotSize), m_memoryManager, true);
+        return hptr<T>((T*) newOrdinaryObject(klass, slotSize), m_memoryManager, registerPointer);
         //return (T*) newOrdinaryObject(klass, slotSize);
     }
 }

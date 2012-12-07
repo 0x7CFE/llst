@@ -351,7 +351,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     
     // Allocating block's stack
     uint32_t stackSize = getIntegerValue(ec.currentContext->method->stackSize);
-    newBlock->stack    = newObject<TObjectArray>(stackSize);
+    newBlock->stack    = newObject<TObjectArray>(stackSize, false);
     
     newBlock->blockBytePointer = newInteger(ec.bytePointer);
     newBlock->bytePointer      = 0;
@@ -378,7 +378,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
-    TObjectArray* args  = newObject<TObjectArray>(ec.instruction.low);
+    hptr<TObjectArray> args = newObject<TObjectArray>(ec.instruction.low, false);
     TObjectArray& stack = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
@@ -386,7 +386,7 @@ void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec)
     
     uint32_t index = ec.instruction.low;
     while (index > 0)
-        (*args)[--index] = stack[--ec.stackTop];
+        args[--index] = stack[--ec.stackTop];
     
     stack[ec.stackTop++] = args;
 }
@@ -423,8 +423,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     newContext->arguments       = arguments;
     newContext->method          = receiverMethod;
     newContext->previousContext = ec.currentContext;
-    newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
-    newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
+    newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize), false);
+    newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize), false);
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
     
@@ -498,7 +498,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
         
-        TObjectArray* messageArguments = newObject<TObjectArray>(2);
+        TObjectArray* messageArguments = newObject<TObjectArray>(2, false);
         (*messageArguments)[1] = rightObject;
         (*messageArguments)[0] = leftObject;
         
@@ -919,11 +919,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             hptr<TObjectArray> pStack = newPointer(ec.currentContext->stack);
             
             uint32_t argCount = ec.instruction.low;
-            TObjectArray* args = newObject<TObjectArray>(argCount);
+            hptr<TObjectArray> args = newObject<TObjectArray>(argCount);
             
             uint32_t i = argCount;
             while (i > 0)
-                (*args)[--i] = pStack[--ec.stackTop];
+                args[--i] = pStack[--ec.stackTop];
             
             //TODO call primitive
             fprintf(stderr, "unimplemented or invalid primitive %d\n", opcode);

@@ -23,14 +23,14 @@ int main(int argc, char **argv) {
     initContext->previousContext = (TContext*) globals.nilObject;
     
     const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
-    initContext->stack = vm.newObject<TObjectArray>(stackSize);
+    initContext->stack = vm.newObject<TObjectArray>(stackSize, false);
     initContext->stackTop = newInteger(0);
     
     initContext->method = globals.initialMethod;
     
     // TODO load value from 
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
-    initContext->temporaries = vm.newObject<TObjectArray>(42);
+    initContext->temporaries = vm.newObject<TObjectArray>(42, false);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
