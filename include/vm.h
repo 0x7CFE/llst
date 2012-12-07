@@ -223,7 +223,7 @@ public:
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
-    template<class T> hptr<T> newPointer(T* object, bool registerPointer = true) { return hptr<T>(object, m_memoryManager, registerPointer); }
+    template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
 };
 
 template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
