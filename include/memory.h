@@ -36,7 +36,7 @@ private:
 public:
     hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
     {
-        if (mm) mm->registerExternalPointer((TObject**) &object);
+        if (mm) mm->registerExternalPointer((TObject**) &target);
     }
     
     hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
@@ -106,7 +106,7 @@ private:
 public:
     hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
     {
-        if (mm) mm->registerExternalPointer((TObject**) &object);
+        if (mm) mm->registerExternalPointer((TObject**) &target);
     }
     
     hptr(const hptr& pointer) : target(pointer.target), mm(pointer.mm) 
