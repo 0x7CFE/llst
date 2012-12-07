@@ -5,7 +5,7 @@
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
-    //m_rootStack.push_back(ec);
+    //ec.push(ec);
     
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot)
@@ -195,10 +195,10 @@ void SmalltalkVM::backTraceContext(TContext* context)
 
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t ticks)
 {
-    m_rootStack.push_back(process); // FIXME get rid of this
     hptr<TProcess> currentProcess = newPointer(process);
     
     TVMExecutionContext ec(m_memoryManager);
+    ec.push(process); // FIXME get rid of this
     ec.currentContext = process->context;
     ec.loadPointers(); // Loads bytePointer & stackTop
     
@@ -218,8 +218,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             currentProcess->context = ec.currentContext;
             currentProcess->result  = ec.returnedValue;
             
-            m_rootStack.pop_back(); // FIXME get rid of this
-//             TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+            ec.pop(); // FIXME get rid of this
+//             TProcess* newProcess = (TProcess*) ec.pop(); ec.rootStack.pop_back();
 //             newProcess->context = ec.currentContext;
 //             newProcess->result  = ec.returnedValue;
 //             ec.storePointers();
@@ -582,7 +582,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
             ec.bytePointer -= 1;
             
             // FIXME do not waste time to store process on the stack. we do not need it
-            process = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+            process = (TProcess*) ec.pop();
             process->context = ec.currentContext;
             process->result = ec.returnedValue;
             
@@ -727,7 +727,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             ec.bytePointer = getIntegerValue(block->blockBytePointer);
             
             // Popping block object from the stack
-            m_rootStack.pop_back();
+            //ec.pop();
             return block;
         } break;
         
@@ -765,9 +765,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO case 18 // turn on debugging
         
         case 19: { // error
-            m_rootStack.pop_back();
+            ec.pop();
             TContext* context = process.context;
-            process = *(TProcess*) m_rootStack.back(); m_rootStack.pop_back();
+            process = *(TProcess*) ec.pop(); 
             process.context = context;
             //return returnError; TODO cast 
         } break;

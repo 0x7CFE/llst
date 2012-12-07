@@ -117,6 +117,11 @@ private:
     };
     
     struct TVMExecutionContext {
+    private:
+        // TODO Think about proper memory organization
+        std::list<TObject*> rootStack;
+        IMemoryManager* memoryManager;
+    public:
         hptr<TContext> currentContext;
         
         TInstruction   instruction;
@@ -125,6 +130,18 @@ private:
         
         hptr<TObject>  returnedValue;
         hptr<TClass>   lastReceiver;
+        
+        void push(TObject* object) { 
+            rootStack.push_back(object); 
+            memoryManager->registerExternalPointer(& rootStack.back());
+        }
+        
+        TObject* pop() { 
+            memoryManager->releaseExternalPointer(& rootStack.back());
+            TObject* top = rootStack.back(); 
+            rootStack.pop_back(); 
+            return top; 
+        }
         
         void loadPointers() {
             bytePointer = getIntegerValue(currentContext->bytePointer);
@@ -135,7 +152,9 @@ private:
             currentContext->bytePointer = newInteger(bytePointer);
             currentContext->stackTop    = newInteger(stackTop);
         }
+        
         TVMExecutionContext(IMemoryManager* mm) : 
+            memoryManager(mm),
             currentContext((TContext*) globals.nilObject, mm),
             returnedValue(globals.nilObject, mm),
             lastReceiver((TClass*)globals.nilObject, mm) 
@@ -187,9 +206,6 @@ private:
     void failPrimitive(
         TObjectArray& stack,
         uint32_t& stackTop);
-    
-    // TODO Think about other memory organization
-    std::vector<TObject*> m_rootStack;
     
     Image*          m_image;
     IMemoryManager* m_memoryManager;
