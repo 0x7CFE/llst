@@ -39,7 +39,7 @@ public:
         if (mm) mm->registerExternalPointer((TObject**) &object);
     }
     
-    hptr(const hptr<O>& pointer) : target(pointer.target), mm(pointer.mm) 
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
     {
         if (mm) mm->registerExternalPointer((TObject**) &target);
     }
@@ -47,7 +47,7 @@ public:
     ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
     
     hptr<Object>& operator = (hptr<Object>& pointer) { target = pointer.target; return *this; }
-    Object* operator = (Object* object) { target = object; return object; }
+    hptr<Object>& operator = (Object* object) { target = object; return *this; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }
@@ -74,7 +74,7 @@ private:
 public:
     hptr(Object* object, IMemoryManager* mm, bool notRegister = false) : target(object), mm(mm) 
     {
-        if (mm) mm->registerExternalPointer((TObject**) &object);
+        if (mm) mm->registerExternalPointer((TObject**) &target);
     }
     
     hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
@@ -84,8 +84,8 @@ public:
     
     ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
     
-   // hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
-   // hptr* operator = (const Object* object) { target = object; return this; }
+    hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
+    hptr<Object>& operator = (Object* object) { target = object; return *this; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }
@@ -116,8 +116,8 @@ public:
     
     ~hptr() { if (mm) mm->releaseExternalPointer((TObject**) &target); }
     
-    hptr* operator = (const hptr<Object>& pointer) { target = pointer.target; return this; }
-    //hptr* operator = (const Object* object) { target = object; return this; }
+    hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
+    hptr<Object>& operator = (Object* object) { target = object; return *this; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }
@@ -187,8 +187,8 @@ private:
     typedef std::list<void*>::iterator TStaticRootsIterator;
     TStaticRoots m_staticRoots;
     
-    typedef std::list<TMovableObject**> TPointerList;
-    typedef std::list<TMovableObject**>::iterator TPointerIterator;
+    typedef std::vector<TMovableObject**> TPointerList;
+    typedef std::vector<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_externalPointers;
     
 public:
