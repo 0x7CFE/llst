@@ -512,9 +512,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
 {
     TByteObject&  byteCodes         = * ec.currentContext->method->byteCodes;
     TObjectArray& stack             = * ec.currentContext->stack;
-    TObjectArray& temporaries       = * ec.currentContext->temporaries;
+//     TObjectArray& temporaries       = * ec.currentContext->temporaries;
     TObjectArray& arguments         = * ec.currentContext->arguments;
-    TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
+//     TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
     TSymbolArray& literals          = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
@@ -1030,7 +1030,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     if ( iSourceStartOffset < 0 || iDestinationStartOffset < 0 || iDestinationStopOffset < 0 || iCount < 1)
         return false;
     
-    if (destination->getSize() < iDestinationStopOffset || source->getSize() < (iSourceStartOffset + iCount) )
+    if (destination->getSize() < (uint32_t) iDestinationStopOffset || source->getSize() < (iSourceStartOffset + iCount) )
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {
