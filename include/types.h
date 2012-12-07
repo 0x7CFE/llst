@@ -112,7 +112,8 @@ public:
     void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
-    TObject* getField(uint32_t index) { return fields[index]; }
+    TObject** getFields() { return fields; }
+    TObject*  getField(uint32_t index) { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
     

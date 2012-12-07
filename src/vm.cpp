@@ -902,7 +902,10 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* source                 = stack[--ec.stackTop];
             TObject* sourceStartOffset      = stack[--ec.stackTop];
             
-            bool succeeded  = doBulkReplace(destination, destinationStartOffset, destinationStopOffset, source, sourceStartOffset);
+            bool succeeded  = doBulkReplace( destination, destinationStartOffset, 
+                                             destinationStopOffset, source, 
+                                             sourceStartOffset );
+            
             if(!succeeded) {
                 failPrimitive(stack, ec.stackTop);
                 break;
@@ -912,18 +915,19 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         
         // TODO cases 33, 35, 40
         
-        default:
+        default: {
+            hptr<TObjectArray> pStack = newPointer(ec.currentContext->stack);
+            
             uint32_t argCount = ec.instruction.low;
             TObjectArray* args = newObject<TObjectArray>(argCount);
             
             uint32_t i = argCount;
-            
             while (i > 0)
-                (*args)[--i] = stack[--ec.stackTop];
+                (*args)[--i] = pStack[--ec.stackTop];
             
             //TODO call primitive
-            fprintf(stderr, "unimplemented or invalid primitive %d ", opcode);
-            break;
+            fprintf(stderr, "unimplemented or invalid primitive %d\n", opcode);
+        }
     }
     
     return globals.nilObject;
@@ -1014,8 +1018,10 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     
     if ( ! isSmallInteger(sourceStartOffset) || ! isSmallInteger(destinationStartOffset) || ! isSmallInteger(destinationStopOffset) )
         return false;
-    
-    int32_t iSourceStartOffset      = getIntegerValue(reinterpret_cast<TInteger>( sourceStartOffset )) - 1; // - 1 because in Smalltalk arrays are indexed from 1
+
+    // Smalltalk indexes are counted starting from 1. 
+    // We need to decrement all values to get the zero based index:
+    int32_t iSourceStartOffset      = getIntegerValue(reinterpret_cast<TInteger>( sourceStartOffset )) - 1; 
     int32_t iDestinationStartOffset = getIntegerValue(reinterpret_cast<TInteger>( destinationStartOffset )) - 1;
     int32_t iDestinationStopOffset  = getIntegerValue(reinterpret_cast<TInteger>( destinationStopOffset )) - 1;
     int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset + 1;
@@ -1027,12 +1033,19 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {
-        //TODO memcpy
+        uint8_t* sourceBytes      = static_cast<TByteObject*>(source)->getBytes();
+        uint8_t* destinationBytes = static_cast<TByteObject*>(destination)->getBytes();
+        
+        memcpy( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
         return true;
     }
     
     if ( ! source->isBinary() && ! destination->isBinary() ) {
-        //TODO memcpy
+        // Interpreting pointer array as raw byte sequence
+        uint8_t* sourceFields      = reinterpret_cast<uint8_t*>(source->getFields());
+        uint8_t* destinationFields = reinterpret_cast<uint8_t*>(destination->getFields());
+        
+        memcpy( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*));
         return true;
     }
     
