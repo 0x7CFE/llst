@@ -146,7 +146,7 @@ void SmalltalkVM::backTraceContext(TContext* context)
     TContext* currentContext = context;
     for (; currentContext != globals.nilObject; currentContext = currentContext->previousContext) {
         TMethod* currentMethod  = currentContext->method;
-        TByteObject&  byteCodes = *currentMethod->byteCodes;
+//         TByteObject&  byteCodes = *currentMethod->byteCodes;
         TObjectArray& stack     = *currentContext->stack;
         
         TObjectArray& temporaries       = *currentContext->temporaries;
@@ -391,13 +391,14 @@ void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec)
     stack[ec.stackTop++] = args;
 }
 
-void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments)
+void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments, TClass* receiverClass /*= 0*/ )
 {
-    TObjectArray& stack = * ec.currentContext->stack;
     hptr<TObjectArray> messageArguments = newPointer(arguments);
     
-    TObject* receiver      = (* arguments)[0];
-    TClass*  receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+    if (!receiverClass) {
+        TObject* receiver = (* arguments)[0];
+        receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+    }
     
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
     
@@ -575,7 +576,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
             TClass*  receiverClass   = ec.currentContext->method->klass->parentClass;
             TObjectArray* messageArguments = (TObjectArray*) stack[--ec.stackTop];
             
-            doSendMessage(ec, messageSelector, messageArguments);
+            doSendMessage(ec, messageSelector, messageArguments, receiverClass);
         } break;
         
         case breakpoint: {

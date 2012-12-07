@@ -189,7 +189,9 @@ private:
     void doPushBlock(TVMExecutionContext& ec);
     void doMarkArguments(TVMExecutionContext& ec);
     void doSendMessage(TVMExecutionContext& ec);
-    void doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments);
+    void doSendMessage(TVMExecutionContext& ec, 
+                       TSymbol* selector, TObjectArray* arguments,  
+                       TClass* receiverClass = 0);
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
