@@ -8,7 +8,7 @@ BakerMemoryManager::BakerMemoryManager() :
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
     m_staticHeapBase(0), m_staticHeapPointer(0)
 { 
-    m_externalPointers.reserve(1024);
+    //m_externalPointers.reserve(1024);
 }
 
 BakerMemoryManager::~BakerMemoryManager()
@@ -322,18 +322,16 @@ void BakerMemoryManager::removeStaticRoot(void* location)
 
 bool BakerMemoryManager::isInStaticHeap(void* location)
 {
-    
+    return (location >= m_staticHeapBase && location < m_staticHeapPointer);
 }
 
 void BakerMemoryManager::registerExternalPointer(TObject** pointer) 
 {
-    printf("Adding external pointer %p\n", pointer);
-    m_externalPointers.push_back((TMovableObject**) pointer);
+    m_externalPointers.push_front((TMovableObject**) pointer);
 }
 
 void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
 {
-    printf("Releasing external pointer %p\n", pointer);
     TPointerIterator iPointer = m_externalPointers.begin();
     for (; iPointer != m_externalPointers.end(); ++iPointer) {
         if (*iPointer == (TMovableObject**) pointer) {

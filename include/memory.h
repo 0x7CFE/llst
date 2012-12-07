@@ -196,8 +196,8 @@ private:
     typedef std::list<void*>::iterator TStaticRootsIterator;
     TStaticRoots m_staticRoots;
     
-    typedef std::vector<TMovableObject**> TPointerList;
-    typedef std::vector<TMovableObject**>::iterator TPointerIterator;
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_externalPointers;
     
 public:
@@ -212,7 +212,7 @@ public:
     
     virtual void  addStaticRoot(void* location);
     virtual void  removeStaticRoot(void* location);
-    virtual bool  isInStaticHeap(void* location);
+    inline virtual bool isInStaticHeap(void* location);
     
     // External pointer handling
     virtual void  registerExternalPointer(TObject** pointer);
