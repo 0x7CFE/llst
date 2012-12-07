@@ -51,10 +51,10 @@ public:
     hptr<Object>& operator = (hptr<Object>& pointer) { target = pointer.target; return *this; }
     hptr<Object>& operator = (Object* object) { target = object; return *this; }
     
-    Object* rawptr() const { return target; }
-    Object* operator -> () const { return target; }
-    Object& (operator*)() const { return *target; }
-    operator Object*() const { return target; }
+    Object* rawptr() { return target; }
+    Object* operator -> ()  { return target; }
+    Object& (operator*)() { return *target; }
+    operator Object*() { return target; }
     
     template<typename C> C* cast() { return (C*) target; }
     
@@ -94,15 +94,15 @@ public:
     hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
     hptr<Object>& operator = (Object* object) { target = object; return *this; }
     
-    Object* rawptr() const { return target; }
-    Object* operator -> () const { return target; }
-    Object& (operator*)() const { return *target; }
-    operator Object*() const { return target; }
+    Object* rawptr() const volatile{ return target; }
+    Object* operator -> () const volatile{ return target; }
+    Object& (operator*)() const volatile{ return *target; }
+    operator Object*() const volatile{ return target; }
     
-    template<typename C> C* cast() { return (C*) target; }
+    template<typename C> C* cast() volatile { return (C*) target; }
     
     template<typename I>
-    T& operator [] (I index) const { return target->operator[](index); }
+    T& operator [] (I index) const volatile { return target->operator[](index); }
 };
 
 // Hptr specialization for TByteObject.

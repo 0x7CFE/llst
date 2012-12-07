@@ -5,7 +5,9 @@
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
-    //ec.push(ec);
+    // Class may be moved during GC in allocation, 
+    // so we need to protect the pointer
+    hptr<TClass> pClass = newPointer(klass);
     
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot)
@@ -18,7 +20,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     // number of pointers except for the first two fields           
     size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
     
-    TObject* instance = new (objectSlot) TObject(fieldsCount, klass);
+    TObject* instance = new (objectSlot) TObject(fieldsCount, pClass.rawptr());
 
     for (uint32_t index = 0; index < fieldsCount; index++)
         instance->putField(index, globals.nilObject);
@@ -28,6 +30,10 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 
 TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
 {
+    // Class may be moved during GC in allocation, 
+    // so we need to protect the pointer
+    hptr<TClass> pClass = newPointer(klass);
+    
     // All binary objects are descendants of ByteObject
     // They could not have ordinary fields, so we may use it 
     uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
@@ -39,7 +45,7 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     if (m_lastGCOccured)
         onCollectionOccured();
     
-    TObject* instance = new (objectSlot) TObject(dataSize, klass);
+    TObject* instance = new (objectSlot) TObject(dataSize, pClass);
     
     return instance;
 }
@@ -676,9 +682,14 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         } break;
         
         case allocateObject: { // 7
-            TObject* size  = stack[--ec.stackTop];
-            TClass*  klass = (TClass*) stack[--ec.stackTop];
+            // Taking object's size and class from the stack
+            TObject* size = stack[--ec.stackTop];
+            TClass* klass = (TClass*) stack[--ec.stackTop];
             uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
+            
+            // Instantinating the object. Each object has size and class fields
+            // which are not directly accessible in the managed code, so we need
+            // to add 2 to the size known to the object intself to get the real size:
             return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
@@ -784,7 +795,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case arrayAtPut: { // 5
             TObject* indexObject = stack[--ec.stackTop];
             TObjectArray* array  = (TObjectArray*) stack[--ec.stackTop];
-            TObject* valueObject;
+            TObject* valueObject = 0;
             
             // If the method is Array:at:put then pop a value from the stack
             if (opcode == arrayAtPut) 
@@ -822,7 +833,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case stringAtPut: { // 22
             TObject* indexObject = stack[--ec.stackTop];
             TString* string      = (TString*) stack[--ec.stackTop];
-            TObject* valueObject;
+            TObject* valueObject = 0;
             
             // If the method is String:at:put then pop a value from the stack
             if (opcode == stringAtPut) 

@@ -282,7 +282,6 @@ void BakerMemoryManager::collectGarbage()
     // Then moving them to the new active heap.
 
     // Here we need to check the rootStack, staticRoots and the VM execution context
-    // TODO This container should be garbage collected too
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
         *iRoot = moveObject( (TMovableObject*) *iRoot);
