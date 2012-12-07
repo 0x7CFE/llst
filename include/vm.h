@@ -208,18 +208,11 @@ private:
     
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
-    // Name without m_ to be short because it is widely used
-    //TVMExecutionContext ec;
-    
-    static SmalltalkVM* s_instance;
 public:
-//    void Initialize() { s_instance = new SmalltalkVM(); }
-    SmalltalkVM* GetInstance() { return s_instance; }
-    
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
-    {}
+    { }
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);

@@ -65,11 +65,15 @@ public:
 //     typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
 };
 
+// Hptr specialization for TArray<> class.
+// Provides typed [] operator that allows
+// convinient indexed access to the array contents
 template<typename T> class hptr< TArray<T> >
 {
 public:
     typedef TArray<T> Object;
 private:
+    // TODO see in base hptr<> 
     Object* target;
     IMemoryManager* mm;
     bool isRegistered;
@@ -101,11 +105,15 @@ public:
     T& operator [] (I index) const { return target->operator[](index); }
 };
 
+// Hptr specialization for TByteObject.
+// Provides typed [] operator that allows
+// convinient indexed access to the bytearray contents
 template<> class hptr<TByteObject>
 {
 public:
     typedef TByteObject Object;
 private:
+    // TODO see in base hptr<> 
     Object* target;
     IMemoryManager* mm;
     bool isRegistered;
@@ -186,16 +194,23 @@ private:
     };
     TMovableObject* moveObject(TMovableObject* object);
     
-    // This contains an array of pointers of objects from the
+    // These variables contain an array of pointers of objects from the
     // static heap to the dynamic one. It is used during the GC
     // as a root for pointer iteration.
-    //TObjectArray* m_staticRoots;
     
-    // FIXME temporary solution before GC will prove it's working
+    // FIXME Temporary solution before GC will prove it's working
+    //       Think about better memory organization
     typedef std::list<void*> TStaticRoots;
     typedef std::list<void*>::iterator TStaticRootsIterator;
     TStaticRoots m_staticRoots;
     
+    // External pointers are typically managed by hptr<> template.
+    // When pointer to a heap object is stored outside of the heap,
+    // specific actions need to be taken in order to prevent pointer
+    // invalidation. GC uses this information to correct external
+    // pointers so they will point to correct location even after garbage
+    // collection. Usual operating pattern is very similar to the stack, 
+    // so list container seems to be a good choice.
     typedef std::list<TMovableObject**> TPointerList;
     typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_externalPointers;
@@ -251,7 +266,7 @@ public:
     Image(IMemoryManager* manager) 
         : m_imageFileFD(-1), m_imageFileSize(0), 
           m_imagePointer(0), m_memoryManager(manager) 
-    {}
+    { }
     
     bool     loadImage(const char* fileName);
     TObject* getGlobal(const char* name);

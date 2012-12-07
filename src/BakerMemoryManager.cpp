@@ -8,12 +8,14 @@ BakerMemoryManager::BakerMemoryManager() :
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0), 
     m_staticHeapBase(0), m_staticHeapPointer(0)
 { 
-    //m_externalPointers.reserve(1024);
+    
 }
 
 BakerMemoryManager::~BakerMemoryManager()
 {
-    
+    // TODO Reset the external pointers to catch the null pointers if something goes wrong
+    free(m_staticHeapBase);
+    free(m_heapOne);
 }
 
 bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
@@ -57,12 +59,6 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     m_activeHeapPointer = (uint8_t*) base + mediane;
     m_inactiveHeapBase = (uint8_t*) base + mediane;
     m_inactiveHeapPointer = (uint8_t*) base + heapSize;
-    
-    // Allocating static roots. We could not set the class
-    // of this object because image is not loaded yet
-    // void* slot = allocate(512 * sizeof(TObject*));
-    // m_staticRoots = new (slot) TObjectArray(512, 0);
-    
     
     return true;
 }

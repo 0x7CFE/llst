@@ -214,9 +214,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
         
         if (ticks && (--ticks == 0)) {
             // Time frame expired
+            ec.storePointers();
             currentProcess->context = ec.currentContext;
             currentProcess->result  = ec.returnedValue;
-            ec.storePointers();
             
             m_rootStack.pop_back(); // FIXME get rid of this
 //             TProcess* newProcess = (TProcess*) m_rootStack.back(); m_rootStack.pop_back();
@@ -289,8 +289,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         break;
                         
                     default:
-                        // We have executed a primitive. Now we have to reject the current context execution
-                        // and push the result onto the previous context's stack
+                        // We have executed a primitive. Now we have to reject the current 
+                        // execution context and push the result onto the previous context's stack
                         ec.currentContext = ec.currentContext->previousContext;
                         
                         // Inject the result...
