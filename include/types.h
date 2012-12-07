@@ -10,7 +10,6 @@
 struct TClass;
 struct TObject;
 
-//template<struct T> 
 inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
 
 // This is a special interpretation of Smalltalk's SmallInteger

@@ -378,7 +378,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
-    hptr<TObjectArray> args = newObject<TObjectArray>(ec.instruction.low, false);
+    TObjectArray* args = (TObjectArray*) newObject<TObjectArray>(ec.instruction.low, false);
     TObjectArray& stack = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
@@ -386,7 +386,7 @@ void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec)
     
     uint32_t index = ec.instruction.low;
     while (index > 0)
-        args[--index] = stack[--ec.stackTop];
+        (*args)[--index] = stack[--ec.stackTop];
     
     stack[ec.stackTop++] = args;
 }
@@ -1025,9 +1025,9 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     int32_t iSourceStartOffset      = getIntegerValue(reinterpret_cast<TInteger>( sourceStartOffset )) - 1; 
     int32_t iDestinationStartOffset = getIntegerValue(reinterpret_cast<TInteger>( destinationStartOffset )) - 1;
     int32_t iDestinationStopOffset  = getIntegerValue(reinterpret_cast<TInteger>( destinationStopOffset )) - 1;
-    int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset + 1;
+    int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset;
     
-    if ( iSourceStartOffset < 0 || iDestinationStartOffset < 0 || iDestinationStopOffset < 0 || iCount < 1)
+    if ( iSourceStartOffset < 0 || iDestinationStartOffset < 0 || iDestinationStopOffset < 0 || iCount < 1 )
         return false;
     
     if (destination->getSize() < (uint32_t) iDestinationStopOffset || source->getSize() < (iSourceStartOffset + iCount) )
