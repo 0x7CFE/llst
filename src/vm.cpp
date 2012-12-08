@@ -406,6 +406,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
     }
     
+    ec.lastReceiver = newPointer(receiverClass);
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
     
     if (receiverMethod == 0) {
@@ -427,7 +428,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // Create a new context from the giving method and arguments
     hptr<TContext> newContext   = newObject<TContext>();
     
-    newContext->arguments       = arguments;
+    newContext->arguments       = messageArguments;
     newContext->method          = receiverMethod;
     newContext->previousContext = ec.currentContext;
     newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize), false);
@@ -438,7 +439,6 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // Replace current context with the new one
     ec.currentContext = newContext;
     ec.loadPointers();
-    ec.lastReceiver   = newPointer(receiverClass);
 }
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
