@@ -117,19 +117,23 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
         while (true) {
             // Checking whether this is inline integer
             if (isSmallInteger((TObject*) oldPlace)) {
-                // Yes it is. Because inline integers are stored
-                // directly in the pointer space all we need to do
-                // is just copy contents of the poiner to a new place
+                // Inline integers are stored directly in the 
+                // pointer space. All we need to do is just copy 
+                // contents of the poiner to a new place
             
                 replacement = oldPlace;
                 oldPlace = previousObject;
                 break;
             }
             
-            // Checking if object is not in old space
-            if ( (oldPlace < (TMovableObject*) m_inactiveHeapBase) 
-              || (oldPlace > (TMovableObject*) m_inactiveHeapPointer))
+            // Checking if object is not in the old space
+            if ( (oldPlace > (TMovableObject*) (m_inactiveHeapBase + m_heapSize / 2)) 
+              || (oldPlace < (TMovableObject*) m_inactiveHeapPointer))
+//             if ( (oldPlace < (TMovableObject*) m_inactiveHeapBase) 
+//               || (oldPlace > (TMovableObject*) m_inactiveHeapPointer))
             {
+                // Object does not belong to a heap.
+                // Either it is located in static space or
                 replacement = oldPlace;
                 oldPlace = previousObject;
                 break;
@@ -153,22 +157,21 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // Moving object to a new space, copying it's data
                 // and finally walking up to the object's class
                 
-                // Actual size of binary data
+                // Size of binary data
                 uint32_t dataSize = oldPlace->size.getSize();
                 
                 // We need to allocate space evenly, so calculating the 
                 // actual size of the block being reserved for the moving object
-                //const uint32_t padding = sizeof(TMovableObject*) - 1;
-                uint32_t slotSize = correctPadding(dataSize); //(dataSize + padding) & ~padding;
+                uint32_t slotSize = correctPadding(dataSize);
                 
                 // Allocating copy in new space
-                m_activeHeapPointer -= slotSize + 2 * sizeof(TMovableObject*);
+                m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(dataSize);
                 newPlace->size.setBinary(true);
                 
-                // Copying byte data FIXME is it correct?
-                memcpy(newPlace->data, oldPlace->data, slotSize + 2 * sizeof(TMovableObject));
+                // Copying byte data
+                memcpy(newPlace->data, oldPlace->data, dataSize);
                 
                 // Marking original copy of object as relocated so it would not be processed again
                 oldPlace->size.setRelocated(true);
@@ -183,7 +186,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // On the next iteration we'll be processing the data[0] of the current object
                 // which is actually class pointer in TObject. 
                 // NOTE It is expected that class of binary object would be non binary
-                continue;
+                //continue;
             } else {
                 // Current object is not binary, i.e. this is an ordinary object
                 // with fields that are either SmallIntegers or pointers to other objects
@@ -242,9 +245,11 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                     lastFieldIndex--;
                 }
                 
-                // T_T
+                // Storing the last visited index to the size
+                // If it gets zero then all fields were moved
                 oldPlace->size.setSize(lastFieldIndex);
                 oldPlace->size.setRelocated(true);
+                
                 newPlace->data[lastFieldIndex] = previousObject;
                 previousObject = oldPlace;
                 oldPlace = oldPlace->data[lastFieldIndex];
@@ -263,11 +268,11 @@ void BakerMemoryManager::collectGarbage()
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
-        printf("\n heap one \n");
+        printf("\n(1)->(2)\n");
         m_activeHeapBase = m_heapTwo;
         m_inactiveHeapBase = m_heapOne;
     } else {
-        printf("\n heap two \n");
+        printf("\n(2)->(1)\n");
         m_activeHeapBase = m_heapOne;
         m_inactiveHeapBase = m_heapTwo;
     }
@@ -275,7 +280,7 @@ void BakerMemoryManager::collectGarbage()
     m_activeHeapOne = not m_activeHeapOne;
     
     m_inactiveHeapPointer = m_activeHeapPointer;
-    m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2; // FIXME
+    m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2;
     
     // Then, performing the collection. Seeking from the root
     // objects down the hierarchy to find active objects. 
@@ -289,7 +294,9 @@ void BakerMemoryManager::collectGarbage()
     // Updating external references
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+        printf("GC: Processing external pointer %p pointing to %p\n", *iExternalPointer, **iExternalPointer);
         **iExternalPointer = moveObject(**iExternalPointer);
+        printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
     }
     
 }

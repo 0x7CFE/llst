@@ -12,24 +12,27 @@ int main(int argc, char **argv) {
     testImage->loadImage("../image/testImage");
     
     SmalltalkVM vm(testImage.get(), memoryManager.get());
+
+#if 1
+    hptr<TDictionary> dict = vm.newObject<TDictionary>();
+    dict->keys = (TSymbolArray*) vm.newObject<TSymbolArray>(1, false);
+    (*dict->keys)[0] = vm.newObject<TSymbol>(1);
+    (*dict->keys)[0]->putByte(0, 42);
     
-//     TSymbol* symbolA = vm.newObject<TSymbol>(10);
-//     hptr<TSymbol> symbolB = vm.newObject<TSymbol>(10);
-//     
-//     symbolA->putByte(0, 42);
-//     symbolB->putByte(0, 42);
-//     
-//     printf("symbolA ptr is %p, data %d\n", (TSymbol*) symbolA, symbolA->getByte(0));
-//     printf("symbolB ptr is %p, data %d\n", (TSymbol*) symbolB, symbolB->getByte(0));
-//     
-//     memoryManager->collectGarbage();
-//     
-//     symbolA->putByte(1, 16);
-//     symbolB->putByte(1, 16);
-//     
-//     printf("symbolA ptr is %p, data %d %d\n", (TSymbol*) symbolA, symbolA->getByte(0), symbolA->getByte(1));
-//     printf("symbolB ptr is %p, data %d %d\n", (TSymbol*) symbolB, symbolB->getByte(0), symbolB->getByte(1));
+    printf("dict.target      = %p\n", dict.rawptr());
+    printf("dict->keys       = %p\n", dict->keys);
+    printf("dict->keys[0]    = %p\n", dict->keys->getField(0));
+    printf("dict->keys[0][0] = %d\n", dict->keys->getField(0)->getByte(0));
     
+    memoryManager->collectGarbage();
+    
+    printf("dict.target      = %p\n", dict.rawptr());
+    printf("dict->keys       = %p\n", dict->keys);
+    printf("dict->keys[0]    = %p\n", dict->keys->getField(0));
+    printf("dict->keys[0][0] = %d\n", dict->keys->getField(0)->getByte(0));
+#endif    
+
+#if 0    
     // Creating runtime context
     hptr<TContext> initContext = vm.newObject<TContext>();
     hptr<TProcess> initProcess = vm.newObject<TProcess>();
@@ -71,6 +74,7 @@ int main(int argc, char **argv) {
             printf("Unknown return code: %d", result);
             
     }
-    
+#endif    
+
     return 0;
 }

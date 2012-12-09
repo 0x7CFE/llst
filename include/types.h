@@ -11,6 +11,7 @@ struct TClass;
 struct TObject;
 
 inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
+//inline size_t correctPadding(size_t size) { return (size + 3) & ~3; }
 
 // This is a special interpretation of Smalltalk's SmallInteger
 // VM handles the special case when object pointer has lowest bit set to 1
@@ -172,6 +173,8 @@ template <typename Element>
 struct TArray : public TObject { 
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* InstanceClassName() { return "Array"; }
+    
+    Element getField(uint32_t index) { return (Element) fields[index]; }
     
     template<typename I>
     Element& operator [] (I index) { return (Element&) fields[index]; }

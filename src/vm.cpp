@@ -28,7 +28,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     return instance;
 }
 
-TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
+TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
 {
     // Class may be moved during GC in allocation, 
     // so we need to protect the pointer
@@ -40,12 +40,12 @@ TObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot)
-        return globals.nilObject;
+        return (TByteObject*) globals.nilObject;
     
     if (m_lastGCOccured)
         onCollectionOccured();
     
-    TObject* instance = new (objectSlot) TObject(dataSize, pClass);
+    TByteObject* instance = new (objectSlot) TByteObject(dataSize, pClass);
     
     return instance;
 }
@@ -152,7 +152,6 @@ void SmalltalkVM::backTraceContext(TContext* context)
     TContext* currentContext = context;
     for (; currentContext != globals.nilObject; currentContext = currentContext->previousContext) {
         TMethod* currentMethod  = currentContext->method;
-//         TByteObject&  byteCodes = *currentMethod->byteCodes;
         TObjectArray& stack     = *currentContext->stack;
         
         TObjectArray& temporaries       = *currentContext->temporaries;
@@ -168,7 +167,7 @@ void SmalltalkVM::backTraceContext(TContext* context)
         printf("\tMethod: %s>>%s bytePointer %d\n", 
                currentMethod->klass->name->toString().c_str(), 
                currentMethod->name->toString().c_str(),
-               context->bytePointer);
+               currentContext->bytePointer);
         
         if (&instanceVariables && instanceVariables.getSize()) {
             printf("\n\tInstance variables:\n");
@@ -225,10 +224,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             currentProcess->result  = ec.returnedValue;
             
             ec.pop(); // FIXME get rid of this
-//             TProcess* newProcess = (TProcess*) ec.pop(); ec.rootStack.pop_back();
-//             newProcess->context = ec.currentContext;
-//             newProcess->result  = ec.returnedValue;
-//             ec.storePointers();
             return returnTimeExpired;
         }
             
@@ -402,7 +397,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     hptr<TObjectArray> messageArguments = newPointer(arguments);
     
     if (!receiverClass) {
-        TObject* receiver = (* arguments)[0];
+        TObject* receiver = messageArguments[0];
         receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
     }
     

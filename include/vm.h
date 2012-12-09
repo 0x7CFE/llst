@@ -215,8 +215,8 @@ private:
     bool m_lastGCOccured;
     void onCollectionOccured();
     
-    TObject* newBinaryObject(TClass* klass, size_t dataSize);
-    TObject* newOrdinaryObject(TClass* klass, size_t slotSize);
+    TByteObject* newBinaryObject(TClass* klass, size_t dataSize);
+    TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
     
     // Helper functions for backTraceContext()
     void printByteObject(TByteObject* value);
