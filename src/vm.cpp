@@ -1016,6 +1016,7 @@ void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
 void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
+    printf("VM: GC had just occured. Flushing the method cache.\n");
     flushMethodCache();
     
     // TODO During the VM execution we may need to reload the context

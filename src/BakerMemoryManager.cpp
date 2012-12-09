@@ -265,6 +265,12 @@ void BakerMemoryManager::collectGarbage()
 {
     m_gcCount++;
     
+    
+    printf("Before collection: heap size %d, used %d, free %d\n", 
+           m_heapSize / 2, 
+           m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
+           m_activeHeapPointer - m_activeHeapBase);
+    
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
@@ -294,10 +300,15 @@ void BakerMemoryManager::collectGarbage()
     // Updating external references
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        printf("GC: Processing external pointer %p pointing to %p\n", *iExternalPointer, **iExternalPointer);
+//         printf("GC: Processing external pointer %p pointing to %p\n", *iExternalPointer, **iExternalPointer);
         **iExternalPointer = moveObject(**iExternalPointer);
-        printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
+//         printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
     }
+    
+    printf("After collection: heap size %d, used %d, free %d\n", 
+           m_heapSize / 2, 
+           m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
+           m_activeHeapPointer - m_activeHeapBase);
     
 }
 
