@@ -9,11 +9,14 @@ int main(int argc, char **argv) {
     memoryManager->initializeHeap(65536 * 16);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
-    testImage->loadImage("../image/testImage");
+    if (argc == 2)
+        testImage->loadImage(argv[1]);
+    else
+        testImage->loadImage("../image/testImage");
     
     SmalltalkVM vm(testImage.get(), memoryManager.get());
 
-// #define test    
+//#define test    
     
 #ifdef test
     hptr<TDictionary> dict = vm.newObject<TDictionary>();

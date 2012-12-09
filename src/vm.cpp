@@ -284,6 +284,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // 34 - flush method cache    TODO
                         
                 switch (primitiveNumber) {
+                    case 19:
+                        fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
+                        return returnError;
+                    
                     case blockInvoke:
                         // We do not want to leave the block context which was just loaded
                         // So we're continuing without context switching
@@ -631,8 +635,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
     
     switch(opcode) {
         case returnIsEqual: { // 1
-            TObject* arg2   = stack[--ec.stackTop];
-            TObject* arg1   = stack[--ec.stackTop];
+            TObject* arg2 = stack[--ec.stackTop];
+            TObject* arg1 = stack[--ec.stackTop];
             
             if(arg1 == arg2)
                 return globals.trueObject;
@@ -647,7 +651,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         
         case ioPutChar: { // 3
             TInteger charObject = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
-            uint8_t  charValue = getIntegerValue(charObject);
+            uint8_t  charValue  = getIntegerValue(charObject);
             putchar(charValue);
             return globals.nilObject;
         } break;
@@ -773,9 +777,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         
         case 19: { // error
             ec.pop();
-            TContext* context = process.context;
             process = *(TProcess*) ec.pop(); 
-            process.context = context;
+            process.context = ec.currentContext;
             //return returnError; TODO cast 
         } break;
         
