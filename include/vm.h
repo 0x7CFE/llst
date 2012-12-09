@@ -195,7 +195,7 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec);
+    TObject* doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec, bool* failed);
     
     TExecuteResult doDoSpecial(TProcess*& process, TVMExecutionContext& ec);
     
@@ -207,7 +207,8 @@ private:
         
     void failPrimitive(
         TObjectArray& stack,
-        uint32_t& stackTop);
+        uint32_t& stackTop,
+        uint8_t opcode);
     
     Image*          m_image;
     IMemoryManager* m_memoryManager;

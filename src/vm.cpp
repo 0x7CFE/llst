@@ -275,9 +275,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 //DoPrimitive is a hack. The interpretator never reaches opcodes after this one,
                 // albeit the compiler generates opcodes. But there are expections to the rules...
                 
+                bool failed             = false;
                 uint8_t primitiveNumber = byteCodes[ec.bytePointer++];
-                ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec);
-
+                ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec, &failed);
+                if(failed) {
+                    stack[ec.stackTop++] = globals.nilObject;
+                    break;
+                }
                 // primitiveNumber exceptions:
                 // 19 - error trap            TODO
                 // 8  - block invocation
@@ -629,7 +633,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
     }
 }
 
-TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec)
+TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec, bool* failed)
 {
     TObjectArray& stack = *ec.currentContext->stack;
     
@@ -657,7 +661,23 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         } break;
         
         case ioGetChar: { // 9
-            int32_t input = getchar();
+            //int32_t input = getchar();
+            int32_t input;
+            static int c = 0;
+            switch(c) {
+                case 0: 
+                    input = 49;
+                    c++;
+                    break;
+                case 1: 
+                    input = 10;
+                    c++;
+                    break;
+                case 2: 
+                    input = EOF;
+                    c++;
+                    break;
+            }
             if(input == EOF)
                 return globals.nilObject;
             else
@@ -756,7 +776,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* rightObject = stack[--ec.stackTop];
             TObject* leftObject  = stack[--ec.stackTop];
             if ( !isSmallInteger(leftObject) || !isSmallInteger(rightObject) ) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
                 
@@ -767,7 +788,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             // Performing an operation
             TObject* result = doSmallInt((SmallIntOpcode) opcode, leftOperand, rightOperand);
             if (result == globals.nilObject) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
             return result;
@@ -800,7 +822,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 valueObject = stack[--ec.stackTop];
             
             if (! isSmallInteger(indexObject) ) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
 
@@ -810,7 +833,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             
             // Checking boundaries
             if (actualIndex >= array->getSize()) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
             
@@ -838,7 +862,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 valueObject = stack[--ec.stackTop];
             
             if ( !isSmallInteger(indexObject) ) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
             
@@ -848,7 +873,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             
             // Checking boundaries
             if (actualIndex >= string->getSize()) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
             
@@ -889,7 +915,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case integerNew: { // 32
             TObject* object = stack[--ec.stackTop];
             if (! isSmallInteger(object)) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
             
@@ -917,7 +944,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                                              sourceStartOffset );
             
             if(!succeeded) {
-                failPrimitive(stack, ec.stackTop);
+                *failed = true;
+                failPrimitive(stack, ec.stackTop, opcode);
                 break;
             }
             return destination;
@@ -1012,8 +1040,9 @@ TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, uint32_t leftOperand, u
 //failPrimitive should push nil into the stack(but it is a normal behaviour(doExecutePrimitive should put the result of execution into the stack)
 //but we need to handle situations like error trapping etc
 //we may put nil outside of doExecutePrimitive function and handle special situations by arg-ptr
-void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop) {
-    stack[stackTop++] = globals.nilObject;
+void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop, uint8_t opcode) {
+    printf("failPrimitive %d\n", opcode);
+    //stack[stackTop++] = globals.nilObject;
 }
 
 void SmalltalkVM::onCollectionOccured()
