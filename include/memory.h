@@ -41,9 +41,9 @@ public:
         if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
     }
     
-    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
     {
-        if (mm) mm->registerExternalPointer((TObject**) &target);
+        if (mm) { mm->registerExternalPointer((TObject**) &target); }
     }
     
     ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
@@ -84,9 +84,9 @@ public:
         if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
     }
     
-    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
     {
-        if (mm) mm->registerExternalPointer((TObject**) &target);
+        if (mm) { mm->registerExternalPointer((TObject**) &target); }
     }
     
     ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
@@ -124,9 +124,9 @@ public:
         if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
     }
     
-    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm) 
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
     {
-        if (mm) mm->registerExternalPointer((TObject**) &target);
+        if (mm) { mm->registerExternalPointer((TObject**) &target); }
     }
     
     ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }

@@ -13,7 +13,9 @@ int main(int argc, char **argv) {
     
     SmalltalkVM vm(testImage.get(), memoryManager.get());
 
-#if 1
+// #define test    
+    
+#ifdef test
     hptr<TDictionary> dict = vm.newObject<TDictionary>();
     dict->keys = (TSymbolArray*) vm.newObject<TSymbolArray>(1, false);
     (*dict->keys)[0] = vm.newObject<TSymbol>(1);
@@ -30,9 +32,7 @@ int main(int argc, char **argv) {
     printf("dict->keys       = %p\n", dict->keys);
     printf("dict->keys[0]    = %p\n", dict->keys->getField(0));
     printf("dict->keys[0][0] = %d\n", dict->keys->getField(0)->getByte(0));
-#endif    
-
-#if 0    
+#else    
     // Creating runtime context
     hptr<TContext> initContext = vm.newObject<TContext>();
     hptr<TProcess> initProcess = vm.newObject<TProcess>();
