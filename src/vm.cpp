@@ -564,7 +564,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
     
     switch(ec.instruction.low) {
         case selfReturn: {
-            ec.returnedValue = arguments[0]; // self
+            ec.returnedValue  = arguments[0]; // self
             ec.currentContext = ec.currentContext->previousContext;
             ec.loadPointers();
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
@@ -665,7 +665,6 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         default:
             /* TODO unknown push constant */ ;
             stack[ec.stackTop++] = globals.nilObject;
-            
     }
 }
 
@@ -692,6 +691,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case ioPutChar: { // 3
             TInteger charObject = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
             uint8_t  charValue  = getIntegerValue(charObject);
+            
             putchar(charValue);
             return globals.nilObject;
         } break;
@@ -723,33 +723,36 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case returnSize: {
             TObject* object = stack[--ec.stackTop];
             uint32_t returnedSize = isSmallInteger(object) ? 0 : object->getSize();
+            
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
         case 6: { // start new process
-            TInteger value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
-            uint32_t ticks = getIntegerValue(value);
+            TInteger  value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
+            uint32_t  ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--ec.stackTop];
             
             // FIXME possible stack overflow due to recursive call
             int result = this->execute(newProcess, ticks);
+            
             return reinterpret_cast<TObject*>(newInteger(result));
         } break;
         
         case allocateObject: { // 7
             // Taking object's size and class from the stack
-            TObject* size = stack[--ec.stackTop];
-            TClass* klass = (TClass*) stack[--ec.stackTop];
+            TObject* size  = stack[--ec.stackTop];
+            TClass*  klass = (TClass*) stack[--ec.stackTop];
             uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
             
             // Instantinating the object. Each object has size and class fields
             // which are not directly accessible in the managed code, so we need
             // to add 2 to the size known to the object intself to get the real size:
+            
             return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
         case blockInvoke: { // 8
-            TBlock* block = (TBlock*) stack[--ec.stackTop];
+            TBlock*  block = (TBlock*) stack[--ec.stackTop];
             uint32_t argumentLocation = getIntegerValue(block->argumentLocation);
             
             // Checking the passed temps size
@@ -758,7 +761,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             // Amount of arguments stored on the stack except the block itself
             uint32_t argCount = ec.instruction.low - 1;
             
-            if (argCount >  (blockTemps ? blockTemps->getSize() : 0) ) {
+            if (argCount > (blockTemps ? blockTemps->getSize() : 0) ) {
                 ec.stackTop -= (argCount  + 1); // unrolling stack
                 
                 /* TODO correct primitive failing
@@ -874,9 +877,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 break;
             }
             
-            if (opcode == arrayAt) 
+            if (opcode == arrayAt) {
                 return array->getField(actualIndex);
-            else { 
+            } else { 
                 // Array:at:put
                 
                 TObject*  oldValue   = array->getField(actualIndex);
@@ -905,7 +908,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             if (opcode == stringAtPut) 
                 valueObject = stack[--ec.stackTop];
             
-            if ( !isSmallInteger(indexObject) ) {
+            if (! isSmallInteger(indexObject)) {
                 *failed = true;
                 failPrimitive(stack, ec.stackTop, opcode);
                 break;
