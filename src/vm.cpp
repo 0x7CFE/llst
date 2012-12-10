@@ -292,7 +292,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TObject** objectSlot = & instanceVariables[ec.instruction.low];
                 
                 // Checking whether we need to register current object slot in the GC
-                checkRoot(value, oldValue, objectSlot);
+                if (checkRoot(value, oldValue, objectSlot))
+                    printf("Root list altered for slot %p and value %p (old %p)\n",
+                            objectSlot, value, oldValue);
                 
                 // Performing an assignment
                 instanceVariables[ec.instruction.low] = value;
@@ -310,10 +312,12 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 bool failed             = false;
                 uint8_t primitiveNumber = byteCodes[ec.bytePointer++];
                 ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec, &failed);
-                if(failed) {
+                
+                if (failed) {
                     stack[ec.stackTop++] = globals.nilObject;
                     break;
                 }
+                
                 // primitiveNumber exceptions:
                 // 19 - error trap            TODO
                 // 8  - block invocation
@@ -596,7 +600,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
         case branchIfTrue: {
             ec.returnedValue = stack[--ec.stackTop];
             
-            if(ec.returnedValue == globals.trueObject)
+            if (ec.returnedValue == globals.trueObject)
                 ec.bytePointer = byteCodes[ec.bytePointer] | (byteCodes[ec.bytePointer+1] << 8);
             else
                 ec.bytePointer += 2;
@@ -605,7 +609,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
         case branchIfFalse: {
             ec.returnedValue = stack[--ec.stackTop];
             
-            if(ec.returnedValue == globals.falseObject)
+            if (ec.returnedValue == globals.falseObject)
                 ec.bytePointer = byteCodes[ec.bytePointer] | (byteCodes[ec.bytePointer+1] << 8);
             else
                 ec.bytePointer += 2;
@@ -674,7 +678,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* arg2 = stack[--ec.stackTop];
             TObject* arg1 = stack[--ec.stackTop];
             
-            if(arg1 == arg2)
+            if (arg1 == arg2)
                 return globals.trueObject;
             else
                 return globals.falseObject;
@@ -710,7 +714,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                     c++;
                     break;
             }
-            if(input == EOF)
+            if (input == EOF)
                 return globals.nilObject;
             else
                 return reinterpret_cast<TObject*>(newInteger(input));
@@ -764,7 +768,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                  * for the failed primitive.
                  *
                 //returnedValue = nilObject;
-                if(context != rootStack[--rootTop])
+                if (context != rootStack[--rootTop])
                 {
                     context = rootStack[rootTop];
                     method = context->data[methodInContext];
@@ -870,15 +874,20 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 break;
             }
             
-            if(opcode == arrayAt) 
+            if (opcode == arrayAt) 
                 return array->getField(actualIndex);
             else { 
+                // Array:at:put
+                
                 TObject*  oldValue   = array->getField(actualIndex);
                 TObject** objectSlot = &( array->getFields()[actualIndex] );
                 
-                checkRoot(valueObject, oldValue, objectSlot);
-                
-                // Array:at:put
+                // Checking whether we need to register current object slot in the GC
+                if (checkRoot(valueObject, oldValue, objectSlot))
+                    printf("Root list altered for slot %p and value %p (old %p)\n",
+                           objectSlot, valueObject, oldValue);
+                    
+                // Storing the value into the array
                 array->putField(actualIndex, valueObject);
                 
                 // Return self
@@ -913,7 +922,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 break;
             }
             
-            if(opcode == stringAt) 
+            if (opcode == stringAt) 
                 // String:at
                 return reinterpret_cast<TObject*>(newInteger( string->getByte(actualIndex) ));
             else { 
@@ -974,11 +983,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* source                 = stack[--ec.stackTop];
             TObject* sourceStartOffset      = stack[--ec.stackTop];
             
-            bool succeeded  = doBulkReplace( destination, destinationStartOffset, 
+            bool isSucceeded = doBulkReplace( destination, destinationStartOffset, 
                                              destinationStopOffset, source, 
                                              sourceStartOffset );
             
-            if(!succeeded) {
+            if (! isSucceeded) {
                 *failed = true;
                 failPrimitive(stack, ec.stackTop, opcode);
                 break;
