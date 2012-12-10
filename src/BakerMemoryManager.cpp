@@ -169,13 +169,13 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(dataSize);
-                newPlace->size.setBinary(true);
+                newPlace->size.setBinary();
                 
                 // Copying byte data
                 memcpy(newPlace->data, oldPlace->data, dataSize);
                 
                 // Marking original copy of object as relocated so it would not be processed again
-                oldPlace->size.setRelocated(true);
+                oldPlace->size.setRelocated();
                 
                 // During GC process temporarily using data[0] as indirection pointer
                 // This will be corrected on the next stage of current GC operation
@@ -196,7 +196,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(fieldsCount);
-                oldPlace->size.setRelocated(true);
+                oldPlace->size.setRelocated();
                 
                 // FIXME What the heck is going on here?
                 //       What about copying object's fields?
@@ -249,7 +249,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // Storing the last visited index to the size
                 // If it gets zero then all fields were moved
                 oldPlace->size.setSize(lastFieldIndex);
-                oldPlace->size.setRelocated(true);
+                oldPlace->size.setRelocated();
                 
                 newPlace->data[lastFieldIndex] = previousObject;
                 previousObject = oldPlace;

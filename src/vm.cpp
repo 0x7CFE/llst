@@ -20,7 +20,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     // number of pointers except for the first two fields           
     size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
     
-    TObject* instance = new (objectSlot) TObject(fieldsCount, pClass.rawptr());
+    TObject* instance = new (objectSlot) TObject(fieldsCount, pClass);
 
     for (uint32_t index = 0; index < fieldsCount; index++)
         instance->putField(index, globals.nilObject);
@@ -932,7 +932,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             
             // Creating clone
             uint32_t dataSize  = original->getSize();
-            hptr<TByteObject> clone = newPointer((TByteObject*) newBinaryObject(klass, dataSize * sizeof(TObject*)));
+            hptr<TByteObject> clone = newPointer((TByteObject*) newBinaryObject(klass, dataSize));
             
             // Cloning data
             memcpy(clone->getBytes(), original->getBytes(), dataSize);
