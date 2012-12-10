@@ -19,6 +19,11 @@ int main(int argc, char **argv) {
 //#define test    
     
 #ifdef test
+    hptr<TObjectArray> rootArray = vm.newObject<TObjectArray>(1000);
+    for (uint32_t i = 0; i < 10; i++) {
+        hptr<TObject> pObject = vm.newObject<TObject>();
+    }
+    
     hptr<TDictionary> dict = vm.newObject<TDictionary>();
     dict->keys = (TSymbolArray*) vm.newObject<TSymbolArray>(1, false);
     (*dict->keys)[0] = vm.newObject<TSymbol>(1);

@@ -16,8 +16,8 @@ public:
     virtual void* staticAllocate(size_t size) = 0;
     virtual void  collectGarbage() = 0;
     
-    virtual void  addStaticRoot(void* location) = 0;
-    virtual void  removeStaticRoot(void* location) = 0;
+    virtual void  addStaticRoot(TObject** pointer) = 0;
+    virtual void  removeStaticRoot(TObject** pointer) = 0;
     virtual bool  isInStaticHeap(void* location) = 0;
     
     // External pointer handling
@@ -200,8 +200,8 @@ private:
     
     // FIXME Temporary solution before GC will prove it's working
     //       Think about better memory organization
-    typedef std::list<void*> TStaticRoots;
-    typedef std::list<void*>::iterator TStaticRootsIterator;
+    typedef std::list<TMovableObject**> TStaticRoots;
+    typedef std::list<TMovableObject**>::iterator TStaticRootsIterator;
     TStaticRoots m_staticRoots;
     
     // External pointers are typically managed by hptr<> template.
@@ -225,8 +225,8 @@ public:
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  collectGarbage();
     
-    virtual void  addStaticRoot(void* location);
-    virtual void  removeStaticRoot(void* location);
+    virtual void  addStaticRoot(TObject** pointer);
+    virtual void  removeStaticRoot(TObject** pointer);
     inline virtual bool isInStaticHeap(void* location);
     
     // External pointer handling
