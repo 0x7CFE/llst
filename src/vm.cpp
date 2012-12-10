@@ -341,10 +341,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         // execution context and push the result onto the previous context's stack
                         ec.currentContext = ec.currentContext->previousContext;
                         
-                        if (ec.currentContext == 0 || ec.currentContext == globals.nilObject) {
-                            TProcess* process = (TProcess*) ec.pop();
-                            process->context  = ec.currentContext;
-                            process->result   = ec.returnedValue;
+                        if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+                            currentProcess = (TProcess*) ec.pop();
+                            currentProcess->context  = ec.currentContext;
+                            currentProcess->result   = ec.returnedValue;
                             return returnReturned;
                         }
                         
@@ -640,7 +640,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
             // FIXME do not waste time to store process on the stack. we do not need it
             process = (TProcess*) ec.pop();
             process->context = ec.currentContext;
-            process->result = ec.returnedValue;
+            process->result  = ec.returnedValue;
             
             ec.storePointers();
             return returnBreak;
@@ -830,6 +830,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case 19: { // error
             process = *(TProcess*) ec.pop(); 
             process.context = ec.currentContext;
+            *failed = true;
             //return returnError; TODO cast 
         } break;
         
