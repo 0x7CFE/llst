@@ -367,7 +367,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
             
             default:
-                fprintf(stderr, "Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
+                fprintf(stderr, "VM: Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
                 fprintf(stderr, "'%s' of class '%s' \n", 
                         ec.currentContext->method->name->toString().c_str(), 
                         ec.lastReceiver == globals.nilObject ? "unknown" : ec.lastReceiver->name->toString().c_str());
@@ -546,6 +546,10 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
                 //FIXME possible overflow?
                 ec.returnedValue = reinterpret_cast<TObject*>(newInteger(leftOperand+rightOperand)); 
                 break;
+                
+            default:
+                fprintf(stderr, "VM: Invalid opcode %d passed to sendBinary\n", ec.instruction.low);
+                ec.returnedValue = globals.nilObject;
         }
         
         // Pushing result back to the stack
@@ -567,9 +571,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
 {
     TByteObject&  byteCodes         = * ec.currentContext->method->byteCodes;
     TObjectArray& stack             = * ec.currentContext->stack;
-//     TObjectArray& temporaries       = * ec.currentContext->temporaries;
     TObjectArray& arguments         = * ec.currentContext->arguments;
-//     TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
     TSymbolArray& literals          = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
@@ -674,6 +676,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case falseConst: stack[ec.stackTop++] = globals.falseObject; break;
         default:
             /* TODO unknown push constant */ ;
+            fprintf(stderr, "VM: unknown push constant %d\n", constant);
             stack[ec.stackTop++] = globals.nilObject;
     }
 }
@@ -1002,7 +1005,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 args[--i] = pStack[--ec.stackTop];
             
             //TODO call primitive
-            fprintf(stderr, "unimplemented or invalid primitive %d\n", opcode);
+            fprintf(stderr, "VM: Unimplemented or invalid primitive %d\n", opcode);
         }
     }
     
