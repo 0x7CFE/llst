@@ -163,7 +163,7 @@ void SmalltalkVM::printValue(uint32_t index, TObject* value, TObject* previousVa
         printf("\t\t%.3d true\n", index);
     else if (value == globals.falseObject)
         printf("\t\t%.3d false\n", index);
-    else {
+    else if (value) {
         std::string className = value->getClass()->name->toString();
         
         printf("\t\t%.3d ", index);
@@ -174,7 +174,8 @@ void SmalltalkVM::printValue(uint32_t index, TObject* value, TObject* previousVa
         }
         
         printf("(%s)\n", className.c_str());
-    }
+    } else 
+        printf("0\n");
 }
 
 void SmalltalkVM::printContents(TObjectArray& array) {
@@ -210,11 +211,6 @@ void SmalltalkVM::backTraceContext(TContext* context)
                currentMethod->name->toString().c_str(),
                currentContext->bytePointer);
         
-        if (&instanceVariables && instanceVariables.getSize()) {
-            printf("\n\tInstance variables:\n");
-            printContents(instanceVariables);
-        }
-        
         if (&arguments && arguments.getSize()) {
             printf("\n\tArguments:\n");
             printContents(arguments);
@@ -223,6 +219,11 @@ void SmalltalkVM::backTraceContext(TContext* context)
         if (&temporaries && temporaries.getSize()) {
             printf("\n\tTemporaries:\n");
             printContents(temporaries);
+        }
+        
+        if (!isSmallInteger(&instanceVariables) && (&instanceVariables) && instanceVariables.getSize()) {
+            printf("\n\tInstance variables:\n");
+            printContents(instanceVariables);
         }
         
         if (&literals && literals.getSize()) {
@@ -423,15 +424,15 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
-    TObjectArray* args = (TObjectArray*) newObject<TObjectArray>(ec.instruction.low, false);
-    TObjectArray& stack = * ec.currentContext->stack;
+    hptr<TObjectArray> args = newObject<TObjectArray>(ec.instruction.low, false);
+    TObjectArray& stack     = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
     // from the top of the stack and creates new array with them
     
     uint32_t index = ec.instruction.low;
     while (index > 0)
-        (*args)[--index] = stack[--ec.stackTop];
+        args[--index] = stack[--ec.stackTop];
     
     stack[ec.stackTop++] = args;
 }
@@ -455,7 +456,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
                 ec.bytePointer - 1, ec.currentContext->method->name->toString().c_str());
         
         ec.currentContext->bytePointer = newInteger(ec.bytePointer);
-        ec.currentContext->stackTop = newInteger(ec.stackTop);
+        ec.currentContext->stackTop    = newInteger(ec.stackTop);
         backTraceContext(ec.currentContext);
         
         exit(1);
@@ -656,7 +657,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case 7: 
         case 8: 
         case 9: 
-            stack[ec.stackTop++] = (TObject*) newInteger(constant);
+            stack[ec.stackTop++] = reinterpret_cast<TObject*>(newInteger(constant));
             break;
             
         case nilConst:   stack[ec.stackTop++] = globals.nilObject;   break;
@@ -837,7 +838,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO case 18 // turn on debugging
         
         case 19: { // error
-            ec.pop();
+            //ec.pop();
             process = *(TProcess*) ec.pop(); 
             process.context = ec.currentContext;
             //return returnError; TODO cast 
