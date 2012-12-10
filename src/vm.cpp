@@ -474,7 +474,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // Save stack and opcode pointers
     ec.storePointers();
     
-    // Create a new context from the giving method and arguments
+    // Create a new context for the giving method and arguments
     hptr<TContext> newContext   = newObject<TContext>();
     
     newContext->arguments       = messageArguments;
@@ -828,10 +828,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO case 18 // turn on debugging
         
         case 19: { // error
-            process = *(TProcess*) ec.pop(); 
+            process = * (TProcess*) ec.pop(); 
             process.context = ec.currentContext;
             *failed = true;
-            //return returnError; TODO cast 
         } break;
         
         case allocateByteArray: { // 20
@@ -1069,7 +1068,8 @@ TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, uint32_t leftOperand, u
             return reinterpret_cast<TObject*>(newInteger( result ));
         }
         
-        default: 
+        default:
+            fprintf(stderr, "VM: Invalid smallint opcode %d", opcode);
             return globals.nilObject; /* FIXME possible error */
     }
 }
@@ -1088,8 +1088,6 @@ void SmalltalkVM::onCollectionOccured()
     // Here we need to handle the GC collection event
     printf("VM: GC had just occured. Flushing the method cache.\n");
     flushMethodCache();
-    
-    // TODO During the VM execution we may need to reload the context
 }
 
 bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
