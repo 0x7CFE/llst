@@ -774,6 +774,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             if (argCount > (blockTemps ? blockTemps->getSize() : 0) ) {
                 ec.stackTop -= (argCount  + 1); // unrolling stack
                 failPrimitive(stack, ec.stackTop, opcode);
+                *failed = true;
                 break;
             }
                 
