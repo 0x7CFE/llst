@@ -310,8 +310,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 //DoPrimitive is a hack. The interpretator never reaches opcodes after this one,
                 // albeit the compiler generates opcodes. But there are expections to the rules...
                 
-                bool failed             = false;
                 uint8_t primitiveNumber = byteCodes[ec.bytePointer++];
+                bool failed = false;
+                
                 ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec, &failed);
                 
                 if (failed) {
@@ -329,6 +330,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
                     
+                    case 34:
                     case blockInvoke:
                         // We do not want to leave the block context which was just loaded
                         // So we're continuing without context switching
@@ -338,6 +340,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         // We have executed a primitive. Now we have to reject the current 
                         // execution context and push the result onto the previous context's stack
                         ec.currentContext = ec.currentContext->previousContext;
+                        
+                        if (ec.currentContext == 0 || ec.currentContext == globals.nilObject) {
+                            TProcess* process = (TProcess*) ec.pop();
+                            process->context  = ec.currentContext;
+                            process->result   = ec.returnedValue;
+                            return returnReturned;
+                        }
                         
                         // Inject the result...
                         ec.stackTop = getIntegerValue(ec.currentContext->stackTop);
@@ -457,7 +466,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         
         ec.currentContext->bytePointer = newInteger(ec.bytePointer);
         ec.currentContext->stackTop    = newInteger(ec.stackTop);
-        backTraceContext(ec.currentContext);
+        //backTraceContext(ec.currentContext);
         
         exit(1);
     }
@@ -764,24 +773,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             
             if (argCount > (blockTemps ? blockTemps->getSize() : 0) ) {
                 ec.stackTop -= (argCount  + 1); // unrolling stack
-                
-                /* TODO correct primitive failing
-                 * Since we're continuing execution from a failed
-                 * primitive, re-fetch context if a GC had occurred
-                 * during the failed execution.  Supply a return value
-                 * for the failed primitive.
-                 *
-                //returnedValue = nilObject;
-                if (context != rootStack[--rootTop])
-                {
-                    context = rootStack[rootTop];
-                    method = context->data[methodInContext];
-                    stack = context->data[stackInContext];
-                    bp = bytePtr(method->data[byteCodesInMethod]);
-                    arguments = temporaries = literals = instanceVariables = 0;
-                } */
-                stack[ec.stackTop++] = globals.nilObject;
-                return globals.nilObject;
+                failPrimitive(stack, ec.stackTop, opcode);
+                break;
             }
                 
             // Loading temporaries array
@@ -796,9 +789,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             // Block is bound to the method's bytecodes, so it's
             // first bytecode will not be zero but the value specified 
             ec.bytePointer = getIntegerValue(block->blockBytePointer);
-            
-            // Popping block object from the stack
-            //ec.pop();
             return block;
         } break;
         
@@ -838,7 +828,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO case 18 // turn on debugging
         
         case 19: { // error
-            //ec.pop();
             process = *(TProcess*) ec.pop(); 
             process.context = ec.currentContext;
             //return returnError; TODO cast 

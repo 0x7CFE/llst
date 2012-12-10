@@ -7,6 +7,8 @@
 #include <memory.h>
 #include <stdlib.h>
 
+#include <stdio.h>
+
 class SmalltalkVM {
 public:
     enum TExecuteResult {
@@ -132,6 +134,7 @@ private:
         hptr<TClass>   lastReceiver;
         
         void push(TObject* object) { 
+            printf("push %p\n", object);
             rootStack.push_back(object); 
             memoryManager->registerExternalPointer(& rootStack.back());
         }
@@ -140,6 +143,7 @@ private:
             memoryManager->releaseExternalPointer(& rootStack.back());
             TObject* top = rootStack.back(); 
             rootStack.pop_back(); 
+            printf("pop %p\n", top);
             return top; 
         }
         
