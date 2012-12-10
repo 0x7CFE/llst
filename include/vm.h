@@ -173,6 +173,8 @@ private:
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
 
+    bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
+    
     // lexicographic comparison of two byte objects
 //     int compareSymbols(const TByteObject* left, const TByteObject* right);
     
