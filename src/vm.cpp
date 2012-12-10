@@ -246,34 +246,41 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             case pushBlock:       doPushBlock(ec);                                                  break; 
             case assignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];         break;
             case assignInstance: {
+                // This is a value to be assigned
                 TObject* value = stack[ec.stackTop - 1];
-                instanceVariables[ec.instruction.low] = value;
                 
-                bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
-                bool slotIsStatic  = m_memoryManager->isInStaticHeap(&instanceVariables);
+                // Old value will be used in the further checks (see below)
+                TObject* oldValue = instanceVariables[ec.instruction.low];
+                
+                // Performing an assignment
+                instanceVariables[ec.instruction.low] = value;
                 
                 // Here we need to perform some actions depending on whether the object slot and
                 // the value resides. Generally, all pointers from the static heap to the dynamic one
                 // should be tracked by the GC because it may be the only valid link to the object in the
                 // dynamic heap which may be collected otherwise
                 
+                bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
+                bool slotIsStatic  = m_memoryManager->isInStaticHeap(&instanceVariables);
+                
                 // Only static slots are subject of our interest
                 if (slotIsStatic) {
-                    bool oldValueIsStatic = m_memoryManager->isInStaticHeap(instanceVariables[ec.instruction.low]);
+                    bool oldValueIsStatic = m_memoryManager->isInStaticHeap(oldValue);
+                    TObject** objectSlot = & instanceVariables[ec.instruction.low];
                     
                     if (!valueIsStatic) {
                         // Adding dynamic value to a static slot. If slot previously contained
                         // the dynamic value then it means that slot was already registered before.
                         // In that case we do not need to register it again.
                         if (oldValueIsStatic)
-                            m_memoryManager->addStaticRoot(& instanceVariables[ec.instruction.low]);
+                            m_memoryManager->addStaticRoot(objectSlot);
                     } else {
                         // Adding static value to a static slot. Typically it means assigning something 
                         // like nilObject. We need to check what pointer contained the slot before.
                         // If it was dynamic, we need to remove the slot from the root list, so GC will not
                         // try to collect a static value from the static heap (it's just a waste of time)
                         if (!oldValueIsStatic)
-                            m_memoryManager->removeStaticRoot(& instanceVariables[ec.instruction.low]);
+                            m_memoryManager->removeStaticRoot(objectSlot);
                     }
                 }
             } break;
