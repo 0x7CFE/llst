@@ -31,6 +31,7 @@ bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
     
     m_staticHeapBase = (uint8_t*) heap;
     m_staticHeapPointer = (uint8_t*) heap + heapSize;
+    m_staticHeapSize = heapSize;
     
     return true;
 }
@@ -296,7 +297,7 @@ void BakerMemoryManager::collectGarbage()
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
     {
-        //printf("GC: Processing root pointer %p pointing to %p\n", *iRoot, **iRoot);
+        printf("GC: Processing root pointer %p pointing to %p\n", *iRoot, **iRoot);
         **iRoot = moveObject(**iRoot);
     }
 
@@ -317,7 +318,7 @@ void BakerMemoryManager::collectGarbage()
 
 bool BakerMemoryManager::isInStaticHeap(void* location)
 {
-    return (location >= m_staticHeapBase && location < m_staticHeapPointer);
+    return (location >= m_staticHeapPointer) && (location < m_staticHeapBase + m_staticHeapSize);
 }
 
 void BakerMemoryManager::addStaticRoot(TObject** pointer)

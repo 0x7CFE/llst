@@ -266,7 +266,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 // Only static slots are subject of our interest
                 if (slotIsStatic) {
                     bool oldValueIsStatic = m_memoryManager->isInStaticHeap(oldValue);
-                    TObject** objectSlot = & instanceVariables[ec.instruction.low];
+                    TObject** objectSlot = & (instanceVariables[ec.instruction.low]);
                     
                     if (!valueIsStatic) {
                         // Adding dynamic value to a static slot. If slot previously contained
