@@ -461,17 +461,252 @@ notNil
 	" no, we are not not-nil "
 	^ false
 !
+
+
+METHOD Block
+assertEq: arg withComment: comment
+    |result header headerTab|
+    header <- String new.
+    header <- header + (method name printString).
+
+    comment notNil ifTrue: [ header <- header + ( '(' + comment + ') ' ) ]
+    
+    header print.
+    
+    headerTab <- 42 - (header size).
+    [headerTab > 0] whileTrue: [
+        ' ' print.
+        headerTab <- headerTab - 1
+    ]
+    
+    result <- self value.
+    
+    result = arg
+        ifTrue:  [ 'OK'   printNl ]
+        ifFalse: [
+                   'FAIL' printNl.
+                   ('Expected ' + arg printString + ', ') print.
+                   'got ' print. result printNl. String newline print.
+                   
+                   method text printNl.
+                 ]
+               
+!
+
+METHOD Block
+assertEq: arg
+    self assertEq: arg withComment: nil.
+!
+
+METHOD Block
+assertWithComment: comment
+    self assertEq: true withComment: comment.
+!
+
+METHOD Block
+assert
+    self assertWithComment: nil.
+!
+
+METHOD Dictionary
+keys
+    ^keys
+!
+
+CLASS MetaTest Class
+METHOD MetaTest
+runAll |reservedNames|
+    reservedNames <- Array new: 2.
+    reservedNames at: 1 put: 'runAll'.
+    reservedNames at: 2 put: 'init'. "TODO"
+    
+    Char newline print.
+    'Running ' print. self class printNl.
+    
+    self class methods
+            do: [:m |
+                    Context new perform: m withArguments: (Array new: 0)
+                ]
+!
+
+COMMENT FIXME make tests be singletons 
+
+COMMENT              --------CompareTest----------
+CLASS CompareTest MetaTest
+
+METHOD CompareTest
+greater
+    [ 3 > 2 ] assert
+!
+
+METHOD CompareTest
+equal
+    [ 42 == 42 ] assert
+!
+
+METHOD CompareTest
+less
+    [ -1 < 0 ] assert
+!
+
+METHOD CompareTest
+nilIsNil
+    [ nil isNil ] assert
+    
+!
+
+METHOD CompareTest
+nilEqNil
+    [ nil ] assertEq: nil
+!
+
+
+COMMENT              --------SmallIntTest----------
+CLASS SmallIntTest MetaTest
+METHOD SmallIntTest
+add
+    [12 + 64] assertEq: 76
+!
+
+METHOD SmallIntTest
+sub
+    [22 - 42 ] assertEq: -20
+!
+
+METHOD SmallIntTest
+div
+    [ 10 / 5 ] assertEq: 2
+!
+
+METHOD SmallIntTest
+mul
+    [ 21 * 2 ] assertEq: 42
+!
+
+COMMENT              --------BranchTest----------
+CLASS BranchTest MetaTest
+
+METHOD BranchTest
+ifTrue |x|
+    [ true ] ifTrue:  [ x <- 123 ]
+             ifFalse: [ x <- 151 ]
+    [ x ] assertEq: 123
+!
+
+
+METHOD BranchTest
+ifFalse |x|
+    [ false ] ifTrue:  [ x <- 34 ]
+              ifFalse: [ x <- 521 ]
+    [ x ] assertEq: 521
+!
+
+COMMENT              --------LoopTest----------
+CLASS LoopTest MetaTest
+
+METHOD LoopTest
+loopCount |count|
+    count <- SmallInt new.
+    
+    1 to: 151251 do: [:i| count <- count + 1 ]
+    
+    [ count ] assertEq: 151251
+!
+
+METHOD LoopTest
+sum |result|
+    result <- SmallInt new.
+    
+    1 to: 100 do: [:i| result <- result + i ]
+    
+    [ result ] assertEq: 5050
+!
+
+COMMENT              --------ClassTest----------
+CLASS ClassTest MetaTest
+
+METHOD ClassTest
+className
+    [ SmallInt printString ] assertEq: 'SmallInt'
+!
+
+COMMENT              --------MethodLoopupTest----------
+CLASS MethodLoopupTest MetaTest
+
+METHOD MethodLoopupTest
+newline
+    [Char   class methods keys includes: #newline] assertWithComment: 'Char'
+    [String class methods keys includes: #newline] assertWithComment: 'String'
+!
+
+COMMENT              --------StringTest----------
+CLASS StringTest MetaTest
+
+METHOD StringTest
+plus
+    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: 'operator +'
+!
+
+METHOD StringTest
+asSymbol
+    [ 'foobar' asSymbol ] assertEq: #foobar
+!
+
+METHOD StringTest
+lowerCase
+    [ 'FooBar' lowerCase ] assertEq: 'foobar'
+!
+
+METHOD StringTest
+asNumber
+    [ '42' asNumber ] assertEq: 42
+!
+
+METHOD StringTest
+copy
+    [ 'foobar' copy ] assertEq: 'foobar'
+!
+
+METHOD StringTest
+at |str|
+    "FIXME"
+    ['foobar' at: 4 ] assertEq: 23. 
+!
+
+METHOD StringTest
+indexOf
+    [ 'foobar' indexOf: 'b' ] assertEq: 4
+!
+
+METHOD StringTest
+reverse
+    [ 'reverse' reverse ] assertEq: 'esrever'
+!
+
+
 METHOD Undefined
 main    | command |
         " initialize classes "
         Char initialize.
 
+        CompareTest      new runAll.
+        SmallIntTest     new runAll.
+        BranchTest       new runAll.
+        LoopTest         new runAll.
+        ClassTest        new runAll.
+        MethodLoopupTest new runAll.
+        StringTest       new runAll.
+        
+        "[ true ] whileTrue: [ $. print ]"
+        
         " main execution loop "
-        [ '-> ' print. command <- String input. 
-            $" print. command print. '" ' print. command notNil ]
+       " [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
+       "                 
 !
+
+
 COMMENT -----------Boolean--------------
 METHOD Boolean
 and: aBlock
