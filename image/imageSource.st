@@ -629,10 +629,10 @@ className
     [ SmallInt printString ] assertEq: 'SmallInt'
 !
 
-COMMENT              --------MethodLoopupTest----------
-CLASS MethodLoopupTest Test
+COMMENT              --------MethodLookupTest----------
+CLASS MethodLookupTest Test
 
-METHOD MethodLoopupTest
+METHOD MethodLookupTest
 newline
     [Char   class methods keys includes: #newline] assertWithComment: 'Char'
     [String class methods keys includes: #newline] assertWithComment: 'String'
@@ -668,8 +668,7 @@ copy
 
 METHOD StringTest
 at |str|
-    "FIXME"
-    ['foobar' at: 4 ] assertEq: 23. 
+    ['foobar' at: 4 ] assertEq: $b. 
 !
 
 METHOD StringTest
@@ -693,7 +692,7 @@ main    | command |
        " BranchTest       new runAll."
         LoopTest         new runAll.
         ClassTest        new runAll.
-        MethodLoopupTest new runAll.
+        MethodLookupTest new runAll.
         StringTest       new runAll.
         
         "[ true ] whileTrue: [ $. print ]"
