@@ -847,7 +847,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case 19: { // error
             process = * (TProcess*) pop_process(); 
             process.context = ec.currentContext;
-            *failed = true;
         } break;
         
         case allocateByteArray: { // 20
