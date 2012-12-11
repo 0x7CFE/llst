@@ -459,10 +459,14 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
     
     if (receiverMethod == 0) {
-        fprintf(stderr, "Failed to lookup selector '%s' of class '%s' ", 
+	fprintf(stderr, "In method %s>>%s at offset %d : \n", 
+		ec.currentContext->method->klass->name->toString().c_str(), 
+		ec.currentContext->method->name->toString().c_str(),
+		ec.bytePointer - 1
+ 	      );
+      
+        fprintf(stderr, "Failed to lookup selector '%s' of class '%s' \n", 
                 selector->toString().c_str(), receiverClass->name->toString().c_str());
-        fprintf(stderr, "at offset %d in method '%s' \n", 
-                ec.bytePointer - 1, ec.currentContext->method->name->toString().c_str());
         
         ec.currentContext->bytePointer = newInteger(ec.bytePointer);
         ec.currentContext->stackTop    = newInteger(ec.stackTop);
