@@ -513,26 +513,25 @@ keys
     ^keys
 !
 
-CLASS MetaTest Class
-METHOD MetaTest
+CLASS Test Class
+METHOD Test
 runAll |reservedNames|
-    reservedNames <- Array new: 2.
-    reservedNames at: 1 put: 'runAll'.
-    reservedNames at: 2 put: 'init'. "TODO"
+    reservedNames <- Array with: #init.
     
     Char newline print.
     'Running ' print. self class printNl.
     
     self class methods
             do: [:m |
-                    Context new perform: m withArguments: (Array new: 0)
+                    ( reservedNames includes: (m name) )
+                        ifFalse: [ Context new perform: m withArguments: (Array new: 0) ]
                 ]
 !
 
 COMMENT FIXME make tests be singletons 
 
 COMMENT              --------CompareTest----------
-CLASS CompareTest MetaTest
+CLASS CompareTest Test
 
 METHOD CompareTest
 greater
@@ -562,7 +561,7 @@ nilEqNil
 
 
 COMMENT              --------SmallIntTest----------
-CLASS SmallIntTest MetaTest
+CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
     [12 + 64] assertEq: 76
@@ -584,7 +583,7 @@ mul
 !
 
 COMMENT              --------BranchTest----------
-CLASS BranchTest MetaTest
+CLASS BranchTest Test
 
 METHOD BranchTest
 ifTrue |x|
@@ -602,7 +601,7 @@ ifFalse |x|
 !
 
 COMMENT              --------LoopTest----------
-CLASS LoopTest MetaTest
+CLASS LoopTest Test
 
 METHOD LoopTest
 loopCount |count|
@@ -623,7 +622,7 @@ sum |result|
 !
 
 COMMENT              --------ClassTest----------
-CLASS ClassTest MetaTest
+CLASS ClassTest Test
 
 METHOD ClassTest
 className
@@ -631,7 +630,7 @@ className
 !
 
 COMMENT              --------MethodLoopupTest----------
-CLASS MethodLoopupTest MetaTest
+CLASS MethodLoopupTest Test
 
 METHOD MethodLoopupTest
 newline
@@ -640,7 +639,7 @@ newline
 !
 
 COMMENT              --------StringTest----------
-CLASS StringTest MetaTest
+CLASS StringTest Test
 
 METHOD StringTest
 plus
