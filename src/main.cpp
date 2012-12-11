@@ -66,20 +66,20 @@ int main(int argc, char **argv) {
     // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:
-            printf("User defined return");
+            printf("User defined return\n");
             break;
             
         case SmalltalkVM::returnReturned:
             // normal return
-            printf("Exited normally");
+            printf("Exited normally\n");
             break;
             
         case SmalltalkVM::returnTimeExpired: 
-            printf("Execution time expired");
+            printf("Execution time expired\n");
             break;
             
         default:
-            printf("Unknown return code: %d", result);
+            printf("Unknown return code: %d\n", result);
             
     }
 #endif    
