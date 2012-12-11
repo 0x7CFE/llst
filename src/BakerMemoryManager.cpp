@@ -148,9 +148,9 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                            oldPlace, oldPlace->size.getSize(), replacement);
                 } else {
                     uint32_t index = oldPlace->size.getSize();
-                    printf("Binary object %p already relocated, size %d, ", oldPlace, oldPlace->size.getSize());
+                    printf("Object %p already relocated, size %d, ", oldPlace, oldPlace->size.getSize());
                     replacement = oldPlace->data[index];
-                    printf("replacement = %p\n", replacement);
+                    printf("replacement = %p, replacement size = %d\n", replacement, replacement->size.getSize());
                 }
                 oldPlace = previousObject;
                 break;
@@ -173,9 +173,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 
                 // Allocating copy in new space
                 m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
-                newPlace = (TMovableObject*) m_activeHeapPointer;
-                newPlace->size.setSize(dataSize);
-                newPlace->size.setBinary();
+                newPlace = new (m_activeHeapPointer) TMovableObject(dataSize, true);
                 
                 printf("to a new place %p\n", newPlace);
                 
@@ -205,8 +203,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 printf("Moving object %p with %d fields ", oldPlace, fieldsCount);
                 
                 m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
-                newPlace = (TMovableObject*) m_activeHeapPointer;
-                newPlace->size.setSize(fieldsCount);
+                newPlace = new (m_activeHeapPointer) TMovableObject(fieldsCount, false);
                 
                 printf("to a new place %p\n", newPlace);
                 

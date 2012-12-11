@@ -45,8 +45,8 @@ public:
     TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
     { 
         data  = (size << 2);
-        data |= (isBinary << 1); 
-        data |= isRelocated; 
+        data |= isBinary    ? FLAG_BINARY : 0; 
+        data |= isRelocated ? FLAG_RELOCATED : 0; 
     }
     
     TSize(const TSize& size) : data(size.data) { }
@@ -134,7 +134,7 @@ public:
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
     {
         // Zeroing data
-        memset(fields, 0, dataSize);
+        memset((void*)fields, 0, dataSize);
     }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }

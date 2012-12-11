@@ -191,6 +191,8 @@ private:
     struct TMovableObject {
         TSize size;
         TMovableObject* data[0];
+        
+        TMovableObject(uint32_t dataSize, bool isBinary = false) : size(dataSize, isBinary) { }
     };
     TMovableObject* moveObject(TMovableObject* object);
     
