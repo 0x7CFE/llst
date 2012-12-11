@@ -72,8 +72,8 @@ bool SmalltalkVM::checkRoot(TObject* value, TObject* oldValue, TObject** objectS
 {
     // Here we need to perform some actions depending on whether the object slot and
     // the value resides. Generally, all pointers from the static heap to the dynamic one
-    // should be tracked by the GC because it may be the only valid link to the object in the
-    // dynamic heap which may be collected otherwise
+    // should be tracked by the GC because it may be the only valid link to the object. 
+    // Object may be collected otherwise.
     
     bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
     bool slotIsStatic  = m_memoryManager->isInStaticHeap(objectSlot);
@@ -93,9 +93,9 @@ bool SmalltalkVM::checkRoot(TObject* value, TObject* oldValue, TObject** objectS
             }
         } else {
             // Adding static value to a static slot. Typically it means assigning something 
-            // like nilObject. We need to check what pointer contained the slot before.
+            // like nilObject. We need to check what pointer was in the slot before (oldValue).
             // If it was dynamic, we need to remove the slot from the root list, so GC will not
-            // try to collect a static value from the static heap (it's just a waste of time)
+            // try to collect a static value from the static heap (it's just a waste of time).
             
             if (!oldValueIsStatic) {
                 m_memoryManager->removeStaticRoot(objectSlot);
@@ -974,11 +974,22 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         
         case bulkReplace: { // 38
             //Implementation of replaceFrom:to:with:startingAt: as a primitive
+            
+            // Array replaceFrom: start to: stop with: replacement startingAt: repStart
+            //      <38 start stop replacement repStart self>.
+            
+            // Current stack contents (top is the top)
+            //      self
+            //      repStart
+            //      replacement
+            //      stop
+            //      start
+            
             TObject* destination            = stack[--ec.stackTop];
-            TObject* destinationStartOffset = stack[--ec.stackTop];
-            TObject* destinationStopOffset  = stack[--ec.stackTop];
-            TObject* source                 = stack[--ec.stackTop];
             TObject* sourceStartOffset      = stack[--ec.stackTop];
+            TObject* source                 = stack[--ec.stackTop];
+            TObject* destinationStopOffset  = stack[--ec.stackTop];
+            TObject* destinationStartOffset = stack[--ec.stackTop];
             
             bool isSucceeded = doBulkReplace( destination, destinationStartOffset, 
                                              destinationStopOffset, source, 
