@@ -44,9 +44,9 @@ private:
 public:
     TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
     { 
-        data = (size << 2); //) & ~FLAGS_MASK; // masking lowest two bits
-        data |= (isBinary << 1); 
-        data |= isRelocated; 
+        data  = (size << 2);
+        data |= isBinary    ? FLAG_BINARY : 0; 
+        data |= isRelocated ? FLAG_RELOCATED : 0; 
     }
     
     TSize(const TSize& size) : data(size.data) { }
@@ -55,8 +55,8 @@ public:
     uint32_t setSize(uint32_t size) { return data = (data & 3) | (size << 2); }
     bool isBinary() const { return data & FLAG_BINARY; }
     bool isRelocated() const { return data & FLAG_RELOCATED; }
-    void setBinary(bool value) { data |= (value << 1); }
-    void setRelocated(bool value) { data |= value; }
+    void setBinary() { data |= FLAG_BINARY; }
+    void setRelocated() { data |= FLAG_RELOCATED; }
 };
 
 
@@ -109,7 +109,6 @@ public:
     // delegated methods from TSize
     bool isBinary() const { return size.isBinary(); }
     bool isRelocated() const { return size.isRelocated(); }
-    void setRelocated(bool value) { size.setRelocated(value); }
     
     // TODO boundary checks
     TObject** getFields() { return fields; }
@@ -135,7 +134,7 @@ public:
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
     {
         // Zeroing data
-        memset(fields, 0, dataSize);
+        memset((void*)fields, 0, dataSize);
     }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }

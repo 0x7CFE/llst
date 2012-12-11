@@ -691,7 +691,7 @@ main    | command |
 
         CompareTest      new runAll.
         SmallIntTest     new runAll.
-        BranchTest       new runAll.
+       " BranchTest       new runAll."
         LoopTest         new runAll.
         ClassTest        new runAll.
         MethodLoopupTest new runAll.

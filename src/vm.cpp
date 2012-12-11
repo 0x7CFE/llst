@@ -20,7 +20,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     // number of pointers except for the first two fields           
     size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
     
-    TObject* instance = new (objectSlot) TObject(fieldsCount, pClass.rawptr());
+    TObject* instance = new (objectSlot) TObject(fieldsCount, pClass);
 
     for (uint32_t index = 0; index < fieldsCount; index++)
         instance->putField(index, globals.nilObject);
@@ -67,6 +67,47 @@ template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize)
     TClass* klass = globals.blockClass;
     return (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
 } */
+
+bool SmalltalkVM::checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot)
+{
+    // Here we need to perform some actions depending on whether the object slot and
+    // the value resides. Generally, all pointers from the static heap to the dynamic one
+    // should be tracked by the GC because it may be the only valid link to the object. 
+    // Object may be collected otherwise.
+    
+    bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
+    bool slotIsStatic  = m_memoryManager->isInStaticHeap(objectSlot);
+    
+    // Only static slots are subject of our interest
+    if (slotIsStatic) {
+        bool oldValueIsStatic = m_memoryManager->isInStaticHeap(oldValue);
+        
+        if (!valueIsStatic) {
+            // Adding dynamic value to a static slot. If slot previously contained
+            // the dynamic value then it means that slot was already registered before.
+            // In that case we do not need to register it again.
+            
+            if (oldValueIsStatic) {
+                m_memoryManager->addStaticRoot(objectSlot);
+                return true; // Root list was altered
+            }
+        } else {
+            // Adding static value to a static slot. Typically it means assigning something 
+            // like nilObject. We need to check what pointer was in the slot before (oldValue).
+            // If it was dynamic, we need to remove the slot from the root list, so GC will not
+            // try to collect a static value from the static heap (it's just a waste of time).
+            
+            if (!oldValueIsStatic) {
+                m_memoryManager->removeStaticRoot(objectSlot);
+                return true; // Root list was altered
+            }
+        }
+    }
+    
+    // Root list was not altered
+    return false;
+}
+
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
@@ -122,7 +163,7 @@ void SmalltalkVM::printValue(uint32_t index, TObject* value, TObject* previousVa
         printf("\t\t%.3d true\n", index);
     else if (value == globals.falseObject)
         printf("\t\t%.3d false\n", index);
-    else {
+    else if (value) {
         std::string className = value->getClass()->name->toString();
         
         printf("\t\t%.3d ", index);
@@ -133,7 +174,8 @@ void SmalltalkVM::printValue(uint32_t index, TObject* value, TObject* previousVa
         }
         
         printf("(%s)\n", className.c_str());
-    }
+    } else 
+        printf("0\n");
 }
 
 void SmalltalkVM::printContents(TObjectArray& array) {
@@ -169,11 +211,6 @@ void SmalltalkVM::backTraceContext(TContext* context)
                currentMethod->name->toString().c_str(),
                currentContext->bytePointer);
         
-        if (&instanceVariables && instanceVariables.getSize()) {
-            printf("\n\tInstance variables:\n");
-            printContents(instanceVariables);
-        }
-        
         if (&arguments && arguments.getSize()) {
             printf("\n\tArguments:\n");
             printContents(arguments);
@@ -182,6 +219,11 @@ void SmalltalkVM::backTraceContext(TContext* context)
         if (&temporaries && temporaries.getSize()) {
             printf("\n\tTemporaries:\n");
             printContents(temporaries);
+        }
+        
+        if (!isSmallInteger(&instanceVariables) && (&instanceVariables) && instanceVariables.getSize()) {
+            printf("\n\tInstance variables:\n");
+            printContents(instanceVariables);
         }
         
         if (&literals && literals.getSize()) {
@@ -236,34 +278,27 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             ec.instruction.low = byteCodes[ec.bytePointer++];
         }
         
-        switch (ec.instruction.high) { // 6 pushes, 2 assignments, 1 mark, 3 sendings, 2 do's
-            case pushInstance:    stack[ec.stackTop++] = instanceVariables[ec.instruction.low];     break;
-            case pushArgument:    stack[ec.stackTop++] = arguments[ec.instruction.low];             break;
-            case pushTemporary:   stack[ec.stackTop++] = temporaries[ec.instruction.low];           break;
-            case pushLiteral:     stack[ec.stackTop++] = literals[ec.instruction.low];              break;
-            case pushConstant:    doPushConstant(ec);                                               break;
+        switch (ec.instruction.high) {
+            case pushInstance:    stack[ec.stackTop++] = instanceVariables[ec.instruction.low]; break;
+            case pushArgument:    stack[ec.stackTop++] = arguments[ec.instruction.low];         break;
+            case pushTemporary:   stack[ec.stackTop++] = temporaries[ec.instruction.low];       break;
+            case pushLiteral:     stack[ec.stackTop++] = literals[ec.instruction.low];          break;
+            case pushConstant:    doPushConstant(ec);                                           break;
             
-            case pushBlock:       doPushBlock(ec);                                                  break; 
-            case assignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];         break;
+            case pushBlock:       doPushBlock(ec);                                              break; 
+            case assignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];     break;
             case assignInstance: {
-                TObject* value = stack[ec.stackTop - 1];
+                TObject*  value      =   stack[ec.stackTop - 1];
+                TObject*  oldValue   =   instanceVariables[ec.instruction.low];
+                TObject** objectSlot = & instanceVariables[ec.instruction.low];
+                
+                // Checking whether we need to register current object slot in the GC
+                if (checkRoot(value, oldValue, objectSlot))
+                    printf("Root list altered for slot %p and value %p (old %p)\n",
+                            objectSlot, value, oldValue);
+                
+                // Performing an assignment
                 instanceVariables[ec.instruction.low] = value;
-                
-                bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
-                bool slotIsStatic  = m_memoryManager->isInStaticHeap(&instanceVariables);
-                
-                // If adding a dynamic value to a static slot, 
-                // then add this slot as a GC root
-                if (slotIsStatic && !valueIsStatic) {
-                    // If old value wasn't staic either, 
-                    // current slot is already in the lists
-                    bool oldValueIsStatic = m_memoryManager->isInStaticHeap(instanceVariables[ec.instruction.low]);
-                    if (! oldValueIsStatic) {
-                        m_memoryManager->removeStaticRoot(& instanceVariables[ec.instruction.low]);
-                        m_memoryManager->addStaticRoot(& instanceVariables[ec.instruction.low]);
-                    }
-                }
-                
             } break;
                 
             case markArguments: doMarkArguments(ec); break; 
@@ -275,13 +310,16 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 //DoPrimitive is a hack. The interpretator never reaches opcodes after this one,
                 // albeit the compiler generates opcodes. But there are expections to the rules...
                 
-                bool failed             = false;
                 uint8_t primitiveNumber = byteCodes[ec.bytePointer++];
+                bool failed = false;
+                
                 ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec, &failed);
-                if(failed) {
+                
+                if (failed) {
                     stack[ec.stackTop++] = globals.nilObject;
                     break;
                 }
+                
                 // primitiveNumber exceptions:
                 // 19 - error trap            TODO
                 // 8  - block invocation
@@ -292,6 +330,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
                     
+                    case 34:
                     case blockInvoke:
                         // We do not want to leave the block context which was just loaded
                         // So we're continuing without context switching
@@ -301,6 +340,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         // We have executed a primitive. Now we have to reject the current 
                         // execution context and push the result onto the previous context's stack
                         ec.currentContext = ec.currentContext->previousContext;
+                        
+                        if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+                            currentProcess = (TProcess*) ec.pop();
+                            currentProcess->context  = ec.currentContext;
+                            currentProcess->result   = ec.returnedValue;
+                            return returnReturned;
+                        }
                         
                         // Inject the result...
                         ec.stackTop = getIntegerValue(ec.currentContext->stackTop);
@@ -321,7 +367,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             } break;
             
             default:
-                fprintf(stderr, "Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
+                fprintf(stderr, "VM: Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
                 fprintf(stderr, "'%s' of class '%s' \n", 
                         ec.currentContext->method->name->toString().c_str(), 
                         ec.lastReceiver == globals.nilObject ? "unknown" : ec.lastReceiver->name->toString().c_str());
@@ -387,15 +433,15 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
-    TObjectArray* args = (TObjectArray*) newObject<TObjectArray>(ec.instruction.low, false);
-    TObjectArray& stack = * ec.currentContext->stack;
+    hptr<TObjectArray> args = newObject<TObjectArray>(ec.instruction.low, false);
+    TObjectArray& stack     = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
     // from the top of the stack and creates new array with them
     
     uint32_t index = ec.instruction.low;
     while (index > 0)
-        (*args)[--index] = stack[--ec.stackTop];
+        args[--index] = stack[--ec.stackTop];
     
     stack[ec.stackTop++] = args;
 }
@@ -419,8 +465,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
                 ec.bytePointer - 1, ec.currentContext->method->name->toString().c_str());
         
         ec.currentContext->bytePointer = newInteger(ec.bytePointer);
-        ec.currentContext->stackTop = newInteger(ec.stackTop);
-        backTraceContext(ec.currentContext);
+        ec.currentContext->stackTop    = newInteger(ec.stackTop);
+        //backTraceContext(ec.currentContext);
         
         exit(1);
     }
@@ -428,7 +474,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // Save stack and opcode pointers
     ec.storePointers();
     
-    // Create a new context from the giving method and arguments
+    // Create a new context for the giving method and arguments
     hptr<TContext> newContext   = newObject<TContext>();
     
     newContext->arguments       = messageArguments;
@@ -500,6 +546,10 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
                 //FIXME possible overflow?
                 ec.returnedValue = reinterpret_cast<TObject*>(newInteger(leftOperand+rightOperand)); 
                 break;
+                
+            default:
+                fprintf(stderr, "VM: Invalid opcode %d passed to sendBinary\n", ec.instruction.low);
+                ec.returnedValue = globals.nilObject;
         }
         
         // Pushing result back to the stack
@@ -521,14 +571,12 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
 {
     TByteObject&  byteCodes         = * ec.currentContext->method->byteCodes;
     TObjectArray& stack             = * ec.currentContext->stack;
-//     TObjectArray& temporaries       = * ec.currentContext->temporaries;
     TObjectArray& arguments         = * ec.currentContext->arguments;
-//     TObjectArray& instanceVariables = *(TObjectArray*) arguments[0];
     TSymbolArray& literals          = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
         case selfReturn: {
-            ec.returnedValue = arguments[0]; // self
+            ec.returnedValue  = arguments[0]; // self
             ec.currentContext = ec.currentContext->previousContext;
             ec.loadPointers();
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
@@ -564,7 +612,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
         case branchIfTrue: {
             ec.returnedValue = stack[--ec.stackTop];
             
-            if(ec.returnedValue == globals.trueObject)
+            if (ec.returnedValue == globals.trueObject)
                 ec.bytePointer = byteCodes[ec.bytePointer] | (byteCodes[ec.bytePointer+1] << 8);
             else
                 ec.bytePointer += 2;
@@ -573,7 +621,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
         case branchIfFalse: {
             ec.returnedValue = stack[--ec.stackTop];
             
-            if(ec.returnedValue == globals.falseObject)
+            if (ec.returnedValue == globals.falseObject)
                 ec.bytePointer = byteCodes[ec.bytePointer] | (byteCodes[ec.bytePointer+1] << 8);
             else
                 ec.bytePointer += 2;
@@ -594,7 +642,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
             // FIXME do not waste time to store process on the stack. we do not need it
             process = (TProcess*) ec.pop();
             process->context = ec.currentContext;
-            process->result = ec.returnedValue;
+            process->result  = ec.returnedValue;
             
             ec.storePointers();
             return returnBreak;
@@ -620,7 +668,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case 7: 
         case 8: 
         case 9: 
-            stack[ec.stackTop++] = (TObject*) newInteger(constant);
+            stack[ec.stackTop++] = reinterpret_cast<TObject*>(newInteger(constant));
             break;
             
         case nilConst:   stack[ec.stackTop++] = globals.nilObject;   break;
@@ -628,8 +676,8 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case falseConst: stack[ec.stackTop++] = globals.falseObject; break;
         default:
             /* TODO unknown push constant */ ;
+            fprintf(stderr, "VM: unknown push constant %d\n", constant);
             stack[ec.stackTop++] = globals.nilObject;
-            
     }
 }
 
@@ -642,7 +690,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             TObject* arg2 = stack[--ec.stackTop];
             TObject* arg1 = stack[--ec.stackTop];
             
-            if(arg1 == arg2)
+            if (arg1 == arg2)
                 return globals.trueObject;
             else
                 return globals.falseObject;
@@ -656,6 +704,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case ioPutChar: { // 3
             TInteger charObject = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
             uint8_t  charValue  = getIntegerValue(charObject);
+            
             putchar(charValue);
             return globals.nilObject;
         } break;
@@ -678,7 +727,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                     c++;
                     break;
             }
-            if(input == EOF)
+            if (input == EOF)
                 return globals.nilObject;
             else
                 return reinterpret_cast<TObject*>(newInteger(input));
@@ -687,33 +736,36 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case returnSize: {
             TObject* object = stack[--ec.stackTop];
             uint32_t returnedSize = isSmallInteger(object) ? 0 : object->getSize();
+            
             return reinterpret_cast<TObject*>(newInteger(returnedSize));
         } break;
         
         case 6: { // start new process
-            TInteger value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
-            uint32_t ticks = getIntegerValue(value);
+            TInteger  value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
+            uint32_t  ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--ec.stackTop];
             
             // FIXME possible stack overflow due to recursive call
             int result = this->execute(newProcess, ticks);
+            
             return reinterpret_cast<TObject*>(newInteger(result));
         } break;
         
         case allocateObject: { // 7
             // Taking object's size and class from the stack
-            TObject* size = stack[--ec.stackTop];
-            TClass* klass = (TClass*) stack[--ec.stackTop];
+            TObject* size  = stack[--ec.stackTop];
+            TClass*  klass = (TClass*) stack[--ec.stackTop];
             uint32_t sizeInPointers = getIntegerValue(reinterpret_cast<TInteger>(size));
             
             // Instantinating the object. Each object has size and class fields
             // which are not directly accessible in the managed code, so we need
             // to add 2 to the size known to the object intself to get the real size:
+            
             return newOrdinaryObject(klass, (sizeInPointers + 2) * sizeof(TObject*)); 
         } break;
         
         case blockInvoke: { // 8
-            TBlock* block = (TBlock*) stack[--ec.stackTop];
+            TBlock*  block = (TBlock*) stack[--ec.stackTop];
             uint32_t argumentLocation = getIntegerValue(block->argumentLocation);
             
             // Checking the passed temps size
@@ -722,26 +774,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             // Amount of arguments stored on the stack except the block itself
             uint32_t argCount = ec.instruction.low - 1;
             
-            if (argCount >  (blockTemps ? blockTemps->getSize() : 0) ) {
+            if (argCount > (blockTemps ? blockTemps->getSize() : 0) ) {
                 ec.stackTop -= (argCount  + 1); // unrolling stack
-                
-                /* TODO correct primitive failing
-                 * Since we're continuing execution from a failed
-                 * primitive, re-fetch context if a GC had occurred
-                 * during the failed execution.  Supply a return value
-                 * for the failed primitive.
-                 *
-                //returnedValue = nilObject;
-                if(context != rootStack[--rootTop])
-                {
-                    context = rootStack[rootTop];
-                    method = context->data[methodInContext];
-                    stack = context->data[stackInContext];
-                    bp = bytePtr(method->data[byteCodesInMethod]);
-                    arguments = temporaries = literals = instanceVariables = 0;
-                } */
-                stack[ec.stackTop++] = globals.nilObject;
-                return globals.nilObject;
+                failPrimitive(stack, ec.stackTop, opcode);
+                *failed = true;
+                break;
             }
                 
             // Loading temporaries array
@@ -756,9 +793,6 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             // Block is bound to the method's bytecodes, so it's
             // first bytecode will not be zero but the value specified 
             ec.bytePointer = getIntegerValue(block->blockBytePointer);
-            
-            // Popping block object from the stack
-            //ec.pop();
             return block;
         } break;
         
@@ -798,10 +832,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO case 18 // turn on debugging
         
         case 19: { // error
-            ec.pop();
-            process = *(TProcess*) ec.pop(); 
+            process = * (TProcess*) ec.pop(); 
             process.context = ec.currentContext;
-            //return returnError; TODO cast 
+            *failed = true;
         } break;
         
         case allocateByteArray: { // 20
@@ -838,13 +871,21 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 break;
             }
             
-            if(opcode == arrayAt) 
+            if (opcode == arrayAt) {
                 return array->getField(actualIndex);
-            else { 
+            } else { 
                 // Array:at:put
-                array->putField(actualIndex, valueObject);
                 
-                // TODO gc ?
+                TObject*  oldValue   = array->getField(actualIndex);
+                TObject** objectSlot = &( array->getFields()[actualIndex] );
+                
+                // Checking whether we need to register current object slot in the GC
+                if (checkRoot(valueObject, oldValue, objectSlot))
+                    printf("Root list altered for slot %p and value %p (old %p)\n",
+                           objectSlot, valueObject, oldValue);
+                    
+                // Storing the value into the array
+                array->putField(actualIndex, valueObject);
                 
                 // Return self
                 return (TObject*) array;
@@ -861,7 +902,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             if (opcode == stringAtPut) 
                 valueObject = stack[--ec.stackTop];
             
-            if ( !isSmallInteger(indexObject) ) {
+            if (! isSmallInteger(indexObject)) {
                 *failed = true;
                 failPrimitive(stack, ec.stackTop, opcode);
                 break;
@@ -878,7 +919,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 break;
             }
             
-            if(opcode == stringAt) 
+            if (opcode == stringAt) 
                 // String:at
                 return reinterpret_cast<TObject*>(newInteger( string->getByte(actualIndex) ));
             else { 
@@ -895,7 +936,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             
             // Creating clone
             uint32_t dataSize  = original->getSize();
-            hptr<TByteObject> clone = newPointer((TByteObject*) newBinaryObject(klass, dataSize * sizeof(TObject*)));
+            hptr<TByteObject> clone = newPointer((TByteObject*) newBinaryObject(klass, dataSize));
             
             // Cloning data
             memcpy(clone->getBytes(), original->getBytes(), dataSize);
@@ -933,17 +974,28 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         
         case bulkReplace: { // 38
             //Implementation of replaceFrom:to:with:startingAt: as a primitive
-            TObject* destination            = stack[--ec.stackTop];
-            TObject* destinationStartOffset = stack[--ec.stackTop];
-            TObject* destinationStopOffset  = stack[--ec.stackTop];
-            TObject* source                 = stack[--ec.stackTop];
-            TObject* sourceStartOffset      = stack[--ec.stackTop];
             
-            bool succeeded  = doBulkReplace( destination, destinationStartOffset, 
+            // Array replaceFrom: start to: stop with: replacement startingAt: repStart
+            //      <38 start stop replacement repStart self>.
+            
+            // Current stack contents (top is the top)
+            //      self
+            //      repStart
+            //      replacement
+            //      stop
+            //      start
+            
+            TObject* destination            = stack[--ec.stackTop];
+            TObject* sourceStartOffset      = stack[--ec.stackTop];
+            TObject* source                 = stack[--ec.stackTop];
+            TObject* destinationStopOffset  = stack[--ec.stackTop];
+            TObject* destinationStartOffset = stack[--ec.stackTop];
+            
+            bool isSucceeded = doBulkReplace( destination, destinationStartOffset, 
                                              destinationStopOffset, source, 
                                              sourceStartOffset );
             
-            if(!succeeded) {
+            if (! isSucceeded) {
                 *failed = true;
                 failPrimitive(stack, ec.stackTop, opcode);
                 break;
@@ -964,7 +1016,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
                 args[--i] = pStack[--ec.stackTop];
             
             //TODO call primitive
-            fprintf(stderr, "unimplemented or invalid primitive %d\n", opcode);
+            fprintf(stderr, "VM: Unimplemented or invalid primitive %d\n", opcode);
         }
     }
     
@@ -1031,7 +1083,8 @@ TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, uint32_t leftOperand, u
             return reinterpret_cast<TObject*>(newInteger( result ));
         }
         
-        default: 
+        default:
+            fprintf(stderr, "VM: Invalid smallint opcode %d", opcode);
             return globals.nilObject; /* FIXME possible error */
     }
 }
@@ -1050,8 +1103,6 @@ void SmalltalkVM::onCollectionOccured()
     // Here we need to handle the GC collection event
     printf("VM: GC had just occured. Flushing the method cache.\n");
     flushMethodCache();
-    
-    // TODO During the VM execution we may need to reload the context
 }
 
 bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
@@ -1070,6 +1121,10 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     
     if (destination->getSize() < (uint32_t) iDestinationStopOffset || source->getSize() < (iSourceStartOffset + iCount) )
+        return false;
+    
+    // If we're moving objects between static and dynamic memory, let the VM hadle it (Why?)
+    if (m_memoryManager->isInStaticHeap(destination) != m_memoryManager->isInStaticHeap(source))
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {

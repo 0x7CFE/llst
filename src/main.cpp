@@ -6,7 +6,7 @@
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(65536 * 16);
+    memoryManager->initializeHeap(65536 * 8);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -19,6 +19,11 @@ int main(int argc, char **argv) {
 //#define test    
     
 #ifdef test
+    hptr<TObjectArray> rootArray = vm.newObject<TObjectArray>(1000);
+    for (uint32_t i = 0; i < 10; i++) {
+        hptr<TObject> pObject = vm.newObject<TObject>();
+    }
+    
     hptr<TDictionary> dict = vm.newObject<TDictionary>();
     dict->keys = (TSymbolArray*) vm.newObject<TSymbolArray>(1, false);
     (*dict->keys)[0] = vm.newObject<TSymbol>(1);
@@ -54,7 +59,7 @@ int main(int argc, char **argv) {
     // TODO load value from 
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42, false);
-    
+
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
     
