@@ -144,9 +144,13 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
             if (oldPlace->size.isRelocated()) {
                 if (oldPlace->size.isBinary()) {
                     replacement = oldPlace->data[0];
+                    printf("Binary object %p already relocated, size %d, replacement = %p\n", 
+                           oldPlace, oldPlace->size.getSize(), replacement);
                 } else {
                     uint32_t index = oldPlace->size.getSize();
+                    printf("Binary object %p already relocated, size %d, ", oldPlace, oldPlace->size.getSize());
                     replacement = oldPlace->data[index];
+                    printf("replacement = %p\n", replacement);
                 }
                 oldPlace = previousObject;
                 break;
@@ -164,12 +168,16 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // We need to allocate space evenly, so calculating the 
                 // actual size of the block being reserved for the moving object
                 uint32_t slotSize = correctPadding(dataSize);
+
+                printf("Moving binary object %p of size %d (slot size %d) ", oldPlace, dataSize, slotSize);
                 
                 // Allocating copy in new space
                 m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(dataSize);
                 newPlace->size.setBinary();
+                
+                printf("to a new place %p\n", newPlace);
                 
                 // Copying byte data
                 memcpy(newPlace->data, oldPlace->data, dataSize);
@@ -193,9 +201,15 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // with fields that are either SmallIntegers or pointers to other objects
                 
                 uint32_t fieldsCount = oldPlace->size.getSize();
+                
+                printf("Moving object %p with %d fields ", oldPlace, fieldsCount);
+                
                 m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
                 newPlace = (TMovableObject*) m_activeHeapPointer;
                 newPlace->size.setSize(fieldsCount);
+                
+                printf("to a new place %p\n", newPlace);
+                
                 oldPlace->size.setRelocated();
                 
                 // FIXME What the heck is going on here?
