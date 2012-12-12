@@ -7,6 +7,9 @@
 #include <vector>
 #include <list>
 
+// Generic interface to a memory manager.
+// Custom implementations such as BakerMemoryManager
+// implement this interface.
 class IMemoryManager {
 public:
     virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
@@ -27,6 +30,19 @@ public:
     virtual uint32_t allocsBeyondCollection() = 0;
 };
 
+// When pointer to a heap object is stored outside of the heap,
+// specific actions need to be taken in order to prevent pointer
+// invalidation due to GC procedure. External pointers need to be 
+// registered in GC so it will use this pointers as roots for the
+// object traversing. GC will update the pointer data with the 
+// actual object location. hptr<> helps to organize external pointers
+// by automatically calling registerExternalPointer() in constructor 
+// and releaseExternalPointer() in desctructor.
+//
+// External pointers are widely used in the VM execution code. 
+// VM provides helper functions newPointer and newObject which are
+// dealing with hptr<> in a user friendly way. Use of these functions
+// is highly recommended. 
 template <typename O> class hptr {
 public:
     typedef O Object;
@@ -187,7 +203,7 @@ private:
     
     // During GC we need to treat all objects in a very simple manner, 
     // just as pointer holders. Class field is also a pointer so we
-    // treat it just as one more object field
+    // treat it just as one more object field.
     struct TMovableObject {
         TSize size;
         TMovableObject* data[0];
