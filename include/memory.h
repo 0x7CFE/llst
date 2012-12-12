@@ -40,8 +40,8 @@ public:
 // and releaseExternalPointer() in desctructor.
 //
 // External pointers are widely used in the VM execution code. 
-// VM provides helper functions newPointer and newObject which are
-// dealing with hptr<> in a user friendly way. Use of these functions
+// VM provide helper functions newPointer() and newObject() which
+// deal with hptr<> in a user friendly way. Use of these functions
 // is highly recommended. 
 template <typename O> class hptr {
 public:
@@ -212,8 +212,8 @@ private:
     };
     TMovableObject* moveObject(TMovableObject* object);
     
-    // These variables contain an array of pointers of objects from the
-    // static heap to the dynamic one. It is used during the GC
+    // These variables contain an array of pointers to objects from the
+    // static heap to the dynamic one. Ihey are used during the GC
     // as a root for pointer iteration.
     
     // FIXME Temporary solution before GC will prove it's working
