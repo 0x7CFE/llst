@@ -121,7 +121,6 @@ private:
     struct TVMExecutionContext {
     private:
         // TODO Think about proper memory organization
-        std::list<TObject*> rootStack;
         IMemoryManager* memoryManager;
     public:
         hptr<TContext> currentContext;
@@ -132,20 +131,6 @@ private:
         
         hptr<TObject>  returnedValue;
         hptr<TClass>   lastReceiver;
-        
-        void push(TObject* object) { 
-            printf("push %p\n", object);
-            rootStack.push_back(object); 
-            memoryManager->registerExternalPointer(& rootStack.back());
-        }
-        
-        TObject* pop() { 
-            memoryManager->releaseExternalPointer(& rootStack.back());
-            TObject* top = rootStack.back(); 
-            rootStack.pop_back(); 
-            printf("pop %p\n", top);
-            return top; 
-        }
         
         void loadPointers() {
             bytePointer = getIntegerValue(currentContext->bytePointer);
@@ -233,7 +218,22 @@ private:
     
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
+    std::list<TObject*> rootStack;
 public:
+    void pushProcess(TObject* object) {
+        printf("push %p\n", object);
+        rootStack.push_back(object);
+        m_memoryManager->registerExternalPointer(& rootStack.back());
+    }
+    
+    TObject* popProcess() {
+        m_memoryManager->releaseExternalPointer(& rootStack.back());
+        TObject* topProcess = rootStack.back();
+        rootStack.pop_back();
+        printf("pop %p\n", topProcess);
+        return topProcess; 
+    }
+    
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 

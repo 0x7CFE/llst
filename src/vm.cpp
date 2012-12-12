@@ -245,7 +245,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
     hptr<TProcess> currentProcess = newPointer(process);
     
     TVMExecutionContext ec(m_memoryManager);
-    ec.push(process); // FIXME get rid of this
     ec.currentContext = process->context;
     ec.loadPointers(); // Loads bytePointer & stackTop
     
@@ -265,7 +264,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
             currentProcess->context = ec.currentContext;
             currentProcess->result  = ec.returnedValue;
             
-            ec.pop(); // FIXME get rid of this
+            popProcess(); // FIXME get rid of this
             return returnTimeExpired;
         }
             
@@ -315,13 +314,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec, &failed);
                 
+                //If primitive failed during execution we should continue execution in the current method
                 if (failed) {
                     stack[ec.stackTop++] = globals.nilObject;
                     break;
                 }
                 
                 // primitiveNumber exceptions:
-                // 19 - error trap            TODO
+                // 19 - error trap
                 // 8  - block invocation
                 // 34 - flush method cache    TODO
                         
@@ -330,7 +330,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
                     
-                    case 34:
+                    case flushCache:                        
+                        //We don't need to put anything onto the stack
+                    
                     case blockInvoke:
                         // We do not want to leave the block context which was just loaded
                         // So we're continuing without context switching
@@ -342,7 +344,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         ec.currentContext = ec.currentContext->previousContext;
                         
                         if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
-                            currentProcess = (TProcess*) ec.pop();
+                            currentProcess = (TProcess*) popProcess();
                             currentProcess->context  = ec.currentContext;
                             currentProcess->result   = ec.returnedValue;
                             return returnReturned;
@@ -459,11 +461,11 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
     
     if (receiverMethod == 0) {
-	fprintf(stderr, "In method %s>>%s at offset %d : \n", 
-		ec.currentContext->method->klass->name->toString().c_str(), 
-		ec.currentContext->method->name->toString().c_str(),
-		ec.bytePointer - 1
- 	      );
+        fprintf(stderr, "In method %s>>%s at offset %d : \n", 
+                ec.currentContext->method->klass->name->toString().c_str(), 
+                ec.currentContext->method->name->toString().c_str(),
+                ec.bytePointer - 1
+              );
       
         fprintf(stderr, "Failed to lookup selector '%s' of class '%s' \n", 
                 selector->toString().c_str(), receiverClass->name->toString().c_str());
@@ -471,6 +473,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         ec.currentContext->bytePointer = newInteger(ec.bytePointer);
         ec.currentContext->stackTop    = newInteger(ec.stackTop);
         //backTraceContext(ec.currentContext);
+        
+        //FIXME pop process and continue
         
         exit(1);
     }
@@ -582,6 +586,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
         case selfReturn: {
             ec.returnedValue  = arguments[0]; // self
             ec.currentContext = ec.currentContext->previousContext;
+            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+                process = (TProcess*) popProcess();
+                process->context  = ec.currentContext;
+                process->result   = ec.returnedValue;
+                return returnReturned;
+            }
+            
             ec.loadPointers();
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
         } break;
@@ -644,7 +655,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(TProcess*& process, TVMExec
             ec.bytePointer -= 1;
             
             // FIXME do not waste time to store process on the stack. we do not need it
-            process = (TProcess*) ec.pop();
+            process = (TProcess*) popProcess();
             process->context = ec.currentContext;
             process->result  = ec.returnedValue;
             
@@ -749,6 +760,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             uint32_t  ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--ec.stackTop];
             
+            pushProcess(newProcess);
             // FIXME possible stack overflow due to recursive call
             int result = this->execute(newProcess, ticks);
             
@@ -836,9 +848,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         // TODO case 18 // turn on debugging
         
         case 19: { // error
-            process = * (TProcess*) ec.pop(); 
+            process = * (TProcess*) popProcess(); 
             process.context = ec.currentContext;
-            *failed = true;
         } break;
         
         case allocateByteArray: { // 20

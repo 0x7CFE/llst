@@ -513,26 +513,25 @@ keys
     ^keys
 !
 
-CLASS MetaTest Class
-METHOD MetaTest
+CLASS Test Class
+METHOD Test
 runAll |reservedNames|
-    reservedNames <- Array new: 2.
-    reservedNames at: 1 put: 'runAll'.
-    reservedNames at: 2 put: 'init'. "TODO"
+    reservedNames <- Array with: #init.
     
     Char newline print.
     'Running ' print. self class printNl.
     
     self class methods
             do: [:m |
-                    Context new perform: m withArguments: (Array new: 0)
+                    ( reservedNames includes: (m name) )
+                        ifFalse: [ Context new perform: m withArguments: (Array new: 0) ]
                 ]
 !
 
 COMMENT FIXME make tests be singletons 
 
 COMMENT              --------CompareTest----------
-CLASS CompareTest MetaTest
+CLASS CompareTest Test
 
 METHOD CompareTest
 greater
@@ -562,7 +561,7 @@ nilEqNil
 
 
 COMMENT              --------SmallIntTest----------
-CLASS SmallIntTest MetaTest
+CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
     [12 + 64] assertEq: 76
@@ -584,7 +583,7 @@ mul
 !
 
 COMMENT              --------BranchTest----------
-CLASS BranchTest MetaTest
+CLASS BranchTest Test
 
 METHOD BranchTest
 ifTrue |x|
@@ -602,7 +601,7 @@ ifFalse |x|
 !
 
 COMMENT              --------LoopTest----------
-CLASS LoopTest MetaTest
+CLASS LoopTest Test
 
 METHOD LoopTest
 loopCount |count|
@@ -623,24 +622,24 @@ sum |result|
 !
 
 COMMENT              --------ClassTest----------
-CLASS ClassTest MetaTest
+CLASS ClassTest Test
 
 METHOD ClassTest
 className
     [ SmallInt printString ] assertEq: 'SmallInt'
 !
 
-COMMENT              --------MethodLoopupTest----------
-CLASS MethodLoopupTest MetaTest
+COMMENT              --------MethodLookupTest----------
+CLASS MethodLookupTest Test
 
-METHOD MethodLoopupTest
+METHOD MethodLookupTest
 newline
     [Char   class methods keys includes: #newline] assertWithComment: 'Char'
     [String class methods keys includes: #newline] assertWithComment: 'String'
 !
 
 COMMENT              --------StringTest----------
-CLASS StringTest MetaTest
+CLASS StringTest Test
 
 METHOD StringTest
 plus
@@ -669,8 +668,7 @@ copy
 
 METHOD StringTest
 at |str|
-    "FIXME"
-    ['foobar' at: 4 ] assertEq: 23. 
+    ['foobar' at: 4 ] assertEq: $b. 
 !
 
 METHOD StringTest
@@ -683,18 +681,59 @@ reverse
     [ 'reverse' reverse ] assertEq: 'esrever'
 !
 
+METHOD Undefined
+testCacheFlush |s|
+    <34>.
+    'Method cache has been flushed' printNl.
+!
+
+METHOD Array
+replaceFrom: start to: stop with: replacement startingAt: repStart | replacementSize replacementEnd |
+    <38 start stop replacement repStart self>.
+    (start = 0) ifTrue: [ 'alarm' printNl ].
+    (stop = 0) ifTrue: [ ^self ].
+    
+    replacementSize <- replacement size.
+    (replacementSize = 0) ifTrue: [ ^self ].
+    
+    replacementEnd <- replacementSize min: stop. "boundary check"
+    
+    0 to: (replacementEnd - 1) do: [:idx|
+        self at: (idx + start) put:
+            (replacement at: (idx + repStart))
+    ]
+!
 
 METHOD Undefined
 main    | command |
         " initialize classes "
+        
         Char initialize.
-
+        
+        nil testCacheFlush.
+        
+        
+        ('b' + 'a') printNl.
+        ('' + 'asd') printNl.
+        ('12' + 'asd') printNl.
+        ('asd' + '') printNl.
+        ('foo' + 'bar') printNl.
+        ('foo' + 'bazbar') printNl. 
+        ('foo' + 'baz' + 'bar') printNl. "FIXME WTF???!?!?!"
+        
+        (Array with: 1 with: 2) + (Array with: 1 with: 2).
+        
+        6 printNl.
+        [$f value] value printNl. "FIXME"
+        
+        ^nil.
+        
         CompareTest      new runAll.
         SmallIntTest     new runAll.
        " BranchTest       new runAll."
         LoopTest         new runAll.
         ClassTest        new runAll.
-        MethodLoopupTest new runAll.
+        MethodLookupTest new runAll.
         StringTest       new runAll.
         
         "[ true ] whileTrue: [ $. print ]"
@@ -1453,15 +1492,9 @@ METHOD Array
 replaceFrom: start to: stop with: replacement
 	^ self replaceFrom: start to: stop with: replacement startingAt: 1
 !
-METHOD Array
-replaceFrom: start to: stop with: replacement startingAt: repStart | base |
-	<38 start stop replacement repStart self>.
-	base <- repStart-1.
-	0 to: (stop - start) do: [:idx|
-		self at: (idx + start) put:
-			(replacement at: (idx + repStart))
-	]
-!
+
+COMMENT FIXME insert replaceFrom:..... here
+
 COMMENT ---------- OrderedArray ------------
 METHOD OrderedArray
 add: value
