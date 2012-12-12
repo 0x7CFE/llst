@@ -681,12 +681,53 @@ reverse
     [ 'reverse' reverse ] assertEq: 'esrever'
 !
 
+METHOD Undefined
+testCacheFlush |s|
+    <34>.
+    'Method cache has been flushed' printNl.
+!
+
+METHOD Array
+replaceFrom: start to: stop with: replacement startingAt: repStart | replacementSize replacementEnd |
+    <38 start stop replacement repStart self>.
+    (start = 0) ifTrue: [ 'alarm' printNl ].
+    (stop = 0) ifTrue: [ ^self ].
+    
+    replacementSize <- replacement size.
+    (replacementSize = 0) ifTrue: [ ^self ].
+    
+    replacementEnd <- replacementSize min: stop. "boundary check"
+    
+    0 to: (replacementEnd - 1) do: [:idx|
+        self at: (idx + start) put:
+            (replacement at: (idx + repStart))
+    ]
+!
 
 METHOD Undefined
 main    | command |
         " initialize classes "
+        
         Char initialize.
-
+        
+        nil testCacheFlush.
+        
+        
+        ('b' + 'a') printNl.
+        ('' + 'asd') printNl.
+        ('12' + 'asd') printNl.
+        ('asd' + '') printNl.
+        ('foo' + 'bar') printNl.
+        ('foo' + 'bazbar') printNl. 
+        ('foo' + 'baz' + 'bar') printNl. "FIXME WTF???!?!?!"
+        
+        (Array with: 1 with: 2) + (Array with: 1 with: 2).
+        
+        6 printNl.
+        [$f value] value printNl. "FIXME"
+        
+        ^nil.
+        
         CompareTest      new runAll.
         SmallIntTest     new runAll.
        " BranchTest       new runAll."
@@ -1451,15 +1492,9 @@ METHOD Array
 replaceFrom: start to: stop with: replacement
 	^ self replaceFrom: start to: stop with: replacement startingAt: 1
 !
-METHOD Array
-replaceFrom: start to: stop with: replacement startingAt: repStart | base |
-	<38 start stop replacement repStart self>.
-	base <- repStart-1.
-	0 to: (stop - start) do: [:idx|
-		self at: (idx + start) put:
-			(replacement at: (idx + repStart))
-	]
-!
+
+COMMENT FIXME insert replaceFrom:..... here
+
 COMMENT ---------- OrderedArray ------------
 METHOD OrderedArray
 add: value
