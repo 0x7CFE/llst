@@ -314,13 +314,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 
                 ec.returnedValue = doExecutePrimitive(primitiveNumber, *process, ec, &failed);
                 
+                //If primitive failed during execution we should continue execution in the current method
                 if (failed) {
                     stack[ec.stackTop++] = globals.nilObject;
                     break;
                 }
                 
                 // primitiveNumber exceptions:
-                // 19 - error trap            TODO
+                // 19 - error trap
                 // 8  - block invocation
                 // 34 - flush method cache    TODO
                         
@@ -329,7 +330,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
                     
-                    case 34:
+                    case flushCache:                        
+                        //We don't need to put anything onto the stack
+                    
                     case blockInvoke:
                         // We do not want to leave the block context which was just loaded
                         // So we're continuing without context switching
