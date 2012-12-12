@@ -60,7 +60,7 @@ int main(int argc, char **argv) {
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42, false);
 
-    vm.push_process(initProcess);
+    vm.pushProcess(initProcess);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);

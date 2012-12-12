@@ -220,15 +220,15 @@ private:
     
     std::list<TObject*> rootStack;
 public:
-    void push_process(TObject* object) {
+    void pushProcess(TObject* object) {
         printf("push %p\n", object);
         rootStack.push_back(object);
-        m_memoryManager->registerExternalPointer(&object);
+        m_memoryManager->registerExternalPointer(& rootStack.back());
     }
     
-    TObject* pop_process() {
+    TObject* popProcess() {
+        m_memoryManager->releaseExternalPointer(& rootStack.back());
         TObject* topProcess = rootStack.back();
-        m_memoryManager->releaseExternalPointer(&topProcess);
         rootStack.pop_back();
         printf("pop %p\n", topProcess);
         return topProcess; 
