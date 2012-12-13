@@ -108,7 +108,6 @@ bool SmalltalkVM::checkRoot(TObject* value, TObject* oldValue, TObject** objectS
     return false;
 }
 
-
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
@@ -330,7 +329,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
                     
-                    case flushCache:                        
+                    //case flushCache:                        
                         //We don't need to put anything onto the stack
                     
                     case blockInvoke:
@@ -537,8 +536,8 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
     // If operands are both small integers, we need to handle it ourselves
     if (isSmallInteger(leftObject) && isSmallInteger(rightObject)) {
         // Loading actual operand values
-        uint32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject.rawptr()));
-        uint32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject.rawptr()));
+        int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject.rawptr()));
+        int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject.rawptr()));
         
         // Performing an operation
         switch (ec.instruction.low) {
@@ -699,6 +698,9 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
 TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec, bool* failed)
 {
     TObjectArray& stack = *ec.currentContext->stack;
+    
+    if (failed)
+        *failed = false;
     
     switch(opcode) {
         case returnIsEqual: { // 1
@@ -985,6 +987,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         case flushCache: // 34
             //FIXME returnedValue is not to be globals.nilObject
             flushMethodCache();
+            *failed = false;
             break;
         
         case bulkReplace: { // 38
@@ -1109,14 +1112,14 @@ TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, uint32_t leftOperand, u
 //but we need to handle situations like error trapping etc
 //we may put nil outside of doExecutePrimitive function and handle special situations by arg-ptr
 void SmalltalkVM::failPrimitive(TObjectArray& stack, uint32_t& stackTop, uint8_t opcode) {
-    printf("failPrimitive %d\n", opcode);
+    //printf("failPrimitive %d\n", opcode);
     //stack[stackTop++] = globals.nilObject;
 }
 
 void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
-    printf("VM: GC had just occured. Flushing the method cache.\n");
+    //printf("VM: GC had just occured. Flushing the method cache.\n");
     flushMethodCache();
 }
 
@@ -1130,7 +1133,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     int32_t iSourceStartOffset      = getIntegerValue(reinterpret_cast<TInteger>( sourceStartOffset )) - 1; 
     int32_t iDestinationStartOffset = getIntegerValue(reinterpret_cast<TInteger>( destinationStartOffset )) - 1;
     int32_t iDestinationStopOffset  = getIntegerValue(reinterpret_cast<TInteger>( destinationStopOffset )) - 1;
-    int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset;
+    int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset + 1;
     
     if ( iSourceStartOffset < 0 || iDestinationStartOffset < 0 || iDestinationStopOffset < 0 || iCount < 1 )
         return false;

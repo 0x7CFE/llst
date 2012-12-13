@@ -709,9 +709,15 @@ main    | command |
         " initialize classes "
         
         Char initialize.
+
+        " main execution loop 
+        [ '-> ' print. command <- String input. command notNil ]
+                whileTrue: [ command isEmpty
+                        ifFalse: [ command doIt printNl ] ]
+        
+        ^nil                  "
         
         nil testCacheFlush.
-        
         
         ('b' + 'a') printNl.
         ('' + 'asd') printNl.
@@ -720,13 +726,13 @@ main    | command |
         ('foo' + 'bar') printNl.
         ('foo' + 'bazbar') printNl. 
         ('foo' + 'baz' + 'bar') printNl. "FIXME WTF???!?!?!"
+        ('foo' + 'baz' + 'bar' + 'bam') printNl. "FIXME WTF???!?!?!"
+        ('abcd' + 'efgh' + 'ijkl' + 'mnop') printNl. "FIXME WTF???!?!?!"
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2).
         
         6 printNl.
         [$f value] value printNl. "FIXME"
-        
-        ^nil.
         
         CompareTest      new runAll.
         SmallIntTest     new runAll.

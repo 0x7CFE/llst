@@ -19,11 +19,11 @@ inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & 
 // Any operation should be done using SmalltalkVM::getIntegerValue() and SmalltalkVM::newInteger()
 // Explicit type cast should be strictly avoided for the sake of design and stability
 // TODO May be we should refactor TInteger to a class which provides cast operators.
-typedef uint32_t TInteger;
+typedef int32_t TInteger;
 
 inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
-inline uint32_t getIntegerValue(TInteger value) { return (uint32_t) value >> 1; }
-inline TInteger newInteger(uint32_t value) { return (value << 1) | 1; }
+inline int32_t  getIntegerValue(TInteger value) { return (int32_t) (value >> 1); }
+inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
 
 // TInstruction represents one decoded Smalltalk instruction.
 // Actual meaning of parts is determined during the execution.
@@ -60,7 +60,6 @@ public:
     void setBinary() { data |= FLAG_BINARY; }
     void setRelocated() { data |= FLAG_RELOCATED; }
 };
-
 
 // TObject is the base class for all objects in smalltalk.
 // Every object in the system starts with two fields. 
@@ -189,6 +188,7 @@ struct TSymbol : public TByteObject {
 // TString represents the Smalltalk's String class. 
 // Strings are binary objects that hold raw character bytes. 
 struct TString : public TByteObject { 
+    
     static const char* InstanceClassName() { return "String"; }
 };
 
@@ -239,7 +239,7 @@ struct TContext : public TObject {
 };
 
 // In Smalltalk, a block is a piece of code that may be executed by sending
-// a #value' or #value: message to it. From the VM's point of view blocks are
+// a #value or #value: message to it. From the VM's point of view blocks are
 // nested contexts that are linked to the wrapping method. Block has direct access to 
 // the lexical context of the wrapping method and it's variables. This is needed to
 // implement the closure mechanism.
@@ -278,13 +278,13 @@ struct TMethod : public TObject {
 struct TDictionary : public TObject {
     TSymbolArray* keys;
     TObjectArray* values;
-    static const char*  InstanceClassName() { return "Dictionary"; }
     
     // Find a value associated with a key
     // Returns NULL if nothing was found
     TObject*      find(TSymbol* key);
     TObject*      find(const char* key);
     
+    static const char* InstanceClassName() { return "Dictionary"; }
 private:
     // Helper comparison functions. Compares the two symbols 'left' and 'right' 
     // (or it's string representation). Returns an integer less than, equal to,

@@ -221,7 +221,7 @@ private:
     std::list<TObject*> rootStack;
 public:
     void pushProcess(TObject* object) {
-        printf("push %p\n", object);
+//         printf("push %p\n", object);
         rootStack.push_back(object);
         m_memoryManager->registerExternalPointer(& rootStack.back());
     }
@@ -230,7 +230,7 @@ public:
         m_memoryManager->releaseExternalPointer(& rootStack.back());
         TObject* topProcess = rootStack.back();
         rootStack.pop_back();
-        printf("pop %p\n", topProcess);
+//         printf("pop %p\n", topProcess);
         return topProcess; 
     }
     

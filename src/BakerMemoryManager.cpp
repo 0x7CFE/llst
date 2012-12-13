@@ -320,10 +320,10 @@ void BakerMemoryManager::collectGarbage()
 //         printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
     }
     
-    printf("After collection: heap size %d, used %d, free %d\n", 
-           m_heapSize / 2, 
-           m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
-           m_activeHeapPointer - m_activeHeapBase);
+//     printf("After collection: heap size %d, used %d, free %d\n", 
+//            m_heapSize / 2, 
+//            m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
+//            m_activeHeapPointer - m_activeHeapBase);
     
 }
 
