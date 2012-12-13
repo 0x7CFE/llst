@@ -239,7 +239,9 @@ public:
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_gcCount(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
-    { }
+    { 
+        flushMethodCache();
+    }
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
@@ -257,18 +259,17 @@ template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool r
     
     if (T::InstancesAreBinary()) {   
         return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, registerPointer);
-        // return (T*) newBinaryObject(klass, dataSize);
     } else {
         size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
         return hptr<T>((T*) newOrdinaryObject(klass, slotSize), m_memoryManager, registerPointer);
-        //return (T*) newOrdinaryObject(klass, slotSize);
     }
 }
 
 // Specializations of newObject for known types
-// template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize /*= 0*/);
-// template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize /*= 0*/);
-// template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize /*= 0*/);
+template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize, bool registerPointer);
+template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(size_t dataSize, bool registerPointer);
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize, bool registerPointer);
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool registerPointer);
 
 
 #endif

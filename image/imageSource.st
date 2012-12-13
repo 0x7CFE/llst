@@ -710,12 +710,12 @@ main    | command |
         
         Char initialize.
 
-        " main execution loop 
+        " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
         
-        ^nil                  "
+        ^nil                  
         
         nil testCacheFlush.
         

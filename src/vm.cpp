@@ -50,23 +50,33 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     return instance;
 }
 
-/*template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize)
+template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
-    return (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
+    TObjectArray* instance = (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
+    return hptr<TObjectArray>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize)
+template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(size_t dataSize, bool registerPointer)
+{
+    TClass* klass = globals.arrayClass;
+    TSymbolArray* instance = (TSymbolArray*) newOrdinaryObject(klass, sizeof(TSymbolArray) + dataSize * sizeof(TObject*));
+    return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
+}
+
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
-    return (TContext*) newOrdinaryObject(klass, sizeof(TContext));
+    TContext* instance = (TContext*) newOrdinaryObject(klass, sizeof(TContext));
+    return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize)
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
-    return (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
-} */
+    TBlock* instance = (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
+    return hptr<TBlock>(instance, m_memoryManager, registerPointer);
+}
 
 bool SmalltalkVM::checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot)
 {
@@ -304,9 +314,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* process, uint32_t tic
                 TObject** objectSlot = & instanceVariables[ec.instruction.low];
                 
                 // Checking whether we need to register current object slot in the GC
-                if (checkRoot(value, oldValue, objectSlot))
-                    printf("Root list altered for slot %p and value %p (old %p)\n",
-                            objectSlot, value, oldValue);
+                checkRoot(value, oldValue, objectSlot);
+//                 if (checkRoot(value, oldValue, objectSlot))
+//                     printf("Root list altered for slot %p and value %p (old %p)\n",
+//                             objectSlot, value, oldValue);
                 
                 // Performing an assignment
                 instanceVariables[ec.instruction.low] = value;
@@ -740,8 +751,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         } break;
         
         case ioGetChar: { // 9
-            //int32_t input = getchar();
-            int32_t input;
+            int32_t input = getchar();
             static int c = 0;
             switch(c) {
                 case 0: 
