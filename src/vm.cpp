@@ -1165,10 +1165,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     if (destination->getSize() < (uint32_t) iDestinationStopOffset || source->getSize() < (iSourceStartOffset + iCount) )
         return false;
     
-    // If we're moving objects between static and dynamic memory, let the VM hadle it (Why?)
-    if (m_memoryManager->isInStaticHeap(destination) != m_memoryManager->isInStaticHeap(source))
-        return false;
-    
     if ( source->isBinary() && destination->isBinary() ) {
         uint8_t* sourceBytes      = static_cast<TByteObject*>(source)->getBytes();
         uint8_t* destinationBytes = static_cast<TByteObject*>(destination)->getBytes();
@@ -1176,6 +1172,10 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         memcpy( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
         return true;
     }
+    
+    // If we're moving objects between static and dynamic memory, let the VM hadle it (Why?)
+    if (m_memoryManager->isInStaticHeap(destination) != m_memoryManager->isInStaticHeap(source))
+        return false;
     
     if ( ! source->isBinary() && ! destination->isBinary() ) {
         // Interpreting pointer array as raw byte sequence
