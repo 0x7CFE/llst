@@ -122,6 +122,16 @@ TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
     }
 }
 
+void SmalltalkVM::updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method)
+{
+    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
+    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
+    
+    entry.methodName = selector;
+    entry.receiverClass = klass;
+    entry.method = method;
+}
+
 TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 {
     // First of all checking the method cache
@@ -135,8 +145,11 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     for (TClass* currentClass = klass; currentClass != globals.nilObject; currentClass = currentClass->parentClass) {
         TDictionary* methods = currentClass->methods;
         result = (TMethod*) methods->find(selector);
-        if (result)
+        if (result) {
+            // Storing result in cache
+            updateMethodCache(selector, klass, result);
             return result;
+        }
     }
     
     return 0;
@@ -1120,6 +1133,7 @@ void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
     //printf("VM: GC had just occured. Flushing the method cache.\n");
+    m_gcCount++;
     flushMethodCache();
 }
 
@@ -1163,4 +1177,11 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     }
     
     return false;
+}
+
+void SmalltalkVM::printVMStat()
+{
+    float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    printf("\nGC count: %d, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+        m_gcCount, m_cacheHits, m_cacheMisses, hitRatio);
 }

@@ -161,6 +161,7 @@ private:
     TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
+    uint32_t m_gcCount;
 
     bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
     
@@ -172,6 +173,7 @@ private:
     
     // fast method lookup in the method cache
     TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
+    void updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method);
     
     // flush the method lookup cache
     void flushMethodCache();
@@ -235,13 +237,15 @@ public:
     }
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
-        : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
+        : m_cacheHits(0), m_cacheMisses(0), m_gcCount(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
     { }
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
+    
+    void printVMStat();
 };
 
 template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool registerPointer /*= true*/)

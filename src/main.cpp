@@ -86,5 +86,7 @@ int main(int argc, char **argv) {
     }
 #endif    
 
+    vm.printVMStat();
+
     return 0;
 }
