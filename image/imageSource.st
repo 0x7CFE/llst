@@ -759,11 +759,11 @@ main    | command |
         Char initialize.
 
         " main execution loop 
-        [ '-> ' print. command <- String input. $" print. command print. $" printNl. command notNil ]
+        [ '-> ' print. command <- String input. command print. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
         
-        ^nil                  "
+        ^nil.                  "
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2).
         
