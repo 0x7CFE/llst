@@ -516,6 +516,7 @@ keys
 CLASS Test Class
 METHOD Test
 runAll |reservedNames|
+    self init.
     reservedNames <- Array with: #init.
     
     Char newline print.
@@ -524,8 +525,12 @@ runAll |reservedNames|
     self class methods
             do: [:m |
                     ( reservedNames includes: (m name) )
-                        ifFalse: [ Context new perform: m withArguments: (Array new: 0) ]
+                        ifFalse: [ Context new perform: m withArguments: (Array with: self) ]
                 ]
+!
+METHOD Test
+init
+    ^nil
 !
 
 COMMENT FIXME make tests be singletons 
@@ -691,10 +696,39 @@ reverse
     [ 'reverse' reverse ] assertEq: 'esrever'
 !
 
+COMMENT              --------ArrayTest----------
+CLASS ArrayTest Test arrOfInts arrOfChars
+
+METHOD ArrayTest
+init
+    arrOfInts <- Array new: 100.
+    1 to: 100 do: [:idx|
+        arrOfInts at: idx put: idx
+    ].
+    
+    arrOfChars <- Array new: 257.
+    1 to: 257 do: [:idx|
+        arrOfChars at: idx put: (Char basicNew: idx-1)
+    ].
+    
+!
+
+METHOD ArrayTest
+at
+    [ (arrOfInts at: 3) + (arrOfInts at: 5) ] assertEq: 8 withComment: 'int'.
+    [ arrOfChars at: 104 ] assertEq: $g withComment: 'char'.
+!
+
+METHOD ArrayTest
+atPut | tmpArr |
+    tmpArr <- arrOfInts.
+    tmpArr at: 6 put: 37834.
+    [ tmpArr at: 6 ] assertEq: 37834.
+!
+
 METHOD Array
 replaceFrom: start to: stop with: replacement startingAt: repStart | replacementSize replacementEnd |
     <38 start stop replacement repStart self>.
-    (start = 0) ifTrue: [ 'alarm' printNl ].
     (stop = 0) ifTrue: [ ^self ].
     
     replacementSize <- replacement size.
@@ -733,9 +767,6 @@ main    | command |
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2).
         
-        6 printNl.
-        [$f value] value printNl.
-        
         CompareTest      new runAll.
         SmallIntTest     new runAll.
        " BranchTest       new runAll."
@@ -743,7 +774,8 @@ main    | command |
         ClassTest        new runAll.
         MethodLookupTest new runAll.
         StringTest       new runAll.
-        
+        ArrayTest        new runAll.
+
         "[ true ] whileTrue: [ $. print ]"
         
         " main execution loop "
@@ -875,7 +907,7 @@ COMMENT -----------Context--------------
 METHOD Context
 setup: aMethod withArguments: a
 	method <- aMethod.
-	arguments <- Array new: 1.
+	arguments <- a.
 	bytePointer <- 0.
 	stack <- Array new: method stackSize.
 	stackTop <- 0.
