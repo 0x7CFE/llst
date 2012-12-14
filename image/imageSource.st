@@ -653,11 +653,10 @@ plus
     [ '' + 'asd' ] assertEq: 'asd' withComment: '3'.
     [ '12' + 'asd' ] assertEq: '12asd' withComment: '4'.
     [ 'asd' + '' ] assertEq: 'asd' withComment: '5'.
-    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: '6'.
-    [ 'foo' + 'bazbar' ] assertEq: 'foobazbar' withComment: '7'.
-    [ 'foo' + 'baz' + 'bar' ] assertEq: 'foobazbar' withComment: '8'.
-    [ 'foo' + 'baz' + 'bar' + 'bam' ] assertEq: 'foobazbarbam' withComment: '9'.
-    [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '10'.
+    [ 'fox' + 'bazbar' ] assertEq: 'foxbazbar' withComment: '6'.
+    [ 'fox' + 'baz' + 'bar' ] assertEq: 'foxbazbar' withComment: '7'.
+    [ 'fox' + 'baz' + 'bar' + 'bam' ] assertEq: 'foxbazbarbam' withComment: '8'.
+    [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '9'.
     
 !
 
@@ -668,7 +667,7 @@ asSymbol
 
 METHOD StringTest
 lowerCase
-    [ 'FooBar' lowerCase ] assertEq: 'foobar'
+    [ 'FoXBar' lowerCase ] assertEq: 'foxbar'
 !
 
 METHOD StringTest
@@ -682,8 +681,14 @@ copy
 !
 
 METHOD StringTest
-at
-    ['foobar' at: 4 ] assertEq: $b. 
+at | str |
+    str <- 'foXbAr'.
+    [ str at: 1 ] assertEq: $f withComment: 'f'.
+    [ str at: 2 ] assertEq: $o withComment: 'o'.
+    [ str at: 3 ] assertEq: $X withComment: 'X'.
+    [ str at: 4 ] assertEq: $b withComment: 'b'.
+    [ str at: 5 ] assertEq: $A withComment: 'A'.
+    [ str at: 6 ] assertEq: $r withComment: 'r'.
 !
 
 METHOD StringTest
