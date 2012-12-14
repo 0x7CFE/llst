@@ -643,7 +643,17 @@ CLASS StringTest Test
 
 METHOD StringTest
 plus
-    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: 'operator +'
+    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: 'operator +. 1'.
+    [ 'b' + 'a' ] assertEq: 'ba' withComment: '2'.
+    [ '' + 'asd' ] assertEq: 'asd' withComment: '3'.
+    [ '12' + 'asd' ] assertEq: '12asd' withComment: '4'.
+    [ 'asd' + '' ] assertEq: 'asd' withComment: '5'.
+    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: '6'.
+    [ 'foo' + 'bazbar' ] assertEq: 'foobazbar' withComment: '7'.
+    [ 'foo' + 'baz' + 'bar' ] assertEq: 'foobazbar' withComment: '8'.
+    [ 'foo' + 'baz' + 'bar' + 'bam' ] assertEq: 'foobazbarbam' withComment: '9'.
+    [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '10'.
+    
 !
 
 METHOD StringTest
@@ -667,7 +677,7 @@ copy
 !
 
 METHOD StringTest
-at |str|
+at
     ['foobar' at: 4 ] assertEq: $b. 
 !
 
@@ -679,12 +689,6 @@ indexOf
 METHOD StringTest
 reverse
     [ 'reverse' reverse ] assertEq: 'esrever'
-!
-
-METHOD Undefined
-testCacheFlush |s|
-    <34>.
-    'Method cache has been flushed' printNl.
 !
 
 METHOD Array
@@ -704,35 +708,33 @@ replaceFrom: start to: stop with: replacement startingAt: repStart | replacement
     ]
 !
 
+METHOD Array
+replaceFromOld: start to: stop with: replacement startingAt: repStart | base |
+       <38 start stop replacement repStart self>.
+       base <- repStart-1.
+       0 to: (stop - start) do: [:idx|
+               self at: (idx + start) put:
+                       (replacement at: (idx + repStart))
+       ]
+!
+
 METHOD Undefined
 main    | command |
         " initialize classes "
         
         Char initialize.
 
-        " main execution loop "
+        " main execution loop 
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
         
-        ^nil                  
-        
-        nil testCacheFlush.
-        
-        ('b' + 'a') printNl.
-        ('' + 'asd') printNl.
-        ('12' + 'asd') printNl.
-        ('asd' + '') printNl.
-        ('foo' + 'bar') printNl.
-        ('foo' + 'bazbar') printNl. 
-        ('foo' + 'baz' + 'bar') printNl. "FIXME WTF???!?!?!"
-        ('foo' + 'baz' + 'bar' + 'bam') printNl. "FIXME WTF???!?!?!"
-        ('abcd' + 'efgh' + 'ijkl' + 'mnop') printNl. "FIXME WTF???!?!?!"
+        ^nil                  "
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2).
         
         6 printNl.
-        [$f value] value printNl. "FIXME"
+        [$f value] value printNl.
         
         CompareTest      new runAll.
         SmallIntTest     new runAll.

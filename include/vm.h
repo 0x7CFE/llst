@@ -105,9 +105,9 @@ private:
     };
     
     enum {
-        returnIsEqual     = 1,
-        returnClass       = 2,
-        returnSize        = 4,
+        objectsAreEqual   = 1,
+        getClass          = 2,
+        getSize           = 4,
         inAtPut           = 5,
         allocateObject    = 7,
         blockInvoke       = 8,
@@ -195,8 +195,8 @@ private:
     // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(
         SmallIntOpcode opcode,
-        uint32_t leftOperand,
-        uint32_t rightOperand);
+        int32_t leftOperand,
+        int32_t rightOperand);
         
     void failPrimitive(
         TObjectArray& stack,
