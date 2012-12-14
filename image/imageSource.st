@@ -759,7 +759,7 @@ main    | command |
         Char initialize.
 
         " main execution loop 
-        [ '-> ' print. command <- String input. command notNil ]
+        [ '-> ' print. command <- String input. $" print. command print. $" printNl. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
         

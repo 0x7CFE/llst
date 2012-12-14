@@ -10,8 +10,10 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     hptr<TClass> pClass = newPointer(klass);
     
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
-    if (!objectSlot)
+    if (!objectSlot) {
+        fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
         return globals.nilObject;
+    }
     
     if (m_lastGCOccured)
         onCollectionOccured();
@@ -39,8 +41,10 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
     
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
-    if (!objectSlot)
+    if (!objectSlot) {
+        fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
         return (TByteObject*) globals.nilObject;
+    }
     
     if (m_lastGCOccured)
         onCollectionOccured();
@@ -745,7 +749,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
         
         case ioPutChar: { // 3
             TInteger charObject = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
-            uint8_t  charValue  = getIntegerValue(charObject);
+            int8_t  charValue  = getIntegerValue(charObject);
             
             putchar(charValue);
             return globals.nilObject;
@@ -990,7 +994,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TProcess& process, TVME
             }
             
             TInteger integer = reinterpret_cast<TInteger>(object);
-            uint32_t value = getIntegerValue(integer);
+            int32_t value = getIntegerValue(integer);
             
             return reinterpret_cast<TObject*>(newInteger(value)); // FIXME long integer
         } break;
