@@ -758,36 +758,56 @@ replaceFromOld: start to: stop with: replacement startingAt: repStart | base |
 !
 
 METHOD Undefined
-main    | command |
+printHierarchy: aClass | class |
+    class <- aClass.
+    [ class isNil ] whileFalse: [ class printNl. class <- class parent ] 
+!
+
+METHOD Undefined
+main    | command x |
         " initialize classes "
         
         Char initialize.
+        
+        "100 times: [ self printHierarchy: Array ].
+        ^nil."
+        
+        x <- 'Hello world!'.
+        x printNl.
+        100 times: [ x printNl ].
+        "[ x <- x copy. x printNl. ]."
+        x printNl.
+        
+        ^nil.
+        [ x ] assertEq: 'Hello world!' withComment: 'copy'.
+        
+        'String' class printNl.
 
-        " main execution loop 
-        [ '-> ' print. command <- String input. $' print. command print. $' printNl. command notNil ]
+        [ 1 ] assertEq: 1 withComment: 'test'.
+        [ 'helloworld' size ] assertEq: 10 withComment: 'len1'.
+        [ 'hello' + 'world'; size ] assertEq: 10 withComment: 'len2'.
+        [ 'looooooooooooooooooooooooooooooooooooooong' size ] assertEq: 42 withComment: 'len3'.
+        [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: 'len4'.
+        
+        
+        " main execution loop "
+        [ '-> ' print. command <- String input. command printNl. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
         
-        ^nil                  "
         
-        (Array with: 1 with: 2) + (Array with: 1 with: 2).
+        ^nil.                  
+        
+        
+        " (Array with: 1 with: 2) + (Array with: 1 with: 2).
         
         CompareTest      new runAll.
         SmallIntTest     new runAll.
-       " BranchTest       new runAll."
         LoopTest         new runAll.
         ClassTest        new runAll.
         MethodLookupTest new runAll.
         StringTest       new runAll.
-        ArrayTest        new runAll.
-
-        "[ true ] whileTrue: [ $. print ]"
-        
-        " main execution loop "
-       " [ '-> ' print. command <- String input. command notNil ]
-                whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ]
-       "                 
+        ArrayTest        new runAll. "
 !
 
 
@@ -2198,6 +2218,10 @@ to: limit by: step do: aBlock  | i |
   i <= limit
     ifTrue:  [ [ i <= limit ] whileTrue: [ aBlock value: i. i <- i + step ] ]
     ifFalse: [ [ i >= limit ] whileTrue: [ aBlock value: i. i <- i + step ] ]
+!
+METHOD Number
+times: aBlock
+    1 to: self do: aBlock
 !
 METHOD Number
 overflow
