@@ -4,6 +4,53 @@
 
 #include <vm.h>
 
+#define test
+
+#ifdef test
+
+TSymbol* newSymbol(SmalltalkVM* vm, char c) {
+    hptr<TSymbol> symbol = vm->newObject<TSymbol>(1);
+    symbol->putByte(0, newInteger(c));
+    return symbol;
+}
+
+void printSymbol(TSymbol* symbol) {
+    putchar( getIntegerValue( symbol->getByte(0) ));
+}
+
+TSymbolArray* chars;
+void initChars(SmalltalkVM* vm) {
+    chars = vm->newObject<TSymbolArray>(255);
+    for(int i = 0; i < 255; i++)
+        chars->putField(i, newSymbol(vm, i));
+}
+
+TSymbolArray* newString(SmalltalkVM* vm, char* str, int len) {
+    hptr<TSymbolArray> string = vm->newObject<TSymbolArray>(len);
+    for(int i = 0; i<len; i++) {
+        string->putField(i, chars->getField(str[i]) );
+    }
+    return string;
+}
+
+TSymbolArray* newRandomString(SmalltalkVM* vm) {
+    srand( time(0) );
+    int len = rand() % 200;
+    hptr<TSymbolArray> string = vm->newObject<TSymbolArray>(len);
+    for(int i = 0; i < len; i++) {
+        string->putField(i, chars->getField( (rand() % 10) + 51 ) );
+    }
+    return string;
+}
+
+void printString(TSymbolArray* string) {
+    for(uint i = 0; i<string->getSize(); i++) {
+        printSymbol( string->getField(i) );
+    }
+}
+
+#endif
+
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
     memoryManager->initializeHeap(65536 * 8);
@@ -19,27 +66,22 @@ int main(int argc, char **argv) {
 //#define test    
     
 #ifdef test
-    hptr<TObjectArray> rootArray = vm.newObject<TObjectArray>(1000);
-    for (uint32_t i = 0; i < 10; i++) {
-        hptr<TObject> pObject = vm.newObject<TObject>();
+    initChars(&vm);
+    
+    hptr<TObjectArray> stack = vm.newObject<TObjectArray>(42);
+    
+    // We create a string, copy it to stack[0], and put onto stack[2] a random string.
+    
+    stack[0] = globals.nilObject; // string will be copied here 
+    stack[1] = newString(&vm, "Hello world!\n", 13);
+    for( int i = 0; i < 2000; i++) {
+        TObject* string = stack[1];
+        stack[0] = string;
+        stack[2] = newRandomString(&vm);
     }
     
-    hptr<TDictionary> dict = vm.newObject<TDictionary>();
-    dict->keys = (TSymbolArray*) vm.newObject<TSymbolArray>(1, false);
-    (*dict->keys)[0] = vm.newObject<TSymbol>(1);
-    (*dict->keys)[0]->putByte(0, 42);
-    
-    printf("dict.target      = %p\n", dict.rawptr());
-    printf("dict->keys       = %p\n", dict->keys);
-    printf("dict->keys[0]    = %p\n", dict->keys->getField(0));
-    printf("dict->keys[0][0] = %d\n", dict->keys->getField(0)->getByte(0));
-    
-    memoryManager->collectGarbage();
-    
-    printf("dict.target      = %p\n", dict.rawptr());
-    printf("dict->keys       = %p\n", dict->keys);
-    printf("dict->keys[0]    = %p\n", dict->keys->getField(0));
-    printf("dict->keys[0][0] = %d\n", dict->keys->getField(0)->getByte(0));
+    printString( (TSymbolArray*) stack[0] );
+
 #else    
     // Creating runtime context
     hptr<TContext> initContext = vm.newObject<TContext>();
