@@ -4,7 +4,7 @@
 
 #include <vm.h>
 
-#define test
+//#define test
 
 #ifdef test
 
