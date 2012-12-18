@@ -25,7 +25,7 @@ void initChars(SmalltalkVM* vm) {
         chars->putField(i, newSymbol(vm, i));
 }
 
-TSymbolArray* newString(SmalltalkVM* vm, char* str, int len) {
+TSymbolArray* newString(SmalltalkVM* vm, const char* str, int len) {
     hptr<TSymbolArray> string = vm->newObject<TSymbolArray>(len);
     for(int i = 0; i<len; i++) {
         string->putField(i, chars->getField(str[i]) );
@@ -35,7 +35,7 @@ TSymbolArray* newString(SmalltalkVM* vm, char* str, int len) {
 
 TSymbolArray* newRandomString(SmalltalkVM* vm) {
     srand( time(0) );
-    int len = rand() % 200;
+    int len = 128; //rand() % 200;
     hptr<TSymbolArray> string = vm->newObject<TSymbolArray>(len);
     for(int i = 0; i < len; i++) {
         string->putField(i, chars->getField( (rand() % 10) + 51 ) );
@@ -53,7 +53,7 @@ void printString(TSymbolArray* string) {
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(65536 * 8);
+    memoryManager->initializeHeap(65536 * 4);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -62,13 +62,11 @@ int main(int argc, char **argv) {
         testImage->loadImage("../image/testImage");
     
     SmalltalkVM vm(testImage.get(), memoryManager.get());
-
-//#define test    
     
 #ifdef test
     initChars(&vm);
     
-    hptr<TObjectArray> stack = vm.newObject<TObjectArray>(42);
+    hptr<TObjectArray> stack = vm.newObject<TObjectArray>(5);
     
     // We create a string, copy it to stack[0], and put onto stack[2] a random string.
     

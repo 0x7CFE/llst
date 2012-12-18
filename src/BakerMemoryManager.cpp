@@ -20,8 +20,10 @@ BakerMemoryManager::~BakerMemoryManager()
 
 bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
 {
-    if (heapSize % 2 != 0)
-        heapSize++;
+//     if (heapSize % 2 != 0)
+//         heapSize++;
+    
+    heapSize = correctPadding(heapSize);
     
     void* heap = malloc(heapSize);
     if (!heap)
@@ -39,8 +41,10 @@ bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
 bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
 {
     // To initialize properly we need a heap with an even size
-    if (heapSize % 2 != 0)
-        heapSize++;
+//     if (heapSize % 2 != 0)
+//         heapSize++;
+    
+    heapSize = correctPadding(heapSize);
     
     void* base = malloc(heapSize);
     if (!base)
@@ -104,6 +108,63 @@ void* BakerMemoryManager::staticAllocate(size_t requestedSize)
     return newPointer;
 }
 
+/*
+BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObjectNew(TMovableObject* object)
+{
+    TMovableObject* currentObject = object;
+    TMovableObject* objectCopy = 0;
+    TMovableObject* previousObject = 0;
+    
+    while (true) {
+        if (isSmallInteger(currentObject)) {
+            // Assigning the result and going up in the hierarchy
+            objectCopy = currentObject;
+            currentObject = previousObject;
+        }
+        
+        if (currentObject->size.isRelocated()) {
+            objectCopy = currentObject->data[0];
+            currentObject = previousObject;
+            break;
+        }
+        
+        if (currentObject->size.isBinary()) {
+            // Copying the object
+            uint32_t dataSize = currentObject->size.getSize();
+            uint32_t slotSize = correctPadding(dataSize);
+            
+            m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
+            objectCopy = new (m_activeHeapPointer) TMovableObject(dataSize, true);
+            
+            // Copying byte data
+            memcpy(objectCopy->data, currentObject->data, dataSize);
+            
+            // Marking original copy of object as relocated so it would not be processed again
+            currentObject->size.setRelocated();
+            
+            TClass* currentClass = currentObject->data[0];
+            
+            // Storing indirection pointer
+            currentObject->data[0] = objectCopy;
+
+            // Now we need to check and move the object's class 
+            // which is now stored in the new copy
+            // In most cases it would be a pointer to the static heap, so we may
+            // check it now and leave the pointer as is if it really points to the static heap.
+            
+            if (! isInStaticHeap(currentClass)) {
+                // On the next iteration we'll be checking the class object
+                previousObject = currentObject;
+                currentObject = currentClass;
+                continue;
+            }
+        } else {
+        }
+        
+    }
+}
+*/
+
 BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObject* object)
 {
     TMovableObject* oldPlace       = object;
@@ -130,8 +191,6 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
             // Checking if object is not in the old space
             if ( (oldPlace > (TMovableObject*) (m_inactiveHeapBase + m_heapSize / 2)) 
               || (oldPlace < (TMovableObject*) m_inactiveHeapPointer))
-//             if ( (oldPlace < (TMovableObject*) m_inactiveHeapBase) 
-//               || (oldPlace > (TMovableObject*) m_inactiveHeapPointer))
             {
                 // Object does not belong to a heap.
                 // Either it is located in static space or
@@ -144,13 +203,13 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
             if (oldPlace->size.isRelocated()) {
                 if (oldPlace->size.isBinary()) {
                     replacement = oldPlace->data[0];
-//                     printf("Binary object %p already relocated, size %d, replacement = %p\n", 
-//                            oldPlace, oldPlace->size.getSize(), replacement);
+                    printf("Binary object %p already relocated, size %d, replacement = %p\n", 
+                           oldPlace, oldPlace->size.getSize(), replacement);
                 } else {
                     uint32_t index = oldPlace->size.getSize();
-//                     printf("Object %p already relocated, size %d, ", oldPlace, oldPlace->size.getSize());
+                    printf("Object %p already relocated, size %d, ", oldPlace, oldPlace->size.getSize());
                     replacement = oldPlace->data[index];
-//                     printf("replacement = %p, replacement size = %d\n", replacement, replacement->size.getSize());
+                    printf("replacement = %p, replacement size = %d\n", replacement, replacement->size.getSize());
                 }
                 oldPlace = previousObject;
                 break;
@@ -169,13 +228,13 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // actual size of the block being reserved for the moving object
                 uint32_t slotSize = correctPadding(dataSize);
 
-//                 printf("Moving binary object %p of size %d (slot size %d) ", oldPlace, dataSize, slotSize);
+                printf("Moving binary object %p of size %d (slot size %d) ", oldPlace, dataSize, slotSize);
                 
                 // Allocating copy in new space
                 m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
                 newPlace = new (m_activeHeapPointer) TMovableObject(dataSize, true);
                 
-//                 printf("to a new place %p\n", newPlace);
+                printf("to a new place %p\n", newPlace);
                 
                 // Copying byte data
                 memcpy(newPlace->data, oldPlace->data, dataSize);
@@ -200,12 +259,12 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 
                 uint32_t fieldsCount = oldPlace->size.getSize();
                 
-//                 printf("Moving object %p with %d fields ", oldPlace, fieldsCount);
+                printf("Moving object %p with %d fields ", oldPlace, fieldsCount);
                 
                 m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
                 newPlace = new (m_activeHeapPointer) TMovableObject(fieldsCount, false);
                 
-//                 printf("to a new place %p\n", newPlace);
+                printf("to a new place %p\n", newPlace);
                 
                 oldPlace->size.setRelocated();
                 
@@ -245,6 +304,9 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
             } else {
                 // last field from TObject
                 uint32_t lastFieldIndex = oldPlace->size.getSize();
+                
+                printf("Moving field [%d] = %p of object old place %p\n", lastFieldIndex, oldPlace->data[lastFieldIndex], oldPlace);
+                
                 newPlace = oldPlace->data[lastFieldIndex]; 
                 previousObject = newPlace->data[lastFieldIndex];
                 newPlace->data[lastFieldIndex] = replacement;
@@ -308,22 +370,24 @@ void BakerMemoryManager::collectGarbage()
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
     {
-//         printf("GC: Processing root pointer %p pointing to %p\n", *iRoot, **iRoot);
+        printf("GC: Processing root pointer %p pointing to %p\n", *iRoot, **iRoot);
         **iRoot = moveObject(**iRoot);
     }
 
     // Updating external references
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-//         printf("GC: Processing external pointer %p pointing to %p\n", *iExternalPointer, **iExternalPointer);
+         printf("GC: Processing external pointer %p pointing to %p\n", *iExternalPointer, **iExternalPointer);
         **iExternalPointer = moveObject(**iExternalPointer);
-//         printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
+         printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
     }
     
-//     printf("After collection: heap size %d, used %d, free %d\n", 
-//            m_heapSize / 2, 
-//            m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
-//            m_activeHeapPointer - m_activeHeapBase);
+//     memset(m_inactiveHeapBase, 0, m_heapSize / 2);
+    
+     printf("After collection: heap size %d, used %d, free %d\n", 
+            m_heapSize / 2, 
+            m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
+            m_activeHeapPointer - m_activeHeapBase);
     
 }
 

@@ -161,7 +161,7 @@ struct TByteArray : public TByteObject {
 // to the similar symbols are practically point to the single object.
 // #helloWorld will always be == to ('hello'+'World') asSymbol,
 // whereas 'hello' + 'World' will not be == 'helloWorld' because strings are 
-// different objects. This is achieved through providing custom implementation of
+// different objects. This is achieved by providing custom implementation of
 // method new: in the MetaSymbol class:
 // 
 // METHOD MetaSymbol
