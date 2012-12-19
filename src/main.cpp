@@ -4,29 +4,29 @@
 
 #include <vm.h>
 
-//#define test
+#define test
 
 #ifdef test
 
-TSymbol* newSymbol(SmalltalkVM* vm, char c) {
-    hptr<TSymbol> symbol = vm->newObject<TSymbol>(1);
-    symbol->putByte(0, newInteger(c));
-    return symbol;
+TChar* newChar(SmalltalkVM* vm, char c) {
+    TChar* character = vm->newObject<TChar>(0, false);
+    character->value = newInteger(c);
+    return character;
 }
 
-void printSymbol(TSymbol* symbol) {
-    putchar( getIntegerValue( symbol->getByte(0) ));
+void printSymbol(TChar* character) {
+    putchar( getIntegerValue( character->value ));
 }
 
-TSymbolArray* chars;
+TObjectArray* chars;
 void initChars(SmalltalkVM* vm) {
-    chars = vm->newObject<TSymbolArray>(255);
+    chars = vm->newObject<TObjectArray>(255);
     for(int i = 0; i < 255; i++)
-        chars->putField(i, newSymbol(vm, i));
+        chars->putField(i, newChar(vm, i));
 }
 
-TSymbolArray* newString(SmalltalkVM* vm, const char* str, int len) {
-    hptr<TSymbolArray> string = vm->newObject<TSymbolArray>(len);
+TObjectArray* newCharString(SmalltalkVM* vm, const char* str, int len) {
+    hptr<TObjectArray> string = vm->newObject<TObjectArray>(len);
     for(int i = 0; i<len; i++) {
         string->putField(i, chars->getField(str[i]) );
     }
@@ -43,9 +43,9 @@ TSymbolArray* newRandomString(SmalltalkVM* vm) {
     return string;
 }
 
-void printString(TSymbolArray* string) {
+void printString(TObjectArray* string) {
     for(uint i = 0; i<string->getSize(); i++) {
-        printSymbol( string->getField(i) );
+        printSymbol( (TChar*) string->getField(i) );
     }
 }
 
@@ -64,6 +64,7 @@ int main(int argc, char **argv) {
     SmalltalkVM vm(testImage.get(), memoryManager.get());
     
 #ifdef test
+    memoryManager->registerExternalPointer((TObject**) &chars);
     initChars(&vm);
     
     hptr<TObjectArray> stack = vm.newObject<TObjectArray>(5);
@@ -71,14 +72,14 @@ int main(int argc, char **argv) {
     // We create a string, copy it to stack[0], and put onto stack[2] a random string.
     
     stack[0] = globals.nilObject; // string will be copied here 
-    stack[1] = newString(&vm, "Hello world!\n", 13);
+    stack[1] = newCharString(&vm, "Hello world!\n", 13);
     for( int i = 0; i < 2000; i++) {
         TObject* string = stack[1];
         stack[0] = string;
         stack[2] = newRandomString(&vm);
     }
     
-    printString( (TSymbolArray*) stack[0] );
+    printString( (TObjectArray*) stack[0] );
 
 #else    
     // Creating runtime context

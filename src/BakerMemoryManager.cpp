@@ -60,8 +60,10 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     m_heapTwo = (uint8_t*) base + mediane;
 
     m_activeHeapOne = true;
+    
     m_activeHeapBase = m_heapOne;
     m_activeHeapPointer = (uint8_t*) base + mediane;
+    
     m_inactiveHeapBase = (uint8_t*) base + mediane;
     m_inactiveHeapPointer = (uint8_t*) base + heapSize;
 

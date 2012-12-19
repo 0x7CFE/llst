@@ -192,6 +192,11 @@ struct TString : public TByteObject {
     static const char* InstanceClassName() { return "String"; }
 };
 
+struct TChar : public TObject {
+    TInteger value;
+    static const char* InstanceClassName() { return "Char"; }
+};
+
 // TArray represents the Smalltalk's Array class.
 // Arrays are ordinary objects except that their field space
 // is used to store pointers to arbitary objects. Access to
