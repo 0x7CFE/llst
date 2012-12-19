@@ -20,9 +20,6 @@ BakerMemoryManager::~BakerMemoryManager()
 
 bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
 {
-//     if (heapSize % 2 != 0)
-//         heapSize++;
-
     heapSize = correctPadding(heapSize);
 
     void* heap = malloc(heapSize);
@@ -41,9 +38,6 @@ bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
 bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
 {
     // To initialize properly we need a heap with an even size
-//     if (heapSize % 2 != 0)
-//         heapSize++;
-
     heapSize = correctPadding(heapSize);
 
     void* base = malloc(heapSize);
@@ -94,7 +88,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
     // TODO Grow the heap if object still not fits
 
-//     fprintf(stderr, "Could not allocate %d bytes in heap\n", requestedSize);
+    fprintf(stderr, "Could not allocate %d bytes in heap\n", requestedSize);
     return 0;
 }
 
@@ -103,7 +97,7 @@ void* BakerMemoryManager::staticAllocate(size_t requestedSize)
     uint8_t* newPointer = m_staticHeapPointer - requestedSize;
     if (newPointer < m_staticHeapBase)
     {
-//         fprintf(stderr, "Could not allocate %d bytes in static heaps\n", requestedSize);
+        fprintf(stderr, "Could not allocate %d bytes in static heaps\n", requestedSize);
         return 0; // TODO Report memory allocation error
     }
     m_staticHeapPointer = newPointer;
@@ -148,13 +142,9 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
             if (currentObject->size.isRelocated()) {
                 if (currentObject->size.isBinary()) {
                     replacement = currentObject->data[0];
-//                     printf("Binary object %p already relocated, size %d, replacement = %p\n",
-//                         currentObject, currentObject->size.getSize(), replacement);
                 } else {
                     uint32_t index = currentObject->size.getSize();
-//                     printf("Object %p already relocated, size %d, ", currentObject, currentObject->size.getSize());
                     replacement = currentObject->data[index];
-//                     printf("replacement = %p, replacement size = %d\n", replacement, replacement->size.getSize());
                 }
                 currentObject = previousObject;
                 break;
@@ -169,15 +159,12 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // Size of binary data
                 uint32_t dataSize = currentObject->size.getSize();
 
-//                 printf("Moving binary object %p of size %d (slot size %d) ", currentObject, dataSize, slotSize);
                 // Allocating copy in new space
 
                 // We need to allocate space evenly, so calculating the
                 // actual size of the block being reserved for the moving object
                 m_activeHeapPointer -= sizeof(TByteObject) + correctPadding(dataSize); 
                 objectCopy = new (m_activeHeapPointer) TMovableObject(dataSize, true);
-
-//                 printf("to a new place %p\n", objectCopy);
 
                 // Copying byte data
                 memcpy(& objectCopy->data[1], & currentObject->data[1], dataSize);
@@ -202,12 +189,8 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 
                 uint32_t fieldsCount = currentObject->size.getSize();
 
-//                 printf("Moving object %p with %d fields ", currentObject, fieldsCount);
-
                 m_activeHeapPointer -= sizeof(TObject) + fieldsCount * sizeof (TObject*);
                 objectCopy = new (m_activeHeapPointer) TMovableObject(fieldsCount, false);
-
-//                 printf("to a new place %p\n", objectCopy);
 
                 currentObject->size.setRelocated();
 
@@ -248,8 +231,6 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // last field from TObject
                 uint32_t lastFieldIndex = currentObject->size.getSize();
 
-//                 printf("Moving field [%d] = %p of object old place %p\n", lastFieldIndex, currentObject->data[lastFieldIndex], currentObject);
-
                 objectCopy = currentObject->data[lastFieldIndex];
                 previousObject = objectCopy->data[lastFieldIndex];
                 objectCopy->data[lastFieldIndex] = replacement;
@@ -281,20 +262,12 @@ void BakerMemoryManager::collectGarbage()
 {
     m_gcCount++;
 
-
-//     printf("Before collection: heap size %d, used %d, free %d\n",
-//            m_heapSize / 2,
-//            m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
-//            m_activeHeapPointer - m_activeHeapBase);
-
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
-//         printf("\n(1)->(2)\n");
         m_activeHeapBase = m_heapTwo;
         m_inactiveHeapBase = m_heapOne;
     } else {
-//         printf("\n(2)->(1)\n");
         m_activeHeapBase = m_heapOne;
         m_inactiveHeapBase = m_heapTwo;
     }
@@ -312,19 +285,14 @@ void BakerMemoryManager::collectGarbage()
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot)
     {
-//         printf("GC: Processing root pointer %p pointing to %p\n", *iRoot, **iRoot);
         **iRoot = moveObject(**iRoot);
     }
 
     // Updating external references
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-//         printf("GC: Processing external pointer %p pointing to %p\n", *iExternalPointer, **iExternalPointer);
         **iExternalPointer = moveObject(**iExternalPointer);
-//         printf("GC: External pointer %p now points to %p\n", *iExternalPointer, **iExternalPointer);
     }
-
-//     memset(m_inactiveHeapBase, 0, m_heapSize / 2);
 
 //     printf("After collection: heap size %d, used %d, free %d\n",
 //             m_heapSize / 2,
