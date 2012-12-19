@@ -4,7 +4,7 @@
 
 #include <vm.h>
 
-#define test
+//#define test
 
 #ifdef test
 
@@ -35,7 +35,7 @@ TObjectArray* newCharString(SmalltalkVM* vm, const char* str, int len) {
 
 TSymbolArray* newRandomString(SmalltalkVM* vm) {
     srand( time(0) );
-    int len = 128; //rand() % 200;
+    int len = rand() % 200;
     hptr<TSymbolArray> string = vm->newObject<TSymbolArray>(len);
     for(int i = 0; i < len; i++) {
         string->putField(i, chars->getField( (rand() % 10) + 51 ) );
@@ -53,7 +53,7 @@ void printString(TObjectArray* string) {
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(65536 * 4);
+    memoryManager->initializeHeap(65536);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -73,6 +73,14 @@ int main(int argc, char **argv) {
     
     stack[0] = globals.nilObject; // string will be copied here 
     stack[1] = newCharString(&vm, "Hello world!\n", 13);
+    
+    TByteArray* array = vm.newObject<TByteArray>(127);
+    strcpy((char*) array->getBytes(), "Hello world from byte array!");
+    stack[3] = array;
+    
+    printf("Before: %s\n", (const char*) stack[3]->getFields());
+    getchar();
+    
     for( int i = 0; i < 2000; i++) {
         TObject* string = stack[1];
         stack[0] = string;
@@ -80,6 +88,7 @@ int main(int argc, char **argv) {
     }
     
     printString( (TObjectArray*) stack[0] );
+    printf("After: %s\n", (const char*) stack[3]->getFields());
 
 #else    
     // Creating runtime context

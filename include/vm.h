@@ -188,9 +188,9 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(uint8_t opcode, TProcess& process, TVMExecutionContext& ec, bool* failed);
+    TObject* doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool* failed);
     
-    TExecuteResult doDoSpecial(TProcess*& process, TVMExecutionContext& ec);
+    TExecuteResult doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec);
     
     // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(
@@ -222,18 +222,16 @@ private:
     
     std::list<TObject*> rootStack;
 public:
-    void pushProcess(TObject* object) {
-//         printf("push %p\n", object);
-        rootStack.push_back(object);
+    void pushProcess(TProcess* process) {
+        rootStack.push_back(process);
         m_memoryManager->registerExternalPointer(& rootStack.back());
     }
     
-    TObject* popProcess() {
+    TProcess* popProcess() {
         m_memoryManager->releaseExternalPointer(& rootStack.back());
-        TObject* topProcess = rootStack.back();
+        TProcess* process = (TProcess*) rootStack.back();
         rootStack.pop_back();
-//         printf("pop %p\n", topProcess);
-        return topProcess; 
+        return process; 
     }
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 

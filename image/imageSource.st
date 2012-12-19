@@ -770,12 +770,12 @@ main    | command x |
         Char initialize.
         
         "100 times: [ self printHierarchy: Array ].
-        ^nil."
+        ^nil.
         
         x <- 'Hello world!'.
         x printNl.
         100 times: [ x printNl ].
-        "[ x <- x copy. x printNl. ]."
+        [ x <- x copy. x printNl. ].
         x printNl.
         
         ^nil.
@@ -789,6 +789,15 @@ main    | command x |
         [ 'looooooooooooooooooooooooooooooooooooooong' size ] assertEq: 42 withComment: 'len3'.
         [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: 'len4'.
         
+        (Array with: 1 with: 2) + (Array with: 1 with: 2)."
+        
+        CompareTest      new runAll.
+        SmallIntTest     new runAll.
+        LoopTest         new runAll.
+        ClassTest        new runAll.
+        MethodLookupTest new runAll.
+        StringTest       new runAll.
+        ArrayTest        new runAll.
         
         " main execution loop "
         [ '-> ' print. command <- String input. command printNl. command notNil ]
@@ -797,17 +806,6 @@ main    | command x |
         
         
         ^nil.                  
-        
-        
-        " (Array with: 1 with: 2) + (Array with: 1 with: 2).
-        
-        CompareTest      new runAll.
-        SmallIntTest     new runAll.
-        LoopTest         new runAll.
-        ClassTest        new runAll.
-        MethodLookupTest new runAll.
-        StringTest       new runAll.
-        ArrayTest        new runAll. "
 !
 
 
