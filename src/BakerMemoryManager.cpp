@@ -166,8 +166,11 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 m_activeHeapPointer -= sizeof(TByteObject) + correctPadding(dataSize); 
                 objectCopy = new (m_activeHeapPointer) TMovableObject(dataSize, true);
 
-                // Copying byte data
-                memcpy(& objectCopy->data[1], & currentObject->data[1], dataSize);
+                // Copying byte data. data[0] is the class pointer, 
+                // actual binary data starts from the data[1]
+                uint8_t* source      = reinterpret_cast<uint8_t*>( & currentObject->data[1] );
+                uint8_t* destination = reinterpret_cast<uint8_t*>( & objectCopy->data[1] );
+                memcpy(destination, source, dataSize);
 
                 // Marking original copy of object as relocated so it would not be processed again
                 currentObject->size.setRelocated();
@@ -176,13 +179,12 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // This will be corrected on the next stage of current GC operation
                 objectCopy->data[0] = previousObject;
                 previousObject = currentObject;
-                currentObject = currentObject->data[0];
+                currentObject  = currentObject->data[0];
                 previousObject->data[0] = objectCopy;
 
                 // On the next iteration we'll be processing the data[0] of the current object
                 // which is actually class pointer in TObject.
                 // NOTE It is expected that class of binary object would be non binary
-                //continue;
             } else {
                 // Current object is not binary, i.e. this is an ordinary object
                 // with fields that are either SmallIntegers or pointers to other objects
