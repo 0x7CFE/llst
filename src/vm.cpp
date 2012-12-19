@@ -489,23 +489,38 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     ec.lastReceiver = newPointer(receiverClass);
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
     
+    // Checking whether we found a method
     if (receiverMethod == 0) {
-        fprintf(stderr, "In method %s>>%s at offset %d : \n", 
-                ec.currentContext->method->klass->name->toString().c_str(), 
-                ec.currentContext->method->name->toString().c_str(),
-                ec.bytePointer - 1);
-      
-        fprintf(stderr, "Failed to lookup selector '%s' of class '%s' \n", 
-                selector->toString().c_str(), receiverClass->name->toString().c_str());
+        // Oops. Method was not found. In this case we should 
+        // send #doesNotUnderstand: message to the receiver
+
+        // Looking up the #doesNotUnderstand: method:
+        receiverMethod = newPointer(lookupMethod(globals.badMethodSymbol, receiverClass));
+        if (receiverMethod == 0) {
+            // Something goes really wrong. 
+            // We could not continue the execution
+            fprintf(stderr, "Could not locate doesNotUnderstand:\n");
+            exit(1);
+        }
         
-        ec.currentContext->bytePointer = newInteger(ec.bytePointer);
-        ec.currentContext->stackTop    = newInteger(ec.stackTop);
-        //backTraceContext(ec.currentContext);
+        // Protecting the selector pointer because it may be invalidated later
+        hptr<TSymbol> failedSelector = newPointer(selector);
         
-        //FIXME pop process and continue
+        // We're replacing the original call arguments with custom one
+        hptr<TObjectArray> errorArguments = newObject<TObjectArray>(2);
         
-        exit(1);
+        // Filling in the call context information
+        errorArguments[0] = messageArguments[0]; // receiver object
+        errorArguments[1] = failedSelector;      // message selector that failed
+        
+        // Replacing the arguments with newly created one
+        messageArguments = errorArguments;
+        
+        // Continuing the execution just as if #doesNotUnderstand:
+        // was the actual selector we wanted to call
     }
+    
+    // TODO Optimize tail call
     
     // Save stack and opcode pointers
     ec.storePointers();

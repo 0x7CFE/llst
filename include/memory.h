@@ -306,7 +306,7 @@ struct TGlobals {
     TMethod* initialMethod;
     TObject* binaryMessages[3];
     TClass*  integerClass;
-    TObject* badMethodSymbol;
+    TSymbol* badMethodSymbol;
 };
 
 extern TGlobals globals;

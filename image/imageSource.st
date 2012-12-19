@@ -800,7 +800,7 @@ main    | command x |
         ArrayTest        new runAll.
         
         " main execution loop "
-        [ '-> ' print. command <- String input. command printNl. command notNil ]
+        [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
         

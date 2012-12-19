@@ -215,7 +215,7 @@ bool Image::loadImage(const char* fileName)
     for (int i = 0; i < 3; i++)
         globals.binaryMessages[i] = readObject();
     
-    globals.badMethodSymbol = readObject();
+    globals.badMethodSymbol = (TSymbol*) readObject();
     
     fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
     m_indirects.clear();
