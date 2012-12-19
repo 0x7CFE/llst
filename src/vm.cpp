@@ -499,7 +499,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         if (receiverMethod == 0) {
             // Something goes really wrong. 
             // We could not continue the execution
-            fprintf(stderr, "Could not locate doesNotUnderstand:\n");
+            fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
             exit(1);
         }
         
@@ -509,7 +509,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         // We're replacing the original call arguments with custom one
         hptr<TObjectArray> errorArguments = newObject<TObjectArray>(2);
         
-        // Filling in the call context information
+        // Filling in the failed call context information
         errorArguments[0] = messageArguments[0]; // receiver object
         errorArguments[1] = failedSelector;      // message selector that failed
         
