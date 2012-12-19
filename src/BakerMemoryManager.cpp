@@ -179,13 +179,12 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // This will be corrected on the next stage of current GC operation
                 objectCopy->data[0] = previousObject;
                 previousObject = currentObject;
-                currentObject = currentObject->data[0];
+                currentObject  = currentObject->data[0];
                 previousObject->data[0] = objectCopy;
 
                 // On the next iteration we'll be processing the data[0] of the current object
                 // which is actually class pointer in TObject.
                 // NOTE It is expected that class of binary object would be non binary
-                //continue;
             } else {
                 // Current object is not binary, i.e. this is an ordinary object
                 // with fields that are either SmallIntegers or pointers to other objects
