@@ -169,20 +169,18 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // Size of binary data
                 uint32_t dataSize = currentObject->size.getSize();
 
+//                 printf("Moving binary object %p of size %d (slot size %d) ", currentObject, dataSize, slotSize);
+                // Allocating copy in new space
+
                 // We need to allocate space evenly, so calculating the
                 // actual size of the block being reserved for the moving object
-                uint32_t slotSize = correctPadding(dataSize);
-
-//                 printf("Moving binary object %p of size %d (slot size %d) ", currentObject, dataSize, slotSize);
-
-                // Allocating copy in new space
-                m_activeHeapPointer -= (slotSize + 2) * sizeof(TMovableObject*);
+                m_activeHeapPointer -= sizeof(TByteObject) + correctPadding(dataSize); 
                 objectCopy = new (m_activeHeapPointer) TMovableObject(dataSize, true);
 
 //                 printf("to a new place %p\n", objectCopy);
 
                 // Copying byte data
-                memcpy(objectCopy->data, currentObject->data, dataSize);
+                memcpy(& objectCopy->data[1], & currentObject->data[1], dataSize);
 
                 // Marking original copy of object as relocated so it would not be processed again
                 currentObject->size.setRelocated();
@@ -206,7 +204,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 
 //                 printf("Moving object %p with %d fields ", currentObject, fieldsCount);
 
-                m_activeHeapPointer -= (fieldsCount + 2) * sizeof (TMovableObject*);
+                m_activeHeapPointer -= sizeof(TObject) + fieldsCount * sizeof (TObject*);
                 objectCopy = new (m_activeHeapPointer) TMovableObject(fieldsCount, false);
 
 //                 printf("to a new place %p\n", objectCopy);
@@ -275,7 +273,6 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 previousObject->data[lastFieldIndex] = objectCopy;
                 break;
             }
-
         }
     }
 }
