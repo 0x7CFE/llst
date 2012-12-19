@@ -814,7 +814,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             // Checking the passed temps size
             TObjectArray* blockTemps = block->temporaries;
             
-            if (argCount > (blockTemps ? blockTemps->getSize() : 0) ) {
+            if (argCount > (blockTemps ? blockTemps->getSize() - argumentLocation : 0) ) {
                 ec.stackTop -= (argCount  + 1); // unrolling stack
                 failPrimitive(stack, ec.stackTop, opcode);
                 *failed = true;
