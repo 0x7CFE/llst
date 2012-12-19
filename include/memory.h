@@ -5,8 +5,11 @@
 #include <stdint.h>
 #include <types.h>
 #include <vector>
-#include <hash_map>
+#include <list>
 
+// Generic interface to a memory manager.
+// Custom implementations such as BakerMemoryManager
+// implement this interface.
 class IMemoryManager {
 public:
     virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
@@ -14,9 +17,150 @@ public:
     
     virtual void* allocate(size_t size, bool* collectionOccured = 0) = 0;
     virtual void* staticAllocate(size_t size) = 0;
-    virtual void  addStaticRoot(TObject* rootObject) = 0;
     virtual void  collectGarbage() = 0;
+    
+    virtual void  addStaticRoot(TObject** pointer) = 0;
+    virtual void  removeStaticRoot(TObject** pointer) = 0;
+    virtual bool  isInStaticHeap(void* location) = 0;
+    
+    // External pointer handling
+    virtual void  registerExternalPointer(TObject** pointer) = 0;
+    virtual void  releaseExternalPointer(TObject** pointer) = 0;
+    
+    virtual uint32_t allocsBeyondCollection() = 0;
 };
+
+// When pointer to a heap object is stored outside of the heap,
+// specific actions need to be taken in order to prevent pointer
+// invalidation due to GC procedure. External pointers need to be 
+// registered in GC so it will use this pointers as roots for the
+// object traversing. GC will update the pointer data with the 
+// actual object location. hptr<> helps to organize external pointers
+// by automatically calling registerExternalPointer() in constructor 
+// and releaseExternalPointer() in desctructor.
+//
+// External pointers are widely used in the VM execution code. 
+// VM provide helper functions newPointer() and newObject() which
+// deal with hptr<> in a user friendly way. Use of these functions
+// is highly recommended. 
+template <typename O> class hptr {
+public:
+    typedef O Object;
+private:
+    Object* target;     // TODO static heap optimization && volatility
+    IMemoryManager* mm; // TODO assign on copy operators
+    bool isRegistered;  // TODO Pack flag into address
+public:
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) 
+        : target(object), mm(mm), isRegistered(registerPointer)
+    {
+        if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
+    {
+        if (mm) { mm->registerExternalPointer((TObject**) &target); }
+    }
+    
+    ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr<Object>& operator = (hptr<Object>& pointer) { target = pointer.target; return *this; }
+    hptr<Object>& operator = (Object* object) { target = object; return *this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    //Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    template<typename C> C* cast() const { return (C*) target; }
+    
+//      template<typename I>
+//      typeof(target->operator[](I()))& operator [] (I index) const { return target->operator[](index); }
+     
+//     template<typename I>
+//     typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
+};
+
+// Hptr specialization for TArray<> class.
+// Provides typed [] operator that allows
+// convinient indexed access to the array contents
+template<typename T> class hptr< TArray<T> >
+{
+public:
+    typedef TArray<T> Object;
+private:
+    // TODO see in base hptr<> 
+    Object* target;
+    IMemoryManager* mm;
+    bool isRegistered;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) 
+    : target(object), mm(mm), isRegistered(registerPointer)
+    {
+        if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
+    {
+        if (mm) { mm->registerExternalPointer((TObject**) &target); }
+    }
+    
+    ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
+    hptr<Object>& operator = (Object* object) { target = object; return *this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+   // Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    template<typename C> C* cast() { return (C*) target; }
+    
+    template<typename I>
+    T& operator [] (I index) const { return target->operator[](index); }
+};
+
+// Hptr specialization for TByteObject.
+// Provides typed [] operator that allows
+// convinient indexed access to the bytearray contents
+template<> class hptr<TByteObject>
+{
+public:
+    typedef TByteObject Object;
+private:
+    // TODO see in base hptr<> 
+    Object* target;
+    IMemoryManager* mm;
+    bool isRegistered;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) 
+    : target(object), mm(mm), isRegistered(registerPointer)
+    {
+        if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
+    }
+    
+    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
+    {
+        if (mm) { mm->registerExternalPointer((TObject**) &target); }
+    }
+    
+    ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
+    
+    hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
+    hptr<Object>& operator = (Object* object) { target = object; return *this; }
+    
+    Object* rawptr() const { return target; }
+    Object* operator -> () const { return target; }
+    Object& (operator*)() const { return *target; }
+    operator Object*() const { return target; }
+    
+    template<typename C> C* cast() { return (C*) target; }
+    
+    //template<typename I>
+    uint8_t& operator [] (uint32_t index) const { return target->operator[](index); }
+};
+
 
 // Simple memory manager implementing classic baker two space algorithm.
 // Each time two separate heaps are allocated but only one is active.
@@ -33,6 +177,8 @@ public:
 class BakerMemoryManager : public IMemoryManager {
 private:
     uint32_t  m_gcCount;
+    uint32_t  m_allocsBeyondGC;
+    
     size_t    m_heapSize;
     size_t    m_maxHeapSize;
     
@@ -57,21 +203,35 @@ private:
     
     // During GC we need to treat all objects in a very simple manner, 
     // just as pointer holders. Class field is also a pointer so we
-    // treat it just as one more object field
+    // treat it just as one more object field.
     struct TMovableObject {
         TSize size;
         TMovableObject* data[0];
+        
+        TMovableObject(uint32_t dataSize, bool isBinary = false) : size(dataSize, isBinary) { }
     };
     TMovableObject* moveObject(TMovableObject* object);
     
-    // This contains an array of pointers of objects from the
-    // static heap to the dynamic one. It is used during the GC
+    // These variables contain an array of pointers to objects from the
+    // static heap to the dynamic one. Ihey are used during the GC
     // as a root for pointer iteration.
-    //TObjectArray* m_staticRoots;
     
-    // FIXME temporary solution before GC will prove it's working
-    std::vector<TMovableObject*> m_staticRoots;
-    //std::hash_map<TObject*, TObject*> m_staticRoots;
+    // FIXME Temporary solution before GC will prove it's working
+    //       Think about better memory organization
+    typedef std::list<TMovableObject**> TStaticRoots;
+    typedef std::list<TMovableObject**>::iterator TStaticRootsIterator;
+    TStaticRoots m_staticRoots;
+    
+    // External pointers are typically managed by hptr<> template.
+    // When pointer to a heap object is stored outside of the heap,
+    // specific actions need to be taken in order to prevent pointer
+    // invalidation. GC uses this information to correct external
+    // pointers so they will point to correct location even after garbage
+    // collection. Usual operating pattern is very similar to the stack, 
+    // so list container seems to be a good choice.
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
+    TPointerList m_externalPointers;
     
 public:
     BakerMemoryManager();
@@ -81,10 +241,20 @@ public:
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
     virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
-    virtual void  addStaticRoot(TObject* rootObject);
     virtual void  collectGarbage();
+    
+    virtual void  addStaticRoot(TObject** pointer);
+    virtual void  removeStaticRoot(TObject** pointer);
+    inline virtual bool isInStaticHeap(void* location);
+    
+    // External pointer handling
+    virtual void  registerExternalPointer(TObject** pointer);
+    virtual void  releaseExternalPointer(TObject** pointer);
+    
+    // Returns amount of allocations that were done after last GC
+    // May be used as a flag that GC had just took place
+    virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
 };
-
 
 class Image {
 private:
@@ -114,7 +284,7 @@ public:
     Image(IMemoryManager* manager) 
         : m_imageFileFD(-1), m_imageFileSize(0), 
           m_imagePointer(0), m_memoryManager(manager) 
-    {}
+    { }
     
     bool     loadImage(const char* fileName);
     TObject* getGlobal(const char* name);
