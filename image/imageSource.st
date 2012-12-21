@@ -732,23 +732,7 @@ atPut | tmpArr |
 !
 
 METHOD Array
-replaceFrom: start to: stop with: replacement startingAt: repStart | replacementSize replacementEnd |
-    <38 start stop replacement repStart self>.
-    (stop = 0) ifTrue: [ ^self ].
-    
-    replacementSize <- replacement size.
-    (replacementSize = 0) ifTrue: [ ^self ].
-    
-    replacementEnd <- replacementSize min: stop. "boundary check"
-    
-    0 to: (replacementEnd - 1) do: [:idx|
-        self at: (idx + start) put:
-            (replacement at: (idx + repStart))
-    ]
-!
-
-METHOD Array
-replaceFromOld: start to: stop with: replacement startingAt: repStart | base |
+replaceFrom: start to: stop with: replacement startingAt: repStart | base |
        <38 start stop replacement repStart self>.
        base <- repStart-1.
        0 to: (stop - start) do: [:idx|
@@ -791,6 +775,8 @@ main    | command x |
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2)."
         
+        "1 to: 1000 do: [ 'Array allMethods' doIt ]."
+        
         CompareTest      new runAll.
         SmallIntTest     new runAll.
         LoopTest         new runAll.
@@ -798,6 +784,8 @@ main    | command x |
         MethodLookupTest new runAll.
         StringTest       new runAll.
         ArrayTest        new runAll.
+        
+        
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
@@ -1408,9 +1396,13 @@ badIndex
 	self error: 'array indexing error'
 !
 METHOD Array
+badIndex: index
+    self error: 'array indexing error (index ' + index printString + ', length ' + self size printString + ')'
+!
+METHOD Array
 at: index
 	<24 self index>
-	(self includesKey: index) ifFalse: [ self badIndex ].
+	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD Array
@@ -1476,7 +1468,7 @@ size
 METHOD Array
 at: index put: value
 	<5 value self index>
-	(self includesKey: index) ifFalse: [ self badIndex ].
+	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD Array
@@ -1592,7 +1584,7 @@ basicAt: index
 METHOD ByteArray
 at: index
 	<21 self index>
-	(self includesKey: index) ifFalse: [ self badIndex ].
+	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD ByteArray
@@ -1603,7 +1595,7 @@ at: index ifAbsent: exceptionBlock
 METHOD ByteArray
 at: index put: aValue
 	<22 aValue self index>
-	(self includesKey: index) ifFalse: [ self badIndex ].
+	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD ByteArray
@@ -1707,7 +1699,7 @@ basicAt: index
 !
 METHOD String
 at: index
-	^self at: index ifAbsent: [ self badIndex ]
+	^self at: index ifAbsent: [ self badIndex: index ]
 !
 METHOD String
 at: index ifAbsent: exceptionBlock | c |
@@ -1724,7 +1716,7 @@ basicAt: index put: value
 METHOD String
 at: index put: aValue
 	(self basicAt: index put: aValue value) isNil ifTrue: [
-		self badIndex
+		self badIndex: index
 	]
 !
 METHOD String
@@ -1823,7 +1815,11 @@ copy
 !
 METHOD List
 badIndex
-	self error: 'Invalid List index'
+	self error: 'Invalid List index (unknown)'
+!
+METHOD List
+badIndex: index
+    self error: 'Invalid List index (' + index printString + ')'
 !
 METHOD List
 findLink: index ifAbsent: aBlock | idx link |
@@ -1839,7 +1835,7 @@ findLink: index ifAbsent: aBlock | idx link |
 !
 METHOD List
 at: index | link |
-	link <- self findLink: index ifAbsent: [ self badIndex ].
+	link <- self findLink: index ifAbsent: [ self badIndex: index ].
 	^ link value
 !
 METHOD List
