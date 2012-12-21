@@ -520,8 +520,6 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         // was the actual selector we wanted to call
     }
     
-    // TODO Optimize tail call
-    
     // Save stack and opcode pointers
     ec.storePointers();
     
@@ -530,13 +528,35 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     
     newContext->arguments       = messageArguments;
     newContext->method          = receiverMethod;
-    newContext->previousContext = ec.currentContext;
     newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize), false);
     newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize), false);
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
     
-    // Replace current context with the new one
+    // Suppose that current send message operation is last operation in the current context. 
+    // If it is true then next instruction will be either stackReturn or blockReturn.
+    // 
+    // VM will switch to the newContext, perform it and then switch back to the current context
+    // for the single one return instruction. This is pretty dumb to load the whole context 
+    // just to exit it immediately. Therefore we looking one instruction ahead to see if it is
+    // a return instruction. If it is, we may skip our context and set our previousContext as 
+    // previousContext for the newContext. In case of blockReturn it will be the previousContext
+    // of the wrapping context.
+    
+    uint8_t nextInstruction = ec.currentContext->method->byteCodes->getByte(ec.bytePointer);
+    if (nextInstruction == (doSpecial * 16 + stackReturn)) {
+        // Optimizing stack return
+        newContext->previousContext = ec.currentContext->previousContext;
+    } else if (nextInstruction == (doSpecial * 16 + blockReturn) &&
+              (ec.currentContext->getClass() == globals.blockClass)) 
+    {
+        // Optimizing block return
+        newContext->previousContext = ec.currentContext.cast<TBlock>()->creatingContext->previousContext;
+    } else 
+        newContext->previousContext = ec.currentContext;
+    
+    // Replace current context with the new one. On the next iteration, 
+    // VM will start interpreting instructions from the new context.
     ec.currentContext = newContext;
     ec.loadPointers();
 }
@@ -814,9 +834,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             
             // Instantinating the object. Each object has size and class fields
             // which are not directly accessible in the managed code, so we need
-            // to add 2 to the size known to the object intself to get the real size:
+            // to add 2 to the size known to the object itself to get the real size:
             
-            return newOrdinaryObject(klass, (fieldsCount + 2) * sizeof(TObject*)); 
+            return newOrdinaryObject(klass, sizeof(TObject) + fieldsCount * sizeof(TObject*)); 
         } break;
         
         case blockInvoke: { // 8
