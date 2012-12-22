@@ -779,13 +779,13 @@ main    | command x |
         
         CompareTest      new runAll.
         SmallIntTest     new runAll.
-        LoopTest         new runAll.
+       " LoopTest         new runAll."
         ClassTest        new runAll.
         MethodLookupTest new runAll.
         StringTest       new runAll.
         ArrayTest        new runAll.
-        
-        
+
+        'Array with: 1' doIt printNl.
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]

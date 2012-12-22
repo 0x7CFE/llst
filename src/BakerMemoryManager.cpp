@@ -296,6 +296,8 @@ void BakerMemoryManager::collectGarbage()
         **iExternalPointer = moveObject(**iExternalPointer);
     }
 
+    memset(m_inactiveHeapBase, 0, m_heapSize / 2);
+    
 //     printf("After collection: heap size %d, used %d, free %d\n",
 //             m_heapSize / 2,
 //             m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
