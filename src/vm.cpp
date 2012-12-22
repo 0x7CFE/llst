@@ -277,10 +277,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
     while (true) {
         // Initializing helper references
         TByteObject&  byteCodes = * ec.currentContext->method->byteCodes;
-        hptr<TObjectArray> stack     = newPointer(ec.currentContext->stack);
+        TObjectArray& stack     = * ec.currentContext->stack;
         
         TObjectArray& temporaries       = * ec.currentContext->temporaries;
-        hptr<TObjectArray> arguments    = newPointer(ec.currentContext->arguments);
+        TObjectArray& arguments         = * ec.currentContext->arguments;
         TObjectArray& instanceVariables = * (TObjectArray*) arguments[0];
         TSymbolArray& literals          = * ec.currentContext->method->literals;
         
@@ -465,7 +465,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
     hptr<TObjectArray> args  = newObject<TObjectArray>(ec.instruction.low);
-    hptr<TObjectArray> stack = newPointer(ec.currentContext->stack);
+    TObjectArray& stack = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
     // from the top of the stack and creates new array with them
@@ -565,8 +565,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
 {
-    hptr<TObjectArray> stack = newPointer( ec.currentContext->stack);
-    hptr<TObjectArray> messageArguments = newPointer((TObjectArray*) stack[--ec.stackTop]);
+    TObjectArray& stack = * ec.currentContext->stack;
+    TObjectArray* messageArguments = (TObjectArray*) stack[--ec.stackTop];
     
     // These do not need to be hptr'ed
     TSymbolArray& literals   =  * ec.currentContext->method->literals;
@@ -593,17 +593,17 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 
 void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
 {
-    hptr<TObjectArray> stack  = newPointer(ec.currentContext->stack);
+    TObjectArray& stack = * ec.currentContext->stack;
     
     // Loading operand objects
-    hptr<TObject> rightObject = newPointer(stack[--ec.stackTop]);
-    hptr<TObject> leftObject  = newPointer(stack[--ec.stackTop]);
+    TObject* rightObject = stack[--ec.stackTop];
+    TObject* leftObject  = stack[--ec.stackTop];
     
     // If operands are both small integers, we need to handle it ourselves
     if (isSmallInteger(leftObject) && isSmallInteger(rightObject)) {
         // Loading actual operand values
-        int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject.rawptr()));
-        int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject.rawptr()));
+        int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
+        int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
         
         // Performing an operation
         switch (ec.instruction.low) {
@@ -631,9 +631,13 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
         
-        hptr<TObjectArray> messageArguments = newObject<TObjectArray>(2);
-        messageArguments[1] = rightObject;
-        messageArguments[0] = leftObject;
+        // Protecting pointers in case GC will occur
+        hptr<TObject> pRightObject = newPointer(rightObject);
+        hptr<TObject> pLeftObject  = newPointer(leftObject);
+        
+        hptr<TObjectArray> messageArguments = newObject<TObjectArray>(2, false);
+        messageArguments[1] = pRightObject;
+        messageArguments[0] = pLeftObject;
         
         TSymbol* messageSelector = (TSymbol*) globals.binaryMessages[ec.instruction.low];
         doSendMessage(ec, messageSelector, messageArguments);
