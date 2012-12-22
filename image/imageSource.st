@@ -785,7 +785,7 @@ main    | command x |
         StringTest       new runAll.
         ArrayTest        new runAll.
 
-        'Array with: 1' doIt printNl.
+        "'Array with: 1' doIt printNl."
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
