@@ -540,23 +540,26 @@ CLASS CompareTest Test
 
 METHOD CompareTest
 greater
-    [ 3 > 2 ] assert
+    [ 3 > 2  ] assertWithComment: 'int int'.
+    [ 3 > #2 ] assertWithComment: 'int symbol'.
 !
 
 METHOD CompareTest
 equal
-    [ 42 == 42 ] assert
+    [ 42 == 42 ] assertWithComment: '1'.
+    [ $x == $x ] assertWithComment: '2'.
+    [ $z  = $z ] assertWithComment: '3'.
 !
 
 METHOD CompareTest
 less
-    [ -1 < 0 ] assert
+    [ -1 < 0 ] assertWithComment: 'int int'.
+    [ #2 < 3 ] assertWithComment: 'symbol int'.
 !
 
 METHOD CompareTest
 nilIsNil
     [ nil isNil ] assert
-    
 !
 
 METHOD CompareTest
@@ -585,6 +588,17 @@ div
 METHOD SmallIntTest
 mul
     [ 21 * 2 ] assertEq: 42
+!
+
+METHOD SmallIntTest
+negative
+    [ -42 negative ] assert
+!
+
+METHOD SmallIntTest
+negated
+    [ -42 negated ] assertEq:  42 withComment: '1'.
+    [  42 negated ] assertEq: -42 withComment: '2'.
 !
 
 COMMENT              --------BranchTest----------
@@ -631,7 +645,13 @@ CLASS ClassTest Test
 
 METHOD ClassTest
 className
-    [ SmallInt printString ] assertEq: 'SmallInt'
+    [ SmallInt printString ] assertEq: 'SmallInt' withComment: '1'.
+    [ 'String' class printString ] assertEq: 'String' withComment: '2'.
+!
+
+METHOD ClassTest
+sendSuper
+    [ Array super printString ] assertEq: 'Collection'
 !
 
 COMMENT              --------MethodLookupTest----------
@@ -641,6 +661,12 @@ METHOD MethodLookupTest
 newline
     [Char   class methods keys includes: #newline] assertWithComment: 'Char'
     [String class methods keys includes: #newline] assertWithComment: 'String'
+!
+
+METHOD MethodLookupTest
+parentMethods
+    [Dictionary methods keys includes: #error: ] assertEq: false withComment: '1'
+    [Dictionary respondsTo: #error: ] assertWithComment: '2'
 !
 
 COMMENT              --------StringTest----------
@@ -701,6 +727,14 @@ reverse
     [ 'reverse' reverse ] assertEq: 'esrever'
 !
 
+METHOD StringTest
+size
+    [ 'helloworld' size ] assertEq: 10 withComment: '1'.
+    [ 'hello' + 'world'; size ] assertEq: 10 withComment: '2'.
+    [ 'looooooooooooooooooooooooooooooooooooooong' size ] assertEq: 42 withComment: '3'.
+    [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: '4'.
+!
+
 COMMENT              --------ArrayTest----------
 CLASS ArrayTest Test arrOfInts arrOfChars
 
@@ -731,6 +765,16 @@ atPut | tmpArr |
     [ tmpArr at: 6 ] assertEq: 37834.
 !
 
+COMMENT              --------GCTest----------
+CLASS GCTest Test
+
+METHOD GCTest
+copy |x|
+    x <- 'Hello world!'.
+    10000 times: [:ignore| x <- x copy ].
+    [ x ] assertEq: 'Hello world!'
+!
+
 METHOD Array
 replaceFrom: start to: stop with: replacement startingAt: repStart | base |
        <38 start stop replacement repStart self>.
@@ -756,22 +800,13 @@ main    | command x |
         "100 times: [ self printHierarchy: Array ].
         ^nil.
         
-        x <- 'Hello world!'.
-        x printNl.
-        100 times: [ x printNl ].
-        [ x <- x copy. x printNl. ].
-        x printNl.
-        
         ^nil.
         [ x ] assertEq: 'Hello world!' withComment: 'copy'.
         
         'String' class printNl.
 
         [ 1 ] assertEq: 1 withComment: 'test'.
-        [ 'helloworld' size ] assertEq: 10 withComment: 'len1'.
-        [ 'hello' + 'world'; size ] assertEq: 10 withComment: 'len2'.
-        [ 'looooooooooooooooooooooooooooooooooooooong' size ] assertEq: 42 withComment: 'len3'.
-        [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: 'len4'.
+
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2)."
         
@@ -784,8 +819,9 @@ main    | command x |
         MethodLookupTest new runAll.
         StringTest       new runAll.
         ArrayTest        new runAll.
-
-        'Array with: 1' doIt printNl.
+        GCTest           new runAll.
+        
+        "'Array with: 1' doIt printNl."
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
