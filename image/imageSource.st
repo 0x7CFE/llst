@@ -197,9 +197,12 @@ question: text	| answer |
 !
 METHOD Object
 error: str
-		" print the message "
+	" print the message "
+	'ERROR' printNl.
+	String newline print.
+	
 	str printNl.
-		" then halt "
+	" then halt "
 	<19>
 !
 METHOD Object
@@ -513,6 +516,35 @@ keys
     ^keys
 !
 
+CLASS TestProcess Process
+
+METHOD TestProcess
+execute | r |
+        r <- self doExecute: 0.
+        (r = 3) ifTrue: [
+                " Note: state field is filled in with arguments on error "
+                (state at: 1) print. ' (class ' print.
+                (state at: 1) class print. ') ' print.
+                'does not understand: ' print.  result printNl
+        ].
+        (r = 4) ifTrue: [ ^ result ]
+                ifFalse: [
+                            String newline print.
+                            'Backtrace:' printNl.
+                            context backtrace.
+                            String newline print.
+                            ^ nil
+                        ]
+!
+
+METHOD Context
+performTest: aMethod withArguments: a | proc |
+        self setup: aMethod withArguments: a.
+        proc <- TestProcess new.
+        proc context: self.
+        ^ proc execute
+!
+
 CLASS Test Class
 METHOD Test
 runAll |reservedNames|
@@ -525,7 +557,7 @@ runAll |reservedNames|
     self class methods
             do: [:m |
                     ( reservedNames includes: (m name) )
-                        ifFalse: [ Context new perform: m withArguments: (Array with: self) ]
+                        ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
 METHOD Test
@@ -592,13 +624,20 @@ mul
 
 METHOD SmallIntTest
 negative
-    [ -42 negative ] assert
+    [ -42 negative ] assertWithComment: '1'.
+    [  42 negative ] assertEq: false withComment: '2'.
 !
 
 METHOD SmallIntTest
 negated
     [ -42 negated ] assertEq:  42 withComment: '1'.
     [  42 negated ] assertEq: -42 withComment: '2'.
+!
+
+METHOD SmallIntTest
+quo
+    [ 5 / 2 ] assertEq: 2 withComment: '1'.
+    [ 200 / 1001 ] assertEq: 0 withComment: '2'.
 !
 
 COMMENT              --------BranchTest----------
