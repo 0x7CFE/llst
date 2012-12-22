@@ -464,8 +464,8 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
-    hptr<TObjectArray> args = newObject<TObjectArray>(ec.instruction.low);
-    TObjectArray& stack     = * ec.currentContext->stack;
+    hptr<TObjectArray> args  = newObject<TObjectArray>(ec.instruction.low);
+    TObjectArray& stack = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
     // from the top of the stack and creates new array with them
@@ -499,7 +499,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         if (receiverMethod == 0) {
             // Something goes really wrong. 
             // We could not continue the execution
-            fprintf(stderr, "Could not locate doesNotUnderstand:\n");
+            fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
             exit(1);
         }
         
@@ -509,7 +509,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         // We're replacing the original call arguments with custom one
         hptr<TObjectArray> errorArguments = newObject<TObjectArray>(2);
         
-        // Filling in the call context information
+        // Filling in the failed call context information
         errorArguments[0] = messageArguments[0]; // receiver object
         errorArguments[1] = failedSelector;      // message selector that failed
         
@@ -520,23 +520,45 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         // was the actual selector we wanted to call
     }
     
-    // TODO Optimize tail call
-    
     // Save stack and opcode pointers
     ec.storePointers();
     
     // Create a new context for the giving method and arguments
     hptr<TContext> newContext   = newObject<TContext>();
+    hptr<TObjectArray> newStack = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
+    hptr<TObjectArray> newTemps = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     
+    newContext->stack           = newStack;
+    newContext->temporaries     = newTemps;
     newContext->arguments       = messageArguments;
     newContext->method          = receiverMethod;
-    newContext->previousContext = ec.currentContext;
-    newContext->stack           = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize), false);
-    newContext->temporaries     = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize), false);
     newContext->stackTop        = newInteger(0);
     newContext->bytePointer     = newInteger(0);
     
-    // Replace current context with the new one
+    // Suppose that current send message operation is last operation in the current context. 
+    // If it is true then next instruction will be either stackReturn or blockReturn.
+    // 
+    // VM will switch to the newContext, perform it and then switch back to the current context
+    // for the single one return instruction. This is pretty dumb to load the whole context 
+    // just to exit it immediately. Therefore, we looking one instruction ahead to see if it is
+    // a return instruction. If it is, we may skip our context and set our previousContext as 
+    // previousContext for the newContext. In case of blockReturn it will be the previousContext
+    // of the wrapping method context.
+    
+    uint8_t nextInstruction = ec.currentContext->method->byteCodes->getByte(ec.bytePointer);
+    if (nextInstruction == (doSpecial * 16 + stackReturn)) {
+        // Optimizing stack return
+        newContext->previousContext = ec.currentContext->previousContext;
+    } else if (nextInstruction == (doSpecial * 16 + blockReturn) &&
+              (ec.currentContext->getClass() == globals.blockClass)) 
+    {
+        // Optimizing block return
+        newContext->previousContext = ec.currentContext.cast<TBlock>()->creatingContext->previousContext;
+    } else 
+        newContext->previousContext = ec.currentContext;
+    
+    // Replace current context with the new one. On the next iteration, 
+    // VM will start interpreting instructions from the new context.
     ec.currentContext = newContext;
     ec.loadPointers();
 }
@@ -571,17 +593,17 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 
 void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
 {
-    hptr<TObjectArray> stack  = newPointer(ec.currentContext->stack);
+    TObjectArray& stack = * ec.currentContext->stack;
     
     // Loading operand objects
-    hptr<TObject> rightObject = newPointer(stack[--ec.stackTop]);
-    hptr<TObject> leftObject  = newPointer(stack[--ec.stackTop]);
+    TObject* rightObject = stack[--ec.stackTop];
+    TObject* leftObject  = stack[--ec.stackTop];
     
     // If operands are both small integers, we need to handle it ourselves
     if (isSmallInteger(leftObject) && isSmallInteger(rightObject)) {
         // Loading actual operand values
-        int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject.rawptr()));
-        int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject.rawptr()));
+        int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
+        int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
         
         // Performing an operation
         switch (ec.instruction.low) {
@@ -609,9 +631,13 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
         
-        TObjectArray* messageArguments = newObject<TObjectArray>(2, false);
-        (*messageArguments)[1] = rightObject;
-        (*messageArguments)[0] = leftObject;
+        // Protecting pointers in case GC will occur
+        hptr<TObject> pRightObject = newPointer(rightObject);
+        hptr<TObject> pLeftObject  = newPointer(leftObject);
+        
+        hptr<TObjectArray> messageArguments = newObject<TObjectArray>(2, false);
+        messageArguments[1] = pRightObject;
+        messageArguments[0] = pLeftObject;
         
         TSymbol* messageSelector = (TSymbol*) globals.binaryMessages[ec.instruction.low];
         doSendMessage(ec, messageSelector, messageArguments);
@@ -659,6 +685,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TV
             ec.returnedValue = stack[--ec.stackTop];
             TBlock* contextAsBlock = ec.currentContext.cast<TBlock>();
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
+            
+            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+                process = popProcess();
+                process->context  = ec.currentContext;
+                process->result   = ec.returnedValue;
+                return returnReturned;
+            }
+            
             ec.loadPointers();
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
         } break;
@@ -814,9 +848,9 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             
             // Instantinating the object. Each object has size and class fields
             // which are not directly accessible in the managed code, so we need
-            // to add 2 to the size known to the object intself to get the real size:
+            // to add 2 to the size known to the object itself to get the real size:
             
-            return newOrdinaryObject(klass, (fieldsCount + 2) * sizeof(TObject*)); 
+            return newOrdinaryObject(klass, sizeof(TObject) + fieldsCount * sizeof(TObject*)); 
         } break;
         
         case blockInvoke: { // 8
