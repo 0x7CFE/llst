@@ -189,7 +189,7 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(uint8_t opcode, TVMExecutionContext& ec, bool* failed);
+    TObject* doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool* failed);
     
     TExecuteResult doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec);
     
@@ -221,7 +221,19 @@ private:
     
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
+    std::list<TObject*> rootStack;
 public:
+    void pushProcess(TProcess* process) {
+        rootStack.push_back(process);
+        m_memoryManager->registerExternalPointer(& rootStack.back());
+    }
+    
+    TProcess* popProcess() {
+        m_memoryManager->releaseExternalPointer(& rootStack.back());
+        TProcess* process = (TProcess*) rootStack.back();
+        rootStack.pop_back();
+        return process; 
+    }
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
         : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
