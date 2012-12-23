@@ -109,8 +109,6 @@ int main(int argc, char **argv) {
     // TODO load value from 
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42, false);
-
-    vm.pushProcess(initProcess);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
@@ -119,6 +117,10 @@ int main(int argc, char **argv) {
     switch (result) {
         case SmalltalkVM::returnError:
             printf("User defined return\n");
+            break;
+            
+        case SmalltalkVM::returnBadMethod:
+            printf("Could not lookup method\n");
             break;
             
         case SmalltalkVM::returnReturned:
