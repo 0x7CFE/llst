@@ -53,7 +53,7 @@ void printString(TObjectArray* string) {
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(65536);
+    memoryManager->initializeHeap(65536 * 32);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)
