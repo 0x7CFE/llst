@@ -138,6 +138,11 @@ int main(int argc, char **argv) {
     }
 #endif    
 
+    TMemoryManagerInfo info = memoryManager->getStat();
+    
+    int averageAllocs = info.gcCount ? (int) info.allocsBeyondGC / info.gcCount : info.allocsBeyondGC;
+    printf("\nGC count: %d, average allocations per gc: %d", info.gcCount, averageAllocs);
+    
     vm.printVMStat();
 
     return 0;

@@ -318,9 +318,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 
                 // Checking whether we need to register current object slot in the GC
                 checkRoot(value, oldValue, objectSlot);
-//                 if (checkRoot(value, oldValue, objectSlot))
-//                     printf("Root list altered for slot %p and value %p (old %p)\n",
-//                             objectSlot, value, oldValue);
                 
                 // Performing an assignment
                 instanceVariables[ec.instruction.low] = value;
@@ -338,7 +335,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 uint8_t primitiveNumber = byteCodes[ec.bytePointer++];
                 bool failed = false;
                 
-                ec.returnedValue = doExecutePrimitive(primitiveNumber, currentProcess, ec, &failed);
+                ec.returnedValue = doExecutePrimitive(primitiveNumber, ec, &failed);
                 
                 //If primitive failed during execution we should continue execution in the current method
                 if (failed) {
@@ -369,7 +366,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                         // execution context and push the result onto the previous context's stack
                         ec.currentContext = ec.currentContext->previousContext;
                         
-                        if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+                        if (ec.currentContext.rawptr() == globals.nilObject) {
                             currentProcess->context  = ec.currentContext;
                             currentProcess->result   = ec.returnedValue;
                             return returnReturned;
@@ -653,7 +650,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TV
         case selfReturn: {
             ec.returnedValue  = arguments[0]; // self
             ec.currentContext = ec.currentContext->previousContext;
-            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+            if (ec.currentContext.rawptr() == globals.nilObject) {
                 process->context  = ec.currentContext;
                 process->result   = ec.returnedValue;
                 return returnReturned;
@@ -667,7 +664,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TV
         {
             ec.returnedValue  = stack[--ec.stackTop];
             ec.currentContext = ec.currentContext->previousContext;
-            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+            if (ec.currentContext.rawptr() == globals.nilObject) {
                 process->context  = ec.currentContext;
                 process->result   = ec.returnedValue;
                 return returnReturned;
@@ -682,7 +679,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TV
             TBlock* contextAsBlock = ec.currentContext.cast<TBlock>();
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
             
-            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+            if (ec.currentContext.rawptr() == globals.nilObject) {
                 process->context  = ec.currentContext;
                 process->result   = ec.returnedValue;
                 return returnReturned;
@@ -775,7 +772,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
     }
 }
 
-TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool* failed)
+TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, TVMExecutionContext& ec, bool* failed)
 {
     TObjectArray& stack = *ec.currentContext->stack;
     
@@ -822,7 +819,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             return reinterpret_cast<TObject*>(newInteger(objectSize));
         } break;
         
-        case 6: { // start new process
+        case startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
             uint32_t  ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--ec.stackTop];
@@ -914,8 +911,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
         
         // TODO case 18 // turn on debugging
         
-        case 19: { // error
-            process->context = ec.currentContext;
+        case throwError: { // 19
+            
         } break;
         
         case allocateByteArray: { // 20
@@ -1179,7 +1176,6 @@ void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
     //printf("VM: GC had just occured. Flushing the method cache.\n");
-    m_gcCount++;
     flushMethodCache();
 }
 
@@ -1235,6 +1231,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("\nGC count: %d, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
-        m_gcCount, m_cacheHits, m_cacheMisses, hitRatio);
+    printf("\nCache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+        m_cacheHits, m_cacheMisses, hitRatio);
 }

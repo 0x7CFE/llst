@@ -81,7 +81,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
         m_activeHeapPointer -= requestedSize;
         void* result = m_activeHeapPointer;
 
-        if (!gcOccured)
+        if (gcOccured && !*gcOccured)
             m_allocsBeyondGC++;
         return result;
     }
@@ -340,4 +340,11 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
             return;
         }
     }
+}
+
+TMemoryManagerInfo BakerMemoryManager::getStat() {
+    TMemoryManagerInfo info;
+    info.allocsBeyondGC = m_allocsBeyondGC;
+    info.gcCount        = m_gcCount;
+    return info;
 }
