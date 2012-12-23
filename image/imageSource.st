@@ -511,6 +511,21 @@ assert
     self assertWithComment: nil.
 !
 
+METHOD Block
+method
+    ^method
+!
+
+METHOD Block
+creatingContext
+    ^creatingContext
+!
+
+METHOD Context
+method
+    ^method
+!
+
 METHOD Dictionary
 keys
     ^keys
@@ -567,7 +582,7 @@ init
 
 COMMENT FIXME make tests be singletons 
 
-COMMENT              --------CompareTest----------
+COMMENT                                                                                                --------CompareTest----------
 CLASS CompareTest Test
 
 METHOD CompareTest
@@ -600,7 +615,7 @@ nilEqNil
 !
 
 
-COMMENT              --------SmallIntTest----------
+COMMENT                                                                                                 --------SmallIntTest----------
 CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
@@ -640,7 +655,7 @@ quo
     [ 200 / 1001 ] assertEq: 0 withComment: '2'.
 !
 
-COMMENT              --------BranchTest----------
+COMMENT                                                                                                 --------BranchTest----------
 CLASS BranchTest Test
 
 METHOD BranchTest
@@ -679,7 +694,7 @@ sum |result|
     [ result ] assertEq: 5050
 !
 
-COMMENT              --------ClassTest----------
+COMMENT                                                                                                ----------ClassTest--------
 CLASS ClassTest Test
 
 METHOD ClassTest
@@ -693,7 +708,7 @@ sendSuper
     [ Array super printString ] assertEq: 'Collection'
 !
 
-COMMENT              --------MethodLookupTest----------
+COMMENT                                                                                                --------MethodLookupTest----
 CLASS MethodLookupTest Test
 
 METHOD MethodLookupTest
@@ -708,7 +723,7 @@ parentMethods
     [Dictionary respondsTo: #error: ] assertWithComment: '2'
 !
 
-COMMENT              --------StringTest----------
+COMMENT                                                                                                -----------StringTest--------
 CLASS StringTest Test
 
 METHOD StringTest
@@ -774,7 +789,7 @@ size
     [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: '4'.
 !
 
-COMMENT              --------ArrayTest----------
+COMMENT                                                                                               --------ArrayTest----------
 CLASS ArrayTest Test arrOfInts arrOfChars
 
 METHOD ArrayTest
@@ -804,7 +819,7 @@ atPut | tmpArr |
     [ tmpArr at: 6 ] assertEq: 37834.
 !
 
-COMMENT              --------GCTest----------
+COMMENT                                                                                                 ----------GCTest------------
 CLASS GCTest Test
 
 METHOD GCTest
@@ -812,6 +827,15 @@ copy |x|
     x <- 'Hello world!'.
     10000 times: [:ignore| x <- x copy ].
     [ x ] assertEq: 'Hello world!'
+!
+
+COMMENT                                                                                                 --------ContextTest----------
+CLASS ContextTest Test previousContext
+
+METHOD ContextTest
+backtrace
+    [ [] method name ] assertEq: 'backtrace' withComment: '1'.
+    [ [] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
 !
 
 METHOD Array
@@ -859,6 +883,7 @@ main    | command x |
         StringTest       new runAll.
         ArrayTest        new runAll.
         GCTest           new runAll.
+        ContextTest      new runAll.
         
         "'Array with: 1' doIt printNl."
         
