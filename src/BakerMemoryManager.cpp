@@ -64,17 +64,18 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     return true;
 }
 
-void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
+void* BakerMemoryManager::allocate(size_t requestedSize)
 {
-    if (gcOccured)
-        *gcOccured = false;
+    bool gcOccured = false;
 
     size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
+            
             collectGarbage();
-            if (gcOccured)
-                *gcOccured = true;
+            notifyMemoryUsers();
+            gcOccured = true;
+            
             continue;
         }
 
@@ -87,7 +88,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
     }
 
     // TODO Grow the heap if object still not fits
-
+    
     fprintf(stderr, "Could not allocate %d bytes in heap\n", requestedSize);
     return 0;
 }
@@ -340,4 +341,18 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
             return;
         }
     }
+}
+
+void BakerMemoryManager::addMemoryUser(IMemoryManagerUser* user) {
+    m_memoryUsers.push_back(user);
+}
+
+void BakerMemoryManager::notifyMemoryUsers() {
+    for(TMemoryUserIterator user = m_memoryUsers.begin(); user != m_memoryUsers.end(); user++)
+        (*user)->onCollectionOccured();
+}
+
+void BakerMemoryManager::printStat() {
+    int averageAllocs = m_gcCount ? (int) m_allocsBeyondGC / m_gcCount : m_allocsBeyondGC;
+    printf("\nGC count: %d, average allocations per gc: %d", m_gcCount, averageAllocs);
 }

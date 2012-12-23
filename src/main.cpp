@@ -138,7 +138,8 @@ int main(int argc, char **argv) {
     }
 #endif    
 
+    memoryManager->printStat();
     vm.printVMStat();
-
+    
     return 0;
 }

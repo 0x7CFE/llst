@@ -9,7 +9,7 @@
 
 #include <stdio.h>
 
-class SmalltalkVM {
+class SmalltalkVM : public IMemoryManagerUser {
 public:
     enum TExecuteResult {
         returnError = 2,
@@ -109,8 +109,10 @@ private:
         getClass          = 2,
         getSize           = 4,
         inAtPut           = 5,
+        startNewProcess   = 6,
         allocateObject    = 7,
         blockInvoke       = 8,
+        throwError        = 19,
         allocateByteArray = 20,
         cloneByteObject   = 23,
         integerNew        = 32,
@@ -161,7 +163,6 @@ private:
     TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
-    uint32_t m_gcCount;
 
     bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
     
@@ -188,7 +189,7 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool* failed);
+    TObject* doExecutePrimitive(uint8_t opcode, TVMExecutionContext& ec, bool* failed);
     
     TExecuteResult doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec);
     
@@ -206,8 +207,7 @@ private:
     Image*          m_image;
     IMemoryManager* m_memoryManager;
     
-    bool m_lastGCOccured;
-    void onCollectionOccured();
+    virtual void onCollectionOccured();
     
     TByteObject* newBinaryObject(TClass* klass, size_t dataSize);
     TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
@@ -223,10 +223,11 @@ private:
 public:
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
-        : m_cacheHits(0), m_cacheMisses(0), m_gcCount(0), m_image(image), 
-        m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
+        : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
+        m_memoryManager(memoryManager) //, ec(memoryManager) 
     { 
         flushMethodCache();
+        memoryManager->addMemoryUser(this);
     }
     
     TExecuteResult execute(TProcess* process, uint32_t ticks);
