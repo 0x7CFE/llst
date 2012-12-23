@@ -526,6 +526,11 @@ method
     ^method
 !
 
+METHOD Context
+arguments
+    ^arguments
+!
+
 METHOD Dictionary
 keys
     ^keys
@@ -594,8 +599,7 @@ greater
 METHOD CompareTest
 equal
     [ 42 == 42 ] assertWithComment: '1'.
-    [ $x == $x ] assertWithComment: '2'.
-    [ $z  = $z ] assertWithComment: '3'.
+    [ $z  = $z ] assertWithComment: '2'.
 !
 
 METHOD CompareTest
@@ -830,13 +834,103 @@ copy |x|
 !
 
 COMMENT                                                                                                 --------ContextTest----------
-CLASS ContextTest Test previousContext
+CLASS ContextTest Test
 
 METHOD ContextTest
 backtrace
     [ [] method name ] assertEq: 'backtrace' withComment: '1'.
     [ [] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
 !
+
+METHOD ContextTest
+instanceClass
+    [ [] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
+!
+
+COMMENT                                                                                                 -------PrimitiveTest----------
+CLASS PrimitiveTest Test
+
+METHOD PrimitiveTest
+SmallIntAdd
+    [ <10 3 5> ] assertEq: 8.
+!
+
+METHOD PrimitiveTest
+SmallIntDiv
+    [ <11 51 5> ] assertEq: 10.
+!
+
+METHOD PrimitiveTest
+SmallIntMod
+    [ <12 8 3> ] assertEq: 2.
+!
+
+METHOD PrimitiveTest
+SmallIntLess
+    [ <13 -1 0> ] assert.
+!
+
+METHOD PrimitiveTest
+SmallIntEqual
+    [ <14 30 30> ] assert.
+!
+
+METHOD PrimitiveTest
+SmallIntMul
+    [ <15 8 6> ] assertEq: 48.
+!
+
+METHOD PrimitiveTest
+SmallIntSub
+    [ <16 3 5> ] assertEq: -2.
+!
+
+METHOD PrimitiveTest
+smallIntBitOr
+    [ <36 12 6> ] assertEq: 14.
+!
+
+METHOD PrimitiveTest
+smallIntBitAnd
+    [ <37 5 12> ] assertEq: 4.
+!
+
+METHOD PrimitiveTest
+smallIntShiftLeft
+    [ <39 5 3> ] assertEq: 40.
+!
+
+METHOD PrimitiveTest
+smallIntShiftRight
+    [ <39 234 -4> ] assertEq: 14.
+!
+
+METHOD PrimitiveTest
+objectSize
+    [ <4 1> ] assertEq: 0 withComment: 'SmallInt'.
+    [ <4 Char> ] assertEq: 7 withComment: 'Char'.
+    [ <4 Object> ] assertEq: 6 withComment: 'Object'.
+!
+
+METHOD PrimitiveTest
+objectsAreEqual |x|
+    x <- Array with: 'a' with: 42.
+    [ <1 x x> ] assertWithComment: '1'.
+    
+    [ <1 $z $z> ] assertEq: false withComment: '2'.
+!
+
+METHOD PrimitiveTest
+objectClass
+    [ [[[<2 1>] value] value] value printString ] assertEq: 'SmallInt' withComment: 'SmallInt'.
+    [ [[[<2 Object>] value] value] value printString ] assertEq: 'MetaObject' withComment: 'Object'.
+!
+
+METHOD PrimitiveTest
+bulkReplace
+    [ <38 1 7 'Hello W' 1 'hello world!'> ] assertEq: 'Hello World!'.
+!
+
 
 METHOD Array
 replaceFrom: start to: stop with: replacement startingAt: repStart | base |
@@ -884,6 +978,7 @@ main    | command x |
         ArrayTest        new runAll.
         GCTest           new runAll.
         ContextTest      new runAll.
+        PrimitiveTest    new runAll.
         
         "'Array with: 1' doIt printNl."
         
