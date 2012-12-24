@@ -677,7 +677,22 @@ ifFalse |x|
     [ x ] assertEq: 521
 !
 
-COMMENT              --------LoopTest----------
+CLASS MyArray Array
+METHOD MyArray
+location: value | low high mid |
+        low <- 1.
+        high <- self size + 1.
+        [ low < high ]
+            whileTrue: [
+                mid <- (low + high) quo: 2.
+                (self at: mid) < value
+                        ifTrue: [ low <- mid + 1 ]
+                        ifFalse: [ high <- mid ] 
+        ].
+        ^ low
+!
+
+COMMENT                                                                                                 --------LoopTest----------
 CLASS LoopTest Test
 
 METHOD LoopTest
@@ -696,6 +711,13 @@ sum |result|
     1 to: 100 do: [:i| result <- result + i ]
     
     [ result ] assertEq: 5050
+!
+
+METHOD LoopTest
+symbolStressTest |x|
+    x <- MyArray new: 100.
+    100 times: [:idx| x at: idx put: (idx asString asSymbol) ]. "FIXME speedup"
+    [ x location: #0; ] assertEq: 0.
 !
 
 COMMENT                                                                                                ----------ClassTest--------
@@ -948,22 +970,50 @@ printHierarchy: aClass | class |
     [ class isNil ] whileFalse: [ class printNl. class <- class parent ] 
 !
 
+CLASS MyDict Dictionary
+METHOD MyDict
+at: key put: value | position |
+    '"' print. value name print. '"' printNl.
+        position <- keys location: key.
+        (position <= keys size and: [ key = (keys at: position)])
+                ifTrue: [ values at: position put: value ]
+                ifFalse: [ keys <- keys insert: key at: position.
+                        values <- values insert: value at: position ].
+        ^ value
+!
+
 METHOD Undefined
-main    | command x |
+testArrayAllMethods |allMethods|
+    allMethods <- MyDict new.
+    
+    Object methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from = to ~~"
+    Magnitude methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from <= to min:"
+    "Collection methods binaryDo: [ :n :m | allMethods at: n put: m ]."
+    "Array methods binaryDo: [ :n :m | allMethods at: n put: m ]."
+!
+
+METHOD Undefined
+main    | command x y allMethods |
         " initialize classes "
         
         Char initialize.
         
+        "nil testArrayAllMethods."
+        
+        allMethods <- Dictionary new.
+    
+        Object methods binaryDo: [ :n :m | allMethods at: n put: m ].
+        
+        y <- Magnitude methods at: ('>' asSymbol). "The problem is not in #> "
+        x <- Magnitude methods at: ('min:' asSymbol). "but in the dictionary size!"
+        
+        allMethods at: (y name) put: y.
+        allMethods at: (x name) put: x. "It fails on the 28-th element"
+        
+        
+        ^nil.
+        
         "100 times: [ self printHierarchy: Array ].
-        ^nil.
-        
-        ^nil.
-        [ x ] assertEq: 'Hello world!' withComment: 'copy'.
-        
-        'String' class printNl.
-
-        [ 1 ] assertEq: 1 withComment: 'test'.
-
         
         (Array with: 1 with: 2) + (Array with: 1 with: 2)."
         
