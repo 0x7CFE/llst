@@ -566,7 +566,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     TObjectArray* messageArguments = (TObjectArray*) stack[--ec.stackTop];
     
     // These do not need to be hptr'ed
-    TSymbolArray& literals   =  * ec.currentContext->method->literals;
+    TSymbolArray& literals   = * ec.currentContext->method->literals;
     TSymbol* messageSelector = literals[ec.instruction.low];
     
     doSendMessage(ec, messageSelector, messageArguments);
@@ -628,7 +628,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
         
-        // Protecting pointers in case GC will occur
+        // Protecting pointers in case if GC occurs
         hptr<TObject> pRightObject = newPointer(rightObject);
         hptr<TObject> pLeftObject  = newPointer(leftObject);
         
@@ -643,10 +643,10 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
 
 SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec)
 {
-    TByteObject&  byteCodes         = * ec.currentContext->method->byteCodes;
-    TObjectArray& stack             = * ec.currentContext->stack;
-    TObjectArray& arguments         = * ec.currentContext->arguments;
-    TSymbolArray& literals          = * ec.currentContext->method->literals;
+    TByteObject&  byteCodes  = * ec.currentContext->method->byteCodes;
+    TObjectArray& stack      = * ec.currentContext->stack;
+    TObjectArray& arguments  = * ec.currentContext->arguments;
+    TSymbolArray& literals   = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
         case selfReturn: {
@@ -1079,8 +1079,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             TObject* destinationStartOffset = stack[--ec.stackTop];
             
             bool isSucceeded = doBulkReplace( destination, destinationStartOffset, 
-                                             destinationStopOffset, source, 
-                                             sourceStartOffset );
+                                              destinationStopOffset, source, 
+                                              sourceStartOffset );
             
             if (! isSucceeded) {
                 *failed = true;
