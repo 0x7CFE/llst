@@ -5,9 +5,9 @@ int TDictionary::compareSymbols(TSymbol* left, TSymbol* right)
 {
     // This function compares two byte objects depending on their lenght and contents
    
-    uint32_t leftSize = left->getSize();
+    uint32_t leftSize  = left->getSize();
     uint32_t rightSize = right->getSize();
-    uint32_t minSize = (leftSize < rightSize) ? leftSize : rightSize;
+    uint32_t minSize   = (leftSize < rightSize) ? leftSize : rightSize;
     
     // Comparing the byte strings byte by byte
     int result = memcmp(left->getBytes(), right->getBytes(), minSize);
@@ -24,11 +24,11 @@ int TDictionary::compareSymbols(TSymbol* left, const char* right)
     // This function compares byte object and 
     // null terminated string depending on their lenght and contents
     
-    uint32_t leftSize = left->getSize();
-    uint32_t rightSize = strlen(right);
-    uint32_t minSize = (leftSize < rightSize) ? leftSize : rightSize;
+    uint32_t leftSize   = left->getSize();
+    uint32_t rightSize  = strlen(right);
+    uint32_t minSize    = (leftSize < rightSize) ? leftSize : rightSize;
     
-    uint8_t* leftBytes = left->getBytes();
+    uint8_t* leftBytes  = left->getBytes();
     uint8_t* rightBytes = (uint8_t*) right;
     
     // Comparing the byte strings byte by byte

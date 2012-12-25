@@ -81,7 +81,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
         m_activeHeapPointer -= requestedSize;
         void* result = m_activeHeapPointer;
 
-        if (!gcOccured)
+        if (gcOccured && !*gcOccured)
             m_allocsBeyondGC++;
         return result;
     }
@@ -296,7 +296,7 @@ void BakerMemoryManager::collectGarbage()
         **iExternalPointer = moveObject(**iExternalPointer);
     }
 
-    memset(m_inactiveHeapBase, 0, m_heapSize / 2);
+//     memset(m_inactiveHeapBase, 0, m_heapSize / 2);
     
 //     printf("After collection: heap size %d, used %d, free %d\n",
 //             m_heapSize / 2,
@@ -340,4 +340,11 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
             return;
         }
     }
+}
+
+TMemoryManagerInfo BakerMemoryManager::getStat() {
+    TMemoryManagerInfo info;
+    info.allocsBeyondGC = m_allocsBeyondGC;
+    info.gcCount        = m_gcCount;
+    return info;
 }

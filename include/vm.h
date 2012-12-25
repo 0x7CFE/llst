@@ -109,8 +109,10 @@ private:
         getClass          = 2,
         getSize           = 4,
         inAtPut           = 5,
+        startNewProcess   = 6,
         allocateObject    = 7,
         blockInvoke       = 8,
+        throwError        = 19,
         allocateByteArray = 20,
         cloneByteObject   = 23,
         integerNew        = 32,
@@ -161,7 +163,6 @@ private:
     TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
-    uint32_t m_gcCount;
 
     bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
     
@@ -235,7 +236,7 @@ public:
     }
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
-        : m_cacheHits(0), m_cacheMisses(0), m_gcCount(0), m_image(image), 
+        : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
     { 
         flushMethodCache();

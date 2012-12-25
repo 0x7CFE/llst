@@ -319,9 +319,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 
                 // Checking whether we need to register current object slot in the GC
                 checkRoot(value, oldValue, objectSlot);
-//                 if (checkRoot(value, oldValue, objectSlot))
-//                     printf("Root list altered for slot %p and value %p (old %p)\n",
-//                             objectSlot, value, oldValue);
                 
                 // Performing an assignment
                 instanceVariables[ec.instruction.low] = value;
@@ -353,6 +350,11 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 // 34 - flush method cache    TODO
                         
                 switch (primitiveNumber) {
+                    case 255:
+                        // Debug break
+                        // Leave the context alone
+                        break;
+                    
                     case 19:
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
@@ -370,7 +372,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                         // execution context and push the result onto the previous context's stack
                         ec.currentContext = ec.currentContext->previousContext;
                         
-                        if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+                        if (ec.currentContext.rawptr() == globals.nilObject) {
                             currentProcess = popProcess();
                             currentProcess->context  = ec.currentContext;
                             currentProcess->result   = ec.returnedValue;
@@ -569,7 +571,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
     TObjectArray* messageArguments = (TObjectArray*) stack[--ec.stackTop];
     
     // These do not need to be hptr'ed
-    TSymbolArray& literals   =  * ec.currentContext->method->literals;
+    TSymbolArray& literals   = * ec.currentContext->method->literals;
     TSymbol* messageSelector = literals[ec.instruction.low];
     
     doSendMessage(ec, messageSelector, messageArguments);
@@ -631,7 +633,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
         
-        // Protecting pointers in case GC will occur
+        // Protecting pointers in case if GC occurs
         hptr<TObject> pRightObject = newPointer(rightObject);
         hptr<TObject> pLeftObject  = newPointer(leftObject);
         
@@ -646,16 +648,16 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
 
 SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec)
 {
-    TByteObject&  byteCodes         = * ec.currentContext->method->byteCodes;
-    TObjectArray& stack             = * ec.currentContext->stack;
-    TObjectArray& arguments         = * ec.currentContext->arguments;
-    TSymbolArray& literals          = * ec.currentContext->method->literals;
+    TByteObject&  byteCodes  = * ec.currentContext->method->byteCodes;
+    TObjectArray& stack      = * ec.currentContext->stack;
+    TObjectArray& arguments  = * ec.currentContext->arguments;
+    TSymbolArray& literals   = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
         case selfReturn: {
             ec.returnedValue  = arguments[0]; // self
             ec.currentContext = ec.currentContext->previousContext;
-            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+            if (ec.currentContext.rawptr() == globals.nilObject) {
                 process = popProcess();
                 process->context  = ec.currentContext;
                 process->result   = ec.returnedValue;
@@ -670,7 +672,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TV
         {
             ec.returnedValue  = stack[--ec.stackTop];
             ec.currentContext = ec.currentContext->previousContext;
-            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+            if (ec.currentContext.rawptr() == globals.nilObject) {
                 process = popProcess();
                 process->context  = ec.currentContext;
                 process->result   = ec.returnedValue;
@@ -686,7 +688,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doDoSpecial(hptr<TProcess>& process, TV
             TBlock* contextAsBlock = ec.currentContext.cast<TBlock>();
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
             
-            if (ec.currentContext.rawptr() == 0 || ec.currentContext.rawptr() == globals.nilObject) {
+            if (ec.currentContext.rawptr() == globals.nilObject) {
                 process = popProcess();
                 process->context  = ec.currentContext;
                 process->result   = ec.returnedValue;
@@ -789,6 +791,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
         *failed = false;
     
     switch(opcode) {
+        case 255: 
+            // Debug trap
+            printf("Debug trap\n");
+            break;
+        
         case objectsAreEqual: { // 1
             TObject* arg2 = stack[--ec.stackTop];
             TObject* arg1 = stack[--ec.stackTop];
@@ -828,7 +835,7 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             return reinterpret_cast<TObject*>(newInteger(objectSize));
         } break;
         
-        case 6: { // start new process
+        case startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
             uint32_t  ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--ec.stackTop];
@@ -921,8 +928,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
         
         // TODO case 18 // turn on debugging
         
-        case 19: { // error
-            process = (TProcess*) popProcess(); 
+        case throwError: { // 19
+            process = popProcess(); 
             process->context = ec.currentContext;
         } break;
         
@@ -1082,8 +1089,8 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             TObject* destinationStartOffset = stack[--ec.stackTop];
             
             bool isSucceeded = doBulkReplace( destination, destinationStartOffset, 
-                                             destinationStopOffset, source, 
-                                             sourceStartOffset );
+                                              destinationStopOffset, source, 
+                                              sourceStartOffset );
             
             if (! isSucceeded) {
                 *failed = true;
@@ -1187,7 +1194,6 @@ void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
     //printf("VM: GC had just occured. Flushing the method cache.\n");
-    m_gcCount++;
     flushMethodCache();
 }
 
@@ -1216,10 +1222,14 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {
+        // Interpreting pointer array as raw byte sequence
         uint8_t* sourceBytes      = static_cast<TByteObject*>(source)->getBytes();
         uint8_t* destinationBytes = static_cast<TByteObject*>(destination)->getBytes();
         
-        memcpy( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
+        // Primitive may be called on the same object, so memory overlapping may occure.
+        // memmove() works much like the ordinary memcpy() except that it correctly 
+        // handles the case with overlapping memory areas
+        memmove( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
         return true;
     }
     
@@ -1229,11 +1239,13 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     
     if ( ! source->isBinary() && ! destination->isBinary() ) {
-        // Interpreting pointer array as raw byte sequence
-        uint8_t* sourceFields      = reinterpret_cast<uint8_t*>(source->getFields());
-        uint8_t* destinationFields = reinterpret_cast<uint8_t*>(destination->getFields());
+        TObject** sourceFields      = source->getFields();
+        TObject** destinationFields = destination->getFields();
         
-        memcpy( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*));
+        // Primitive may be called on the same object, so memory overlapping may occure.
+        // memmove() works much like the ordinary memcpy() except that it correctly 
+        // handles the case with overlapping memory areas
+        memmove( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*) );
         return true;
     }
     
@@ -1243,6 +1255,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("\nGC count: %d, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
-        m_gcCount, m_cacheHits, m_cacheMisses, hitRatio);
+    printf("\nCache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+        m_cacheHits, m_cacheMisses, hitRatio);
 }

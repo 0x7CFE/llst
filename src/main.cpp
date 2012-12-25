@@ -53,7 +53,7 @@ void printString(TObjectArray* string) {
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(65536);
+    memoryManager->initializeHeap(65536 * 32);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
     // TODO load value from 
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42, false);
-
+    
     vm.pushProcess(initProcess);
     
     // And starting the image execution!
@@ -119,6 +119,10 @@ int main(int argc, char **argv) {
     switch (result) {
         case SmalltalkVM::returnError:
             printf("User defined return\n");
+            break;
+            
+        case SmalltalkVM::returnBadMethod:
+            printf("Could not lookup method\n");
             break;
             
         case SmalltalkVM::returnReturned:
@@ -136,6 +140,11 @@ int main(int argc, char **argv) {
     }
 #endif    
 
+    TMemoryManagerInfo info = memoryManager->getStat();
+    
+    int averageAllocs = info.gcCount ? (int) info.allocsBeyondGC / info.gcCount : info.allocsBeyondGC;
+    printf("\nGC count: %d, average allocations per gc: %d", info.gcCount, averageAllocs);
+    
     vm.printVMStat();
 
     return 0;

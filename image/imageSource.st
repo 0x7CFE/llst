@@ -197,9 +197,12 @@ question: text	| answer |
 !
 METHOD Object
 error: str
-		" print the message "
+	" print the message "
+	'ERROR' printNl.
+	String newline print.
+	
 	str printNl.
-		" then halt "
+	" then halt "
 	<19>
 !
 METHOD Object
@@ -508,9 +511,58 @@ assert
     self assertWithComment: nil.
 !
 
+METHOD Block
+method
+    ^method
+!
+
+METHOD Block
+creatingContext
+    ^creatingContext
+!
+
+METHOD Context
+method
+    ^method
+!
+
+METHOD Context
+arguments
+    ^arguments
+!
+
 METHOD Dictionary
 keys
     ^keys
+!
+
+CLASS TestProcess Process
+
+METHOD TestProcess
+execute | r |
+        r <- self doExecute: 0.
+        (r = 3) ifTrue: [
+                " Note: state field is filled in with arguments on error "
+                (state at: 1) print. ' (class ' print.
+                (state at: 1) class print. ') ' print.
+                'does not understand: ' print.  result printNl
+        ].
+        (r = 4) ifTrue: [ ^ result ]
+                ifFalse: [
+                            String newline print.
+                            'Backtrace:' printNl.
+                            context backtrace.
+                            String newline print.
+                            ^ nil
+                        ]
+!
+
+METHOD Context
+performTest: aMethod withArguments: a | proc |
+        self setup: aMethod withArguments: a.
+        proc <- TestProcess new.
+        proc context: self.
+        ^ proc execute
 !
 
 CLASS Test Class
@@ -525,7 +577,7 @@ runAll |reservedNames|
     self class methods
             do: [:m |
                     ( reservedNames includes: (m name) )
-                        ifFalse: [ Context new perform: m withArguments: (Array with: self) ]
+                        ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
 METHOD Test
@@ -535,28 +587,30 @@ init
 
 COMMENT FIXME make tests be singletons 
 
-COMMENT              --------CompareTest----------
+COMMENT                                                                                                --------CompareTest----------
 CLASS CompareTest Test
 
 METHOD CompareTest
 greater
-    [ 3 > 2 ] assert
+    [ 3 > 2  ] assertWithComment: 'int int'.
+    [ 3 > #2 ] assertWithComment: 'int symbol'.
 !
 
 METHOD CompareTest
 equal
-    [ 42 == 42 ] assert
+    [ 42 == 42 ] assertWithComment: '1'.
+    [ $z  = $z ] assertWithComment: '2'.
 !
 
 METHOD CompareTest
 less
-    [ -1 < 0 ] assert
+    [ -1 < 0 ] assertWithComment: 'int int'.
+    [ #2 < 3 ] assertWithComment: 'symbol int'.
 !
 
 METHOD CompareTest
 nilIsNil
     [ nil isNil ] assert
-    
 !
 
 METHOD CompareTest
@@ -565,7 +619,7 @@ nilEqNil
 !
 
 
-COMMENT              --------SmallIntTest----------
+COMMENT                                                                                                 --------SmallIntTest----------
 CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
@@ -587,7 +641,25 @@ mul
     [ 21 * 2 ] assertEq: 42
 !
 
-COMMENT              --------BranchTest----------
+METHOD SmallIntTest
+negative
+    [ -42 negative ] assertWithComment: '1'.
+    [  42 negative ] assertEq: false withComment: '2'.
+!
+
+METHOD SmallIntTest
+negated
+    [ -42 negated ] assertEq:  42 withComment: '1'.
+    [  42 negated ] assertEq: -42 withComment: '2'.
+!
+
+METHOD SmallIntTest
+quo
+    [ 5 / 2 ] assertEq: 2 withComment: '1'.
+    [ 200 / 1001 ] assertEq: 0 withComment: '2'.
+!
+
+COMMENT                                                                                                 --------BranchTest----------
 CLASS BranchTest Test
 
 METHOD BranchTest
@@ -605,7 +677,22 @@ ifFalse |x|
     [ x ] assertEq: 521
 !
 
-COMMENT              --------LoopTest----------
+CLASS MyArray Array
+METHOD MyArray
+location: value | low high mid |
+        low <- 1.
+        high <- self size + 1.
+        [ low < high ]
+            whileTrue: [
+                mid <- (low + high) quo: 2.
+                (self at: mid) < value
+                        ifTrue: [ low <- mid + 1 ]
+                        ifFalse: [ high <- mid ] 
+        ].
+        ^ low
+!
+
+COMMENT                                                                                                 --------LoopTest----------
 CLASS LoopTest Test
 
 METHOD LoopTest
@@ -626,15 +713,28 @@ sum |result|
     [ result ] assertEq: 5050
 !
 
-COMMENT              --------ClassTest----------
+METHOD LoopTest
+symbolStressTest |x|
+    x <- MyArray new: 100.
+    100 times: [:idx| x at: idx put: (idx asString asSymbol) ]. "FIXME speedup"
+    [ x location: #0; ] assertEq: 0.
+!
+
+COMMENT                                                                                                ----------ClassTest--------
 CLASS ClassTest Test
 
 METHOD ClassTest
 className
-    [ SmallInt printString ] assertEq: 'SmallInt'
+    [ SmallInt printString ] assertEq: 'SmallInt' withComment: '1'.
+    [ 'String' class printString ] assertEq: 'String' withComment: '2'.
 !
 
-COMMENT              --------MethodLookupTest----------
+METHOD ClassTest
+sendSuper
+    [ Array super printString ] assertEq: 'Collection'
+!
+
+COMMENT                                                                                                --------MethodLookupTest----
 CLASS MethodLookupTest Test
 
 METHOD MethodLookupTest
@@ -643,7 +743,13 @@ newline
     [String class methods keys includes: #newline] assertWithComment: 'String'
 !
 
-COMMENT              --------StringTest----------
+METHOD MethodLookupTest
+parentMethods
+    [Dictionary methods keys includes: #error: ] assertEq: false withComment: '1'
+    [Dictionary respondsTo: #error: ] assertWithComment: '2'
+!
+
+COMMENT                                                                                                -----------StringTest--------
 CLASS StringTest Test
 
 METHOD StringTest
@@ -701,7 +807,15 @@ reverse
     [ 'reverse' reverse ] assertEq: 'esrever'
 !
 
-COMMENT              --------ArrayTest----------
+METHOD StringTest
+size
+    [ 'helloworld' size ] assertEq: 10 withComment: '1'.
+    [ 'hello' + 'world'; size ] assertEq: 10 withComment: '2'.
+    [ 'looooooooooooooooooooooooooooooooooooooong' size ] assertEq: 42 withComment: '3'.
+    [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: '4'.
+!
+
+COMMENT                                                                                               --------ArrayTest----------
 CLASS ArrayTest Test arrOfInts arrOfChars
 
 METHOD ArrayTest
@@ -731,6 +845,115 @@ atPut | tmpArr |
     [ tmpArr at: 6 ] assertEq: 37834.
 !
 
+COMMENT                                                                                                 ----------GCTest------------
+CLASS GCTest Test
+
+METHOD GCTest
+copy |x|
+    x <- 'Hello world!'.
+    10000 times: [:ignore| x <- x copy ].
+    [ x ] assertEq: 'Hello world!'
+!
+
+COMMENT                                                                                                 --------ContextTest----------
+CLASS ContextTest Test
+
+METHOD ContextTest
+backtrace
+    [ [] method name ] assertEq: 'backtrace' withComment: '1'.
+    [ [] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
+!
+
+METHOD ContextTest
+instanceClass
+    [ [] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
+!
+
+COMMENT                                                                                                 -------PrimitiveTest----------
+CLASS PrimitiveTest Test
+
+METHOD PrimitiveTest
+SmallIntAdd
+    [ <10 3 5> ] assertEq: 8.
+!
+
+METHOD PrimitiveTest
+SmallIntDiv
+    [ <11 51 5> ] assertEq: 10.
+!
+
+METHOD PrimitiveTest
+SmallIntMod
+    [ <12 8 3> ] assertEq: 2.
+!
+
+METHOD PrimitiveTest
+SmallIntLess
+    [ <13 -1 0> ] assert.
+!
+
+METHOD PrimitiveTest
+SmallIntEqual
+    [ <14 30 30> ] assert.
+!
+
+METHOD PrimitiveTest
+SmallIntMul
+    [ <15 8 6> ] assertEq: 48.
+!
+
+METHOD PrimitiveTest
+SmallIntSub
+    [ <16 3 5> ] assertEq: -2.
+!
+
+METHOD PrimitiveTest
+smallIntBitOr
+    [ <36 12 6> ] assertEq: 14.
+!
+
+METHOD PrimitiveTest
+smallIntBitAnd
+    [ <37 5 12> ] assertEq: 4.
+!
+
+METHOD PrimitiveTest
+smallIntShiftLeft
+    [ <39 5 3> ] assertEq: 40.
+!
+
+METHOD PrimitiveTest
+smallIntShiftRight
+    [ <39 234 -4> ] assertEq: 14.
+!
+
+METHOD PrimitiveTest
+objectSize
+    [ <4 1> ] assertEq: 0 withComment: 'SmallInt'.
+    [ <4 Char> ] assertEq: 7 withComment: 'Char'.
+    [ <4 Object> ] assertEq: 6 withComment: 'Object'.
+!
+
+METHOD PrimitiveTest
+objectsAreEqual |x|
+    x <- Array with: 'a' with: 42.
+    [ <1 x x> ] assertWithComment: '1'.
+    
+    [ <1 $z $z> ] assertEq: false withComment: '2'.
+!
+
+METHOD PrimitiveTest
+objectClass
+    [ [[[<2 1>] value] value] value printString ] assertEq: 'SmallInt' withComment: 'SmallInt'.
+    [ [[[<2 Object>] value] value] value printString ] assertEq: 'MetaObject' withComment: 'Object'.
+!
+
+METHOD PrimitiveTest
+bulkReplace
+    [ <38 1 7 'Hello W' 1 'hello world!'> ] assertEq: 'Hello World!'.
+!
+
+
 METHOD Array
 replaceFrom: start to: stop with: replacement startingAt: repStart | base |
        <38 start stop replacement repStart self>.
@@ -747,35 +970,47 @@ printHierarchy: aClass | class |
     [ class isNil ] whileFalse: [ class printNl. class <- class parent ] 
 !
 
+CLASS MyDict Dictionary
+METHOD MyDict
+at: key put: value | position |
+    $" print. value name print. $" printNl.
+        position <- keys location: key.
+        (position <= keys size and: [ key = (keys at: position)])
+                ifTrue: [ values at: position put: value ]
+                ifFalse: [ keys <- keys insert: key at: position.
+                        values <- values insert: value at: position ].
+        ^ value
+!
+
 METHOD Undefined
-main    | command x |
+testArrayAllMethods |allMethods|
+    allMethods <- MyDict new.
+    
+    Object methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from = to ~~"
+    Magnitude methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from <= to min:"
+    "Collection methods binaryDo: [ :n :m | allMethods at: n put: m ]."
+    "Array methods binaryDo: [ :n :m | allMethods at: n put: m ]."
+!
+
+METHOD Undefined
+main    | command x y allMethods |
         " initialize classes "
         
         Char initialize.
         
-        "100 times: [ self printHierarchy: Array ].
-        ^nil.
+        "nil testArrayAllMethods."
         
-        x <- 'Hello world!'.
-        x printNl.
-        100 times: [ x printNl ].
-        [ x <- x copy. x printNl. ].
-        x printNl.
-        
-        ^nil.
-        [ x ] assertEq: 'Hello world!' withComment: 'copy'.
-        
-        'String' class printNl.
+        allMethods <- Dictionary new.
+    
+        Object methods binaryDo: [ :n :m | allMethods at: n put: m. n printNl ].
+       
+        y <- Magnitude methods at: ('>' asSymbol). "The problem is not in #> "
+        x <- Magnitude methods at: ('min:' asSymbol). "but in the dictionary size!"
 
-        [ 1 ] assertEq: 1 withComment: 'test'.
-        [ 'helloworld' size ] assertEq: 10 withComment: 'len1'.
-        [ 'hello' + 'world'; size ] assertEq: 10 withComment: 'len2'.
-        [ 'looooooooooooooooooooooooooooooooooooooong' size ] assertEq: 42 withComment: 'len3'.
-        [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: 'len4'.
+        allMethods at: (y name) put: y.
+        '>' printNl.  allMethods printNl.
         
-        (Array with: 1 with: 2) + (Array with: 1 with: 2)."
-        
-        "1 to: 1000 do: [ 'Array allMethods' doIt ]."
+        allMethods at: (x name) put: x. "It fails on the 28-th element"
         
         CompareTest      new runAll.
         SmallIntTest     new runAll.
@@ -784,8 +1019,11 @@ main    | command x |
         MethodLookupTest new runAll.
         StringTest       new runAll.
         ArrayTest        new runAll.
-
-        'Array with: 1' doIt printNl.
+        GCTest           new runAll.
+        ContextTest      new runAll.
+        PrimitiveTest    new runAll.
+        
+        "'Array with: 1' doIt printNl."
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
@@ -958,19 +1196,19 @@ argCount
 METHOD Block
 value
 	" start block execution "
-	<8 self>
+	<8 self>.
 	(self argCount)
 !
 METHOD Block
 value: a
 	" start block execution "
-	<8 a self>
+	<8 a self>.
 	(self argCount)
 !
 METHOD Block
 value: a value: b
 	" start block execution "
-	<8 a b self>
+	<8 a b self>.
 	(self argCount)
 !
 METHOD Block
@@ -1401,13 +1639,13 @@ badIndex: index
 !
 METHOD Array
 at: index
-	<24 self index>
+	<24 self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD Array
 at: index ifAbsent: exceptionBlock
-	<24 self index>
+	<24 self index>.
 	exceptionBlock value
 !
 METHOD Array
@@ -1467,7 +1705,7 @@ size
 !
 METHOD Array
 at: index put: value
-	<5 value self index>
+	<5 value self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
@@ -1501,8 +1739,11 @@ insert: value at: position | newArray newSize |
 	newArray <- self class new: newSize.
 	newArray replaceFrom: 1 to: position-1 with: self.
 	newArray at: position put: value.
-	newArray replaceFrom: position+1 to: newSize with:
-		self startingAt: position.
+	newArray 
+        replaceFrom: position+1 
+        to: newSize 
+        with: self 
+        startingAt: position.
 	^ newArray
 !
 METHOD Array
@@ -1567,7 +1808,7 @@ location: value | low high mid |
 	[ low < high ] whileTrue:
 		[ mid <- (low + high) quo: 2.
 		(self at: mid) < value
-			ifTrue: [ low <- mid + 1 ]
+			ifTrue:  [ low  <- mid + 1 ]
 			ifFalse: [ high <- mid ] ].
 	^ low
 !
@@ -1578,23 +1819,23 @@ new: size
 !
 METHOD ByteArray
 basicAt: index
-	<21 self index>
+	<21 self index>.
 	^nil
 !
 METHOD ByteArray
 at: index
-	<21 self index>
+	<21 self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD ByteArray
 at: index ifAbsent: exceptionBlock
-	<21 self index>
+	<21 self index>.
 	exceptionBlock value
 !
 METHOD ByteArray
 at: index put: aValue
-	<22 aValue self index>
+	<22 aValue self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
@@ -1694,7 +1935,7 @@ doIt	| meth |
 !
 METHOD String
 basicAt: index
-	<21 self index>
+	<21 self index>.
 	^nil
 !
 METHOD String
@@ -1710,7 +1951,7 @@ at: index ifAbsent: exceptionBlock | c |
 !
 METHOD String
 basicAt: index put: value
-	<22 value self index>
+	<22 value self index>.
 	^nil
 !
 METHOD String
@@ -2269,21 +2510,21 @@ asInteger
 !
 METHOD SmallInt
 quo: arg
-	<11 self arg>
+	<11 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self quo: arg asSmallInt].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD SmallInt
 rem: arg
-	<12 self arg>
+	<12 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self rem: arg asSmallInt].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD SmallInt
 + arg
-	<10 self arg>
+	<10 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self + arg asSmallInt].
 	self primitiveFailed
 !
@@ -2293,25 +2534,25 @@ METHOD SmallInt
 !
 METHOD SmallInt
 * arg
-	<15 self arg>
+	<15 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self * arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 - arg
-	<16 self arg>
+	<16 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self - arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 < arg
-	<13 self arg>
+	<13 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self < arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 = arg
-	<14 self arg>
+	<14 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self = arg asSmallInt].
 	self primitiveFailed
 !
@@ -2340,7 +2581,7 @@ METHOD MetaInteger
 new: low
 	<32 low>
 	low <- low asSmallInt.
-	<32 low>
+	<32 low>.
 	self primitiveFailed
 !
 METHOD Integer
@@ -2364,45 +2605,45 @@ hash
 !
 METHOD Integer
 quo: arg
-	<25 self arg>
+	<25 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self quo: arg asInteger].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD Integer
 rem: arg
-	<26 self arg>
+	<26 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self rem: arg asInteger].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD Integer
 + arg
-	<27 self arg>
+	<27 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self + arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 * arg
-	<28 self arg>
+	<28 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self * arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 - arg
-	<29 self arg>
+	<29 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self - arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 < arg
-	<30 self arg>
+	<30 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self < arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 = arg
-	<31 self arg>
+	<31 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self = arg asInteger].
 	self primitiveFailed
 !

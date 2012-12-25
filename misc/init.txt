@@ -1,3 +1,122 @@
+Undefined>>main
+    ...
+    0059 SendMessage name
+    0061 PushTemporary 1        Method min
+    0062 MarkArguments 3
+    0063 SendMessage at:put:
+    0065 DoSpecial popTop
+
+Method>>name
+    0000 PushInstance 0
+    0001 DoSpecial stackReturn
+    0002 DoSpecial popTop
+    0003 DoSpecial selfReturn
+
+OrderedArray location: value    
+    0000 PushConstant 1
+    0001 AssignTemporary 0              low <- 1
+    0002 DoSpecial popTop
+    0003 PushArgument 0                 value
+    0004 MarkArguments 1                #(value)
+    0005 SendMessage size
+    0006 PushConstant 1
+    0007 SendBinary +
+    0008 AssignTemporary 1              high <- self size + 1.
+    0009 DoSpecial popTop
+    0010 PushBlock
+    0013     PushTemporary 0
+    0014     PushTemporary 1
+    0015     SendBinary <
+    0016     DoSpecial stackReturn
+    0017 PushTemporary 0
+    0018 PushTemporary 1
+    0019 SendBinary <
+    0020 DoSpecial branchIfFalse 53
+    0023 PushTemporary 0
+    0024 PushTemporary 1
+    0025 SendBinary +
+    0026 PushConstant 2
+    0027 MarkArguments 2
+    0028 SendMessage quo:
+    0029 AssignTemporary 2              mid <- (low + high) quo: 2.
+    0030 DoSpecial popTop
+    0031 PushArgument 0
+    0032 PushTemporary 2
+    0033 MarkArguments 2
+    0034 SendMessage at:
+    0035 PushArgument 1
+    0036 SendBinary <
+    0037 DoSpecial branchIfFalse 47
+    0040 PushTemporary 2
+    0041 PushConstant 1
+    0042 SendBinary +
+    0043 AssignTemporary 0
+    0044 DoSpecial branch 49
+    0047 PushTemporary 2
+    0048 AssignTemporary 1
+    0049 DoSpecial popTop
+    0050 DoSpecial branch 17
+    0053 PushConstant 0
+    0054 DoSpecial popTop
+    0055 PushTemporary 0
+    0056 DoSpecial stackReturn
+    0057 DoSpecial popTop
+    0058 DoSpecial selfReturn
+    
+    
+Dictionary at: index put: value
+    0000 PushInstance 0                 keys  
+    0001 PushArgument 1                 value
+    0002 MarkArguments 2                #(keys value)
+    0003 SendMessage location:          keys location: value
+    0004 AssignTemporary 0              position <- keys location: value
+    0005 DoSpecial popTop
+    0006 PushTemporary 0                position
+    0007 PushInstance 0                 keys
+    0008 MarkArguments 1                #(keys)
+    0009 SendMessage size               keys size
+    0010 SendBinary <=                  keys size <= 
+    0011 DoSpecial branchIfFalse 24     position <= keys size
+    0014 PushArgument 1
+    0015 PushInstance 0
+    0016 PushTemporary 0
+    0017 MarkArguments 2
+    0018 SendMessage at:
+    0019 MarkArguments 2
+    0020 SendMessage =
+    0021 DoSpecial branch 25
+    0024 PushConstant false
+    0025 DoSpecial branchIfFalse 36
+    0028 PushInstance 1
+    0029 PushTemporary 0
+    0030 PushArgument 2
+    0031 MarkArguments 3
+    0032 SendMessage at:put:
+    0033 DoSpecial branch 49
+    0036 PushInstance 0
+    0037 PushArgument 1
+    0038 PushTemporary 0
+    0039 MarkArguments 3
+    0040 SendMessage insert:at:
+    0041 AssignInstance 0
+    0042 DoSpecial popTop
+    0043 PushInstance 1
+    0044 PushArgument 2
+    0045 PushTemporary 0
+    0046 MarkArguments 3
+    0047 SendMessage insert:at:
+    0048 AssignInstance 1
+    0049 DoSpecial popTop
+    0050 PushArgument 2
+    0051 DoSpecial stackReturn
+    0052 DoSpecial popTop
+    0053 DoSpecial selfReturn
+
+
+
+
+
+
 initialMethod
     pushConstant    10 (nil)
     markArguments   1

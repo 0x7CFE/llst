@@ -7,6 +7,12 @@
 #include <vector>
 #include <list>
 
+struct TMemoryManagerInfo {
+    uint32_t gcCount;
+    uint32_t allocsBeyondGC;
+};
+
+
 // Generic interface to a memory manager.
 // Custom implementations such as BakerMemoryManager
 // implement this interface.
@@ -28,6 +34,7 @@ public:
     virtual void  releaseExternalPointer(TObject** pointer) = 0;
     
     virtual uint32_t allocsBeyondCollection() = 0;
+    virtual TMemoryManagerInfo getStat() = 0;
 };
 
 // When pointer to a heap object is stored outside of the heap,
@@ -254,6 +261,8 @@ public:
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
+    
+    virtual TMemoryManagerInfo getStat();
 };
 
 class Image {
