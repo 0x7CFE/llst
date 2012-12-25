@@ -350,6 +350,11 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 // 34 - flush method cache    TODO
                         
                 switch (primitiveNumber) {
+                    case 255:
+                        // Debug break
+                        // Leave the context alone
+                        break;
+                    
                     case 19:
                         fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
                         return returnError;
@@ -786,6 +791,11 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
         *failed = false;
     
     switch(opcode) {
+        case 255: 
+            // Debug trap
+            printf("Debug trap\n");
+            break;
+        
         case objectsAreEqual: { // 1
             TObject* arg2 = stack[--ec.stackTop];
             TObject* arg1 = stack[--ec.stackTop];
@@ -1212,10 +1222,14 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     
     if ( source->isBinary() && destination->isBinary() ) {
+        // Interpreting pointer array as raw byte sequence
         uint8_t* sourceBytes      = static_cast<TByteObject*>(source)->getBytes();
         uint8_t* destinationBytes = static_cast<TByteObject*>(destination)->getBytes();
         
-        memcpy( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
+        // Primitive may be called on the same object, so memory overlapping may occure.
+        // memmove() works much like the ordinary memcpy() except that it correctly 
+        // handles the case with overlapping memory areas
+        memmove( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
         return true;
     }
     
@@ -1225,11 +1239,13 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     
     if ( ! source->isBinary() && ! destination->isBinary() ) {
-        // Interpreting pointer array as raw byte sequence
-        uint8_t* sourceFields      = reinterpret_cast<uint8_t*>(source->getFields());
-        uint8_t* destinationFields = reinterpret_cast<uint8_t*>(destination->getFields());
+        TObject** sourceFields      = source->getFields();
+        TObject** destinationFields = destination->getFields();
         
-        memcpy( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*));
+        // Primitive may be called on the same object, so memory overlapping may occure.
+        // memmove() works much like the ordinary memcpy() except that it correctly 
+        // handles the case with overlapping memory areas
+        memmove( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*) );
         return true;
     }
     

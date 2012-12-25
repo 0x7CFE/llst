@@ -973,7 +973,7 @@ printHierarchy: aClass | class |
 CLASS MyDict Dictionary
 METHOD MyDict
 at: key put: value | position |
-    '"' print. value name print. '"' printNl.
+    $" print. value name print. $" printNl.
         position <- keys location: key.
         (position <= keys size and: [ key = (keys at: position)])
                 ifTrue: [ values at: position put: value ]
@@ -1002,22 +1002,15 @@ main    | command x y allMethods |
         
         allMethods <- Dictionary new.
     
-        Object methods binaryDo: [ :n :m | allMethods at: n put: m ].
-        
+        Object methods binaryDo: [ :n :m | allMethods at: n put: m. n printNl ].
+       
         y <- Magnitude methods at: ('>' asSymbol). "The problem is not in #> "
         x <- Magnitude methods at: ('min:' asSymbol). "but in the dictionary size!"
-        
+
         allMethods at: (y name) put: y.
+        '>' printNl.  allMethods printNl.
+        
         allMethods at: (x name) put: x. "It fails on the 28-th element"
-        
-        
-        ^nil.
-        
-        "100 times: [ self printHierarchy: Array ].
-        
-        (Array with: 1 with: 2) + (Array with: 1 with: 2)."
-        
-        "1 to: 1000 do: [ 'Array allMethods' doIt ]."
         
         CompareTest      new runAll.
         SmallIntTest     new runAll.
@@ -1203,19 +1196,19 @@ argCount
 METHOD Block
 value
 	" start block execution "
-	<8 self>
+	<8 self>.
 	(self argCount)
 !
 METHOD Block
 value: a
 	" start block execution "
-	<8 a self>
+	<8 a self>.
 	(self argCount)
 !
 METHOD Block
 value: a value: b
 	" start block execution "
-	<8 a b self>
+	<8 a b self>.
 	(self argCount)
 !
 METHOD Block
@@ -1646,13 +1639,13 @@ badIndex: index
 !
 METHOD Array
 at: index
-	<24 self index>
+	<24 self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD Array
 at: index ifAbsent: exceptionBlock
-	<24 self index>
+	<24 self index>.
 	exceptionBlock value
 !
 METHOD Array
@@ -1712,7 +1705,7 @@ size
 !
 METHOD Array
 at: index put: value
-	<5 value self index>
+	<5 value self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
@@ -1746,8 +1739,11 @@ insert: value at: position | newArray newSize |
 	newArray <- self class new: newSize.
 	newArray replaceFrom: 1 to: position-1 with: self.
 	newArray at: position put: value.
-	newArray replaceFrom: position+1 to: newSize with:
-		self startingAt: position.
+	newArray 
+        replaceFrom: position+1 
+        to: newSize 
+        with: self 
+        startingAt: position.
 	^ newArray
 !
 METHOD Array
@@ -1812,7 +1808,7 @@ location: value | low high mid |
 	[ low < high ] whileTrue:
 		[ mid <- (low + high) quo: 2.
 		(self at: mid) < value
-			ifTrue: [ low <- mid + 1 ]
+			ifTrue:  [ low  <- mid + 1 ]
 			ifFalse: [ high <- mid ] ].
 	^ low
 !
@@ -1823,23 +1819,23 @@ new: size
 !
 METHOD ByteArray
 basicAt: index
-	<21 self index>
+	<21 self index>.
 	^nil
 !
 METHOD ByteArray
 at: index
-	<21 self index>
+	<21 self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD ByteArray
 at: index ifAbsent: exceptionBlock
-	<21 self index>
+	<21 self index>.
 	exceptionBlock value
 !
 METHOD ByteArray
 at: index put: aValue
-	<22 aValue self index>
+	<22 aValue self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
@@ -1939,7 +1935,7 @@ doIt	| meth |
 !
 METHOD String
 basicAt: index
-	<21 self index>
+	<21 self index>.
 	^nil
 !
 METHOD String
@@ -1955,7 +1951,7 @@ at: index ifAbsent: exceptionBlock | c |
 !
 METHOD String
 basicAt: index put: value
-	<22 value self index>
+	<22 value self index>.
 	^nil
 !
 METHOD String
@@ -2514,21 +2510,21 @@ asInteger
 !
 METHOD SmallInt
 quo: arg
-	<11 self arg>
+	<11 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self quo: arg asSmallInt].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD SmallInt
 rem: arg
-	<12 self arg>
+	<12 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self rem: arg asSmallInt].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD SmallInt
 + arg
-	<10 self arg>
+	<10 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self + arg asSmallInt].
 	self primitiveFailed
 !
@@ -2538,25 +2534,25 @@ METHOD SmallInt
 !
 METHOD SmallInt
 * arg
-	<15 self arg>
+	<15 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self * arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 - arg
-	<16 self arg>
+	<16 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self - arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 < arg
-	<13 self arg>
+	<13 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self < arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 = arg
-	<14 self arg>
+	<14 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self = arg asSmallInt].
 	self primitiveFailed
 !
@@ -2585,7 +2581,7 @@ METHOD MetaInteger
 new: low
 	<32 low>
 	low <- low asSmallInt.
-	<32 low>
+	<32 low>.
 	self primitiveFailed
 !
 METHOD Integer
@@ -2609,45 +2605,45 @@ hash
 !
 METHOD Integer
 quo: arg
-	<25 self arg>
+	<25 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self quo: arg asInteger].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD Integer
 rem: arg
-	<26 self arg>
+	<26 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self rem: arg asInteger].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD Integer
 + arg
-	<27 self arg>
+	<27 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self + arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 * arg
-	<28 self arg>
+	<28 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self * arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 - arg
-	<29 self arg>
+	<29 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self - arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 < arg
-	<30 self arg>
+	<30 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self < arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 = arg
-	<31 self arg>
+	<31 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self = arg asInteger].
 	self primitiveFailed
 !
