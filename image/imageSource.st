@@ -247,6 +247,10 @@ METHOD Object
 basicDo: aBlock
 	^ self do: aBlock
 !
+METHOD Object
+withSelf: aBlock
+    ^ aBlock value: self
+!
 COMMENT ---------Class-------------------
 METHOD Class
 name: n parent: c variables: v
@@ -1031,6 +1035,16 @@ value
 !
 
 METHOD Undefined
+benchmark | list ms |
+    list <- List new.
+    1 to: 1000 do: [ :x | list add: x atRandom ].
+    list printNl.
+    ms <- Timer millisecondsToRun: [ list <- list sort ].
+    list printNl.
+    ms printNl.
+!
+
+METHOD Undefined
 main    | command x y allMethods |
         " initialize classes "
         
@@ -1048,6 +1062,11 @@ main    | command x y allMethods |
         GCTest           new runAll.
         ContextTest      new runAll.
         PrimitiveTest    new runAll.
+        
+        "Timer millisecondsToRun: [ 
+            Dictionary new withSelf: [ :d | 
+                1 to: 10000 do: [ :x | 
+                    d at: x put: x ]. d printNl. ] ]"
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
@@ -1589,6 +1608,31 @@ reject: testBlock
 		" select the things that do not match predicate "
 	^ self select: [:x | (testBlock value: x) not ]
 !
+
+METHOD Collection
+sort
+    ^ self sort: [ :x :y | x < y ]
+!
+
+METHOD Collection
+sort: criteria | this size left right mediane result |
+    "TODO This code requires optimization"
+
+    size <- self size.
+    this <- self asList.
+    (size < 2) ifTrue: [ ^self ].
+    
+    mediane <- this first. this removeFirst.
+    left    <- this select: [ :x | criteria value: x value: mediane ].
+    right   <- this select: [ :x | (criteria value: x value: mediane) not ].
+    
+    result <- List new.
+    result addAll:  (left sort: criteria).
+    result addLast: mediane.
+    result addAll:  (right sort: criteria).
+    ^result.
+!
+
 METHOD Collection
 printString | count res |
 	res <- super printString.
@@ -1810,6 +1854,10 @@ elementsExchangeIdentityWith: otherArray
 METHOD Array
 replaceFrom: start to: stop with: replacement
 	^ self replaceFrom: start to: stop with: replacement startingAt: 1
+!
+METHOD Array
+sort: aBlock
+    ^ (super sort: aBlock) asArray
 !
 
 COMMENT FIXME insert replaceFrom:..... here

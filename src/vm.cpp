@@ -1271,6 +1271,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("\n%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+    printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
         m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }
