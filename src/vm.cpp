@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
@@ -804,6 +805,12 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
         case 254:
             m_memoryManager->collectGarbage();
             break;
+            
+        case 253: {
+            timeval tv;
+            gettimeofday(&tv, NULL);
+            return reinterpret_cast<TObject*>(newInteger( (tv.tv_sec*1000000 + tv.tv_usec) / 1000));
+        } break;
         
         case objectsAreEqual: { // 1
             TObject* arg2 = stack[--ec.stackTop];
@@ -1264,7 +1271,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("%d messages sent\n", m_messagesSent);
-    printf("Cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
-        m_cacheHits, m_cacheMisses, hitRatio);
+    printf("\n%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+        m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }

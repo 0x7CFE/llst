@@ -1000,6 +1000,36 @@ testArrayAllMethods |allMethods|
     "Array methods binaryDo: [ :n :m | allMethods at: n put: m ]."
 !
 
+CLASS Timer Object initValue
+METHOD MetaTimer
+get
+    <253>
+!
+
+METHOD MetaTimer
+new | instance |
+    instance <- super new.
+    self in: instance at: 1 put: self get.
+    ^instance
+!
+
+METHOD MetaTimer
+millisecondsToRun: aBlock | timer |
+    timer <- Timer new.
+    aBlock value.
+    ^timer value.
+!
+
+METHOD Timer
+initValue
+    ^initValue
+!
+
+METHOD Timer
+value
+    ^ self class get - initValue
+!
+
 METHOD Undefined
 main    | command x y allMethods |
         " initialize classes "
