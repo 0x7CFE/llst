@@ -1,0 +1,86 @@
+
+0004 PushLiteral 0
+0005 SendBinary <
+0006 DoSpecial branchIfFalse 24
+0009 PushTemporary 0
+0010 PushConstant 1
+0011 SendBinary +
+0012 AssignTemporary 0
+0013 DoSpecial popTop
+0014 PushTemporary 0
+0015 PushConstant 2
+0016 MarkArguments 2
+0017 SendMessage *
+0018 MarkArguments 1
+0020 DoSpecial popTop
+0021 DoSpecial branch 3
+0024 PushConstant nil
+0025 DoSpecial popTop
+0026 DoSpecial selfReturn
+
+
+
+
+function my_method
+  %stack         = alloca <6 x Object> 
+  %temporararies = alloca <1 x Object>
+  %stack_top     = alloca i32          ; int * stack_top
+  %literals      = alloca <3 x Symbol> 
+
+  store i32 0, i32* %stack_top
+
+  %s.1 = call Symbol makesymbol("10") ; со строками не всё так просто, надо их кастовать
+  %s.2 = call Symbol makesymbol("*")  ; для упрощения запишу так
+  %s.3 = call Symbol makesymbol("printNl")
+  insertelement <3 x Symbol> %literals, Symbol %s.1, i32 0
+  insertelement %literals, %s.2, i32 1
+  insertelement %literals, %s.3, i32 2
+
+  ;0000 PushConstant 0
+  %1 = call make_obj(i32 0)
+  %2 = load i32* %stack_top
+  insertelement %stack, %1, %2
+
+  ;stack_top_val++
+  %3 = load i32* %stack_top
+  %4 = add %3, 1
+  store %4, %stack_top
+
+  ;0001 AssignTemporary 0
+  ;AssignTemporary x   :  temps[x] = stack[stack_top]
+  
+  ;top = stack[stack_top]
+  %5 = load i32* %stack_top
+  %6 = sub %5, 1
+  %7 = extractelement %stack, %6, %7
+  insertelement %temporararies, %7, 0
+
+  ;0002 DoSpecial popTop
+  ;stackTop--;
+  %8 = load i32* %stack_top
+  %9 = sub %8, 1
+  store %9, %stack_top
+
+  ;0003 PushTemporary 0
+  ;stack->data[stackTop++] = temporaries->data[low];
+
+  %10 = extractelement %temporararies, 0
+  %11 = load i32* %stack_top
+  insertelement %temporararies, %10, %11
+
+  ;stackTop++
+  %12 = load i32* %stack_top
+  %13 = add %12, 1
+  store %13, %stack_top
+
+  ;0004 PushLiteral 0
+  ;stack->data[stackTop++] = literals->data[low];
+  %14 = extractelement %literals, 0
+  %15 = load i32* %stack_top
+  insertelement %stack, %14, %15
+
+  ;stackTop++
+  %16 = load i32* %stack_top
+  %17 = add %16, 1
+  store %17, %stack_top
+  
