@@ -292,6 +292,14 @@ subclasses: indent
 				obj subclasses: indent + 4 ] ]
 !
 METHOD Class
+hierarchy | class list |
+    list <- List new.
+    class <- self.
+    [class isNil] whileFalse: 
+        [ list add: class. class <- class parent ]
+    ^list
+!
+METHOD Class
 listMethods
 	methods keysDo:
 		[ :name | name printNl ]
@@ -472,7 +480,7 @@ assertEq: arg withComment: comment
     header <- String new.
     header <- header + (method name printString).
 
-    comment notNil ifTrue: [ header <- header + ( '(' + comment + ') ' ) ]
+    comment notNil ifTrue: [ header <- header + '(' + comment + ') ' ].
     
     header print.
     
@@ -480,11 +488,11 @@ assertEq: arg withComment: comment
     [headerTab > 0] whileTrue: [
         ' ' print.
         headerTab <- headerTab - 1
-    ]
+    ].
     
     result <- self value.
     
-    result = arg
+    (result = arg)
         ifTrue:  [ 'OK'   printNl ]
         ifFalse: [
                    'FAIL' printNl.
@@ -1000,21 +1008,9 @@ main    | command x y allMethods |
         
         "nil testArrayAllMethods."
         
-        allMethods <- Dictionary new.
-    
-        Object methods binaryDo: [ :n :m | allMethods at: n put: m. n printNl ].
-       
-        y <- Magnitude methods at: ('>' asSymbol). "The problem is not in #> "
-        x <- Magnitude methods at: ('min:' asSymbol). "but in the dictionary size!"
-
-        allMethods at: (y name) put: y.
-        '>' printNl.  allMethods printNl.
-        
-        allMethods at: (x name) put: x. "It fails on the 28-th element"
-        
         CompareTest      new runAll.
         SmallIntTest     new runAll.
-       " LoopTest         new runAll."
+        LoopTest         new runAll.
         ClassTest        new runAll.
         MethodLookupTest new runAll.
         StringTest       new runAll.
@@ -1023,13 +1019,10 @@ main    | command x y allMethods |
         ContextTest      new runAll.
         PrimitiveTest    new runAll.
         
-        "'Array with: 1' doIt printNl."
-        
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
-        
         
         ^nil.                  
 !
@@ -4127,6 +4120,11 @@ COMMENT --------- System ----------
 METHOD MetaSystem
 name
   ^<109>
+!
+METHOD MetaSystem
+collectGarbage
+    <254>
+    self primitiveFailed
 !
 METHOD MetaSystem
 isWindows

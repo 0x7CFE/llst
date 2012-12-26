@@ -563,6 +563,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // VM will start interpreting instructions from the new context.
     ec.currentContext = newContext;
     ec.loadPointers();
+    
+    m_messagesSent++;
 }
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
@@ -591,6 +593,8 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 
     ec.returnedValue = result ? globals.trueObject : globals.falseObject;
     stack[ec.stackTop++] = ec.returnedValue;
+    
+    m_messagesSent++;
 }
 
 void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
@@ -629,6 +633,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         
         // Pushing result back to the stack
         stack[ec.stackTop++] = ec.returnedValue;
+        m_messagesSent++;
     } else {
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
@@ -794,6 +799,10 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
         case 255: 
             // Debug trap
             printf("Debug trap\n");
+            break;
+            
+        case 254:
+            m_memoryManager->collectGarbage();
             break;
         
         case objectsAreEqual: { // 1
@@ -1226,7 +1235,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         uint8_t* sourceBytes      = static_cast<TByteObject*>(source)->getBytes();
         uint8_t* destinationBytes = static_cast<TByteObject*>(destination)->getBytes();
         
-        // Primitive may be called on the same object, so memory overlapping may occure.
+        // Primitive may be called on the same object, so memory overlapping may occur.
         // memmove() works much like the ordinary memcpy() except that it correctly 
         // handles the case with overlapping memory areas
         memmove( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
@@ -1242,7 +1251,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         TObject** sourceFields      = source->getFields();
         TObject** destinationFields = destination->getFields();
         
-        // Primitive may be called on the same object, so memory overlapping may occure.
+        // Primitive may be called on the same object, so memory overlapping may occur.
         // memmove() works much like the ordinary memcpy() except that it correctly 
         // handles the case with overlapping memory areas
         memmove( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*) );
@@ -1255,6 +1264,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("\nCache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+    printf("%d messages sent\n", m_messagesSent);
+    printf("Cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
         m_cacheHits, m_cacheMisses, hitRatio);
 }
