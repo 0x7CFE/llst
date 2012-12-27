@@ -22,21 +22,21 @@ public:
     }; 
 private:
     enum Opcode {
-        extended = 0,
-        pushInstance,
-        pushArgument,    
-        pushTemporary,   
-        pushLiteral,     
-        pushConstant,    
-        assignInstance,  
-        assignTemporary, 
-        markArguments,   
-        sendMessage,     
-        sendUnary,       
-        sendBinary,      
-        pushBlock,       
-        doPrimitive,     
-        doSpecial = 15
+        opExtended = 0,
+        opPushInstance,
+        opPushArgument,    
+        opPushTemporary,   
+        opPushLiteral,     
+        opPushConstant,    
+        opAssignInstance,  
+        opAssignTemporary, 
+        opMarkArguments,   
+        opSendMessage,     
+        opSendUnary,       
+        opSendBinary,      
+        opPushBlock,       
+        opDoPrimitive,     
+        opDoSpecial = 15
     };
     
     enum Special {
@@ -56,6 +56,11 @@ private:
         nilConst = 10,
         trueConst,
         falseConst
+    };
+    
+    enum UnaryOpcode {
+        isNil  = 0,
+        notNil = 1
     };
     
     enum TClassID {
@@ -165,16 +170,15 @@ private:
     uint32_t m_cacheMisses;
     uint32_t m_messagesSent;
 
-    bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
-    
-    // lexicographic comparison of two byte objects
-//     int compareSymbols(const TByteObject* left, const TByteObject* right);
-    
-    // locate the method in the hierarchy of the class
-    TMethod* lookupMethod(TSymbol* selector, TClass* klass);
+    bool checkRoot(TObject* value, TObject** objectSlot);
     
     // fast method lookup in the method cache
     TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
+    // if not found then
+    // locate the method in the hierarchy of the class
+    TMethod* lookupMethod       (TSymbol* selector, TClass* klass);
+    
+    
     void updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method);
     
     // flush the method lookup cache
@@ -190,9 +194,8 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool* failed);
-    
-    TExecuteResult doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec);
+    TExecuteResult doExecutePrimitive(hptr<TProcess>& process, TVMExecutionContext& ec);
+    TExecuteResult doSpecial         (hptr<TProcess>& process, TVMExecutionContext& ec);
     
     // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(
@@ -211,14 +214,8 @@ private:
     bool m_lastGCOccured;
     void onCollectionOccured();
     
-    TByteObject* newBinaryObject(TClass* klass, size_t dataSize);
+    TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
     TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
-    
-    // Helper functions for backTraceContext()
-    void printByteObject(TByteObject* value);
-    void printValue(uint32_t index, TObject* value, TObject* previousValue = 0);
-    void printContents(TObjectArray& array);
-    void backTraceContext(TContext* context);
     
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
