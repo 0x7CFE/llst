@@ -194,19 +194,12 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
+    TObject* performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed);
     TExecuteResult doExecutePrimitive(hptr<TProcess>& process, TVMExecutionContext& ec);
     TExecuteResult doSpecial         (hptr<TProcess>& process, TVMExecutionContext& ec);
     
     // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(
-        SmallIntOpcode opcode,
-        int32_t leftOperand,
-        int32_t rightOperand);
-        
-    void failPrimitive(
-        TObjectArray& stack,
-        uint32_t& stackTop,
-        uint8_t opcode);
+    TObject* doSmallInt(SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
     
     Image*          m_image;
     IMemoryManager* m_memoryManager;
