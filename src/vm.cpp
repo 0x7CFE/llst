@@ -2,6 +2,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/time.h>
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
@@ -412,8 +413,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
 
 void SmalltalkVM::doPushBlock(TVMExecutionContext& ec) 
 {
-    hptr<TByteObject>  byteCodes = newPointer(ec.currentContext->method->byteCodes);
-    hptr<TObjectArray> stack     = newPointer(ec.currentContext->stack);
+    TByteObject&  byteCodes  = * ec.currentContext->method->byteCodes;
+    hptr<TObjectArray> stack = newPointer(ec.currentContext->stack);
         
     // Block objects are usually inlined in the wrapping method code
     // pushBlock operation creates a block object initialized
@@ -454,6 +455,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     else
         newBlock->creatingContext = ec.currentContext;
     
+    // Inheriting the context objects
     newBlock->method      = ec.currentContext->method;
     newBlock->arguments   = ec.currentContext->arguments;
     newBlock->temporaries = ec.currentContext->temporaries;
@@ -526,7 +528,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     ec.storePointers();
     
     // Create a new context for the giving method and arguments
-    hptr<TContext> newContext   = newObject<TContext>();
+    hptr<TContext>   newContext = newObject<TContext>();
     hptr<TObjectArray> newStack = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
     hptr<TObjectArray> newTemps = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     
@@ -563,6 +565,8 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // VM will start interpreting instructions from the new context.
     ec.currentContext = newContext;
     ec.loadPointers();
+    
+    m_messagesSent++;
 }
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
@@ -591,6 +595,8 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 
     ec.returnedValue = result ? globals.trueObject : globals.falseObject;
     stack[ec.stackTop++] = ec.returnedValue;
+    
+    m_messagesSent++;
 }
 
 void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
@@ -629,6 +635,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         
         // Pushing result back to the stack
         stack[ec.stackTop++] = ec.returnedValue;
+        m_messagesSent++;
     } else {
         // This binary operator is performed on an ordinary object.
         // We do not know how to handle it, thus send the message to the receiver
@@ -795,6 +802,16 @@ TObject* SmalltalkVM::doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process
             // Debug trap
             printf("Debug trap\n");
             break;
+            
+        case 254:
+            m_memoryManager->collectGarbage();
+            break;
+            
+        case 253: {
+            timeval tv;
+            gettimeofday(&tv, NULL);
+            return reinterpret_cast<TObject*>(newInteger( (tv.tv_sec*1000000 + tv.tv_usec) / 1000));
+        } break;
         
         case objectsAreEqual: { // 1
             TObject* arg2 = stack[--ec.stackTop];
@@ -1226,7 +1243,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         uint8_t* sourceBytes      = static_cast<TByteObject*>(source)->getBytes();
         uint8_t* destinationBytes = static_cast<TByteObject*>(destination)->getBytes();
         
-        // Primitive may be called on the same object, so memory overlapping may occure.
+        // Primitive may be called on the same object, so memory overlapping may occur.
         // memmove() works much like the ordinary memcpy() except that it correctly 
         // handles the case with overlapping memory areas
         memmove( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
@@ -1242,7 +1259,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         TObject** sourceFields      = source->getFields();
         TObject** destinationFields = destination->getFields();
         
-        // Primitive may be called on the same object, so memory overlapping may occure.
+        // Primitive may be called on the same object, so memory overlapping may occur.
         // memmove() works much like the ordinary memcpy() except that it correctly 
         // handles the case with overlapping memory areas
         memmove( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*) );
@@ -1255,6 +1272,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("\nCache hits: %d, misses: %d, hit ratio %.2f %%\n", 
-        m_cacheHits, m_cacheMisses, hitRatio);
+    printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n", 
+        m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }

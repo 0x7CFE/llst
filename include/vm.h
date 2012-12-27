@@ -159,10 +159,11 @@ private:
         TMethod* method;
     };
     
-    static const unsigned int LOOKUP_CACHE_SIZE = 4096;
+    static const unsigned int LOOKUP_CACHE_SIZE = 512;
     TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
+    uint32_t m_messagesSent;
 
     bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
     
@@ -236,7 +237,7 @@ public:
     }
     
     SmalltalkVM(Image* image, IMemoryManager* memoryManager) 
-        : m_cacheHits(0), m_cacheMisses(0), m_image(image), 
+        : m_cacheHits(0), m_cacheMisses(0), m_messagesSent(0), m_image(image), 
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager) 
     { 
         flushMethodCache();

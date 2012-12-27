@@ -142,8 +142,9 @@ int main(int argc, char **argv) {
 
     TMemoryManagerInfo info = memoryManager->getStat();
     
-    int averageAllocs = info.gcCount ? (int) info.allocsBeyondGC / info.gcCount : info.allocsBeyondGC;
-    printf("\nGC count: %d, average allocations per gc: %d", info.gcCount, averageAllocs);
+    int averageAllocs = info.collectionsCount ? (int) info.allocationsCount / info.collectionsCount : info.allocationsCount;
+    printf("\nGC count: %d, average allocations per gc: %d, microseconds spent in GC: %d\n", 
+           info.collectionsCount, averageAllocs, (uint32_t) info.totalCollectionDelay);
     
     vm.printVMStat();
 

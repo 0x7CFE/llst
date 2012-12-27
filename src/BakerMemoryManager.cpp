@@ -1,14 +1,16 @@
 #include <memory.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 BakerMemoryManager::BakerMemoryManager() :
-    m_gcCount(0), m_allocsBeyondGC(0), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
+    m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0), 
+    m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
     m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0),
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
     m_staticHeapBase(0), m_staticHeapPointer(0)
 {
-
+    // Nothing to be done here
 }
 
 BakerMemoryManager::~BakerMemoryManager()
@@ -82,7 +84,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
         void* result = m_activeHeapPointer;
 
         if (gcOccured && !*gcOccured)
-            m_allocsBeyondGC++;
+            m_allocationsCount++;
         return result;
     }
 
@@ -132,7 +134,8 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
               || (currentObject < (TMovableObject*) m_inactiveHeapPointer))
             {
                 // Object does not belong to a heap.
-                // Either it is located in static space or
+                // Either it is located in static space 
+                // or this is a broken pointer
                 replacement   = currentObject;
                 currentObject = previousObject;
                 break;
@@ -196,12 +199,12 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 
                 currentObject->size.setRelocated();
 
-                // FIXME What the heck is going on here?
-                //       What about copying object's fields?
+                // Initializing indices. Actual field copying
+                // will be done later in the next subloop
                 const uint32_t lastObjectIndex = fieldsCount;
                 objectCopy->data[lastObjectIndex] = previousObject;
                 previousObject = currentObject;
-                currentObject = currentObject->data[lastObjectIndex];
+                currentObject  = currentObject->data[lastObjectIndex];
                 previousObject->data[lastObjectIndex] = objectCopy;
             }
         }
@@ -237,7 +240,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 previousObject = objectCopy->data[lastFieldIndex];
                 objectCopy->data[lastFieldIndex] = replacement;
 
-                // Recovering zero fields (FIXME do they really exist?)
+                // Recovering zero fields
                 lastFieldIndex--;
                 while((lastFieldIndex > 0) && (currentObject->data[lastFieldIndex] == 0))
                 {
@@ -262,7 +265,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 
 void BakerMemoryManager::collectGarbage()
 {
-    m_gcCount++;
+    m_collectionsCount++;
 
     // First of all swapping the spaces
     if (m_activeHeapOne)
@@ -283,26 +286,28 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects.
     // Then moving them to the new active heap.
 
+    // Storing timestamp on start
+    timeval tv1;
+    gettimeofday(&tv1, NULL);
+    
     // Here we need to check the rootStack, staticRoots and the VM execution context
     TStaticRootsIterator iRoot = m_staticRoots.begin();
-    for (; iRoot != m_staticRoots.end(); ++iRoot)
-    {
+    for (; iRoot != m_staticRoots.end(); ++iRoot) {
         **iRoot = moveObject(**iRoot);
     }
 
-    // Updating external references
+    // Updating external references. Typically this is pointers stored in the hptr<>
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
         **iExternalPointer = moveObject(**iExternalPointer);
     }
-
-//     memset(m_inactiveHeapBase, 0, m_heapSize / 2);
     
-//     printf("After collection: heap size %d, used %d, free %d\n",
-//             m_heapSize / 2,
-//             m_heapSize / 2 - (m_activeHeapPointer - m_activeHeapBase),
-//             m_activeHeapPointer - m_activeHeapBase);
-
+    // Storing timestamp of the end
+    timeval tv2;
+    gettimeofday(&tv2, NULL);
+    
+    // Calculating total microseconds spent in the garbage collection procedure
+    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
 }
 
 bool BakerMemoryManager::isInStaticHeap(void* location)
@@ -342,9 +347,11 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
     }
 }
 
-TMemoryManagerInfo BakerMemoryManager::getStat() {
+TMemoryManagerInfo BakerMemoryManager::getStat() 
+{
     TMemoryManagerInfo info;
-    info.allocsBeyondGC = m_allocsBeyondGC;
-    info.gcCount        = m_gcCount;
+    info.allocationsCount     = m_allocationsCount;
+    info.collectionsCount     = m_collectionsCount;
+    info.totalCollectionDelay = m_totalCollectionDelay;
     return info;
 }

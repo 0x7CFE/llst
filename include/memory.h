@@ -8,10 +8,10 @@
 #include <list>
 
 struct TMemoryManagerInfo {
-    uint32_t gcCount;
-    uint32_t allocsBeyondGC;
+    uint32_t collectionsCount;
+    uint32_t allocationsCount;
+    uint64_t totalCollectionDelay;
 };
-
 
 // Generic interface to a memory manager.
 // Custom implementations such as BakerMemoryManager
@@ -183,8 +183,9 @@ public:
 // 
 class BakerMemoryManager : public IMemoryManager {
 private:
-    uint32_t  m_gcCount;
-    uint32_t  m_allocsBeyondGC;
+    uint32_t  m_collectionsCount;
+    uint32_t  m_allocationsCount;
+    uint64_t  m_totalCollectionDelay;
     
     size_t    m_heapSize;
     size_t    m_maxHeapSize;
@@ -260,7 +261,7 @@ public:
     
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
-    virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
+    virtual uint32_t allocsBeyondCollection() { return m_allocationsCount; }
     
     virtual TMemoryManagerInfo getStat();
 };

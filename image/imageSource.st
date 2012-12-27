@@ -247,6 +247,10 @@ METHOD Object
 basicDo: aBlock
 	^ self do: aBlock
 !
+METHOD Object
+withSelf: aBlock
+    ^ aBlock value: self
+!
 COMMENT ---------Class-------------------
 METHOD Class
 name: n parent: c variables: v
@@ -290,6 +294,14 @@ subclasses: indent
 				1 to: indent do: [:ignore| $  print ].
 				obj printNl.
 				obj subclasses: indent + 4 ] ]
+!
+METHOD Class
+hierarchy | class list |
+    list <- List new.
+    class <- self.
+    [class isNil] whileFalse: 
+        [ list add: class. class <- class parent ]
+    ^list
 !
 METHOD Class
 listMethods
@@ -472,7 +484,7 @@ assertEq: arg withComment: comment
     header <- String new.
     header <- header + (method name printString).
 
-    comment notNil ifTrue: [ header <- header + ( '(' + comment + ') ' ) ]
+    comment notNil ifTrue: [ header <- header + '(' + comment + ') ' ].
     
     header print.
     
@@ -480,11 +492,11 @@ assertEq: arg withComment: comment
     [headerTab > 0] whileTrue: [
         ' ' print.
         headerTab <- headerTab - 1
-    ]
+    ].
     
     result <- self value.
     
-    result = arg
+    (result = arg)
         ifTrue:  [ 'OK'   printNl ]
         ifFalse: [
                    'FAIL' printNl.
@@ -992,6 +1004,57 @@ testArrayAllMethods |allMethods|
     "Array methods binaryDo: [ :n :m | allMethods at: n put: m ]."
 !
 
+CLASS Timer Object initValue
+METHOD MetaTimer
+get
+    <253>
+!
+
+METHOD MetaTimer
+new | instance |
+    instance <- super new.
+    self in: instance at: 1 put: self get.
+    ^instance
+!
+
+METHOD MetaTimer
+millisecondsToRun: aBlock | timer |
+    timer <- Timer new.
+    aBlock value.
+    ^timer value.
+!
+
+METHOD Timer
+initValue
+    ^initValue
+!
+
+METHOD Timer
+value
+    ^ self class get - initValue
+!
+
+METHOD Undefined
+benchmark: size | list ms |
+    list <- List new.
+    1 to: size do: [ :x | list add: x atRandom ].
+    "list printNl."
+    ms <- Timer millisecondsToRun: [ list <- list sort ].
+    "list printNl."
+    'Sorted in ms: ' print. ms printNl.
+!
+
+METHOD Undefined
+benchmark2: random | dict ms |
+    dict <- Dictionary new.
+    ms <- Timer millisecondsToRun: [ 
+    random 
+        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 100 atRandom ] ]
+        ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
+    dict printNl. 'size ' print. dict size printNl.
+    ms printNl
+!
+
 METHOD Undefined
 main    | command x y allMethods |
         " initialize classes "
@@ -1000,21 +1063,9 @@ main    | command x y allMethods |
         
         "nil testArrayAllMethods."
         
-        allMethods <- Dictionary new.
-    
-        Object methods binaryDo: [ :n :m | allMethods at: n put: m. n printNl ].
-       
-        y <- Magnitude methods at: ('>' asSymbol). "The problem is not in #> "
-        x <- Magnitude methods at: ('min:' asSymbol). "but in the dictionary size!"
-
-        allMethods at: (y name) put: y.
-        '>' printNl.  allMethods printNl.
-        
-        allMethods at: (x name) put: x. "It fails on the 28-th element"
-        
         CompareTest      new runAll.
         SmallIntTest     new runAll.
-       " LoopTest         new runAll."
+        LoopTest         new runAll.
         ClassTest        new runAll.
         MethodLookupTest new runAll.
         StringTest       new runAll.
@@ -1023,13 +1074,10 @@ main    | command x y allMethods |
         ContextTest      new runAll.
         PrimitiveTest    new runAll.
         
-        "'Array with: 1' doIt printNl."
-        
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
                         ifFalse: [ command doIt printNl ] ]
-        
         
         ^nil.                  
 !
@@ -1566,6 +1614,31 @@ reject: testBlock
 		" select the things that do not match predicate "
 	^ self select: [:x | (testBlock value: x) not ]
 !
+
+METHOD Collection
+sort
+    ^ self sort: [ :x :y | x < y ]
+!
+
+METHOD Collection
+sort: criteria | this size left right mediane result |
+    "TODO This code requires optimization"
+
+    size <- self size.
+    this <- self asList.
+    (size < 2) ifTrue: [ ^self ].
+    
+    mediane <- this first. this removeFirst.
+    left    <- this select: [ :x |  criteria value: x value: mediane ].
+    right   <- this select: [ :x | (criteria value: x value: mediane) not ].
+    
+    result <- List new.
+    result addAll:  (left sort: criteria).
+    result addLast: mediane.
+    result addAll:  (right sort: criteria).
+    ^result.
+!
+
 METHOD Collection
 printString | count res |
 	res <- super printString.
@@ -1787,6 +1860,10 @@ elementsExchangeIdentityWith: otherArray
 METHOD Array
 replaceFrom: start to: stop with: replacement
 	^ self replaceFrom: start to: stop with: replacement startingAt: 1
+!
+METHOD Array
+sort: aBlock
+    ^ (super sort: aBlock) asArray
 !
 
 COMMENT FIXME insert replaceFrom:..... here
@@ -4127,6 +4204,11 @@ COMMENT --------- System ----------
 METHOD MetaSystem
 name
   ^<109>
+!
+METHOD MetaSystem
+collectGarbage
+    <254>
+    self primitiveFailed
 !
 METHOD MetaSystem
 isWindows
