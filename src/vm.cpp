@@ -413,8 +413,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
 
 void SmalltalkVM::doPushBlock(TVMExecutionContext& ec) 
 {
-    hptr<TByteObject>  byteCodes = newPointer(ec.currentContext->method->byteCodes);
-    hptr<TObjectArray> stack     = newPointer(ec.currentContext->stack);
+    TByteObject&  byteCodes  = * ec.currentContext->method->byteCodes;
+    hptr<TObjectArray> stack = newPointer(ec.currentContext->stack);
         
     // Block objects are usually inlined in the wrapping method code
     // pushBlock operation creates a block object initialized
@@ -455,6 +455,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     else
         newBlock->creatingContext = ec.currentContext;
     
+    // Inheriting the context objects
     newBlock->method      = ec.currentContext->method;
     newBlock->arguments   = ec.currentContext->arguments;
     newBlock->temporaries = ec.currentContext->temporaries;
@@ -527,7 +528,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     ec.storePointers();
     
     // Create a new context for the giving method and arguments
-    hptr<TContext> newContext   = newObject<TContext>();
+    hptr<TContext>   newContext = newObject<TContext>();
     hptr<TObjectArray> newStack = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
     hptr<TObjectArray> newTemps = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
     

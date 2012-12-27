@@ -134,7 +134,8 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
               || (currentObject < (TMovableObject*) m_inactiveHeapPointer))
             {
                 // Object does not belong to a heap.
-                // Either it is located in static space or
+                // Either it is located in static space 
+                // or this is a broken pointer
                 replacement   = currentObject;
                 currentObject = previousObject;
                 break;
@@ -198,12 +199,12 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 
                 currentObject->size.setRelocated();
 
-                // FIXME What the heck is going on here?
-                //       What about copying object's fields?
+                // Initializing indices. Actual field copying
+                // will be done later in the next subloop
                 const uint32_t lastObjectIndex = fieldsCount;
                 objectCopy->data[lastObjectIndex] = previousObject;
                 previousObject = currentObject;
-                currentObject = currentObject->data[lastObjectIndex];
+                currentObject  = currentObject->data[lastObjectIndex];
                 previousObject->data[lastObjectIndex] = objectCopy;
             }
         }
@@ -239,7 +240,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 previousObject = objectCopy->data[lastFieldIndex];
                 objectCopy->data[lastFieldIndex] = replacement;
 
-                // Recovering zero fields (FIXME do they really exist?)
+                // Recovering zero fields
                 lastFieldIndex--;
                 while((lastFieldIndex > 0) && (currentObject->data[lastFieldIndex] == 0))
                 {
@@ -285,8 +286,7 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects.
     // Then moving them to the new active heap.
 
-    //timespec ts;
-    //clock_gettime(CLOCK_REALTIME, &ts);
+    // Storing timestamp on start
     timeval tv1;
     gettimeofday(&tv1, NULL);
     
@@ -302,6 +302,7 @@ void BakerMemoryManager::collectGarbage()
         **iExternalPointer = moveObject(**iExternalPointer);
     }
     
+    // Storing timestamp of the end
     timeval tv2;
     gettimeofday(&tv2, NULL);
     

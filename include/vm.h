@@ -159,7 +159,7 @@ private:
         TMethod* method;
     };
     
-    static const unsigned int LOOKUP_CACHE_SIZE = 4096;
+    static const unsigned int LOOKUP_CACHE_SIZE = 512;
     TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;

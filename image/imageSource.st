@@ -1035,13 +1035,24 @@ value
 !
 
 METHOD Undefined
-benchmark | list ms |
+benchmark: size | list ms |
     list <- List new.
-    1 to: 1000 do: [ :x | list add: x atRandom ].
-    list printNl.
+    1 to: size do: [ :x | list add: x atRandom ].
+    "list printNl."
     ms <- Timer millisecondsToRun: [ list <- list sort ].
-    list printNl.
-    ms printNl.
+    "list printNl."
+    'Sorted in ms: ' print. ms printNl.
+!
+
+METHOD Undefined
+benchmark2: random | dict ms |
+    dict <- Dictionary new.
+    ms <- Timer millisecondsToRun: [ 
+    random 
+        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 100 atRandom ] ]
+        ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
+    dict printNl. 'size ' print. dict size printNl.
+    ms printNl
 !
 
 METHOD Undefined
@@ -1062,11 +1073,6 @@ main    | command x y allMethods |
         GCTest           new runAll.
         ContextTest      new runAll.
         PrimitiveTest    new runAll.
-        
-        "Timer millisecondsToRun: [ 
-            Dictionary new withSelf: [ :d | 
-                1 to: 10000 do: [ :x | 
-                    d at: x put: x ]. d printNl. ] ]"
         
         " main execution loop "
         [ '-> ' print. command <- String input. command notNil ]
@@ -1623,7 +1629,7 @@ sort: criteria | this size left right mediane result |
     (size < 2) ifTrue: [ ^self ].
     
     mediane <- this first. this removeFirst.
-    left    <- this select: [ :x | criteria value: x value: mediane ].
+    left    <- this select: [ :x |  criteria value: x value: mediane ].
     right   <- this select: [ :x | (criteria value: x value: mediane) not ].
     
     result <- List new.
