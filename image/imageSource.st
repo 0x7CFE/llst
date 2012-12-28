@@ -1629,7 +1629,7 @@ sort: criteria | size left right mediane result |
     "TODO This code requires optimization"
     (self isEmpty) ifTrue: [^self].
     
-    mediane <- self first. self removeFirst.
+    mediane <- self popFirst.
     left    <- self select: [ :x |  criteria value: x value: mediane ].
     right   <- self select: [ :x | (criteria value: x value: mediane) not ].
     
@@ -2181,6 +2181,15 @@ removeFirst
 	elements isNil
 		ifTrue: [ self emptyCollection ]
 		ifFalse: [ elements <- elements next ]
+!
+METHOD List
+popFirst | value |
+    elements isNil
+        ifTrue: [ ^nil ]
+        ifFalse: [
+            value <- elements value.
+            elements <- elements next.
+            ^value ]
 !
 METHOD List
 remove: anElement
