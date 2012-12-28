@@ -282,7 +282,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             case opSendBinary:    doSendBinary(ec);    break;
                 
             case opDoPrimitive: {
-                TExecuteResult result = doExecutePrimitive(currentProcess, ec);
+                TExecuteResult result = doPrimitive(currentProcess, ec);
                 if (result != returnNoReturn)
                     return result;
             } break;
@@ -413,7 +413,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         messageArguments = errorArguments;
         
         // Continuing the execution just as if #doesNotUnderstand:
-        // was the actual selector we wanted to call
+        // was the actual selector that we wanted to call
     }
     
     // Save stack and opcode pointers
@@ -496,11 +496,11 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
 {
     TObjectArray& stack = * ec.currentContext->stack;
     
-    // Loading operand objects
+    // Loading the operand objects
     TObject* rightObject = stack[--ec.stackTop];
     TObject* leftObject  = stack[--ec.stackTop];
     
-    // If operands are both small integers, we need to handle it ourselves
+    // If operands are both small integers, we may handle it ourselves
     if (isSmallInteger(leftObject) && isSmallInteger(rightObject)) {
         // Loading actual operand values
         int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
@@ -687,7 +687,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
     }
 }
 
-SmalltalkVM::TExecuteResult SmalltalkVM::doExecutePrimitive(hptr<TProcess>& process, TVMExecutionContext& ec)
+SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TVMExecutionContext& ec)
 {
     TObjectArray& stack = *ec.currentContext->stack;
     uint8_t      opcode = (*ec.currentContext->method->byteCodes)[ec.bytePointer++];
@@ -867,15 +867,15 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
             
             // Switching execution context to the invoking block
-                block->previousContext = ec.currentContext->previousContext;
-                ec.currentContext = (TContext*) block;
-                ec.stackTop = 0; // resetting stack
-                
-                // Block is bound to the method's bytecodes, so it's
-                // first bytecode will not be zero but the value specified 
-                ec.bytePointer = getIntegerValue(block->blockBytePointer);
-                
-                return block;
+            block->previousContext = ec.currentContext->previousContext;
+            ec.currentContext = (TContext*) block;
+            ec.stackTop = 0; // resetting stack
+
+            // Block is bound to the method's bytecodes, so it's
+            // first bytecode will not be zero but the value specified
+            ec.bytePointer = getIntegerValue(block->blockBytePointer);
+
+            return block;
         } break;
         
         case smallIntAdd:        // 10
@@ -912,10 +912,10 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         
         // TODO case 18 // turn on debugging
         
-        case throwError: { // 19
+        case throwError: // 19
             process = popProcess(); 
             process->context = ec.currentContext;
-        } break;
+            break;
         
         case allocateByteArray: { // 20
             int32_t dataSize = getIntegerValue(reinterpret_cast<TInteger>(stack[--ec.stackTop]));
