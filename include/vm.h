@@ -1,3 +1,37 @@
+/*
+ *    vm.h 
+ *    
+ *    LLST virtual machine related classes and structures
+ *    
+ *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+ *    
+ *    LLST is 
+ *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
+ *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+ *    
+ *    LLST is based on the LittleSmalltalk which is 
+ *        Copyright (C) 1987-2005 by Timothy A. Budd
+ *        Copyright (C) 2007 by Charles R. Childers
+ *        Copyright (C) 2005-2007 by Danny Reinhold
+ *        
+ *    Original license of LittleSmalltalk may be found in the LICENSE file.
+ *        
+ *    
+ *    This file is part of LLST.
+ *    LLST is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *    
+ *    LLST is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *    
+ *    You should have received a copy of the GNU General Public License
+ *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef LLST_VM_H_INCLUDED
 #define LLST_VM_H_INCLUDED
 
@@ -22,21 +56,21 @@ public:
     }; 
 private:
     enum Opcode {
-        extended = 0,
-        pushInstance,
-        pushArgument,    
-        pushTemporary,   
-        pushLiteral,     
-        pushConstant,    
-        assignInstance,  
-        assignTemporary, 
-        markArguments,   
-        sendMessage,     
-        sendUnary,       
-        sendBinary,      
-        pushBlock,       
-        doPrimitive,     
-        doSpecial = 15
+        opExtended = 0,
+        opPushInstance,
+        opPushArgument,    
+        opPushTemporary,   
+        opPushLiteral,     
+        opPushConstant,    
+        opAssignInstance,  
+        opAssignTemporary, 
+        opMarkArguments,   
+        opSendMessage,     
+        opSendUnary,       
+        opSendBinary,      
+        opPushBlock,       
+        opDoPrimitive,     
+        opDoSpecial = 15
     };
     
     enum Special {
@@ -58,15 +92,9 @@ private:
         falseConst
     };
     
-    enum TClassID {
-        Object,
-        Class,
-        Method,
-        Context,
-        Process,
-        Array,
-        Dictionary,
-        Block,
+    enum UnaryOpcode {
+        isNil  = 0,
+        notNil = 1
     };
     
     enum SmallIntOpcode {
@@ -123,6 +151,7 @@ private:
     struct TVMExecutionContext {
     private:
         // TODO Think about proper memory organization
+        // TODO Implement stackPush / stackPop / reloadContextData etc ?
         IMemoryManager* memoryManager;
     public:
         hptr<TContext> currentContext;
@@ -165,16 +194,15 @@ private:
     uint32_t m_cacheMisses;
     uint32_t m_messagesSent;
 
-    bool checkRoot(TObject* value, TObject* oldValue, TObject** objectSlot);
-    
-    // lexicographic comparison of two byte objects
-//     int compareSymbols(const TByteObject* left, const TByteObject* right);
-    
-    // locate the method in the hierarchy of the class
-    TMethod* lookupMethod(TSymbol* selector, TClass* klass);
+    bool checkRoot(TObject* value, TObject** objectSlot);
     
     // fast method lookup in the method cache
     TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
+    // if not found then
+    // locate the method in the hierarchy of the class
+    TMethod* lookupMethod       (TSymbol* selector, TClass* klass);
+    
+    
     void updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method);
     
     // flush the method lookup cache
@@ -190,20 +218,12 @@ private:
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
     
-    TObject* doExecutePrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool* failed);
-    
-    TExecuteResult doDoSpecial(hptr<TProcess>& process, TVMExecutionContext& ec);
+    TObject* performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed);
+    TExecuteResult doExecutePrimitive(hptr<TProcess>& process, TVMExecutionContext& ec);
+    TExecuteResult doSpecial         (hptr<TProcess>& process, TVMExecutionContext& ec);
     
     // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(
-        SmallIntOpcode opcode,
-        int32_t leftOperand,
-        int32_t rightOperand);
-        
-    void failPrimitive(
-        TObjectArray& stack,
-        uint32_t& stackTop,
-        uint8_t opcode);
+    TObject* doSmallInt(SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
     
     Image*          m_image;
     IMemoryManager* m_memoryManager;
@@ -211,14 +231,8 @@ private:
     bool m_lastGCOccured;
     void onCollectionOccured();
     
-    TByteObject* newBinaryObject(TClass* klass, size_t dataSize);
+    TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
     TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
-    
-    // Helper functions for backTraceContext()
-    void printByteObject(TByteObject* value);
-    void printValue(uint32_t index, TObject* value, TObject* previousValue = 0);
-    void printContents(TObjectArray& array);
-    void backTraceContext(TContext* context);
     
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
@@ -243,7 +257,7 @@ public:
         flushMethodCache();
     }
     
-    TExecuteResult execute(TProcess* process, uint32_t ticks);
+    TExecuteResult execute(TProcess* p, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
     
