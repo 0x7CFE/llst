@@ -12,6 +12,10 @@ COMMENT
 COMMENT Copyright (C) 1987-2005 by Timothy A. Budd
 COMMENT Copyright (C) 2007 by Charles R. Childers
 COMMENT Copyright (C) 2005-2007 by Danny Reinhold
+COMMENT 
+COMMENT Some parts of this file are
+COMMENT Copyright (C) 2012 Dmitry Kashitsyn   <korvin@deeptown.org>
+COMMENT Copyright (C) 2012 Roman Proskuryakov <humbug@deeptown.org>
 COMMENT
 COMMENT ============================================================================
 COMMENT This license applies to the virtual machine and to the initial image of 
