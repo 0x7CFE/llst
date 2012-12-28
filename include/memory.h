@@ -86,29 +86,30 @@ public:
 // VM provide helper functions newPointer() and newObject() which
 // deal with hptr<> in a user friendly way. Use of these functions
 // is highly recommended. 
-template <typename O> class hptr {
+
+template <typename O> class hptr_base {
 public:
     typedef O Object;
-private:
+protected:
     Object* target;     // TODO static heap optimization && volatility
     IMemoryManager* mm; // TODO assign on copy operators
     bool isRegistered;  // TODO Pack flag into address
 public:
-    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) 
-        : target(object), mm(mm), isRegistered(registerPointer)
+    hptr_base(Object* object, IMemoryManager* mm, bool registerPointer = true)
+    : target(object), mm(mm), isRegistered(registerPointer)
     {
         if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
     }
     
-    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
+    hptr_base(const hptr_base<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
     {
         if (mm) { mm->registerExternalPointer((TObject**) &target); }
     }
     
-    ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
+    ~hptr_base() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
     
-    hptr<Object>& operator = (hptr<Object>& pointer) { target = pointer.target; return *this; }
-    hptr<Object>& operator = (Object* object) { target = object; return *this; }
+    //hptr_base<Object>& operator = (hptr_base<Object>& pointer) { target = pointer.target; return *this; }
+    //hptr_base<Object>& operator = (Object* object) { target = object; return *this; }
     
     Object* rawptr() const { return target; }
     Object* operator -> () const { return target; }
@@ -116,94 +117,47 @@ public:
     operator Object*() const { return target; }
     
     template<typename C> C* cast() const { return (C*) target; }
+};
+
+template <typename O> class hptr : public hptr_base<O> {
+public:
+    typedef O Object;
+public:
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<O>(object, mm, registerPointer) {}
+    hptr(const hptr<Object>& pointer) : hptr_base<O>(pointer) { }
+    hptr<Object>& operator = (Object* object) { hptr_base<O>::target = object; return *this; }
     
-//      template<typename I>
-//      typeof(target->operator[](I()))& operator [] (I index) const { return target->operator[](index); }
-     
-//     template<typename I>
-//     typeof(target->operator[](1))& operator [] (I index) const { return target->operator[](index); }
+    template<typename I>
+    Object& operator [] (I index) const { return hptr_base<O>::target->operator[](index); }
 };
 
 // Hptr specialization for TArray<> class.
 // Provides typed [] operator that allows
 // convinient indexed access to the array contents
-template<typename T> class hptr< TArray<T> >
-{
+template <typename T> class hptr< TArray<T> > : public hptr_base< TArray<T> > {
 public:
     typedef TArray<T> Object;
-private:
-    // TODO see in base hptr<> 
-    Object* target;
-    IMemoryManager* mm;
-    bool isRegistered;
 public:
-    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) 
-    : target(object), mm(mm), isRegistered(registerPointer)
-    {
-        if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
-    }
-    
-    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
-    {
-        if (mm) { mm->registerExternalPointer((TObject**) &target); }
-    }
-    
-    ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
-    
-    hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
-    hptr<Object>& operator = (Object* object) { target = object; return *this; }
-    
-    Object* rawptr() const { return target; }
-    Object* operator -> () const { return target; }
-   // Object& (operator*)() const { return *target; }
-    operator Object*() const { return target; }
-    
-    template<typename C> C* cast() { return (C*) target; }
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
+    hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
+    hptr<Object>& operator = (Object* object) { hptr_base<Object>::target = object; return *this; }
     
     template<typename I>
-    T& operator [] (I index) const { return target->operator[](index); }
+    T& operator [] (I index) const { return hptr_base<Object>::target->operator[](index); }
 };
 
 // Hptr specialization for TByteObject.
 // Provides typed [] operator that allows
 // convinient indexed access to the bytearray contents
-template<> class hptr<TByteObject>
-{
+template <> class hptr<TByteObject> : public hptr_base<TByteObject> {
 public:
     typedef TByteObject Object;
-private:
-    // TODO see in base hptr<> 
-    Object* target;
-    IMemoryManager* mm;
-    bool isRegistered;
 public:
-    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) 
-    : target(object), mm(mm), isRegistered(registerPointer)
-    {
-        if (mm && registerPointer) mm->registerExternalPointer((TObject**) &target);
-    }
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
+    hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
     
-    hptr(const hptr<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
-    {
-        if (mm) { mm->registerExternalPointer((TObject**) &target); }
-    }
-    
-    ~hptr() { if (mm && isRegistered) mm->releaseExternalPointer((TObject**) &target); }
-    
-    hptr<Object>& operator = (const hptr<Object>& pointer) { target = pointer.target; return *this; }
-    hptr<Object>& operator = (Object* object) { target = object; return *this; }
-    
-    Object* rawptr() const { return target; }
-    Object* operator -> () const { return target; }
-    Object& (operator*)() const { return *target; }
-    operator Object*() const { return target; }
-    
-    template<typename C> C* cast() { return (C*) target; }
-    
-    //template<typename I>
-    uint8_t& operator [] (uint32_t index) const { return target->operator[](index); }
+    uint8_t& operator [] (uint32_t index) const { return hptr_base<Object>::target->operator[](index); }
 };
-
 
 // Simple memory manager implementing classic baker two space algorithm.
 // Each time two separate heaps are allocated but only one is active.
