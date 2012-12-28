@@ -554,8 +554,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
     TSymbolArray& literals   = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
-        case selfReturn:
-        {
+        case selfReturn: {
             ec.returnedValue  = arguments[0]; // arguments[0] always keep self
             ec.currentContext = ec.currentContext->previousContext;
             
@@ -570,8 +569,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
         } break;
         
-        case stackReturn:
-        {
+        case stackReturn: {
             ec.returnedValue  = stack[--ec.stackTop];
             ec.currentContext = ec.currentContext->previousContext;
             
@@ -586,8 +584,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
         } break;
         
-        case blockReturn:
-        {
+        case blockReturn: {
             ec.returnedValue = stack[--ec.stackTop];
             TBlock* contextAsBlock = ec.currentContext.cast<TBlock>();
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
