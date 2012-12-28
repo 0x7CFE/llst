@@ -477,8 +477,8 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 { 
     TObjectArray& stack = *ec.currentContext->stack;
     TObject*        top = stack[--ec.stackTop];
-
-    switch(ec.instruction.low) {
+    
+    switch( (UnaryOpcode) ec.instruction.low ) {
         case isNil  : ec.returnedValue = (top == globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         case notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         
@@ -554,7 +554,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
     TSymbolArray& literals   = * ec.currentContext->method->literals;
     
     switch(ec.instruction.low) {
-        case selfReturn: {
+        case selfReturn:
+        {
             ec.returnedValue  = arguments[0]; // arguments[0] always keep self
             ec.currentContext = ec.currentContext->previousContext;
             
@@ -585,7 +586,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             (*ec.currentContext->stack)[ec.stackTop++] = ec.returnedValue;
         } break;
         
-        case blockReturn: {
+        case blockReturn:
+        {
             ec.returnedValue = stack[--ec.stackTop];
             TBlock* contextAsBlock = ec.currentContext.cast<TBlock>();
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
@@ -724,14 +726,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doExecutePrimitive(hptr<TProcess>& proc
             // Leave the context alone
             break;
         
-        case 19:
+        case throwError: // 19
             fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
             return returnError;
         
-        //case flushCache:                        
+        //case flushCache:
             //We don't need to put anything onto the stack
         
-        case blockInvoke:
+        case blockInvoke: // 8
             // We do not want to leave the block context which was just loaded
             // So we're continuing without context switching
             break;
@@ -1041,7 +1043,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         } break;
         
         case flushCache: // 34
-            //FIXME returnedValue is not to be globals.nilObject
             flushMethodCache();
             break;
             
@@ -1064,9 +1065,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TObject* destinationStopOffset  = stack[--ec.stackTop];
             TObject* destinationStartOffset = stack[--ec.stackTop];
             
-            bool isSucceeded = doBulkReplace( destination, destinationStartOffset, 
-                                              destinationStopOffset, source, 
-                                              sourceStartOffset );
+            bool isSucceeded = doBulkReplace( destination, destinationStartOffset, destinationStopOffset,
+                                              source, sourceStartOffset );
             
             if (! isSucceeded) {
                 failed = true;
@@ -1087,8 +1087,9 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             while (i > 0)
                 args[--i] = pStack[--ec.stackTop];
             
-            //TODO call primitive
-                fprintf(stderr, "VM: Unimplemented or invalid primitive %d\n", opcode);
+            //TODO call primitive(opcode, args)
+            
+            fprintf(stderr, "VM: Unimplemented or invalid primitive %d\n", opcode);
         }
     }
     
@@ -1155,8 +1156,8 @@ TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, int32_t leftOperand, in
         }
         
         default:
-            fprintf(stderr, "VM: Invalid smallint opcode %d", opcode);
-            return globals.nilObject; /* FIXME possible error */
+            fprintf(stderr, "VM: Invalid SmallInt opcode %d\n", opcode);
+            return globals.nilObject;
     }
 }
 
