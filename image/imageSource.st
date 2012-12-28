@@ -1625,12 +1625,13 @@ sort
 !
 
 METHOD Collection
-sort: criteria | this size left right mediane result |
+sort: criteria | size left right mediane result |
     "TODO This code requires optimization"
+    (self isEmpty) ifTrue: [^self].
     
-    mediane <- this first. this removeFirst.
-    left    <- this select: [ :x |  criteria value: x value: mediane ].
-    right   <- this select: [ :x | (criteria value: x value: mediane) not ].
+    mediane <- self first. self removeFirst.
+    left    <- self select: [ :x |  criteria value: x value: mediane ].
+    right   <- self select: [ :x | (criteria value: x value: mediane) not ].
     
     result <- List new.
     result addAll:  (left sort: criteria).
