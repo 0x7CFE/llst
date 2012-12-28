@@ -63,17 +63,6 @@ private:
         notNil = 1
     };
     
-    enum TClassID {
-        Object,
-        Class,
-        Method,
-        Context,
-        Process,
-        Array,
-        Dictionary,
-        Block,
-    };
-    
     enum SmallIntOpcode {
         smallIntAdd = 10,
         smallIntDiv,
@@ -128,6 +117,7 @@ private:
     struct TVMExecutionContext {
     private:
         // TODO Think about proper memory organization
+        // TODO Implement stackPush / stackPop / reloadContextData etc ?
         IMemoryManager* memoryManager;
     public:
         hptr<TContext> currentContext;
@@ -233,7 +223,7 @@ public:
         flushMethodCache();
     }
     
-    TExecuteResult execute(TProcess* process, uint32_t ticks);
+    TExecuteResult execute(TProcess* p, uint32_t ticks);
     template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
     
