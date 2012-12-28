@@ -123,12 +123,12 @@ template <typename O> class hptr : public hptr_base<O> {
 public:
     typedef O Object;
 public:
-    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<O>(object, mm, registerPointer) {}
-    hptr(const hptr<Object>& pointer) : hptr_base<O>(pointer) { }
-    hptr<Object>& operator = (Object* object) { hptr_base<O>::target = object; return *this; }
+    hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
+    hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
+    hptr<Object>& operator = (Object* object) { hptr_base<Object>::target = object; return *this; }
     
     template<typename I>
-    Object& operator [] (I index) const { return hptr_base<O>::target->operator[](index); }
+    Object& operator [] (I index) const { return hptr_base<Object>::target->operator[](index); }
 };
 
 // Hptr specialization for TArray<> class.
