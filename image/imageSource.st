@@ -1627,10 +1627,6 @@ sort
 METHOD Collection
 sort: criteria | this size left right mediane result |
     "TODO This code requires optimization"
-
-    size <- self size.
-    this <- self asList.
-    (size < 2) ifTrue: [ ^self ].
     
     mediane <- this first. this removeFirst.
     left    <- this select: [ :x |  criteria value: x value: mediane ].
@@ -3694,8 +3690,8 @@ value: v
 METHOD LiteralNode
 compile: encoder block: inBlock
 	super compile: encoder.
-	value == nil ifTrue: [ ^ encoder genHigh: 5 low: 10 ].
-	value == true ifTrue: [ ^ encoder genHigh: 5 low: 11 ].
+	value == nil   ifTrue: [ ^ encoder genHigh: 5 low: 10 ].
+	value == true  ifTrue: [ ^ encoder genHigh: 5 low: 11 ].
 	value == false ifTrue: [ ^ encoder genHigh: 5 low: 12 ].
 	(((value class == SmallInt) and:
 	 [value < 10]) and: [value negative not])

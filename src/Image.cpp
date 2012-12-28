@@ -87,12 +87,12 @@ bool Image::openImageFile(const char* fileName)
 
     // Mapping the image file to the memory
     m_imageMap = mmap(
-        0,              // let the kernel provide the address
+        0,                // let the kernel provide the address
         m_imageFileSize,  // map the entire image file
-        PROT_READ,      // read only access
-        MAP_PRIVATE,    // private mapping only for us
+        PROT_READ,        // read only access
+        MAP_PRIVATE,      // private mapping only for us
         m_imageFileFD,    // map this file
-        0);             // from the very beginning (zero offset)
+        0);               // from the very beginning (zero offset)
         
     if (!m_imageMap) {
         fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
@@ -140,9 +140,7 @@ TObject* Image::readObject()
 {
     // TODO error checking 
     
-    //fprintf(stderr, "Reading image record type\n");
     TImageRecordType type = (TImageRecordType) readWord();
-    //fprintf(stderr, "Reading record %d\n", (uint32_t) type);
     switch (type) {
         case invalidObject: 
             fprintf(stderr, "Invalid object at offset %p\n", (void*) (m_imagePointer - (uint8_t*)m_imageMap));
@@ -163,7 +161,6 @@ TObject* Image::readObject()
             
             for (uint32_t i = 0; i < fieldsCount; i++)
                 newObject->putField(i, readObject());
-                //FIXME ? globals.initialMethod.temporarySize pointing to nilObject. i == 4
             
             return newObject;
         }
