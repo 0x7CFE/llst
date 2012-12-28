@@ -7,6 +7,8 @@
 #include <vector>
 #include <list>
 
+// Memory manager statics is held
+// in the following structue
 struct TMemoryManagerInfo {
     uint32_t collectionsCount;
     uint32_t allocationsCount;

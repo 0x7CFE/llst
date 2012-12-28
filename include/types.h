@@ -10,6 +10,9 @@
 struct TClass;
 struct TObject;
 
+// All our objects needed to be aligned by the 4 bytes at least.
+// This function helps to calculate the buffer size enough to fit the data,
+// yet being a multiple of 4 (or 8 depending on the pointer size)
 inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
 //inline size_t correctPadding(size_t size) { return (size + 3) & ~3; }
 
@@ -21,6 +24,7 @@ inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & 
 // TODO May be we should refactor TInteger to a class which provides cast operators.
 typedef int32_t TInteger;
 
+// Helper functions for TInteger operation
 inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
 inline int32_t  getIntegerValue(TInteger value) { return (int32_t) (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
@@ -134,7 +138,7 @@ public:
     // Byte objects are said to be binary
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
     {
-        // Zeroing data
+        // Zeroing byte object data
         memset((void*)fields, 0, dataSize);
     }
     
@@ -188,10 +192,13 @@ struct TSymbol : public TByteObject {
 // TString represents the Smalltalk's String class. 
 // Strings are binary objects that hold raw character bytes. 
 struct TString : public TByteObject { 
-    
     static const char* InstanceClassName() { return "String"; }
 };
 
+// Chars are intermediate representation of single printable character
+// When #String>>at: method is called an instance of Char is returned.
+// Note that actually String is NOT the array of Chars. String is binary
+// object holding raw character bytes which then interpreted as characters
 struct TChar : public TObject {
     TInteger value;
     static const char* InstanceClassName() { return "Char"; }

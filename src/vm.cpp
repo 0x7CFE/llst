@@ -16,6 +16,8 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
         return globals.nilObject;
     }
     
+    // VM need to perform some actions if collection was occured.
+    // First of all we need to invalidate the method cache
     if (m_lastGCOccured)
         onCollectionOccured();
     
@@ -47,6 +49,8 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
         return (TByteObject*) globals.nilObject;
     }
     
+    // VM need to perform some actions if collection was occured.
+    // First of all we need to invalidate the method cache
     if (m_lastGCOccured)
         onCollectionOccured();
     
@@ -144,16 +148,16 @@ void SmalltalkVM::updateMethodCache(TSymbol* selector, TClass* klass, TMethod* m
     uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
     TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    entry.methodName = selector;
+    entry.methodName    = selector;
     entry.receiverClass = klass;
-    entry.method = method;
+    entry.method        = method;
 }
 
 TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 {
     // First of all checking the method cache
     // Frequently called methods most likely will be there
-    TMethod* method = (TMethod*) lookupMethodInCache(selector, klass);
+    TMethod* method = lookupMethodInCache(selector, klass);
     if (method)
         return method; // We're lucky!
     
@@ -180,8 +184,10 @@ void SmalltalkVM::flushMethodCache()
 
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
 {
+    // Protecting the process pointer
     hptr<TProcess> currentProcess = newPointer(p);
-    
+
+    // Initializing an execution context
     TVMExecutionContext ec(m_memoryManager);
     ec.currentContext = currentProcess->context;
     ec.loadPointers(); // Loads bytePointer & stackTop
@@ -206,8 +212,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             return returnTimeExpired;
         }
             
-        // decoding the instruction
-        //TInstruction instruction;
+        // Decoding the instruction
         ec.instruction.low = (ec.instruction.high = byteCodes[ec.bytePointer++]) & 0x0F;
         ec.instruction.high >>= 4;
         if (ec.instruction.high == opExtended) {
@@ -215,6 +220,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             ec.instruction.low = byteCodes[ec.bytePointer++];
         }
         
+        // And executing it
         switch (ec.instruction.high) {
             case opPushInstance:    stack[ec.stackTop++] = instanceVariables[ec.instruction.low]; break;
             case opPushArgument:    stack[ec.stackTop++] = arguments[ec.instruction.low];         break;
@@ -225,14 +231,14 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             
             case opAssignTemporary: temporaries[ec.instruction.low] = stack[ec.stackTop - 1];     break;
             case opAssignInstance: {
-                TObject*  value      =   stack[ec.stackTop - 1];
+                TObject*  newValue   =   stack[ec.stackTop - 1];
                 TObject** objectSlot = & instanceVariables[ec.instruction.low];
                 
                 // Checking whether we need to register current object slot in the GC
-                checkRoot(value, objectSlot);
+                checkRoot(newValue, objectSlot);
                 
                 // Performing an assignment
-                instanceVariables[ec.instruction.low] = value;
+                instanceVariables[ec.instruction.low] = newValue;
             } break;
                 
             case opMarkArguments: doMarkArguments(ec); break;
@@ -262,7 +268,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
         }
     }
 }
-
 
 void SmalltalkVM::doPushBlock(TVMExecutionContext& ec) 
 {
@@ -322,7 +327,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 void SmalltalkVM::doMarkArguments(TVMExecutionContext& ec) 
 {
     hptr<TObjectArray> args  = newObject<TObjectArray>(ec.instruction.low);
-    TObjectArray& stack = * ec.currentContext->stack;
+    TObjectArray& stack      = * ec.currentContext->stack;
     
     // This operation takes instruction.low arguments 
     // from the top of the stack and creates new array with them
@@ -726,7 +731,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doExecutePrimitive(hptr<TProcess>& proc
 TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed) {
     TObjectArray& stack = *ec.currentContext->stack;
     
-    switch(opcode) {
+    switch (opcode) {
         // FIXME opcodes 253-255 are not standard
         case 255: 
             // Debug trap
@@ -1058,7 +1063,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
 
 TObject* SmalltalkVM::doSmallInt( SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand)
 {
-    switch(opcode) {
+    switch (opcode) {
         case smallIntAdd:
             return reinterpret_cast<TObject*>(newInteger( leftOperand + rightOperand )); //FIXME possible overflow
         
