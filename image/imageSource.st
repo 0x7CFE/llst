@@ -1041,10 +1041,8 @@ value
 METHOD Undefined
 benchmark: size | list ms |
     list <- List new.
-    1 to: size do: [ :x | list add: x atRandom ].
-    "list printNl."
+    1 to: size do: [ :x | list add: 1000 atRandom ].
     ms <- Timer millisecondsToRun: [ list <- list sort ].
-    "list printNl."
     'Sorted in ms: ' print. ms printNl.
 !
 
@@ -1053,7 +1051,7 @@ benchmark2: random | dict ms |
     dict <- Dictionary new.
     ms <- Timer millisecondsToRun: [ 
     random 
-        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 100 atRandom ] ]
+        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
         ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
     dict printNl. 'size ' print. dict size printNl.
     ms printNl
@@ -1625,19 +1623,24 @@ sort
 !
 
 METHOD Collection
-sort: criteria | size left right mediane result |
-    "TODO This code requires optimization"
+sort: criteria | left right mediane |
     (self isEmpty) ifTrue: [^self].
-    
+
     mediane <- self popFirst.
-    left    <- self select: [ :x |  criteria value: x value: mediane ].
-    right   <- self select: [ :x | (criteria value: x value: mediane) not ].
-    
-    result <- List new.
-    result addAll:  (left sort: criteria).
-    result addLast: mediane.
-    result addAll:  (right sort: criteria).
-    ^result.
+
+    left  <- List new.
+    right <- List new.
+    self do: [ :x |
+        (criteria value: x value: mediane)
+            ifTrue:  [ left  add: x ]
+            ifFalse: [ right add: x ] ].
+
+    left  <- left  sort: criteria.
+    right <- right sort: criteria.
+            
+    right add: mediane.
+    "left reverseDo: [ :x | right add: x ]."
+    ^ left appendList: right
 !
 
 METHOD Collection
@@ -1864,7 +1867,7 @@ replaceFrom: start to: stop with: replacement
 !
 METHOD Array
 sort: aBlock
-    ^ (super sort: aBlock) asArray
+    ^ (super asList sort: aBlock) asArray
 !
 
 COMMENT FIXME insert replaceFrom:..... here
@@ -2119,6 +2122,19 @@ addLast: anElement
 		ifTrue: [ self add: anElement]
 		ifFalse: [ elements addLast: anElement ].
 	^ anElement
+!
+METHOD List
+firstLink
+    ^elements
+!
+METHOD List
+appendList: aList | element |
+    (elements isNil) ifTrue: [ elements <- aList firstLink. ^self ].
+
+    element <- elements.
+    [element next isNil] whileFalse: [element <- element next].
+    element next: aList firstLink.
+    ^self
 !
 METHOD List
 addAll: aCollection
@@ -2888,6 +2904,10 @@ value: val
 METHOD Link
 next
 	^ next
+!
+METHOD Link
+next: aLink
+    next <- aLink
 !
 METHOD Link
 do: aBlock
