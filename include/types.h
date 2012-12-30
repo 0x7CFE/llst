@@ -43,6 +43,7 @@
 
 struct TClass;
 struct TObject;
+struct TMethod;
 
 // All our objects needed to be aligned by the 4 bytes at least.
 // This function helps to calculate the buffer size enough to fit the data,
@@ -261,11 +262,8 @@ struct TArray : public TObject {
     Element& operator [] (I index) { return (Element&) fields[index]; }
 };
 
-struct TMethod;
 typedef TArray<TObject*> TObjectArray;
 typedef TArray<TSymbol*> TSymbolArray;
-typedef TArray<TMethod*> TMethodArray;
-
 
 // Context class is the heart of Smalltalk's VM execution mechanism.
 // Basicly, it holds all information needed to execute a method.
