@@ -1,0 +1,16 @@
+; ModuleID = 'types'
+%struct.TSize = type { i32, i32, i32, i32 }
+%struct.TObject = type { %struct.TSize, %struct.TClass*, [0 x %struct.TClass*] }
+%struct.TByteObject = type { %struct.TObject }
+%struct.TSymbol = type { %struct.TByteObject }
+%struct.TString = type { %struct.TByteObject }
+%struct.TChar = type { %struct.TObject }
+%struct.TArray = type { %struct.TObject }
+%struct.TObjectArray = type { %struct.TObject }
+%struct.TSymbolArray = type { %struct.TObject }
+%struct.TContext = type { %struct.TObject, %struct.TMethod*, %struct.TObjectArray*, %struct.TObjectArray*, %struct.TObjectArray*, i32, i32, %struct.TContext* }
+%struct.TBlock = type { %struct.TContext, i32, %struct.TContext*, i32 }
+%struct.TMethod = type { %struct.TObject, %struct.TSymbol*, %struct.TByteObject*, %struct.TSymbolArray*, i32, i32, %struct.TClass*, %struct.TString*, %struct.TObject* }
+%struct.TDictionary = type { %struct.TObject, %struct.TSymbolArray*, %struct.TObjectArray* }
+%struct.TClass = type { %struct.TObject, %struct.TSymbol*, %struct.TClass*, %struct.TDictionary*, i32, %struct.TSymbolArray*, %struct.TObject* }
+%struct.TProcess = type { %struct.TObject, %struct.TContext*, %struct.TObject*, %struct.TObject* }
