@@ -1,8 +1,7 @@
 /*
- *    LLVMMemoryManager.cpp
+ *    jit.h
  *
- *    Implementation of the MM aware of LLVM specifics
- *    such as function stack traversing.
+ *    LLVM related routines
  *
  *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
  *
@@ -33,29 +32,12 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <memory.h>
+#include <types.h>
 
-// This will be used by llvm functions to store frame stack info
-extern "C" { LLVMMemoryManager::TStackEntry* llvm_gc_root_chain = 0; }
+#include <llvm/Function.h>
 
-void LLVMMemoryManager::moveObjects()
-{
-    // First of all doing our usual job
-    BakerMemoryManager::moveObjects();
+class MethodCompiler {
+public:
+     llvm::Function* compileMethod(TMethod* method);
+};
 
-    // Then, traversing the call stack pointers
-    for (TStackEntry* entry = llvm_gc_root_chain; entry != 0; entry = entry->next) {
-        // NOTE We do not using the meta info
-
-        // Iterating through the roots in the current stack frame
-        for (int32_t index = 0, count = entry->map->numRoots; index < count; index++) {
-            TMovableObject** objectSlot = (TMovableObject**) entry->roots[index];
-            *objectSlot = moveObject(*objectSlot);
-        }
-    }
-}
-
-LLVMMemoryManager::~LLVMMemoryManager()
-{
-    
-}
