@@ -251,7 +251,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
         ec.instruction.high >>= 4;
         if (ec.instruction.high == opExtended) {
             ec.instruction.high = ec.instruction.low;
-            ec.instruction.low = byteCodes[ec.bytePointer++];
+            ec.instruction.low  = byteCodes[ec.bytePointer++];
         }
         
         // And executing it

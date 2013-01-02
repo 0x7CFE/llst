@@ -35,8 +35,28 @@
 #include <types.h>
 
 #include <llvm/Function.h>
+#include <llvm/LLVMContext.h>
+#include <llvm/Module.h>
 
 class MethodCompiler {
+private:
+    // This structure contains working data which is
+    // used during the compilation process. 
+    // Add more fields if necessary.
+    
+    struct TJITContext {
+        TMethod*           method;
+        llvm::Function*    function;
+        llvm::Module*      module;
+        llvm::BasicBlock*  basicBlock;
+
+        llvm::LLVMContext& llvmContext;
+
+        TJITContext(TMethod* method, llvm::LLVMContext context)
+            : method(method), llvmContext(context) { };
+    };
+
+    void doPushInstance(TJITContext& jitContext);
 public:
      llvm::Function* compileMethod(TMethod* method);
 };
