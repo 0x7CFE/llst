@@ -100,6 +100,11 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     return true;
 }
 
+void BakerMemoryManager::growHeap()
+{
+    
+}
+
 void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
     if (gcOccured)
@@ -109,6 +114,12 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
+
+            // If even after collection there is too less space
+            // we may try to expand the heap
+//             if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 16))
+//                 growHeap();
+
             if (gcOccured)
                 *gcOccured = true;
             continue;
@@ -323,18 +334,9 @@ void BakerMemoryManager::collectGarbage()
     // Storing timestamp on start
     timeval tv1;
     gettimeofday(&tv1, NULL);
-    
-    // Here we need to check the rootStack, staticRoots and the VM execution context
-    TStaticRootsIterator iRoot = m_staticRoots.begin();
-    for (; iRoot != m_staticRoots.end(); ++iRoot) {
-        **iRoot = moveObject(**iRoot);
-    }
 
-    // Updating external references. Typically this is pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
-    }
+    // Moving the live objects in the new heap
+    moveObjects();
     
     // Storing timestamp of the end
     timeval tv2;
@@ -342,6 +344,21 @@ void BakerMemoryManager::collectGarbage()
     
     // Calculating total microseconds spent in the garbage collection procedure
     m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+}
+
+void BakerMemoryManager::moveObjects()
+{
+    // Here we need to check the rootStack, staticRoots and the VM execution context
+    TStaticRootsIterator iRoot = m_staticRoots.begin();
+    for (; iRoot != m_staticRoots.end(); ++iRoot) {
+        **iRoot = moveObject(**iRoot);
+    }
+    
+    // Updating external references. Typically this is pointers stored in the hptr<>
+    TPointerIterator iExternalPointer = m_externalPointers.begin();
+    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+        **iExternalPointer = moveObject(**iExternalPointer);
+    }
 }
 
 bool BakerMemoryManager::isInStaticHeap(void* location)
