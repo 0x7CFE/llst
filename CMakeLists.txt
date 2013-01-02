@@ -22,7 +22,7 @@ file(GLOB CPP_FILES "src/*.cpp")
 
 add_executable(llst ${CPP_FILES})
 
-set (COMPILER_FLAGS "-O3 -m32 -march=native -mtune=native -mfpmath=sse -Ofast -flto -funroll-loops -Wall")
+set (COMPILER_FLAGS "-O3 -m32 -march=native -mtune=native -Ofast -flto -funroll-loops -Wall")
 set (LINKER_FLAGS "-m32 -flto -L/usr/lib32 -Wall")
 
 set_target_properties(llst PROPERTIES COMPILE_FLAGS "${COMPILER_FLAGS}")

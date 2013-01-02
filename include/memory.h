@@ -198,34 +198,39 @@ private:
         uint32_t top;
         TObject* data[0];
     };
-    
-    // During GC we need to treat all objects in a very simple manner, 
+
+protected:
+    // During GC we need to treat all objects in a very simple manner,
     // just as pointer holders. Class field is also a pointer so we
     // treat it just as one more object field.
     struct TMovableObject {
         TSize size;
         TMovableObject* data[0];
-        
+
         TMovableObject(uint32_t dataSize, bool isBinary = false) : size(dataSize, isBinary) { }
     };
-    TMovableObject* moveObject(TMovableObject* object);
+
+    /*virtual*/ TMovableObject* moveObject(TMovableObject* object);
+    virtual void moveObjects();
+    virtual void growHeap();
     
+private:
     // These variables contain an array of pointers to objects from the
     // static heap to the dynamic one. Ihey are used during the GC
     // as a root for pointer iteration.
-    
+
     // FIXME Temporary solution before GC will prove it's working
     //       Think about better memory organization
     typedef std::list<TMovableObject**> TStaticRoots;
     typedef std::list<TMovableObject**>::iterator TStaticRootsIterator;
     TStaticRoots m_staticRoots;
-    
+
     // External pointers are typically managed by hptr<> template.
     // When pointer to a heap object is stored outside of the heap,
     // specific actions need to be taken in order to prevent pointer
     // invalidation. GC uses this information to correct external
     // pointers so they will point to correct location even after garbage
-    // collection. Usual operating pattern is very similar to the stack, 
+    // collection. Usual operating pattern is very similar to the stack,
     // so list container seems to be a good choice.
     typedef std::list<TMovableObject**> TPointerList;
     typedef std::list<TMovableObject**>::iterator TPointerIterator;
@@ -243,7 +248,7 @@ public:
     
     virtual void  addStaticRoot(TObject** pointer);
     virtual void  removeStaticRoot(TObject** pointer);
-    inline virtual bool isInStaticHeap(void* location);
+    virtual bool  isInStaticHeap(void* location);
     
     // External pointer handling
     virtual void  registerExternalPointer(TObject** pointer);
@@ -254,6 +259,27 @@ public:
     virtual uint32_t allocsBeyondCollection() { return m_allocationsCount; }
     
     virtual TMemoryManagerInfo getStat();
+};
+
+class LLVMMemoryManager : public BakerMemoryManager {
+protected:
+    virtual void moveObjects();
+    
+public:
+    struct TFrameMap {
+        int32_t numRoots;
+        int32_t numMeta;
+        const void* meta[0];
+    };
+
+    struct TStackEntry {
+        TStackEntry* next;
+        const TFrameMap* map;
+        void* roots[0];
+    };
+
+    LLVMMemoryManager();
+    virtual ~LLVMMemoryManager();
 };
 
 class Image {
