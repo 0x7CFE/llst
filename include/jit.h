@@ -41,26 +41,60 @@
 
 class MethodCompiler {
 private:
-    // This structure contains working data which is
-    // used during the compilation process. 
-    // Add more fields if necessary.
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
+
+    // This structure contains working data which is
+    // used during the compilation process.
+    // Add more fields if necessary.
     struct TJITContext {
-        TMethod*           method;
-        llvm::Function*    function;
-        llvm::Module*      module;
+        TMethod*            method;       // Smalltalk method we're currently processing
 
-        llvm::LLVMContext& llvmContext;
+        llvm::Function*     function;     // LLVM function that is created based on method
+        //llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
+        llvm::Value*        arguments;    // LLVM representation for method arguments array
+        llvm::Value*        temporaries;  // LLVM representation for method temporaries array
+        llvm::Value*        self;         // LLVM representation for current object
+        
+        // Value stack is used as a FIFO value holder during the compilation process.
+        // Software VM uses object arrays to hold the values in dynamic.
+        // Instead we're interpriting the push, pop and assign instructions
+        // as a commands which values should be linked together. For example,
+        // two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
+        // will be linked together with effect of instanceVariables[2] = temporaries[1]
+        std::vector<llvm::Value*> valueStack;
 
-        TJITContext(TMethod* method, llvm::LLVMContext& context)
-            : method(method), llvmContext(context) { };
+        void pushValue(llvm::Value* value) { valueStack.push_back(value); }
+        llvm::Value* popValue() {
+            llvm::Value* value = valueStack.back();
+            valueStack.pop_back();
+            return value;
+        }
+        
+        TJITContext(TMethod* method) : method(method) { };
     };
 
-    void doPushInstance(TJITContext& jitContext);
+    struct TObjectTypes {
+        llvm::StructType* object;
+        llvm::StructType* context;
+        llvm::StructType* method;
+        llvm::StructType* symbol;
+        llvm::StructType* objectArray;
+        llvm::StructType* symbolArray;
+    };
+    TObjectTypes ot;
+    void initObjectTypes();
+
+    void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
+    
+    llvm::Function* createFunction(TMethod* method);
 public:
     llvm::Function* compileMethod(TMethod* method);
+
     MethodCompiler(llvm::Module* JITModule, llvm::Module* TypeModule)
-        : m_JITModule(JITModule), m_TypeModule(TypeModule) { }
+        : m_JITModule(JITModule), m_TypeModule(TypeModule)
+    {
+        initObjectTypes();
+    }
 };
 

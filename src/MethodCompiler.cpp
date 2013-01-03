@@ -38,40 +38,38 @@
 
 using namespace llvm;
 
-Function* MethodCompiler::compileMethod(TMethod* method)
+void MethodCompiler::initObjectTypes()
 {
-    TByteObject& byteCodes   = * method->byteCodes;
-    uint32_t     byteCount   = byteCodes.getSize();
-    uint32_t     bytePointer = 0;
-    
-    StructType*  LLSTObject      = m_TypeModule->getTypeByName("struct.TObject");
-    StructType*  LLSTContext     = m_TypeModule->getTypeByName("struct.TContext");
-    //StructType*  LLSTMethod      = m_TypeModule->getTypeByName("struct.TMethod");
-    //StructType*  LLSTSymbol      = m_TypeModule->getTypeByName("struct.TSymbol");
-    //StructType*  LLSTObjectArray = m_TypeModule->getTypeByName("struct.TObjectArray");
-    //StructType*  LLSTSymbolArray = m_TypeModule->getTypeByName("struct.TSymbolArray");
-    
-    std::vector<Type*> methodParams;
-    methodParams.push_back(LLSTContext);
-    
-    FunctionType* methodType = FunctionType::get(
-        /*result*/ LLSTObject,
-        /*params*/ methodParams,
-        /*varArg*/ false
-    );
+    ot.object      = m_TypeModule->getTypeByName("struct.TObject");
+    ot.context     = m_TypeModule->getTypeByName("struct.TContext");
+    ot.method      = m_TypeModule->getTypeByName("struct.TMethod");
+    ot.symbol      = m_TypeModule->getTypeByName("struct.TSymbol");
+    ot.objectArray = m_TypeModule->getTypeByName("struct.TObjectArray");
+    ot.symbolArray = m_TypeModule->getTypeByName("struct.TSymbolArray");
+}
 
-    std::string methodName = method->klass->name->toString() + ">>" + method->name->toString();
-    Function* resultMethod  = cast<Function>( m_JITModule->getOrInsertFunction(methodName, methodType) );
-    Value*    methodContext;
-    {
-        Function::arg_iterator args = resultMethod->arg_begin();
-        Value* methodContext = args++;
-        methodContext->setName("context");
-    }
-    BasicBlock* BB = BasicBlock::Create(m_JITModule->getContext(), "entry", resultMethod);
+Function* MethodCompiler::createFunction(TMethod* method)
+{
+    std::vector<Type*> methodParams;
+    methodParams.push_back(ot.context);
+
+    FunctionType* functionType = FunctionType::get(
+        ot.object,    // function return value
+        methodParams, // parameters
+        false         // we're not dealing with vararg
+    );
     
-    llvm::IRBuilder<> builder(BB);
-    Value* methodMethod = builder.CreateGEP(methodContext, builder.getInt32(1), "method");
+    std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+    return cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType) );
+}
+
+void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& context)
+{
+    // First argument of every function is the pointer to the TContext object
+    Value* contextObject = (Value*) (context.function->arg_begin()); // FIXME is this cast correct?
+    contextObject->setName("context");
+    
+    //Value* methodObject = builder.CreateGEP(methodContext, builder.getInt32(1), "method");
     
     std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
     argsIdx.reserve(4);
@@ -80,7 +78,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     argsIdx.push_back( builder.getInt32(2) ); // TObject.fields *
     argsIdx.push_back( builder.getInt32(0) ); // TObject.fields
     
-    Value* methodArgs   = builder.CreateGEP(methodContext, argsIdx, "args");
+    Value* methodArguments   = builder.CreateGEP(contextObject, argsIdx, "arguments");
     
     std::vector<Value*> tmpsIdx;
     tmpsIdx.reserve(4);
@@ -89,21 +87,30 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     tmpsIdx.push_back( builder.getInt32(2) );
     tmpsIdx.push_back( builder.getInt32(0) );
     
-    Value* methodTemps  = builder.CreateGEP(methodContext, tmpsIdx, "temporaries");
-    Value* methodSelf   = builder.CreateGEP(methodArgs, builder.getInt32(0), "self");
-    
-    std::vector<Value*> stack;
-    
-    //TJITContext jitContext(method, getGlobalContext());
+    context.temporaries = builder.CreateGEP(contextObject, tmpsIdx, "temporaries");
+    context.self = builder.CreateGEP(methodArguments, builder.getInt32(0), "self");
+}
 
-    // TODO initialize llvm context data, create the function
-    // Module should be initialized somewhere else
-    // jitContext.module = new Module("llst", jitContext.llvmContext); 
-    // jitContext.function = Function::Create();
+Function* MethodCompiler::compileMethod(TMethod* method)
+{
+    TByteObject& byteCodes   = * method->byteCodes;
+    uint32_t     byteCount   = byteCodes.getSize();
+    uint32_t     bytePointer = 0;
+    
+    TJITContext jitContext(method);
+    
+    // Creating the function named as "Class>>method"
+    jitContext.function = createFunction(method);
 
-    // TODO Write the function preamble such as init stack,
-    //      temporaries and other stuff. Don't forget to
-    //      mark it with @llvm.gcroot() intrinsic
+    // Creating the basic block and inserting it into the function
+    BasicBlock* basicBlock = BasicBlock::Create(m_JITModule->getContext(), "entry", jitContext.function);
+
+    // Builder inserts instructions into basicBlock
+    llvm::IRBuilder<> builder(basicBlock);
+    
+    // Writing the function preamble and initializing
+    // commonly used pointers such as method arguments or temporaries
+    writePreamble(builder, jitContext);
     
     // Processing the method's bytecodes
     while (bytePointer < byteCount) {
@@ -119,44 +126,37 @@ Function* MethodCompiler::compileMethod(TMethod* method)
         // Then writing the code
         switch (instruction.high) {
             case SmalltalkVM::opPushInstance: {
-                Value* selfAtPtr = builder.CreateGEP(methodSelf, builder.getInt32(instruction.low));
+                Value* selfAtPtr = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
                 Value* selfAt    = builder.CreateLoad(selfAtPtr);
-                stack.push_back(selfAt);
+                jitContext.pushValue(selfAt);
             } break;
             
             case SmalltalkVM::opAssignInstance: {
-                Value* stackTop  = stack.back();
-                Value* selfAtPtr = builder.CreateGEP(methodSelf, builder.getInt32(instruction.low));
-                builder.CreateStore(&*stackTop, selfAtPtr);
+                Value* stackTop  = jitContext.popValue();
+                Value* selfAtPtr = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
+                builder.CreateStore(stackTop, selfAtPtr);
             } break;
             
             case SmalltalkVM::opPushArgument: {
-                Value* argAtPtr = builder.CreateGEP(methodArgs, builder.getInt32(instruction.low));
+                Value* argAtPtr = builder.CreateGEP(jitContext.arguments, builder.getInt32(instruction.low));
                 Value* argAt    = builder.CreateLoad(argAtPtr);
-                stack.push_back(argAt);
+                jitContext.pushValue(argAt);
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
-                Value* stackTop  = stack.back();
-                Value* tempAtPtr = builder.CreateGEP(methodTemps, builder.getInt32(instruction.low));
-                builder.CreateStore(&*stackTop, tempAtPtr);
+                Value* stackTop  = jitContext.popValue();
+                Value* tempAtPtr = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
+                builder.CreateStore(stackTop, tempAtPtr);
             } break;
 
             default:
                 fprintf(stderr, "VM: Invalid opcode %d at offset %d in method %s",
-                        instruction.high,
-                        bytePointer,
-                        method->name->toString().c_str());
+                        instruction.high, bytePointer, method->name->toString().c_str());
                 exit(1);
         }
     }
 
     // TODO Write the function epilogue and do the remaining job
 
-    return resultMethod;
-}
-
-void MethodCompiler::doPushInstance(TJITContext& jitContext)
-{
-    
+    return jitContext.function;
 }
