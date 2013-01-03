@@ -54,7 +54,7 @@ public:
         
         returnNoReturn = 255
     }; 
-private:
+    //FIXME move enums away from SmalltalkVM class
     enum Opcode {
         opExtended = 0,
         opPushInstance,
@@ -85,7 +85,8 @@ private:
         sendToSuper = 11,
         breakpoint = 12
     };
-    
+
+private:
     enum {
         nilConst = 10,
         trueConst,

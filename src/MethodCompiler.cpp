@@ -40,11 +40,58 @@ using namespace llvm;
 
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
-    TByteArray& byteCodes   = * method->byteCodes;
-    uint32_t    byteCount   = byteCodes.getSize();
-    uint32_t    bytePointer = 0;
-
-    TJITContext jitContext(method, getGlobalContext());
+    TByteObject& byteCodes   = * method->byteCodes;
+    uint32_t     byteCount   = byteCodes.getSize();
+    uint32_t     bytePointer = 0;
+    
+    StructType*  LLSTObject      = m_TypeModule->getTypeByName("struct.TObject");
+    StructType*  LLSTContext     = m_TypeModule->getTypeByName("struct.TContext");
+    //StructType*  LLSTMethod      = m_TypeModule->getTypeByName("struct.TMethod");
+    //StructType*  LLSTSymbol      = m_TypeModule->getTypeByName("struct.TSymbol");
+    //StructType*  LLSTObjectArray = m_TypeModule->getTypeByName("struct.TObjectArray");
+    //StructType*  LLSTSymbolArray = m_TypeModule->getTypeByName("struct.TSymbolArray");
+    
+    std::vector<Type*> methodParams;
+    methodParams.push_back(LLSTContext);
+    
+    FunctionType* methodType = FunctionType::get(
+        /*result*/ LLSTObject,
+        /*params*/ methodParams,
+        /*varArg*/ false
+    );
+    
+    Function* resultMethod  = cast<Function>( m_JITModule->getOrInsertFunction(method->name->toString(), methodType) );
+    Value*    methodContext;
+    {
+        Function::arg_iterator args = resultMethod->arg_begin();
+        Value* methodContext = args++;
+        methodContext->setName("context");
+    }
+    BasicBlock* BB = BasicBlock::Create(m_JITModule->getContext(), "entry", resultMethod);
+    
+    llvm::IRBuilder<> builder(BB);
+    Value* methodMethod = builder.CreateGEP(methodContext, builder.getInt32(1), "method");
+    
+    std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
+    argsIdx.push_back( builder.getInt32(2) ); // Context.Arguments*
+    argsIdx.push_back( builder.getInt32(0) ); // TObject
+    argsIdx.push_back( builder.getInt32(2) ); // TObject.fields *
+    argsIdx.push_back( builder.getInt32(0) ); // TObject.fields
+    
+    Value* methodArgs   = builder.CreateGEP(methodContext, argsIdx, "args");
+    
+    std::vector<Value*> tmpsIdx;
+    tmpsIdx.push_back( builder.getInt32(3) );
+    tmpsIdx.push_back( builder.getInt32(0) );
+    tmpsIdx.push_back( builder.getInt32(2) );
+    tmpsIdx.push_back( builder.getInt32(0) );
+    
+    Value* methodTemps  = builder.CreateGEP(methodContext, tmpsIdx, "temporaries");
+    Value* methodSelf   = builder.CreateGEP(methodArgs, builder.getInt32(0), "self");
+    
+    std::vector<Value*> stack;
+    
+    //TJITContext jitContext(method, getGlobalContext());
 
     // TODO initialize llvm context data, create the function
     // Module should be initialized somewhere else
@@ -68,8 +115,26 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
         // Then writing the code
         switch (instruction.high) {
-            case SmalltalkVM::opPushInstance: doPushInstance(jitContext); break;
-            // ...
+            case SmalltalkVM::opPushInstance: {
+                Value* selfAtPtr = builder.CreateGEP(methodSelf, builder.getInt32(instruction.low));
+                Value* selfAt    = builder.CreateLoad(selfAtPtr);
+                stack.push_back(selfAt);
+            } break;
+            case SmalltalkVM::opAssignInstance: {
+                Value* stackTop  = stack.back();
+                Value* selfAtPtr = builder.CreateGEP(methodSelf, builder.getInt32(instruction.low));
+                builder.CreateStore(&*stackTop, selfAtPtr);
+            } break;
+            case SmalltalkVM::opPushArgument: {
+                Value* argAtPtr = builder.CreateGEP(methodArgs, builder.getInt32(instruction.low));
+                Value* argAt    = builder.CreateLoad(argAtPtr);
+                stack.push_back(argAt);
+            } break;
+            case SmalltalkVM::opAssignTemporary: {
+                Value* stackTop  = stack.back();
+                Value* tempAtPtr = builder.CreateGEP(methodTemps, builder.getInt32(instruction.low));
+                builder.CreateStore(&*stackTop, tempAtPtr);
+            } break;
 
             default:
                 fprintf(stderr, "VM: Invalid opcode %d at offset %d in method %s",
@@ -82,7 +147,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
     // TODO Write the function epilogue and do the remaining job
 
-    return jitContext.function;
+    return resultMethod;
 }
 
 void MethodCompiler::doPushInstance(TJITContext& jitContext)

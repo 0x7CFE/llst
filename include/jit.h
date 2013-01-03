@@ -37,27 +37,30 @@
 #include <llvm/Function.h>
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
+#include <llvm/Support/IRBuilder.h>
 
 class MethodCompiler {
 private:
     // This structure contains working data which is
     // used during the compilation process. 
     // Add more fields if necessary.
-    
+    llvm::Module* m_JITModule;
+    llvm::Module* m_TypeModule;
     struct TJITContext {
         TMethod*           method;
         llvm::Function*    function;
         llvm::Module*      module;
-        llvm::BasicBlock*  basicBlock;
 
         llvm::LLVMContext& llvmContext;
 
-        TJITContext(TMethod* method, llvm::LLVMContext context)
+        TJITContext(TMethod* method, llvm::LLVMContext& context)
             : method(method), llvmContext(context) { };
     };
 
     void doPushInstance(TJITContext& jitContext);
 public:
-     llvm::Function* compileMethod(TMethod* method);
+    llvm::Function* compileMethod(TMethod* method);
+    MethodCompiler(llvm::Module* JITModule, llvm::Module* TypeModule)
+        : m_JITModule(JITModule), m_TypeModule(TypeModule) { }
 };
 
