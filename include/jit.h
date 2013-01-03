@@ -66,6 +66,7 @@ private:
         std::vector<llvm::Value*> valueStack;
 
         void pushValue(llvm::Value* value) { valueStack.push_back(value); }
+        llvm::Value* lastValue() { return valueStack.back(); }
         llvm::Value* popValue() {
             llvm::Value* value = valueStack.back();
             valueStack.pop_back();

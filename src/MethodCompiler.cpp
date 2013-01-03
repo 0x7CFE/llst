@@ -191,13 +191,13 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
-                Value* value  = jitContext.popValue();
+                Value* value  = jitContext.lastValue();
                 Value* temporaryAddress = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
                 builder.CreateStore(value, temporaryAddress);
             } break;
 
             case SmalltalkVM::opAssignInstance: {
-                Value* value = jitContext.popValue();
+                Value* value = jitContext.lastValue();
                 Value* instanceVariableAddress = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
                 builder.CreateStore(value, instanceVariableAddress);
                 // TODO analog of checkRoot()
