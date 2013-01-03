@@ -59,8 +59,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
         /*params*/ methodParams,
         /*varArg*/ false
     );
-    
-    Function* resultMethod  = cast<Function>( m_JITModule->getOrInsertFunction(method->name->toString(), methodType) );
+
+    std::string methodName = method->klass->name->toString() + ">>" + method->name->toString();
+    Function* resultMethod  = cast<Function>( m_JITModule->getOrInsertFunction(methodName, methodType) );
     Value*    methodContext;
     {
         Function::arg_iterator args = resultMethod->arg_begin();
@@ -73,6 +74,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     Value* methodMethod = builder.CreateGEP(methodContext, builder.getInt32(1), "method");
     
     std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
+    argsIdx.reserve(4);
     argsIdx.push_back( builder.getInt32(2) ); // Context.Arguments*
     argsIdx.push_back( builder.getInt32(0) ); // TObject
     argsIdx.push_back( builder.getInt32(2) ); // TObject.fields *
@@ -81,6 +83,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     Value* methodArgs   = builder.CreateGEP(methodContext, argsIdx, "args");
     
     std::vector<Value*> tmpsIdx;
+    tmpsIdx.reserve(4);
     tmpsIdx.push_back( builder.getInt32(3) );
     tmpsIdx.push_back( builder.getInt32(0) );
     tmpsIdx.push_back( builder.getInt32(2) );
@@ -120,16 +123,19 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 Value* selfAt    = builder.CreateLoad(selfAtPtr);
                 stack.push_back(selfAt);
             } break;
+            
             case SmalltalkVM::opAssignInstance: {
                 Value* stackTop  = stack.back();
                 Value* selfAtPtr = builder.CreateGEP(methodSelf, builder.getInt32(instruction.low));
                 builder.CreateStore(&*stackTop, selfAtPtr);
             } break;
+            
             case SmalltalkVM::opPushArgument: {
                 Value* argAtPtr = builder.CreateGEP(methodArgs, builder.getInt32(instruction.low));
                 Value* argAt    = builder.CreateLoad(argAtPtr);
                 stack.push_back(argAt);
             } break;
+            
             case SmalltalkVM::opAssignTemporary: {
                 Value* stackTop  = stack.back();
                 Value* tempAtPtr = builder.CreateGEP(methodTemps, builder.getInt32(instruction.low));
