@@ -69,8 +69,9 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     Value* contextObject = (Value*) (context.function->arg_begin()); // FIXME is this cast correct?
     contextObject->setName("context");
     
-    //Value* methodObject = builder.CreateGEP(methodContext, builder.getInt32(1), "method");
-    
+    Value* methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
+    context.literals    = builder.CreateGEP(methodObject, builder.getInt32(3), "literals");
+
     std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
     argsIdx.reserve(4);
     argsIdx.push_back( builder.getInt32(2) ); // Context.Arguments*
@@ -78,7 +79,7 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     argsIdx.push_back( builder.getInt32(2) ); // TObject.fields *
     argsIdx.push_back( builder.getInt32(0) ); // TObject.fields
     
-    Value* methodArguments   = builder.CreateGEP(contextObject, argsIdx, "arguments");
+    context.arguments = builder.CreateGEP(contextObject, argsIdx, "arguments");
     
     std::vector<Value*> tmpsIdx;
     tmpsIdx.reserve(4);
@@ -88,7 +89,7 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     tmpsIdx.push_back( builder.getInt32(0) );
     
     context.temporaries = builder.CreateGEP(contextObject, tmpsIdx, "temporaries");
-    context.self = builder.CreateGEP(methodArguments, builder.getInt32(0), "self");
+    context.self = builder.CreateGEP(context.arguments, builder.getInt32(0), "self");
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method)
@@ -126,27 +127,75 @@ Function* MethodCompiler::compileMethod(TMethod* method)
         // Then writing the code
         switch (instruction.high) {
             case SmalltalkVM::opPushInstance: {
-                Value* selfAtPtr = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
-                Value* selfAt    = builder.CreateLoad(selfAtPtr);
-                jitContext.pushValue(selfAt);
-            } break;
-            
-            case SmalltalkVM::opAssignInstance: {
-                Value* stackTop  = jitContext.popValue();
-                Value* selfAtPtr = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
-                builder.CreateStore(stackTop, selfAtPtr);
+                // Self is interprited as object array. 
+                // Array elements are instance variables
+                // TODO Boundary check against self size
+                Value* valuePointer     = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
+                Value* instanceVariable = builder.CreateLoad(valuePointer);
+                jitContext.pushValue(instanceVariable);
             } break;
             
             case SmalltalkVM::opPushArgument: {
-                Value* argAtPtr = builder.CreateGEP(jitContext.arguments, builder.getInt32(instruction.low));
-                Value* argAt    = builder.CreateLoad(argAtPtr);
-                jitContext.pushValue(argAt);
+                // TODO Boundary check against arguments size
+                Value* valuePointer = builder.CreateGEP(jitContext.arguments, builder.getInt32(instruction.low));
+                Value* argument     = builder.CreateLoad(valuePointer);
+                jitContext.pushValue(argument);
+            } break;
+            
+            case SmalltalkVM::opPushTemporary: {
+                // TODO Boundary check against temporaries size
+                Value* valuePointer = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
+                Value* temporary    = builder.CreateLoad(valuePointer);
+                jitContext.pushValue(temporary);
+            }; break;
+            
+            case SmalltalkVM::opPushLiteral: {
+                // TODO Boundary check against literals size
+                Value* valuePointer = builder.CreateGEP(jitContext.literals, builder.getInt32(instruction.low));
+                Value* literal      = builder.CreateLoad(valuePointer);
+                jitContext.pushValue(literal);
+            } break;
+
+            case SmalltalkVM::opPushConstant: {
+                const uint8_t constant = instruction.low;
+                Value* constantValue   = 0;
+                switch (constant) {
+                    case 0:
+                    case 1:
+                    case 2:
+                    case 3:
+                    case 4:
+                    case 5:
+                    case 6:
+                    case 7:
+                    case 8:
+                    case 9:
+                        constantValue = builder.getInt32(newInteger(constant));
+                        break;
+
+                    // TODO access to global image objects such as nil, true, false, etc.
+                    /* case nilConst:   stack[ec.stackTop++] = globals.nilObject;   break;
+                    case trueConst:  stack[ec.stackTop++] = globals.trueObject;  break;
+                    case falseConst: stack[ec.stackTop++] = globals.falseObject; break; */
+                    default:
+                        /* TODO unknown push constant */ ;
+                        fprintf(stderr, "VM: unknown push constant %d\n", constant);
+                }
+
+                jitContext.pushValue(constantValue);
+            } break;
+            
+            case SmalltalkVM::opAssignInstance: {
+                Value* value = jitContext.popValue();
+                Value* instanceVariableAddress = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
+                builder.CreateStore(value, instanceVariableAddress);
+                // TODO analog of checkRoot()
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
-                Value* stackTop  = jitContext.popValue();
-                Value* tempAtPtr = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
-                builder.CreateStore(stackTop, tempAtPtr);
+                Value* value  = jitContext.popValue();
+                Value* temporaryAddress = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
+                builder.CreateStore(value, temporaryAddress);
             } break;
 
             default:

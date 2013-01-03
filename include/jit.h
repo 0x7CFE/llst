@@ -54,6 +54,7 @@ private:
         //llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
+        llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
         
         // Value stack is used as a FIFO value holder during the compilation process.
