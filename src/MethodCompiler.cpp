@@ -69,8 +69,8 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     Value* contextObject = (Value*) (context.function->arg_begin()); // FIXME is this cast correct?
     contextObject->setName("context");
     
-    Value* methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
-    context.literals    = builder.CreateGEP(methodObject, builder.getInt32(3), "literals");
+    context.methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
+    context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
 
     std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
     argsIdx.reserve(4);

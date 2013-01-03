@@ -51,7 +51,7 @@ private:
         TMethod*            method;       // Smalltalk method we're currently processing
 
         llvm::Function*     function;     // LLVM function that is created based on method
-        //llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
+        llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
