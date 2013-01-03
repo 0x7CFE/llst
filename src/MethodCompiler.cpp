@@ -184,18 +184,38 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 jitContext.pushValue(constantValue);
             } break;
-            
-            case SmalltalkVM::opAssignInstance: {
-                Value* value = jitContext.popValue();
-                Value* instanceVariableAddress = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
-                builder.CreateStore(value, instanceVariableAddress);
-                // TODO analog of checkRoot()
+
+            case SmalltalkVM::opPushBlock: {
+                Value* blockFunction = compileBlock(jitContext);
+                jitContext.pushValue(blockFunction);
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
                 Value* value  = jitContext.popValue();
                 Value* temporaryAddress = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
                 builder.CreateStore(value, temporaryAddress);
+            } break;
+
+            case SmalltalkVM::opAssignInstance: {
+                Value* value = jitContext.popValue();
+                Value* instanceVariableAddress = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
+                builder.CreateStore(value, instanceVariableAddress);
+                // TODO analog of checkRoot()
+            } break;
+
+            case SmalltalkVM::opMarkArguments: {
+                // Here we need to create the arguments array from the values on the stack
+                
+                uint8_t argumentsCount = instruction.low;
+
+                // FIXME May be we may unroll the arguments array and pass the values directly.
+                //       However, in some cases this may lead to additional architectural problems.
+                Value* arguments = 0; // TODO create call equivalent to newObject<TObjectArray>(argumentsCount)
+                uint8_t index = argumentsCount;
+                while (index > 0)
+                    builder.CreateInsertValue(arguments, jitContext.popValue(), index);
+
+                jitContext.pushValue(arguments);
             } break;
 
             default:
@@ -209,3 +229,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
     return jitContext.function;
 }
+
+Function* MethodCompiler::compileBlock(TJITContext& context)
+{
+    
+}
+

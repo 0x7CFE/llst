@@ -89,6 +89,7 @@ private:
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
     
     llvm::Function* createFunction(TMethod* method);
+    llvm::Function* compileBlock(TJITContext& context);
 public:
     llvm::Function* compileMethod(TMethod* method);
 
