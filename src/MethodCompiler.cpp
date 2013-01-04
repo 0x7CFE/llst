@@ -70,26 +70,23 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     contextObject->setName("context");
     
     context.methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
-    context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
 
-    std::vector<Value*> argsIndex; // * Context.Arguments->operator[](2)
-    argsIndex.reserve(4);
-    argsIndex.push_back( builder.getInt32(2) ); // Context.Arguments*
-    argsIndex.push_back( builder.getInt32(0) ); // TObject
-    argsIndex.push_back( builder.getInt32(2) ); // TObject.fields *
-    argsIndex.push_back( builder.getInt32(0) ); // TObject.fields
+    Value* argsObjectPtr   = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
+    Value* argsObjectArray = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
+    Value* argsObject      = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
+    Value* argsFields      = builder.CreateStructGEP(argsObject, 2, "argsFields");
+    context.arguments      = builder.CreateStructGEP(argsFields, 0, "arguments");
     
-    context.arguments = builder.CreateGEP(contextObject, argsIndex, "arguments");
+    //TODO do the same with literals as with args
+    context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
     
-    std::vector<Value*> tempsIndex;
-    tempsIndex.reserve(4);
-    tempsIndex.push_back( builder.getInt32(3) );
-    tempsIndex.push_back( builder.getInt32(0) );
-    tempsIndex.push_back( builder.getInt32(2) );
-    tempsIndex.push_back( builder.getInt32(0) );
+    //TODO do the same with temporaries as with args
+    context.temporaries = builder.CreateGEP(contextObject, NULL, "temporaries");
     
-    context.temporaries = builder.CreateGEP(contextObject, tempsIndex, "temporaries");
-    context.self = builder.CreateGEP(context.arguments, builder.getInt32(0), "self");
+    Value* selfObjectPtr = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
+    Value* selfObject    = builder.CreateLoad(selfObjectPtr, "selfObject");
+    Value* selfFields    = builder.CreateStructGEP(selfObject, 2, "selfFields");
+    context.self         = builder.CreateStructGEP(selfFields, 0, "self");
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method)
@@ -303,7 +300,11 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
 void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
     switch (opcode) {
-        case SmalltalkVM::selfReturn:  builder.CreateRet(jitContext.self); break;
+        case SmalltalkVM::selfReturn:  {
+            Value* selfPtr = builder.CreateGEP(jitContext.arguments, 0);
+            Value* self    = builder.CreateLoad(selfPtr);
+            builder.CreateRet(self);
+        } break;
         case SmalltalkVM::stackReturn: builder.CreateRet(jitContext.popValue()); break;
         case SmalltalkVM::blockReturn: /* TODO */ break;
         case SmalltalkVM::duplicate:   jitContext.pushValue(jitContext.lastValue()); break;

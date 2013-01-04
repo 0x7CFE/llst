@@ -108,9 +108,18 @@ define %struct.TObject** @"TObject::getFields()"(%struct.TObject* %this) {
 
 define void @"MethodCompilerExample"(%struct.TContext* %context) {
 entry:
-    %args  = getelementptr %struct.TContext* %context, i32 2, i32 0, i32 2, i32 0
+    %argObjectPtr    = getelementptr inbounds %struct.TContext* %context, i32 0, i32 2
+    %argsObjectArray = load %struct.TObjectArray** %argObjectPtr, align 4
+    %argsObject      = bitcast %struct.TObjectArray* %argsObjectArray to %struct.TObject*
+    %argsFields      = getelementptr inbounds %struct.TObject* %argsObject, i32 0, i32 2
+    %args            = getelementptr inbounds [0 x %struct.TObject*]* %argsFields, i32 0, i32 0
+
     %temps = getelementptr %struct.TContext* %context, i32 3, i32 0, i32 2, i32 0
-    %self  = getelementptr %struct.TObject** %args, i32 0
+    
+    %selfObjectPtr = getelementptr %struct.TObject** %args, i32 0
+    %selfObject    = load %struct.TObject** %selfObjectPtr
+    %selfFields    = getelementptr inbounds %struct.TObject* %selfObject, i32 0, i32 2
+    %self          = getelementptr inbounds [0 x %struct.TObject*]* %selfFields, i32 0, i32 0
     
     ; push argument 3
     %ptr.0  = getelementptr %struct.TObject** %args, i32 3
