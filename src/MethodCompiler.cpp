@@ -170,7 +170,8 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     case 7:
                     case 8:
                     case 9:
-                        constantValue = builder.getInt32(newInteger(constant));
+                        Value* integerValue = builder.getInt32(newInteger(constant));
+                        constantValue = builder.CreateIntToPtr(integerValue, ot.object);
                         break;
 
                     // TODO access to global image objects such as nil, true, false, etc.
@@ -247,8 +248,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 builder.SetInsertPoint(integersBlock);
                 
-                Value* rightInt    = builder.CreatePtrToInt(rightValue, Type::getInt32Ty(m_JITModule->getContext()));
-                Value* leftInt     = builder.CreatePtrToInt(leftValue, Type::getInt32Ty(m_JITModule->getContext()));
+                Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
+                Value* rightInt       = builder.CreateCall(getIntValue, rightValue);
+                Value* leftInt        = builder.CreateCall(getIntValue, leftValue);
                 
                 Value* intResult;
                 switch (instruction.low) {
