@@ -102,8 +102,31 @@ define %struct.TClass* @"TObject::getClass()"(%struct.TObject* %this) {
 }
 
 define %struct.TObject** @"TObject::getFields()"(%struct.TObject* %this) {
-    %fields = getelementptr %struct.TObject* %this, i32 0, i32 2, i32 0
-    ret %struct.TObject** %fields
+    %fields = getelementptr inbounds %struct.TObject* %this, i32 0, i32 2
+    %result = getelementptr inbounds [0 x %struct.TObject*]* %fields, i32 0, i32 0
+    ret %struct.TObject** %result
+}
+
+; FIXME demangle TObject/TObjectArray/TSymbolArray ::getField() properly
+
+define %struct.TObject* @"TObject::getField(int)"(%struct.TObject* %this, i32 %index) {
+    %fields    = getelementptr inbounds %struct.TObject* %this, i32 0, i32 2
+    %resultPtr = getelementptr inbounds [0 x %struct.TObject*]* %fields, i32 0, i32 %index
+    %result    = load %struct.TObject** %resultPtr
+    ret %struct.TObject* %result
+}
+
+define %struct.TObject* @"TObjectArray::getField(int)"(%struct.TObjectArray* %this, i32 %index) {
+    %asTObject = bitcast %struct.TObjectArray* %this to %struct.TObject*
+    %result    = call %struct.TObject* @"TObject::getField(int)"(%struct.TObject* %asTObject, i32 %index)
+    ret %struct.TObject* %result
+}
+
+define %struct.TSymbol* @"TSymbolArray::getField(int)"(%struct.TSymbolArray* %this, i32 %index) {
+    %asTObject = bitcast %struct.TSymbolArray* %this to %struct.TObject*
+    %field     = call %struct.TObject* @"TObject::getField(int)"(%struct.TObject* %asTObject, i32 %index)
+    %result    = bitcast %struct.TObject* %field to %struct.TSymbol*
+    ret %struct.TSymbol* %result
 }
 
 define void @"MethodCompilerExample"(%struct.TContext* %context) {
@@ -111,15 +134,13 @@ entry:
     %argObjectPtr    = getelementptr inbounds %struct.TContext* %context, i32 0, i32 2
     %argsObjectArray = load %struct.TObjectArray** %argObjectPtr, align 4
     %argsObject      = bitcast %struct.TObjectArray* %argsObjectArray to %struct.TObject*
-    %argsFields      = getelementptr inbounds %struct.TObject* %argsObject, i32 0, i32 2
-    %args            = getelementptr inbounds [0 x %struct.TObject*]* %argsFields, i32 0, i32 0
+    %args            = call %struct.TObject** @"TObject::getFields()"(%struct.TObject* %argsObject)
 
     %temps = getelementptr %struct.TContext* %context, i32 3, i32 0, i32 2, i32 0
     
     %selfObjectPtr = getelementptr %struct.TObject** %args, i32 0
     %selfObject    = load %struct.TObject** %selfObjectPtr
-    %selfFields    = getelementptr inbounds %struct.TObject* %selfObject, i32 0, i32 2
-    %self          = getelementptr inbounds [0 x %struct.TObject*]* %selfFields, i32 0, i32 0
+    %self          = call %struct.TObject** @"TObject::getFields()"(%struct.TObject* %selfObject)
     
     ; push argument 3
     %ptr.0  = getelementptr %struct.TObject** %args, i32 3

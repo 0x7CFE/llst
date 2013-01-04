@@ -69,13 +69,16 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     Value* contextObject = (Value*) (context.function->arg_begin());
     contextObject->setName("context");
     
-    context.methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
+    context.methodObject = builder.CreateStructGEP(contextObject, 1, "method");
+    
+    Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
+    
+    // TODO maybe we shuld rewrite arguments[idx] using TArrayObject::getField ?
 
     Value* argsObjectPtr   = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
     Value* argsObjectArray = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
     Value* argsObject      = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
-    Value* argsFields      = builder.CreateStructGEP(argsObject, 2, "argsFields");
-    context.arguments      = builder.CreateStructGEP(argsFields, 0, "arguments");
+    context.arguments      = builder.CreateCall(objectGetFields, argsObject, "arguments");
     
     //TODO do the same with literals as with args
     context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
@@ -86,7 +89,7 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     Value* selfObjectPtr = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
     Value* selfObject    = builder.CreateLoad(selfObjectPtr, "selfObject");
     Value* selfFields    = builder.CreateStructGEP(selfObject, 2, "selfFields");
-    context.self         = builder.CreateStructGEP(selfFields, 0, "self");
+    context.self         = builder.CreateCall(objectGetFields, selfFields, "self");
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method)
