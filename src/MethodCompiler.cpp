@@ -65,30 +65,30 @@ Function* MethodCompiler::createFunction(TMethod* method)
 
 void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& context)
 {
-    // First argument of every function is the pointer to the TContext object
+    // First argument of every function is a pointer to TContext object
     Value* contextObject = (Value*) (context.function->arg_begin());
     contextObject->setName("context");
     
     context.methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
     context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
 
-    std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
-    argsIdx.reserve(4);
-    argsIdx.push_back( builder.getInt32(2) ); // Context.Arguments*
-    argsIdx.push_back( builder.getInt32(0) ); // TObject
-    argsIdx.push_back( builder.getInt32(2) ); // TObject.fields *
-    argsIdx.push_back( builder.getInt32(0) ); // TObject.fields
+    std::vector<Value*> argsIndex; // * Context.Arguments->operator[](2)
+    argsIndex.reserve(4);
+    argsIndex.push_back( builder.getInt32(2) ); // Context.Arguments*
+    argsIndex.push_back( builder.getInt32(0) ); // TObject
+    argsIndex.push_back( builder.getInt32(2) ); // TObject.fields *
+    argsIndex.push_back( builder.getInt32(0) ); // TObject.fields
     
-    context.arguments = builder.CreateGEP(contextObject, argsIdx, "arguments");
+    context.arguments = builder.CreateGEP(contextObject, argsIndex, "arguments");
     
-    std::vector<Value*> tmpsIdx;
-    tmpsIdx.reserve(4);
-    tmpsIdx.push_back( builder.getInt32(3) );
-    tmpsIdx.push_back( builder.getInt32(0) );
-    tmpsIdx.push_back( builder.getInt32(2) );
-    tmpsIdx.push_back( builder.getInt32(0) );
+    std::vector<Value*> tempsIndex;
+    tempsIndex.reserve(4);
+    tempsIndex.push_back( builder.getInt32(3) );
+    tempsIndex.push_back( builder.getInt32(0) );
+    tempsIndex.push_back( builder.getInt32(2) );
+    tempsIndex.push_back( builder.getInt32(0) );
     
-    context.temporaries = builder.CreateGEP(contextObject, tmpsIdx, "temporaries");
+    context.temporaries = builder.CreateGEP(contextObject, tempsIndex, "temporaries");
     context.self = builder.CreateGEP(context.arguments, builder.getInt32(0), "self");
 }
 
@@ -103,9 +103,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     jitContext.function = createFunction(method);
 
     // Creating the basic block and inserting it into the function
-    BasicBlock* basicBlock = BasicBlock::Create(m_JITModule->getContext(), "entry", jitContext.function);
+    BasicBlock* basicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jitContext.function);
 
-    // Builder inserts instructions into basicBlock
+    // Builder inserts instructions into basic blocks
     IRBuilder<> builder(basicBlock);
     
     // Writing the function preamble and initializing
@@ -179,7 +179,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     case falseConst: stack[ec.stackTop++] = globals.falseObject; break; */
                     default:
                         /* TODO unknown push constant */ ;
-                        fprintf(stderr, "VM: unknown push constant %d\n", constant);
+                        fprintf(stderr, "JIT: unknown push constant %d\n", constant);
                 }
 
                 jitContext.pushValue(constantValue);
@@ -189,7 +189,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 uint16_t newBytePointer = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
                 jitContext.bytePointer += 2;
                 
-                Value* blockFunction = compileBlock(jitContext);
+                //Value* blockFunction = compileBlock(jitContext);
                 // FIXME We need to push a block object initialized 
                 //       with the IR code in additional field
                 // jitContext.pushValue(blockFunction);
@@ -228,28 +228,28 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 // TODO Extract this code into subroutines. 
                 //      Replace the operation with call to LLVM function
                 
-                Value* rightValue  = jitContext.popValue();
-                Value* leftValue   = jitContext.popValue();
+                Value* rightValue = jitContext.popValue();
+                Value* leftValue  = jitContext.popValue();
 
                 // Checking if values are both small integers
-                Function* isSmallInt = m_TypeModule->getFunction("isSmallInteger()");
-                Value* rightIsInt    = builder.CreateCall(isSmallInt, rightValue);
-                Value* leftIsInt     = builder.CreateCall(isSmallInt, leftValue);
-                Value* isSmallInts   = builder.CreateAnd(rightIsInt, leftIsInt);
+                Function* isSmallInt  = m_TypeModule->getFunction("isSmallInteger()");
+                Value*    rightIsInt  = builder.CreateCall(isSmallInt, rightValue);
+                Value*    leftIsInt   = builder.CreateCall(isSmallInt, leftValue);
+                Value*    isSmallInts = builder.CreateAnd(rightIsInt, leftIsInt);
                 
                 BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers"  , jitContext.function);
                 BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jitContext.function);
-                BasicBlock* fallbackBlock   = BasicBlock::Create(m_JITModule->getContext(), "fallback"  , jitContext.function);
+                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "fallback"  , jitContext.function);
 
                 // Dpending on the contents we may either do the integer operations
                 // directly or create a send message call using operand objects
                 builder.CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
 
+                // Now the integers part
                 builder.SetInsertPoint(integersBlock);
-                
                 Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
-                Value* rightInt       = builder.CreateCall(getIntValue, rightValue);
-                Value* leftInt        = builder.CreateCall(getIntValue, leftValue);
+                Value*    rightInt    = builder.CreateCall(getIntValue, rightValue);
+                Value*    leftInt     = builder.CreateCall(getIntValue, leftValue);
                 
                 Value* intResult;
                 switch (instruction.low) {
@@ -259,15 +259,21 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", instruction.low);
                 }
-                builder.CreateBr(fallbackBlock);
-                
+                // Jumping out the integersBlock to the vaulue aggregator
+                builder.CreateBr(resultBlock);
+
+                // Now the sendBinary block
                 builder.SetInsertPoint(sendBinaryBlock);
                 // TODO Do the sendMessage call in sendBinaryBlock and store the result in callBinaryResult
                 Value* callBinaryResult = 0;
+                // Jumping out the sendBinaryBlock to the value aggregator
+                builder.CreateBr(resultBlock);
                 
-                builder.CreateBr(fallbackBlock);
-                builder.SetInsertPoint(fallbackBlock);
-                
+                // Now the value aggregator block
+                builder.SetInsertPoint(resultBlock);
+                // We do not know now which way the program will be executed,
+                // so we need to aggregate two possible results one of which 
+                // will be then selected as a return value
                 PHINode* phi = builder.CreatePHI(ot.object, 2);
                 phi->addIncoming(intResult, integersBlock);
                 phi->addIncoming(callBinaryResult, sendBinaryBlock);
@@ -275,10 +281,10 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 jitContext.pushValue(phi);
             } break;
 
-            case SmalltalkVM::opDoSpecial: doSpecial(builder, jitContext);
+            case SmalltalkVM::opDoSpecial: doSpecial(instruction.low, builder, jitContext);
             
             default:
-                fprintf(stderr, "VM: Invalid opcode %d at offset %d in method %s",
+                fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s",
                         instruction.high, jitContext.bytePointer, method->name->toString().c_str());
                 exit(1);
         }
@@ -291,20 +297,17 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
 Function* MethodCompiler::compileBlock(TJITContext& context)
 {
-    
+    return 0; // TODO
 }
 
-void MethodCompiler::doSpecial(IRBuilder<>& builder, TJITContext& context)
+void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
-    TByteObject& byteCodes   = * context.method->byteCodes;
-    TInstruction instruction; //FIXME move instruction to TJITContext
-    switch(instruction.low) {
-        
-        
-        case SmalltalkVM::popTop:
-            context.popValue();
-            break;
+    switch (opcode) {
+        case SmalltalkVM::selfReturn:  builder.CreateRet(jitContext.self); break;
+        case SmalltalkVM::stackReturn: builder.CreateRet(jitContext.popValue()); break;
+        case SmalltalkVM::blockReturn: /* TODO */ break;
+        case SmalltalkVM::duplicate:   jitContext.pushValue(jitContext.lastValue()); break;
+        case SmalltalkVM::popTop:      jitContext.popValue(); break;
         
     }
-    
 }
