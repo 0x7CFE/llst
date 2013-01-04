@@ -186,8 +186,14 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             } break;
 
             case SmalltalkVM::opPushBlock: {
+                uint16_t newBytePointer = byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8);
+                bytePointer += 2;
+                
                 Value* blockFunction = compileBlock(jitContext);
-                jitContext.pushValue(blockFunction);
+                // FIXME We need to push a block object initialized 
+                //       with the IR code in additional field
+                // jitContext.pushValue(blockFunction);
+                bytePointer = newBytePointer;
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
@@ -218,6 +224,47 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 jitContext.pushValue(arguments);
             } break;
 
+            case SmalltalkVM::opSendBinary: {
+                // TODO Extract this code into subroutines. 
+                //      Replace the operation with call to LLVM function
+                
+                Value* rightValue  = jitContext.popValue();
+                Value* leftValue   = jitContext.popValue();
+
+                // Checking if values are both small integers
+                Value* rightInt    = builder.CreatePtrToInt(rightValue, Type::getInt32Ty(m_JITModule->getContext()));
+                Value* leftInt     = builder.CreatePtrToInt(leftValue, Type::getInt32Ty(m_JITModule->getContext()));
+                Value* andValue    = builder.CreateAnd(leftInt, rightInt);
+                Value* isSmallInts = builder.CreateTrunc(andValue, Type::getInt1Ty(m_JITModule->getContext()));
+                
+                BasicBlock* integersBlock = BasicBlock::Create(m_JITModule->getContext(), "integers", jitContext.function);
+                BasicBlock* fallbackBlock = BasicBlock::Create(m_JITModule->getContext(), "fallback", jitContext.function);
+
+                // Here result of operation will be placed
+                Value* resultPtr = builder.CreateAlloca(ot.object->getPointerTo());
+
+                // Dpending on the contents we may either do the integer operations
+                // directly or create a send message call using operand objects
+                builder.CreateCondBr(isSmallInts, integersBlock, fallbackBlock);
+
+                IRBuilder<> intBuilder(integersBlock);
+                Value* intResult;
+                switch (instruction.low) {
+                    case 0: intResult = intBuilder.CreateICmpSLT(leftInt, rightInt); // operator <
+                    case 1: intResult = intBuilder.CreateICmpSLE(leftInt, rightInt); // operator <=
+                    case 2: intResult = intBuilder.CreateAdd(leftInt, rightInt);     // operator +
+                    default:
+                        fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", instruction.low);
+                }
+                // intBuilder.CreateStore(); store the intResult to the resultPtr
+
+                // TODO Do the sendMessage call in fallbackBlock and store the result in resultPtr
+                
+                jitContext.pushValue(resultPtr);
+            }; break;
+
+            case SmalltalkVM::opDoSpecial: doSpecial(builder, jitContext);
+            
             default:
                 fprintf(stderr, "VM: Invalid opcode %d at offset %d in method %s",
                         instruction.high, bytePointer, method->name->toString().c_str());
@@ -235,3 +282,7 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
     
 }
 
+void MethodCompiler::doSpecial(IRBuilder<>& builder, TJITContext& context)
+{
+    
+}

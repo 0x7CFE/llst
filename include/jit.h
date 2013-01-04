@@ -49,7 +49,9 @@ private:
     // Add more fields if necessary.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
-
+        uint32_t            bytePointer;
+        uint32_t            byteCount;
+        
         llvm::Function*     function;     // LLVM function that is created based on method
         llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
@@ -63,7 +65,6 @@ private:
         // as a commands which values should be linked together. For example,
         // two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
         // will be linked together with effect of instanceVariables[2] = temporaries[1]
-        std::vector<llvm::Value*> valueStack;
 
         void pushValue(llvm::Value* value) { valueStack.push_back(value); }
         llvm::Value* lastValue() { return valueStack.back(); }
@@ -73,7 +74,13 @@ private:
             return value;
         }
         
-        TJITContext(TMethod* method) : method(method) { };
+        TJITContext(TMethod* method) : method(method), bytePointer(0) {
+            byteCount = method->byteCodes->getSize();
+            valueStack.reserve(method->stackSize);
+        };
+        
+    private:    
+        std::vector<llvm::Value*> valueStack;
     };
 
     struct TObjectTypes {
@@ -88,6 +95,7 @@ private:
     void initObjectTypes();
 
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
+    void doSpecial(llvm::IRBuilder<>& builder, TJITContext& context);
     
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);
