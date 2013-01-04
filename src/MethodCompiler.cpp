@@ -232,36 +232,47 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 Value* leftValue   = jitContext.popValue();
 
                 // Checking if values are both small integers
-                Value* rightInt    = builder.CreatePtrToInt(rightValue, Type::getInt32Ty(m_JITModule->getContext()));
-                Value* leftInt     = builder.CreatePtrToInt(leftValue, Type::getInt32Ty(m_JITModule->getContext()));
-                Value* andValue    = builder.CreateAnd(leftInt, rightInt);
-                Value* isSmallInts = builder.CreateTrunc(andValue, Type::getInt1Ty(m_JITModule->getContext()));
+                Function* isSmallInt = m_TypeModule->getFunction("isSmallInteger()");
+                Value* rightIsInt    = builder.CreateCall(isSmallInt, rightValue);
+                Value* leftIsInt     = builder.CreateCall(isSmallInt, leftValue);
+                Value* isSmallInts   = builder.CreateAnd(rightIsInt, leftIsInt);
                 
-                BasicBlock* integersBlock = BasicBlock::Create(m_JITModule->getContext(), "integers", jitContext.function);
-                BasicBlock* fallbackBlock = BasicBlock::Create(m_JITModule->getContext(), "fallback", jitContext.function);
-
-                // Here result of operation will be placed
-                Value* resultPtr = builder.CreateAlloca(ot.object->getPointerTo());
+                BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers"  , jitContext.function);
+                BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jitContext.function);
+                BasicBlock* fallbackBlock   = BasicBlock::Create(m_JITModule->getContext(), "fallback"  , jitContext.function);
 
                 // Dpending on the contents we may either do the integer operations
                 // directly or create a send message call using operand objects
-                builder.CreateCondBr(isSmallInts, integersBlock, fallbackBlock);
+                builder.CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
 
-                IRBuilder<> intBuilder(integersBlock);
+                builder.SetInsertPoint(integersBlock);
+                
+                Value* rightInt    = builder.CreatePtrToInt(rightValue, Type::getInt32Ty(m_JITModule->getContext()));
+                Value* leftInt     = builder.CreatePtrToInt(leftValue, Type::getInt32Ty(m_JITModule->getContext()));
+                
                 Value* intResult;
                 switch (instruction.low) {
-                    case 0: intResult = intBuilder.CreateICmpSLT(leftInt, rightInt); // operator <
-                    case 1: intResult = intBuilder.CreateICmpSLE(leftInt, rightInt); // operator <=
-                    case 2: intResult = intBuilder.CreateAdd(leftInt, rightInt);     // operator +
+                    case 0: intResult = builder.CreateICmpSLT(leftInt, rightInt); // operator <
+                    case 1: intResult = builder.CreateICmpSLE(leftInt, rightInt); // operator <=
+                    case 2: intResult = builder.CreateAdd(leftInt, rightInt);     // operator +
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", instruction.low);
                 }
-                // intBuilder.CreateStore(); store the intResult to the resultPtr
-
-                // TODO Do the sendMessage call in fallbackBlock and store the result in resultPtr
+                builder.CreateBr(fallbackBlock);
                 
-                jitContext.pushValue(resultPtr);
-            }; break;
+                builder.SetInsertPoint(sendBinaryBlock);
+                // TODO Do the sendMessage call in sendBinaryBlock and store the result in callBinaryResult
+                Value* callBinaryResult = 0;
+                
+                builder.CreateBr(fallbackBlock);
+                builder.SetInsertPoint(fallbackBlock);
+                
+                PHINode* phi = builder.CreatePHI(ot.object, 2);
+                phi->addIncoming(intResult, integersBlock);
+                phi->addIncoming(callBinaryResult, sendBinaryBlock);
+                
+                jitContext.pushValue(phi);
+            } break;
 
             case SmalltalkVM::opDoSpecial: doSpecial(builder, jitContext);
             
