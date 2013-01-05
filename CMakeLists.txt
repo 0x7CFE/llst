@@ -1,5 +1,30 @@
 cmake_minimum_required(VERSION 2.8)
 
+# A convenience variable:
+set(LLVM_ROOT "/usr/lib/llvm-3.1" CACHE PATH "Root of LLVM install.")
+
+# A bit of a sanity check:
+if( NOT EXISTS ${LLVM_ROOT}/include/llvm )
+message(FATAL_ERROR "LLVM_ROOT (${LLVM_ROOT}) is not a valid LLVM install")
+endif()
+
+# We incorporate the CMake features provided by LLVM:
+set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${LLVM_ROOT}/share/llvm/cmake")
+include(LLVMConfig)
+
+# Now set the header and library paths:
+include_directories( ${LLVM_INCLUDE_DIRS} )
+link_directories( ${LLVM_LIBRARY_DIRS} )
+add_definitions( ${LLVM_DEFINITIONS} )
+
+# Let's suppose we want to build a JIT compiler with support for
+# binary code (no interpreter):
+llvm_map_components_to_libraries(REQ_LLVM_LIBRARIES jit native)
+
+
+set (COMPILER_FLAGS "-O3 -m32 -march=native -mtune=native -Ofast -flto -funroll-loops -Wall ${LLVM_CXX_FLAGS}")
+set (LINKER_FLAGS "-m32 -flto -L/usr/lib32 -Wall ${LLVM_LD_FLAGS}")
+
 project(llst)
 
 add_subdirectory(src)
@@ -8,40 +33,9 @@ add_subdirectory(include)
 file(GLOB CPP_FILES "src/*.cpp")
 
 add_executable(llst ${CPP_FILES})
-
-if(NOT LLVM_CXX_FLAGS)
-   exec_program("llvm-config-3.0 --cxxflags"
-                OUTPUT_VARIABLE LLVM_CXX_FLAGS)
-   set(LLVM_CXX_FLAGS "${LLVM_CXX_FLAGS}" CACHE STRING "LLVM Compiler flags")
-endif()
-
-if(NOT LLVM_LD_FLAGS)
-   exec_program("llvm-config-3.0 --ldflags"
-                OUTPUT_VARIABLE LLVM_LD_FLAGS)
-   set(LLVM_LD_FLAGS "${LLVM_LD_FLAGS}" CACHE STRING "LLVM Linker flags")
-endif()
-
-SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
-SET (CMAKE_CXX_FLAGS                "-g -m32 -Wall -O3 ${COMPILER_FLAGS}")
-
-SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
-SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
-SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
-SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
-
-SET (CMAKE_AR      "/usr/bin/llvm-ar")
-SET (CMAKE_LINKER  "/usr/bin/llvm-link")
-SET (CMAKE_NM      "/usr/bin/llvm-nm")
-SET (CMAKE_OBJDUMP "/usr/bin/llvm-objdump")
-SET (CMAKE_RANLIB  "/usr/bin/llvm-ranlib")
-
-set (COMPILER_FLAGS "-O3 -m32 -march=native -mtune=native -flto -funroll-loops -Wall ${LLVM_CXX_FLAGS}")
-set (LINKER_FLAGS "-m32 -flto -L/usr/lib32 -Wall -lllvm ${LLVM_LD_FLAGS}")
-# set (COMPILER_FLAGS "-O3 -m32 -march=native -mtune=native -Ofast -flto -funroll-loops -Wall ${LLVM_CXX_FLAGS}")
-# set (LINKER_FLAGS "-m32 -flto -L/usr/lib32 -Wall -lllvm ${LLVM_LD_FLAGS}")
-
 set_target_properties(llst PROPERTIES COMPILE_FLAGS "${COMPILER_FLAGS}")
 set_target_properties(llst PROPERTIES LINK_FLAGS "${LINKER_FLAGS}")
+target_link_libraries(llst ${REQ_LLVM_LIBRARIES})
 
 include_directories(include)
 
