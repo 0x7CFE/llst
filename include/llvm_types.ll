@@ -66,6 +66,12 @@ define i1 @"isSmallInteger()"(%struct.TObject* %value) {
     ret i1 true
 }
 
+define i32 @"getIntegerValue()"(%struct.TObject* %value) {
+    %int = ptrtoint %struct.TObject* %value to i32
+    %result = ashr i32 %int, 1
+    ret i32 %result
+}
+
 define i32 @"TObject::getSize()"(%struct.TObject* %this) {
     %1 = getelementptr %struct.TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
