@@ -103,9 +103,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     jitContext.function = createFunction(method);
 
     // Creating the basic block and inserting it into the function
-    BasicBlock* basicBlock = BasicBlock::Create(m_JITModule->getContext(), "entry", jitContext.function);
+    BasicBlock* basicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jitContext.function);
 
-    // Builder inserts instructions into basicBlock
+    // Builder inserts instructions into basic blocks
     IRBuilder<> builder(basicBlock);
     
     // Writing the function preamble and initializing
@@ -228,29 +228,28 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 // TODO Extract this code into subroutines. 
                 //      Replace the operation with call to LLVM function
                 
-                Value* rightValue  = jitContext.popValue();
-                Value* leftValue   = jitContext.popValue();
+                Value* rightValue = jitContext.popValue();
+                Value* leftValue  = jitContext.popValue();
 
                 // Checking if values are both small integers
-                Function* isSmallInt = m_TypeModule->getFunction("isSmallInteger()");
-                Value* rightIsInt    = builder.CreateCall(isSmallInt, rightValue);
-                Value* leftIsInt     = builder.CreateCall(isSmallInt, leftValue);
-                Value* isSmallInts   = builder.CreateAnd(rightIsInt, leftIsInt);
+                Function* isSmallInt  = m_TypeModule->getFunction("isSmallInteger()");
+                Value*    rightIsInt  = builder.CreateCall(isSmallInt, rightValue);
+                Value*    leftIsInt   = builder.CreateCall(isSmallInt, leftValue);
+                Value*    isSmallInts = builder.CreateAnd(rightIsInt, leftIsInt);
                 
                 BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers"  , jitContext.function);
                 BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jitContext.function);
-                BasicBlock* fallbackBlock   = BasicBlock::Create(m_JITModule->getContext(), "fallback"  , jitContext.function);
+                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "fallback"  , jitContext.function);
 
-                // TODO Rewrite using phi functions
                 // Dpending on the contents we may either do the integer operations
                 // directly or create a send message call using operand objects
                 builder.CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
 
+                // Now the integers part
                 builder.SetInsertPoint(integersBlock);
-                
                 Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
-                Value* rightInt       = builder.CreateCall(getIntValue, rightValue);
-                Value* leftInt        = builder.CreateCall(getIntValue, leftValue);
+                Value*    rightInt    = builder.CreateCall(getIntValue, rightValue);
+                Value*    leftInt     = builder.CreateCall(getIntValue, leftValue);
                 
                 Value* intResult;
                 switch (instruction.low) {
@@ -260,15 +259,21 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", instruction.low);
                 }
-                builder.CreateBr(fallbackBlock);
-                
+                // Jumping out the integersBlock to the vaulue aggregator
+                builder.CreateBr(resultBlock);
+
+                // Now the sendBinary block
                 builder.SetInsertPoint(sendBinaryBlock);
                 // TODO Do the sendMessage call in sendBinaryBlock and store the result in callBinaryResult
                 Value* callBinaryResult = 0;
+                // Jumping out the sendBinaryBlock to the value aggregator
+                builder.CreateBr(resultBlock);
                 
-                builder.CreateBr(fallbackBlock);
-                builder.SetInsertPoint(fallbackBlock);
-                
+                // Now the value aggregator block
+                builder.SetInsertPoint(resultBlock);
+                // We do not know now which way the program will be executed,
+                // so we need to aggregate two possible results one of which 
+                // will be then selected as a return value
                 PHINode* phi = builder.CreatePHI(ot.object, 2);
                 phi->addIncoming(intResult, integersBlock);
                 phi->addIncoming(callBinaryResult, sendBinaryBlock);
