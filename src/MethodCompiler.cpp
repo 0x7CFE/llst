@@ -65,30 +65,30 @@ Function* MethodCompiler::createFunction(TMethod* method)
 
 void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& context)
 {
-    // First argument of every function is the pointer to the TContext object
+    // First argument of every function is a pointer to TContext object
     Value* contextObject = (Value*) (context.function->arg_begin());
     contextObject->setName("context");
     
     context.methodObject = builder.CreateGEP(contextObject, builder.getInt32(1), "method");
     context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
 
-    std::vector<Value*> argsIdx; // * Context.Arguments->operator[](2)
-    argsIdx.reserve(4);
-    argsIdx.push_back( builder.getInt32(2) ); // Context.Arguments*
-    argsIdx.push_back( builder.getInt32(0) ); // TObject
-    argsIdx.push_back( builder.getInt32(2) ); // TObject.fields *
-    argsIdx.push_back( builder.getInt32(0) ); // TObject.fields
+    std::vector<Value*> argsIndex; // * Context.Arguments->operator[](2)
+    argsIndex.reserve(4);
+    argsIndex.push_back( builder.getInt32(2) ); // Context.Arguments*
+    argsIndex.push_back( builder.getInt32(0) ); // TObject
+    argsIndex.push_back( builder.getInt32(2) ); // TObject.fields *
+    argsIndex.push_back( builder.getInt32(0) ); // TObject.fields
     
-    context.arguments = builder.CreateGEP(contextObject, argsIdx, "arguments");
+    context.arguments = builder.CreateGEP(contextObject, argsIndex, "arguments");
     
-    std::vector<Value*> tmpsIdx;
-    tmpsIdx.reserve(4);
-    tmpsIdx.push_back( builder.getInt32(3) );
-    tmpsIdx.push_back( builder.getInt32(0) );
-    tmpsIdx.push_back( builder.getInt32(2) );
-    tmpsIdx.push_back( builder.getInt32(0) );
+    std::vector<Value*> tempsIndex;
+    tempsIndex.reserve(4);
+    tempsIndex.push_back( builder.getInt32(3) );
+    tempsIndex.push_back( builder.getInt32(0) );
+    tempsIndex.push_back( builder.getInt32(2) );
+    tempsIndex.push_back( builder.getInt32(0) );
     
-    context.temporaries = builder.CreateGEP(contextObject, tmpsIdx, "temporaries");
+    context.temporaries = builder.CreateGEP(contextObject, tempsIndex, "temporaries");
     context.self = builder.CreateGEP(context.arguments, builder.getInt32(0), "self");
 }
 
@@ -179,7 +179,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     case falseConst: stack[ec.stackTop++] = globals.falseObject; break; */
                     default:
                         /* TODO unknown push constant */ ;
-                        fprintf(stderr, "VM: unknown push constant %d\n", constant);
+                        fprintf(stderr, "JIT: unknown push constant %d\n", constant);
                 }
 
                 jitContext.pushValue(constantValue);
@@ -284,7 +284,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             case SmalltalkVM::opDoSpecial: doSpecial(instruction.low, builder, jitContext);
             
             default:
-                fprintf(stderr, "VM: Invalid opcode %d at offset %d in method %s",
+                fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s",
                         instruction.high, jitContext.bytePointer, method->name->toString().c_str());
                 exit(1);
         }
