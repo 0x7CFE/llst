@@ -95,7 +95,7 @@ private:
     void initObjectTypes();
 
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
-    void doSpecial(llvm::IRBuilder<>& builder, TJITContext& context);
+    void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
     
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);

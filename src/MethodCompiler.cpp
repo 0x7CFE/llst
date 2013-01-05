@@ -189,7 +189,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 uint16_t newBytePointer = byteCodes[bytePointer] | (byteCodes[bytePointer+1] << 8);
                 bytePointer += 2;
                 
-                Value* blockFunction = compileBlock(jitContext);
+                //Value* blockFunction = compileBlock(jitContext);
                 // FIXME We need to push a block object initialized 
                 //       with the IR code in additional field
                 // jitContext.pushValue(blockFunction);
@@ -241,6 +241,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 BasicBlock* fallbackBlock = BasicBlock::Create(m_JITModule->getContext(), "fallback", jitContext.function);
 
                 // Here result of operation will be placed
+                // TODO Rewrite using phi functions
                 Value* resultPtr = builder.CreateAlloca(ot.object->getPointerTo());
 
                 // Dpending on the contents we may either do the integer operations
@@ -263,7 +264,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 jitContext.pushValue(resultPtr);
             }; break;
 
-            case SmalltalkVM::opDoSpecial: doSpecial(builder, jitContext);
+            case SmalltalkVM::opDoSpecial: doSpecial(instruction.low, builder, jitContext);
             
             default:
                 fprintf(stderr, "VM: Invalid opcode %d at offset %d in method %s",
@@ -279,10 +280,17 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
 Function* MethodCompiler::compileBlock(TJITContext& context)
 {
-    
+    return 0; // TODO
 }
 
-void MethodCompiler::doSpecial(IRBuilder<>& builder, TJITContext& context)
+void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
-    
+    switch (opcode) {
+        case SmalltalkVM::selfReturn:  builder.CreateRet(jitContext.self); break;
+        case SmalltalkVM::stackReturn: builder.CreateRet(jitContext.popValue()); break;
+        case SmalltalkVM::blockReturn: /* TODO */ break;
+        case SmalltalkVM::duplicate:   jitContext.pushValue(jitContext.lastValue()); break;
+        case SmalltalkVM::popTop:      jitContext.popValue(); break;
+        
+    }
 }
