@@ -278,6 +278,24 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 jitContext.pushValue(arguments);
             } break;
 
+            case SmalltalkVM::opSendUnary: {
+                Value* value = jitContext.popValue();
+                Value* result = 0;
+                switch ((SmalltalkVM::UnaryOpcode) instruction.low) {
+                    case SmalltalkVM::isNil:
+                        // TODO compare with nilObject return trueObject if equal
+                        break;
+
+                    case SmalltalkVM::notNil:
+                        // TODO compare with nilObject return trueObject if not equal
+                        break;
+                        
+                    default:
+                        fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", instruction.low);
+                }
+                jitContext.pushValue(result);
+            }; break;
+            
             case SmalltalkVM::opSendBinary: {
                 // TODO Extract this code into subroutines. 
                 //      Replace the operation with call to LLVM function
@@ -293,7 +311,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 
                 BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers"  , jitContext.function);
                 BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jitContext.function);
-                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "fallback"  , jitContext.function);
+                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result"  , jitContext.function);
 
                 // Dpending on the contents we may either do the integer operations
                 // directly or create a send message call using operand objects
@@ -313,7 +331,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", instruction.low);
                 }
-                // Jumping out the integersBlock to the vaulue aggregator
+                // Jumping out the integersBlock to the value aggregator
                 builder.CreateBr(resultBlock);
 
                 // Now the sendBinary block
@@ -403,5 +421,9 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
             // Switching to a newly created block
             builder.SetInsertPoint(skipBlock);
         } break;
+
+        case SmalltalkVM::breakpoint:
+            // TODO
+            break;
     }
 }

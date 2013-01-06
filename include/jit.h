@@ -40,6 +40,7 @@
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
 #include <llvm/Support/IRBuilder.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
 
 class MethodCompiler {
 private:
@@ -48,7 +49,6 @@ private:
 
     // This structure contains working data which is
     // used during the compilation process.
-    // Add more fields if necessary.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
         uint32_t            bytePointer;
@@ -114,3 +114,10 @@ public:
     }
 };
 
+
+class JITRuntime {
+private:
+    llvm::ExecutionEngine* m_executionEngine;
+    MethodCompiler* m_methodCompiler;
+public:
+};
