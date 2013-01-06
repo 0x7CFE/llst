@@ -84,7 +84,7 @@ Dictionary at: index put: value
     0018 SendMessage at:
     0019 MarkArguments 2
     0020 SendMessage =
-    0021 DoSpecial branch 25
+ #  0021 DoSpecial branch 25
  *  0024 PushConstant false
  #  0025 DoSpecial branchIfFalse 36
     0028 PushInstance 1
