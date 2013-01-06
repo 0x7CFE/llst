@@ -356,6 +356,8 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
 
 void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
+    TByteObject& byteCodes   = * jitContext.method->byteCodes;
+    
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {
             Value* selfPtr = builder.CreateGEP(jitContext.arguments, 0);
@@ -368,8 +370,6 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
         case SmalltalkVM::popTop:      jitContext.popValue(); break;
 
         case SmalltalkVM::branch: {
-            TByteObject& byteCodes   = * jitContext.method->byteCodes;
-            
             // Loading branch target bytecode offset
             uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
             jitContext.bytePointer += 2; // skipping the branch offset data
@@ -378,6 +378,30 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
             // from the previously stored basic blocks
             BasicBlock* target = m_targetToBlockMap[targetOffset];
             builder.CreateBr(target);
+        } break;
+
+        case SmalltalkVM::branchIfTrue:
+        case SmalltalkVM::branchIfFalse: {
+            // Loading branch target bytecode offset
+            uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
+            jitContext.bytePointer += 2; // skipping the branch offset data
+            
+            // Finding appropriate branch target
+            // from the previously stored basic blocks
+            BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
+
+            // This is a block that goes right after the branch instruction.
+            // If branch condition is not met execution continues right after
+            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jitContext.function);
+
+            // Creating condition check
+            Value* boolObject = 0; // TODO = (opcode == SmalltalkVM::branchIfTrue) ? trueObject : falseObject
+            Value* condition = jitContext.popValue();
+            Value* boolValue = builder.CreateXor(condition, boolObject);
+            builder.CreateCondBr(boolValue, targetBlock, skipBlock);
+
+            // Switching to a newly created block
+            builder.SetInsertPoint(skipBlock);
         } break;
     }
 }

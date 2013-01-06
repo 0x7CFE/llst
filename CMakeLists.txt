@@ -46,7 +46,7 @@ execute_process(COMMAND llvm-config-3.1 --ldflags --libs jit
                 OUTPUT_VARIABLE LLVM_LD_FLAGS)
                 
 set (COMPILER_FLAGS "-m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} ")
-set (LINKER_FLAGS   "-m32 -L/usr/lib32 -v -Wall ${LLVM_LD_FLAGS} ")
+set (LINKER_FLAGS   "-m32 -L/usr/lib32 -Wall ${LLVM_LD_FLAGS} ")
 
 add_subdirectory(src)
 add_subdirectory(include)
