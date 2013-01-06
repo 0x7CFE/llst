@@ -31,7 +31,7 @@ OrderedArray location: value
     0017 PushTemporary 0
     0018 PushTemporary 1
     0019 SendBinary <
-    0020 DoSpecial branchIfFalse 53
+ *  0020 DoSpecial branchIfFalse 53
     0023 PushTemporary 0
     0024 PushTemporary 1
     0025 SendBinary +
@@ -46,17 +46,17 @@ OrderedArray location: value
     0034 SendMessage at:
     0035 PushArgument 1
     0036 SendBinary <
-    0037 DoSpecial branchIfFalse 47
+ #  0037 DoSpecial branchIfFalse 47
     0040 PushTemporary 2
     0041 PushConstant 1
     0042 SendBinary +
     0043 AssignTemporary 0
     0044 DoSpecial branch 49
-    0047 PushTemporary 2
+ #  0047 PushTemporary 2
     0048 AssignTemporary 1
     0049 DoSpecial popTop
     0050 DoSpecial branch 17
-    0053 PushConstant 0
+ *  0053 PushConstant 0
     0054 DoSpecial popTop
     0055 PushTemporary 0
     0056 DoSpecial stackReturn
@@ -76,7 +76,7 @@ Dictionary at: index put: value
     0008 MarkArguments 1                #(keys)
     0009 SendMessage size               keys size
     0010 SendBinary <=                  keys size <= 
-    0011 DoSpecial branchIfFalse 24     position <= keys size
+ *  0011 DoSpecial branchIfFalse 24     position <= keys size
     0014 PushArgument 1
     0015 PushInstance 0
     0016 PushTemporary 0
@@ -84,16 +84,16 @@ Dictionary at: index put: value
     0018 SendMessage at:
     0019 MarkArguments 2
     0020 SendMessage =
-    0021 DoSpecial branch 25
-    0024 PushConstant false
-    0025 DoSpecial branchIfFalse 36
+ #  0021 DoSpecial branch 25
+ *  0024 PushConstant false
+ #  0025 DoSpecial branchIfFalse 36
     0028 PushInstance 1
     0029 PushTemporary 0
     0030 PushArgument 2
     0031 MarkArguments 3
     0032 SendMessage at:put:
     0033 DoSpecial branch 49
-    0036 PushInstance 0
+ #  0036 PushInstance 0
     0037 PushArgument 1
     0038 PushTemporary 0
     0039 MarkArguments 3

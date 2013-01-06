@@ -38,6 +38,8 @@
 
 #include <vm.h>
 
+extern "C" {
+
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
     memoryManager->initializeHeap(65536 * 32);
@@ -107,4 +109,6 @@ int main(int argc, char **argv) {
     vm.printVMStat();
 
     return 0;
+}
+
 }

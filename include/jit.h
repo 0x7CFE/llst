@@ -32,7 +32,9 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <types.h>
+#include <types.h>                    
+#include <map>
+#include <list>
 
 #include <llvm/Function.h>
 #include <llvm/LLVMContext.h>
@@ -82,6 +84,9 @@ private:
     private:    
         std::vector<llvm::Value*> valueStack;
     };
+
+    std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
+    void scanForBranches(TJITContext& jitContext);
 
     struct TObjectTypes {
         llvm::StructType* object;

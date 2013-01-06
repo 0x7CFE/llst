@@ -92,6 +92,44 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     context.self         = builder.CreateCall(objectGetFields, selfFields, "self");
 }
 
+void MethodCompiler::scanForBranches(TJITContext& jitContext)
+{
+    TByteObject& byteCodes   = * jitContext.method->byteCodes;
+    uint32_t     byteCount   = byteCodes.getSize();
+
+    // Processing the method's bytecodes
+    while (jitContext.bytePointer < byteCount) {
+        // Decoding the pending instruction (TODO move to a function)
+        TInstruction instruction;
+        instruction.low = (instruction.high = byteCodes[jitContext.bytePointer++]) & 0x0F;
+        instruction.high >>= 4;
+        if (instruction.high == SmalltalkVM::opExtended) {
+            instruction.high = instruction.low;
+            instruction.low  = byteCodes[jitContext.bytePointer++];
+        }
+
+        // We're now looking only for branch bytecodes
+        if (instruction.high != SmalltalkVM::opDoSpecial)
+            continue;
+
+        switch (instruction.low) {
+            case SmalltalkVM::branch:
+            case SmalltalkVM::branchIfTrue:
+            case SmalltalkVM::branchIfFalse: {
+                // Loading branch target bytecode offset
+                uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
+                jitContext.bytePointer += 2; // skipping the branch offset data
+                
+                // Creating the referred basic block and inserting it into the function
+                // Later it will be filled with instructions and linked with other blocks
+                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jitContext.function);
+
+                m_targetToBlockMap[targetOffset] = targetBasicBlock;
+            } break;
+        }
+    }
+}
+
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
     TByteObject& byteCodes   = * method->byteCodes;
@@ -103,17 +141,33 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     jitContext.function = createFunction(method);
 
     // Creating the basic block and inserting it into the function
-    BasicBlock* basicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jitContext.function);
+    BasicBlock* currentBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jitContext.function);
 
     // Builder inserts instructions into basic blocks
-    IRBuilder<> builder(basicBlock);
+    IRBuilder<> builder(currentBasicBlock);
     
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
     writePreamble(builder, jitContext);
+
+    scanForBranches(jitContext);
     
     // Processing the method's bytecodes
     while (jitContext.bytePointer < byteCount) {
+        uint32_t currentOffset = jitContext.bytePointer;
+
+        std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
+        if (iBlock != m_targetToBlockMap.end()) {
+            // Somewhere in the code we have a branch instruction that
+            // points to the current offset. We need to end the current
+            // basic block and start a new one, linking previous 
+            // basic block to a new one.
+
+            BasicBlock* newBlock = iBlock->second;   // Picking a basic block
+            builder.CreateBr(newBlock);       // Linking blocks together
+            builder.SetInsertPoint(newBlock); // and switching to a new block
+        }
+        
         // First of all decoding the pending instruction
         TInstruction instruction;
         instruction.low = (instruction.high = byteCodes[jitContext.bytePointer++]) & 0x0F;
@@ -251,7 +305,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 Value*    rightInt    = builder.CreateCall(getIntValue, rightValue);
                 Value*    leftInt     = builder.CreateCall(getIntValue, leftValue);
                 
-                Value* intResult;
+                Value* intResult = 0;
                 switch (instruction.low) {
                     case 0: intResult = builder.CreateICmpSLT(leftInt, rightInt); // operator <
                     case 1: intResult = builder.CreateICmpSLE(leftInt, rightInt); // operator <=
@@ -302,6 +356,8 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
 
 void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
+    TByteObject& byteCodes   = * jitContext.method->byteCodes;
+    
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {
             Value* selfPtr = builder.CreateGEP(jitContext.arguments, 0);
@@ -312,6 +368,40 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
         case SmalltalkVM::blockReturn: /* TODO */ break;
         case SmalltalkVM::duplicate:   jitContext.pushValue(jitContext.lastValue()); break;
         case SmalltalkVM::popTop:      jitContext.popValue(); break;
-        
+
+        case SmalltalkVM::branch: {
+            // Loading branch target bytecode offset
+            uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
+            jitContext.bytePointer += 2; // skipping the branch offset data
+
+            // Finding appropriate branch target 
+            // from the previously stored basic blocks
+            BasicBlock* target = m_targetToBlockMap[targetOffset];
+            builder.CreateBr(target);
+        } break;
+
+        case SmalltalkVM::branchIfTrue:
+        case SmalltalkVM::branchIfFalse: {
+            // Loading branch target bytecode offset
+            uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
+            jitContext.bytePointer += 2; // skipping the branch offset data
+            
+            // Finding appropriate branch target
+            // from the previously stored basic blocks
+            BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
+
+            // This is a block that goes right after the branch instruction.
+            // If branch condition is not met execution continues right after
+            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jitContext.function);
+
+            // Creating condition check
+            Value* boolObject = 0; // TODO = (opcode == SmalltalkVM::branchIfTrue) ? trueObject : falseObject
+            Value* condition = jitContext.popValue();
+            Value* boolValue = builder.CreateXor(condition, boolObject);
+            builder.CreateCondBr(boolValue, targetBlock, skipBlock);
+
+            // Switching to a newly created block
+            builder.SetInsertPoint(skipBlock);
+        } break;
     }
 }
