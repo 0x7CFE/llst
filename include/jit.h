@@ -38,6 +38,7 @@
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
 #include <llvm/Support/IRBuilder.h>
+#include <map>
 
 class MethodCompiler {
 private:
@@ -83,6 +84,19 @@ private:
         std::vector<llvm::Value*> valueStack;
     };
 
+    typedef uint32_t TSiteOffset;
+    struct TBranchSite {
+        uint32_t targetOffset;
+        llvm::BasicBlock::iterator insertPoint;
+        TBranchSite(uint32_t targetOffset, llvm::BasicBlock::iterator insertPoint)
+            : targetOffset(targetOffset), insertPoint(insertPoint) {}
+    };
+    
+    std::map<TSiteOffset, TBranchSite> m_branchSites;
+
+    std::map<uint32_t, std::list<uint32_t> > m_branchTargets;
+    std::map<uint32_t, llvm::BasicBlock*> m_offsetToBlockMap;
+    
     struct TObjectTypes {
         llvm::StructType* object;
         llvm::StructType* context;
