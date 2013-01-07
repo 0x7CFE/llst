@@ -86,16 +86,16 @@ public:
         breakpoint = 12
     };
 
+    enum UnaryOpcode {
+        isNil  = 0,
+        notNil = 1
+    };
+    
 private:
     enum {
         nilConst = 10,
         trueConst,
         falseConst
-    };
-    
-    enum UnaryOpcode {
-        isNil  = 0,
-        notNil = 1
     };
     
     enum SmallIntOpcode {

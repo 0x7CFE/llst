@@ -478,7 +478,7 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
     TObjectArray& stack = *ec.currentContext->stack;
     TObject*        top = stack[--ec.stackTop];
     
-    switch( (UnaryOpcode) ec.instruction.low ) {
+    switch ((UnaryOpcode) ec.instruction.low) {
         case isNil  : ec.returnedValue = (top == globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         case notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         
