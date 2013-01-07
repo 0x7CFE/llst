@@ -97,50 +97,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     ot.initializeFromModule(m_TypeModule);
     
-    /* Original TGlobals struct is
-     * struct TGlobals {
-     *    TObject* nilObject;
-     *    TObject* trueObject;
-     *    TObject* falseObject;
-     *    TClass*  smallIntClass;
-     *    TClass*  arrayClass;
-     *    TClass*  blockClass;
-     *    TClass*  contextClass;
-     *    TClass*  stringClass;
-     *    TDictionary* globalsObject;
-     *    TMethod* initialMethod;
-     *    TObject* binaryMessages[3];
-     *    TClass*  integerClass;
-     *    TSymbol* badMethodSymbol;
-     * };
-     */
-    
     // Mapping the globals into the JIT module
-    Type* globalTypes[] = {
-        ot.object->getPointerTo(), // true
-        ot.object->getPointerTo(), // false
-        ot.object->getPointerTo(), // nil
-
-        ot.klass->getPointerTo(),  // SmallInt
-        ot.klass->getPointerTo(),  // Array
-        ot.klass->getPointerTo(),  // Block
-        ot.klass->getPointerTo(),  // Context
-        ot.klass->getPointerTo(),  // String
-
-        ot.dictionary->getPointerTo(), // globals object
-        ot.method->getPointerTo(),     // initial method
-
-        // FIXME Struct of 3 binary messages
-        //       Could it be simply unrolled here?
-        ot.object->getPointerTo(), // binaryMessages[0] '<'
-        ot.object->getPointerTo(), // binaryMessages[1] '<='
-        ot.object->getPointerTo(), // binaryMessages[2] '+'
-
-        ot.klass->getPointerTo(),  // Integer
-        ot.symbol->getPointerTo()  // #doesNotUnderstand symbol
-    };
-
-    GlobalValue* m_jitGlobals = m_JITModule->getGlobalVariable("globals");
+    GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
 }
 

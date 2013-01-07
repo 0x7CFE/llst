@@ -57,6 +57,7 @@ struct TObjectTypes {
     llvm::StructType* symbol;
     llvm::StructType* objectArray;
     llvm::StructType* symbolArray;
+    llvm::StructType* globals;
     
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("struct.TObject");
@@ -67,6 +68,7 @@ struct TObjectTypes {
         symbol      = module->getTypeByName("struct.TSymbol");
         objectArray = module->getTypeByName("struct.TObjectArray");
         symbolArray = module->getTypeByName("struct.TSymbolArray");
+        globals     = module->getTypeByName("struct.TGlobals");
     }
 };
 
