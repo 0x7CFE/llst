@@ -119,5 +119,13 @@ class JITRuntime {
 private:
     llvm::ExecutionEngine* m_executionEngine;
     MethodCompiler* m_methodCompiler;
+
+    llvm::Module* m_JITModule;
+    llvm::Module* m_TypeModule;
 public:
+    MethodCompiler* getCompiler() { return m_methodCompiler; }
+    void dumpJIT();
+    
+    void initialize();
+    ~JITRuntime();
 };

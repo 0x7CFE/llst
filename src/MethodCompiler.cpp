@@ -309,9 +309,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 Value*    leftIsInt   = builder.CreateCall(isSmallInt, leftValue);
                 Value*    isSmallInts = builder.CreateAnd(rightIsInt, leftIsInt);
                 
-                BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers"  , jitContext.function);
+                BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers",   jitContext.function);
                 BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jitContext.function);
-                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result"  , jitContext.function);
+                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result",     jitContext.function);
 
                 // Dpending on the contents we may either do the integer operations
                 // directly or create a send message call using operand objects

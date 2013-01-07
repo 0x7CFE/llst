@@ -24,18 +24,18 @@ project(llst)
 # llvm_map_components_to_libraries(REQ_LLVM_LIBRARIES jit native)
 # 
 
-SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
-SET (CMAKE_CXX_FLAGS                "-g -m32 -Wall")
-SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
-SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
-SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
-SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
-
-SET (CMAKE_AR      "/usr/bin/llvm-ar")
-SET (CMAKE_LINKER  "/usr/bin/llvm-link")
-SET (CMAKE_NM      "/usr/bin/llvm-nm")
-SET (CMAKE_OBJDUMP "/usr/bin/llvm-objdump")
-SET (CMAKE_RANLIB  "/usr/bin/llvm-ranlib")
+# SET (CMAKE_CXX_COMPILER             "/usr/bin/clang++")
+# SET (CMAKE_CXX_FLAGS                "-g -m32 -Wall")
+# SET (CMAKE_CXX_FLAGS_DEBUG          "-g")
+# SET (CMAKE_CXX_FLAGS_MINSIZEREL     "-Os -DNDEBUG")
+# SET (CMAKE_CXX_FLAGS_RELEASE        "-O4 -DNDEBUG")
+# SET (CMAKE_CXX_FLAGS_RELWITHDEBINFO "-O2 -g")
+# 
+# SET (CMAKE_AR      "/usr/bin/llvm-ar")
+# SET (CMAKE_LINKER  "/usr/bin/llvm-link")
+# SET (CMAKE_NM      "/usr/bin/llvm-nm")
+# SET (CMAKE_OBJDUMP "/usr/bin/llvm-objdump")
+# SET (CMAKE_RANLIB  "/usr/bin/llvm-ranlib")
 
 execute_process(COMMAND llvm-config-3.1 --cxxflags
                 OUTPUT_STRIP_TRAILING_WHITESPACE

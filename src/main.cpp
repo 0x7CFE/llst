@@ -37,6 +37,7 @@
 #include <memory>
 
 #include <vm.h>
+#include <jit.h>
 
 extern "C" {
 
@@ -49,6 +50,28 @@ int main(int argc, char **argv) {
         testImage->loadImage(argv[1]);
     else
         testImage->loadImage("../image/testImage");
+
+    JITRuntime runtime;
+
+    printf("Initializing runtime...");
+    runtime.initialize();
+    printf("done\n");
+    
+    MethodCompiler* compiler = runtime.getCompiler();
+
+    printf("Acquiring class and method...");
+    TClass*  undefined = (TClass*)  testImage->getGlobal("Undefined");
+    TMethod* main      = (TMethod*) undefined->methods->find("main");
+    printf("done\n");
+    
+    printf("Compiling!..");
+    compiler->compileMethod(main);
+    printf("done\n");
+    
+    printf("And here goes the listing (hopefully...)\n");
+    runtime.dumpJIT();
+    
+    exit(0);
     
     SmalltalkVM vm(testImage.get(), memoryManager.get());
     
