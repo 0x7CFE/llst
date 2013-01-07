@@ -40,8 +40,12 @@
 
 using namespace llvm;
 
-void JITRuntime::initialize()
+JITRuntime* JITRuntime::s_instance = 0;
+
+void JITRuntime::initialize(SmalltalkVM* softVM)
 {
+    m_softVM = softVM;
+    
     // Initializing LLVM subsystem
     InitializeNativeTarget();
     
@@ -75,3 +79,16 @@ void JITRuntime::dumpJIT()
 JITRuntime::~JITRuntime() {
     // TODO Finalize stuff and dispose memory
 }
+
+extern "C" {
+    
+TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
+    return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
+}
+
+TObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
+    return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
+}
+    
+}
+

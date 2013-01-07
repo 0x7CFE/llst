@@ -232,13 +232,16 @@ private:
     bool m_lastGCOccured;
     void onCollectionOccured();
     
-    TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
-    TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
     
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     
     std::list<TObject*> rootStack;
 public:
+    // NOTE For typical operation these should not be used directly.
+    //      Use the template newObject<T>() instead
+    TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
+    TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
+    
     void pushProcess(TProcess* process) {
         rootStack.push_back(process);
         m_memoryManager->registerExternalPointer(& rootStack.back());
