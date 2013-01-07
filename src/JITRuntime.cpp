@@ -53,7 +53,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     // Initializing types module
     SMDiagnostic Err;
-    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext);
+    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
     
     // Initializing JIT module.
     // All JIT functions will be created here
