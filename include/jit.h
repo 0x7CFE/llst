@@ -36,11 +36,16 @@
 #include <map>
 #include <list>
 
+#include <stdio.h>
+
 #include <llvm/Function.h>
 #include <llvm/LLVMContext.h>
 #include <llvm/Module.h>
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/ExecutionEngine/Interpreter.h>
+#include <llvm/Linker.h>
+#include "llvm/Support/raw_ostream.h"
 
 class MethodCompiler {
 private:
@@ -110,6 +115,14 @@ public:
     MethodCompiler(llvm::Module* JITModule, llvm::Module* TypeModule)
         : m_JITModule(JITModule), m_TypeModule(TypeModule)
     {
+        /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
+        std::string linkerErrorMessages;
+        bool linkerFailed = llvm::Linker::LinkModules(m_JITModule, TypeModule, llvm::Linker::PreserveSource, &linkerErrorMessages);
+        if (linkerFailed) {
+            printf("%s\n", linkerErrorMessages.c_str());
+            exit(1);
+        }
+        */
         initObjectTypes();
     }
 };

@@ -34,14 +34,6 @@
 
 #include <jit.h>
 
-#include "llvm/Module.h"
-#include "llvm/Function.h"
-#include "llvm/Support/IRBuilder.h"
-#include "llvm/Support/raw_ostream.h"
-#include "llvm/ExecutionEngine/JIT.h"
-#include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/LLVMContext.h"
-
 #include "llvm/Support/TargetSelect.h"
 #include <llvm/Support/IRReader.h>
 
@@ -56,7 +48,7 @@ void JITRuntime::initialize()
 
     // Initializing types module
     SMDiagnostic Err;
-    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, getGlobalContext());
+    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, Context);
     
     // Initializing JIT module.
     // All JIT functions will be created here
@@ -65,7 +57,12 @@ void JITRuntime::initialize()
     // Initializing method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
     
-    m_executionEngine = ExecutionEngine::createJIT(m_JITModule);
+    std::string error;
+    m_executionEngine = EngineBuilder(m_JITModule).setErrorStr(&error).create();
+    if(!m_executionEngine) {
+        printf("%s\n", error.c_str());
+        exit(1);
+    }
 }
 
 void JITRuntime::dumpJIT()
