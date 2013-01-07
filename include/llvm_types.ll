@@ -167,3 +167,7 @@ entry:
 define i32 @main() {
     ret i32 0
 }
+
+; memory management functions
+declare %struct.TObject*     @newOrdinaryFunction(%struct.TClass, i32)
+declare %struct.TByteObject* @newBinaryFunction(%struct.TClass, i32)

@@ -129,8 +129,8 @@ public:
 };
 
 extern "C" {
-    TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize);
-    TObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
+    TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
 }
 
 class JITRuntime {
@@ -141,11 +141,13 @@ private:
 
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
+    llvm::Function* m_newOrdinaryObjectFunction;
+    llvm::Function* m_newBinaryObjectFunction;
     
     static JITRuntime* s_instance;
 
-    friend TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize);
-    friend TObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
+    friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     static JITRuntime* Instance() { return s_instance; }
 public:
     

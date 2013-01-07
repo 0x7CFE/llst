@@ -59,7 +59,18 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // All JIT functions will be created here
     m_JITModule = new Module("jit", Context);
 
-    // Initializing method compiler
+    // Providing the memory management interface to the JIT module
+    // FIXME Think about interfacing the MemoryManager directly
+    StructType* objectType            = m_TypeModule->getTypeByName("struct.TObject");
+    StructType* byteObjectType        = m_TypeModule->getTypeByName("struct.TByteObject");
+// FIXME
+//     FunctionType* newOrdinaryObjectType = m_TypeModule->getTypeByName("newOrdinaryObject")->getType();   
+//     FunctionType* newBinaryObjectType   = m_TypeModule->getFunction("newBinaryObjectObject")->getType(); 
+//     
+//     m_newOrdinaryObjectFunction = cast<Function>(m_JITModule->getOrInsertFunction("newOrdinaryObject", objectType, newOrdinaryObjectType));
+//     m_newBinaryObjectFunction   = cast<Function>(m_JITModule->getOrInsertFunction("newBinaryObject", byteObjectType, newBinaryObjectType));
+    
+    // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
     
     std::string error;
@@ -86,7 +97,7 @@ TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
-TObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
+TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
     
