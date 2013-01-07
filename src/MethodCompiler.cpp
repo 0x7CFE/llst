@@ -38,16 +38,6 @@
 
 using namespace llvm;
 
-void MethodCompiler::initObjectTypes()
-{
-    ot.object      = m_TypeModule->getTypeByName("struct.TObject");
-    ot.context     = m_TypeModule->getTypeByName("struct.TContext");
-    ot.method      = m_TypeModule->getTypeByName("struct.TMethod");
-    ot.symbol      = m_TypeModule->getTypeByName("struct.TSymbol");
-    ot.objectArray = m_TypeModule->getTypeByName("struct.TObjectArray");
-    ot.symbolArray = m_TypeModule->getTypeByName("struct.TSymbolArray");
-}
-
 Function* MethodCompiler::createFunction(TMethod* method)
 {
     std::vector<Type*> methodParams;

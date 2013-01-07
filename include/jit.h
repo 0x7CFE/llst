@@ -48,6 +48,28 @@
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
 
+struct TObjectTypes {
+    llvm::StructType* object;
+    llvm::StructType* klass;
+    llvm::StructType* context;
+    llvm::StructType* dictionary;
+    llvm::StructType* method;
+    llvm::StructType* symbol;
+    llvm::StructType* objectArray;
+    llvm::StructType* symbolArray;
+    
+    void initializeFromModule(llvm::Module* module) {
+        object      = module->getTypeByName("struct.TObject");
+        klass       = module->getTypeByName("struct.TClass");
+        context     = module->getTypeByName("struct.TContext");
+        dictionary  = module->getTypeByName("struct.TDictionary");
+        method      = module->getTypeByName("struct.TMethod");
+        symbol      = module->getTypeByName("struct.TSymbol");
+        objectArray = module->getTypeByName("struct.TObjectArray");
+        symbolArray = module->getTypeByName("struct.TSymbolArray");
+    }
+};
+
 class MethodCompiler {
 private:
     llvm::Module* m_JITModule;
@@ -94,16 +116,7 @@ private:
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jitContext);
 
-    struct TObjectTypes {
-        llvm::StructType* object;
-        llvm::StructType* context;
-        llvm::StructType* method;
-        llvm::StructType* symbol;
-        llvm::StructType* objectArray;
-        llvm::StructType* symbolArray;
-    };
     TObjectTypes ot;
-    void initObjectTypes();
 
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
     void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
@@ -124,7 +137,7 @@ public:
             exit(1);
         }
         */
-        initObjectTypes();
+        ot.initializeFromModule(m_TypeModule);
     }
 };
 
@@ -143,6 +156,9 @@ private:
     llvm::Module* m_TypeModule;
     llvm::Function* m_newOrdinaryObjectFunction;
     llvm::Function* m_newBinaryObjectFunction;
+
+    TObjectTypes ot;
+    llvm::GlobalVariable* m_jitGlobals;
     
     static JITRuntime* s_instance;
 
