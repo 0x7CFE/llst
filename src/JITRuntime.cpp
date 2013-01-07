@@ -49,26 +49,31 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Initializing LLVM subsystem
     InitializeNativeTarget();
     
-    LLVMContext& Context = getGlobalContext();
+    LLVMContext& llvmContext = getGlobalContext();
 
     // Initializing types module
     SMDiagnostic Err;
-    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, Context);
+    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext);
     
     // Initializing JIT module.
     // All JIT functions will be created here
-    m_JITModule = new Module("jit", Context);
+    m_JITModule = new Module("jit", llvmContext);
 
     // Providing the memory management interface to the JIT module
     // FIXME Think about interfacing the MemoryManager directly
-    StructType* objectType            = m_TypeModule->getTypeByName("struct.TObject");
-    StructType* byteObjectType        = m_TypeModule->getTypeByName("struct.TByteObject");
-// FIXME
-//     FunctionType* newOrdinaryObjectType = m_TypeModule->getTypeByName("newOrdinaryObject")->getType();   
-//     FunctionType* newBinaryObjectType   = m_TypeModule->getFunction("newBinaryObjectObject")->getType(); 
-//     
-//     m_newOrdinaryObjectFunction = cast<Function>(m_JITModule->getOrInsertFunction("newOrdinaryObject", objectType, newOrdinaryObjectType));
-//     m_newBinaryObjectFunction   = cast<Function>(m_JITModule->getOrInsertFunction("newBinaryObject", byteObjectType, newBinaryObjectType));
+
+    // These are then used as an allocator function return types
+    StructType* objectType     = m_TypeModule->getTypeByName("struct.TObject");
+    StructType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject");
+
+    std::vector<Type*> params;
+    params.push_back(objectType->getPointerTo());    // klass
+    params.push_back(Type::getInt32Ty(llvmContext)); // size
+    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType, params, false);
+    FunctionType* newBnaryObjectType    = FunctionType::get(byteObjectType, params, false);
+    
+    m_newOrdinaryObjectFunction = cast<Function>(m_JITModule->getOrInsertFunction("newOrdinaryObject", newOrdinaryObjectType));
+    m_newBinaryObjectFunction   = cast<Function>(m_JITModule->getOrInsertFunction("newBinaryObject", newBnaryObjectType));
     
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);

@@ -169,5 +169,5 @@ define i32 @main() {
 }
 
 ; memory management functions
-declare %struct.TObject*     @newOrdinaryFunction(%struct.TClass, i32)
-declare %struct.TByteObject* @newBinaryFunction(%struct.TClass, i32)
+;declare %struct.TObject*     @newOrdinaryFunction(%struct.TClass, i32)
+;declare %struct.TByteObject* @newBinaryFunction(%struct.TClass, i32)
