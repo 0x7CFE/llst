@@ -33,6 +33,7 @@
  */
 
 #include <types.h>                    
+#include "vm.h"
 #include <map>
 #include <list>
 
@@ -127,18 +128,34 @@ public:
     }
 };
 
+extern "C" {
+    TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
+    TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+}
 
 class JITRuntime {
 private:
+    SmalltalkVM* m_softVM;
     llvm::ExecutionEngine* m_executionEngine;
     MethodCompiler* m_methodCompiler;
 
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
+    llvm::Function* m_newOrdinaryObjectFunction;
+    llvm::Function* m_newBinaryObjectFunction;
+    
+    static JITRuntime* s_instance;
+
+    friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
+    friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    static JITRuntime* Instance() { return s_instance; }
 public:
+    
     MethodCompiler* getCompiler() { return m_methodCompiler; }
+    SmalltalkVM* getVM() { return m_softVM; }
+    
     void dumpJIT();
     
-    void initialize();
+    void initialize(SmalltalkVM* softVM);
     ~JITRuntime();
 };

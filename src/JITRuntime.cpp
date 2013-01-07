@@ -40,22 +40,42 @@
 
 using namespace llvm;
 
-void JITRuntime::initialize()
+JITRuntime* JITRuntime::s_instance = 0;
+
+void JITRuntime::initialize(SmalltalkVM* softVM)
 {
+    m_softVM = softVM;
+    
     // Initializing LLVM subsystem
     InitializeNativeTarget();
     
-    LLVMContext& Context = getGlobalContext();
+    LLVMContext& llvmContext = getGlobalContext();
 
     // Initializing types module
     SMDiagnostic Err;
-    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, Context);
+    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext);
     
     // Initializing JIT module.
     // All JIT functions will be created here
-    m_JITModule = new Module("jit", Context);
+    m_JITModule = new Module("jit", llvmContext);
 
-    // Initializing method compiler
+    // Providing the memory management interface to the JIT module
+    // FIXME Think about interfacing the MemoryManager directly
+
+    // These are then used as an allocator function return types
+    StructType* objectType     = m_TypeModule->getTypeByName("struct.TObject");
+    StructType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject");
+
+    std::vector<Type*> params;
+    params.push_back(objectType->getPointerTo());    // klass
+    params.push_back(Type::getInt32Ty(llvmContext)); // size
+    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType, params, false);
+    FunctionType* newBnaryObjectType    = FunctionType::get(byteObjectType, params, false);
+    
+    m_newOrdinaryObjectFunction = cast<Function>(m_JITModule->getOrInsertFunction("newOrdinaryObject", newOrdinaryObjectType));
+    m_newBinaryObjectFunction   = cast<Function>(m_JITModule->getOrInsertFunction("newBinaryObject", newBnaryObjectType));
+    
+    // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
     
     std::string error;
@@ -75,3 +95,16 @@ void JITRuntime::dumpJIT()
 JITRuntime::~JITRuntime() {
     // TODO Finalize stuff and dispose memory
 }
+
+extern "C" {
+    
+TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
+    return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
+}
+
+TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
+    return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
+}
+    
+}
+

@@ -39,8 +39,6 @@
 #include <vm.h>
 #include <jit.h>
 
-extern "C" {
-
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
     memoryManager->initializeHeap(65536 * 32);
@@ -51,10 +49,12 @@ int main(int argc, char **argv) {
     else
         testImage->loadImage("../image/testImage");
 
+    SmalltalkVM vm(testImage.get(), memoryManager.get());
+    
     JITRuntime runtime;
 
     printf("Initializing runtime...");
-    runtime.initialize();
+    runtime.initialize(&vm);
     printf("done\n");
     
     MethodCompiler* compiler = runtime.getCompiler();
@@ -73,7 +73,6 @@ int main(int argc, char **argv) {
     
     exit(0);
     
-    SmalltalkVM vm(testImage.get(), memoryManager.get());
     
     // Creating runtime context
     hptr<TContext> initContext = vm.newObject<TContext>();
@@ -132,6 +131,4 @@ int main(int argc, char **argv) {
     vm.printVMStat();
 
     return 0;
-}
-
 }
