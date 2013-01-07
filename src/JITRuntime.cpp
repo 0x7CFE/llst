@@ -36,6 +36,7 @@
 
 #include "llvm/Support/TargetSelect.h"
 #include <llvm/Support/IRReader.h>
+#include <llvm/Analysis/Verifier.h>
 
 using namespace llvm;
 
@@ -58,7 +59,7 @@ void JITRuntime::initialize()
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
     
     std::string error;
-    m_executionEngine = EngineBuilder(m_JITModule).setErrorStr(&error).create();
+    m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
     if(!m_executionEngine) {
         printf("%s\n", error.c_str());
         exit(1);
@@ -67,6 +68,7 @@ void JITRuntime::initialize()
 
 void JITRuntime::dumpJIT()
 {
+    verifyModule(*m_JITModule);
     m_JITModule->dump();
 }
 

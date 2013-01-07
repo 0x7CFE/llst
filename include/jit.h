@@ -43,7 +43,7 @@
 #include <llvm/Module.h>
 #include <llvm/Support/IRBuilder.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
-#include <llvm/ExecutionEngine/Interpreter.h>
+#include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
 
