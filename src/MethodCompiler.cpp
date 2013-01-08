@@ -70,11 +70,15 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     Value* argsObject      = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
     context.arguments      = builder.CreateCall(objectGetFields, argsObject, "arguments");
     
-    //TODO do the same with literals as with args
-    context.literals     = builder.CreateGEP(context.methodObject, builder.getInt32(3), "literals");
+    Value* literalsObjectPtr   = builder.CreateStructGEP(contextObject, 3, "literalsObjectPtr");
+    Value* literalsSymbolArray = builder.CreateLoad(literalsObjectPtr, "literalsSymbolArray");
+    Value* literalsObject      = builder.CreateBitCast(literalsSymbolArray, ot.object->getPointerTo());
+    context.literals           = builder.CreateCall(objectGetFields, literalsObject, "literals");
     
-    //TODO do the same with temporaries as with args
-    context.temporaries = builder.CreateGEP(contextObject, NULL, "temporaries");
+    Value* tempsObjectPtr   = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
+    Value* tempsObjectArray = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
+    Value* tempsObject      = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo());
+    context.temporaries     = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
     
     Value* selfObjectPtr = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
     Value* selfObject    = builder.CreateLoad(selfObjectPtr, "selfObject");
@@ -113,7 +117,8 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
                 // Creating the referred basic block and inserting it into the function
                 // Later it will be filled with instructions and linked to other blocks
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jitContext.function);
-
+                //FIXME BasicBlock::Create (3 args) inserts basic block at the end of the function.
+                // We have to use 4 args to place blocks in the correct order.
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
             } break;
         }
