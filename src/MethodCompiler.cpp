@@ -222,7 +222,6 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                     case trueConst:  stack[ec.stackTop++] = globals.trueObject;  break;
                     case falseConst: stack[ec.stackTop++] = globals.falseObject; break; */
                     default:
-                        /* TODO unknown push constant */ ;
                         fprintf(stderr, "JIT: unknown push constant %d\n", constant);
                 }
 
@@ -269,20 +268,37 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             } break;
 
             case SmalltalkVM::opSendUnary: {
+                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+                
+                //FIXME hairy
+                
+                Value* nilGEP = builder.CreateStructGEP(globals, 0);
+                Value* nilVal = builder.CreateLoad(nilGEP);
+                
+                Value* trueGEP = builder.CreateStructGEP(globals, 1);
+                Value* trueVal = builder.CreateLoad(trueGEP);
+                
+                Value* falseGEP = builder.CreateStructGEP(globals, 2);
+                Value* falseVal = builder.CreateLoad(falseGEP);
+                
                 Value* value = jitContext.popValue();
-                Value* result = 0;
+                Value* condition = 0;
+                
                 switch ((SmalltalkVM::UnaryOpcode) instruction.low) {
                     case SmalltalkVM::isNil:
-                        // TODO compare with nilObject return trueObject if equal
+                        condition = builder.CreateICmpEQ(value, nilVal);
                         break;
 
                     case SmalltalkVM::notNil:
-                        // TODO compare with nilObject return trueObject if not equal
+                        condition = builder.CreateICmpNE(value, nilVal);
                         break;
                         
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", instruction.low);
                 }
+                
+                Value* result = builder.CreateSelect(condition, trueVal, falseVal);
+                
                 jitContext.pushValue(result);
             }; break;
             

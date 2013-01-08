@@ -54,6 +54,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Initializing types module
     SMDiagnostic Err;
     m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
+    if (!m_TypeModule) {
+        Err.Print("JITRuntime.cpp", errs());
+        exit(1);
+    }
     
     // Initializing JIT module.
     // All JIT functions will be created here
@@ -71,23 +75,19 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         Type::getInt32Ty(llvmContext) // size
     };
     FunctionType* newOrdinaryObjectType = FunctionType::get(objectType, params, false);
-    FunctionType* newBnaryObjectType    = FunctionType::get(byteObjectType, params, false);
+    FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
     
     // Creating function references
-    m_newOrdinaryObjectFunction = cast<Function>(m_JITModule->getOrInsertFunction("newOrdinaryObject", newOrdinaryObjectType));
-    m_newBinaryObjectFunction   = cast<Function>(m_JITModule->getOrInsertFunction("newBinaryObject", newBnaryObjectType));
+    m_newOrdinaryObjectFunction = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
+    m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
 
-    // Marking functions as external
-    m_newOrdinaryObjectFunction->setLinkage(Function::ExternalLinkage);
-    m_newBinaryObjectFunction->setLinkage(Function::ExternalLinkage);
-    
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
     if(!m_executionEngine) {
-        printf("%s\n", error.c_str());
+        errs() << error;
         exit(1);
     }
 
@@ -97,51 +97,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     ot.initializeFromModule(m_TypeModule);
     
-    /* Original TGlobals struct is
-     * struct TGlobals {
-     *    TObject* nilObject;
-     *    TObject* trueObject;
-     *    TObject* falseObject;
-     *    TClass*  smallIntClass;
-     *    TClass*  arrayClass;
-     *    TClass*  blockClass;
-     *    TClass*  contextClass;
-     *    TClass*  stringClass;
-     *    TDictionary* globalsObject;
-     *    TMethod* initialMethod;
-     *    TObject* binaryMessages[3];
-     *    TClass*  integerClass;
-     *    TSymbol* badMethodSymbol;
-     * };
-     */
-    
     // Mapping the globals into the JIT module
-    Type* globalTypes[] = {
-        ot.object->getPointerTo(), // true
-        ot.object->getPointerTo(), // false
-        ot.object->getPointerTo(), // nil
-
-        ot.klass->getPointerTo(),  // SmallInt
-        ot.klass->getPointerTo(),  // Array
-        ot.klass->getPointerTo(),  // Block
-        ot.klass->getPointerTo(),  // Context
-        ot.klass->getPointerTo(),  // String
-
-        ot.dictionary->getPointerTo(), // globals object
-        ot.method->getPointerTo(),     // initial method
-
-        // FIXME Struct of 3 binary messages
-        //       Could it be simply unrolled here?
-        ot.object->getPointerTo(), // binaryMessages[0] '<'
-        ot.object->getPointerTo(), // binaryMessages[1] '<='
-        ot.object->getPointerTo(), // binaryMessages[2] '+'
-
-        ot.klass->getPointerTo(),  // Integer
-        ot.symbol->getPointerTo()  // #doesNotUnderstand symbol
-    };
-
-    GlobalValue* m_jitGlobals = m_JITModule->getGlobalVariable("globals");
+    GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
+    
+    //TODO prettify globals' names
+    //m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object)
 }
 
 void JITRuntime::dumpJIT()

@@ -55,6 +55,20 @@
                           %struct.TObject*, ; state
                           %struct.TObject* ; result
                         }
+%struct.TGlobals = type { %struct.TObject*, ; nilObject
+                          %struct.TObject*, ; trueObject
+                          %struct.TObject*, ; falseObject
+                          %struct.TClass*, ; smallIntClass
+                          %struct.TClass*, ; arrayClass
+                          %struct.TClass*, ; blockClass
+                          %struct.TClass*, ; contextClass
+                          %struct.TClass*, ; stringClass
+                          %struct.TDictionary*, ; globalsObject
+                          %struct.TMethod*, ; initialMethod
+                          [3 x %struct.TObject*], ; binaryMessages : [<, <=, +]
+                          %struct.TClass*, ; integerClass
+                          %struct.TSymbol* ; badMethodSymbol
+                        }
 
 ; We can use extern C++ function but
 ; llvm passes may optimize/inline IR code.
@@ -164,7 +178,7 @@ entry:
     ret void
 }
 
-define i32 @main() {
+define i32 @main() { ; FIXME remove from release
     ret i32 0
 }
 
