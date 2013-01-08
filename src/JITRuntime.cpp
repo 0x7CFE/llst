@@ -75,16 +75,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         Type::getInt32Ty(llvmContext) // size
     };
     FunctionType* newOrdinaryObjectType = FunctionType::get(objectType, params, false);
-    FunctionType* newBnaryObjectType    = FunctionType::get(byteObjectType, params, false);
+    FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
     
     // Creating function references
-    m_newOrdinaryObjectFunction = cast<Function>(m_JITModule->getOrInsertFunction("newOrdinaryObject", newOrdinaryObjectType));
-    m_newBinaryObjectFunction   = cast<Function>(m_JITModule->getOrInsertFunction("newBinaryObject", newBnaryObjectType));
+    m_newOrdinaryObjectFunction = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
+    m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
 
-    // Marking functions as external
-    m_newOrdinaryObjectFunction->setLinkage(Function::ExternalLinkage);
-    m_newBinaryObjectFunction->setLinkage(Function::ExternalLinkage);
-    
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
     
@@ -104,6 +100,9 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Mapping the globals into the JIT module
     GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
+    
+    //TODO prettify globals' names
+    //m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object)
 }
 
 void JITRuntime::dumpJIT()
