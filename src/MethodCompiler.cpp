@@ -111,7 +111,7 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
                 jitContext.bytePointer += 2; // skipping the branch offset data
                 
                 // Creating the referred basic block and inserting it into the function
-                // Later it will be filled with instructions and linked with other blocks
+                // Later it will be filled with instructions and linked to other blocks
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jitContext.function);
 
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
@@ -140,6 +140,10 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // commonly used pointers such as method arguments or temporaries
     writePreamble(builder, jitContext);
 
+    // First analyzing pass. Scans the bytecode for the branch sites and
+    // collects branch targets. Creates target basic blocks beforehand.
+    // Target blocks are collected in the m_targetToBlockMap map with 
+    // target bytecode offset as a key.
     scanForBranches(jitContext);
     
     // Processing the method's bytecodes
@@ -259,6 +263,10 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 // FIXME May be we may unroll the arguments array and pass the values directly.
                 //       However, in some cases this may lead to additional architectural problems.
+                Value* arrayClass = 0; // TODO Get global object Array
+                Value* args[] = { arrayClass, builder.getInt32(2) };
+
+                //builder.CreateCall();
                 Value* arguments = 0; // TODO create call equivalent to newObject<TObjectArray>(argumentsCount)
                 uint8_t index = argumentsCount;
                 while (index > 0)
@@ -272,26 +280,21 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 
                 //FIXME hairy
                 
-                Value* nilGEP = builder.CreateStructGEP(globals, 0);
-                Value* nilVal = builder.CreateLoad(nilGEP);
+                Value* nilPtr    = builder.CreateStructGEP(globals, 0);
+                Value* nilVal    = builder.CreateLoad(nilPtr);
                 
-                Value* trueGEP = builder.CreateStructGEP(globals, 1);
-                Value* trueVal = builder.CreateLoad(trueGEP);
+                Value* truePtr   = builder.CreateStructGEP(globals, 1);
+                Value* trueVal   = builder.CreateLoad(truePtr);
                 
-                Value* falseGEP = builder.CreateStructGEP(globals, 2);
-                Value* falseVal = builder.CreateLoad(falseGEP);
+                Value* falsePtr  = builder.CreateStructGEP(globals, 2);
+                Value* falseVal  = builder.CreateLoad(falsePtr);
                 
-                Value* value = jitContext.popValue();
+                Value* value     = jitContext.popValue();
                 Value* condition = 0;
                 
                 switch ((SmalltalkVM::UnaryOpcode) instruction.low) {
-                    case SmalltalkVM::isNil:
-                        condition = builder.CreateICmpEQ(value, nilVal);
-                        break;
-
-                    case SmalltalkVM::notNil:
-                        condition = builder.CreateICmpNE(value, nilVal);
-                        break;
+                    case SmalltalkVM::isNil:  condition = builder.CreateICmpEQ(value, nilVal); break;
+                    case SmalltalkVM::notNil: condition = builder.CreateICmpNE(value, nilVal); break;
                         
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", instruction.low);

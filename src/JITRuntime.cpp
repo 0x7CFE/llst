@@ -55,7 +55,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     SMDiagnostic Err;
     m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
     if (!m_TypeModule) {
-        Err.Print("JITRuntime.cpp", errs());
+        Err.print("JITRuntime.cpp", errs());
         exit(1);
     }
     
