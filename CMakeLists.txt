@@ -18,12 +18,12 @@ execute_process(COMMAND ${CONFIG_COMMAND} --ldflags
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_LD_FLAGS)
 
-# TODO provide correct minimal subset of the needed libraries
+# TODO provide correct minimal subset of the needed libraries. libs: jit backend asmparser bitreader, but no need!
 execute_process(COMMAND ${CONFIG_COMMAND} --libs all
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_LIBS)
 
-set (COMPILER_FLAGS "-m32 -march=native -mtune=native -flto -funroll-loops -Wall ${LLVM_CXX_FLAGS} ")
+set (COMPILER_FLAGS "-m32 -march=native -mtune=native -flto -fno-rtti -funroll-loops -Wall ${LLVM_CXX_FLAGS} ")
 set (LINKER_FLAGS   "-m32 -L/usr/lib32 -flto -Wall ${LLVM_LD_FLAGS} ")
 
 add_subdirectory(src)
