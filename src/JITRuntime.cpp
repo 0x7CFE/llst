@@ -54,6 +54,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Initializing types module
     SMDiagnostic Err;
     m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
+    if (!m_TypeModule) {
+        Err.Print("JITRuntime.cpp", errs());
+        exit(1);
+    }
     
     // Initializing JIT module.
     // All JIT functions will be created here
@@ -87,7 +91,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
     if(!m_executionEngine) {
-        printf("%s\n", error.c_str());
+        errs() << error;
         exit(1);
     }
 
