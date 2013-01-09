@@ -124,10 +124,12 @@ private:
     TObjectTypes ot;
     llvm::Function* m_newOrdinaryObjectFunction;
     llvm::Function* m_newBinaryObjectFunction;
+    llvm::Function* m_sendMessageFunction;
     
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
     void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
     
+    llvm::Value*    createArray(llvm::IRBuilder<>& builder, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);
 public:
@@ -137,11 +139,13 @@ public:
         llvm::Module* JITModule,
         llvm::Module* TypeModule,
         llvm::Function* newOrdinaryObjectFunction,
-        llvm::Function* newBinaryObjectFunction
+        llvm::Function* newBinaryObjectFunction,
+        llvm::Function* sendMessageFunction
     )
         : m_JITModule(JITModule), m_TypeModule(TypeModule),
           m_newOrdinaryObjectFunction(newOrdinaryObjectFunction),
-          m_newBinaryObjectFunction(newBinaryObjectFunction)
+          m_newBinaryObjectFunction(newBinaryObjectFunction),
+          m_sendMessageFunction(sendMessageFunction)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -169,9 +173,11 @@ private:
 
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
+
     llvm::Function* m_newOrdinaryObjectFunction;
     llvm::Function* m_newBinaryObjectFunction;
-
+    llvm::Function* m_sendMessageFunction;
+    
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;
     

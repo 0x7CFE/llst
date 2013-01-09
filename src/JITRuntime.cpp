@@ -81,11 +81,13 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Creating function references
     m_newOrdinaryObjectFunction = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-
+    m_sendMessageFunction       = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler( m_JITModule, m_TypeModule,
                                            m_newOrdinaryObjectFunction,
-                                           m_newBinaryObjectFunction );
+                                           m_newBinaryObjectFunction,
+                                           m_sendMessageFunction );
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -95,9 +97,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     }
 
     // Mapping the function references to actual functions
-    m_executionEngine->addGlobalMapping(m_newOrdinaryObjectFunction, reinterpret_cast<void*>(&newOrdinaryObject));
-    m_executionEngine->addGlobalMapping(m_newBinaryObjectFunction, reinterpret_cast<void*>(&newBinaryObject));
-
+    m_executionEngine->addGlobalMapping(m_newOrdinaryObjectFunction, reinterpret_cast<void*>(& ::newOrdinaryObject));
+    m_executionEngine->addGlobalMapping(m_newBinaryObjectFunction, reinterpret_cast<void*>(& ::newBinaryObject));
+    m_executionEngine->addGlobalMapping(m_sendMessageFunction, reinterpret_cast<void*>(& ::sendMessage));
+    
     ot.initializeFromModule(m_TypeModule);
     
     // Mapping the globals into the JIT module
@@ -144,7 +147,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
 
     // Preparing the context objects. Because we do not call the software
-    // implementation here we do not need to allocate the stack object
+    // implementation here, we do not need to allocate the stack object
     // because it is not used by JIT runtime. We also may skip the proper
     // initialization of various objects such as stackTop and bytePointer.
     
@@ -156,7 +159,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     newContext->temporaries       = newTemps;
     newContext->arguments         = messageArguments;
     newContext->method            = method;
-    //newContext->previousContext   = previousContext;
+    newContext->previousContext   = callingContext;
     
     // Calling the method and returning the result
     std::vector<GenericValue> args;

@@ -130,6 +130,20 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
     }
 }
 
+Value* MethodCompiler::createArray(IRBuilder<>& builder, uint32_t elementsCount)
+{
+    // Acquiring the array class to be used in new object creation
+    GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+    Value* arrayClassPtr = builder.CreateStructGEP(globals, 0);
+    Value* arrayClass    = builder.CreateLoad(arrayClassPtr);
+    
+    // Instantinating new array object
+    Value* args[] = { arrayClass, builder.getInt32(elementsCount) };
+    Value* arrayObject = builder.CreateCall(m_newOrdinaryObjectFunction, args);
+
+    return arrayObject;
+}
+
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
     TByteObject& byteCodes = * method->byteCodes;
@@ -274,14 +288,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 // FIXME May be we may unroll the arguments array and pass the values directly.
                 //       However, in some cases this may lead to additional architectural problems.
 
-                // Acquiring the array class to be used in new object creation
-                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
-                Value* arrayClassPtr = builder.CreateStructGEP(globals, 0);
-                Value* arrayClass    = builder.CreateLoad(arrayClassPtr);
-
-                // Instantinating new array object
-                Value* args[] = { arrayClass, builder.getInt32(argumentsCount) };
-                Value* arguments = builder.CreateCall(m_newOrdinaryObjectFunction, args);
+                Value* arguments = createArray(builder, argumentsCount);
 
                 // Filling object with contents
                 uint8_t index = argumentsCount;
@@ -361,8 +368,13 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 // Now the sendBinary block
                 builder.SetInsertPoint(sendBinaryBlock);
-                // TODO Do the sendMessage call in sendBinaryBlock and store the result in callBinaryResult
-                Value* callBinaryResult = 0;
+                // We need to create an arguments array and fill it with argument objects
+                // Then send the message just like ordinary one
+                Value* arguments = createArray(builder, 2);
+                builder.CreateInsertValue(arguments, jitContext.popValue(), 0);
+                builder.CreateInsertValue(arguments, jitContext.popValue(), 1);
+                Value* callBinaryResult = builder.CreateCall(m_sendMessageFunction, arguments);
+                
                 // Jumping out the sendBinaryBlock to the value aggregator
                 builder.CreateBr(resultBlock);
                 
@@ -376,6 +388,12 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 phi->addIncoming(callBinaryResult, sendBinaryBlock);
                 
                 jitContext.pushValue(phi);
+            } break;
+
+            case SmalltalkVM::opSendMessage: {
+                Value* arguments = jitContext.popValue();
+                Value* result = builder.CreateCall(m_sendMessageFunction, arguments);
+                jitContext.pushValue(result);
             } break;
 
             case SmalltalkVM::opDoSpecial: doSpecial(instruction.low, builder, jitContext);
