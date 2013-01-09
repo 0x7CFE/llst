@@ -65,29 +65,34 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     
     // TODO maybe we shuld rewrite arguments[idx] using TArrayObject::getField ?
 
-    Value* argsObjectPtr   = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
-    Value* argsObjectArray = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
-    Value* argsObject      = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
-    context.arguments      = builder.CreateCall(objectGetFields, argsObject, "arguments");
+    Value* argsObjectPtr       = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
+    Value* argsObjectArray     = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
+    Value* argsObject          = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
+    context.arguments          = builder.CreateCall(objectGetFields, argsObject, "arguments");
     
     Value* literalsObjectPtr   = builder.CreateStructGEP(contextObject, 3, "literalsObjectPtr");
     Value* literalsSymbolArray = builder.CreateLoad(literalsObjectPtr, "literalsSymbolArray");
     Value* literalsObject      = builder.CreateBitCast(literalsSymbolArray, ot.object->getPointerTo());
     context.literals           = builder.CreateCall(objectGetFields, literalsObject, "literals");
     
-    Value* tempsObjectPtr   = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
-    Value* tempsObjectArray = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
-    Value* tempsObject      = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo());
-    context.temporaries     = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
+    Value* tempsObjectPtr      = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
+    Value* tempsObjectArray    = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
+    Value* tempsObject         = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo());
+    context.temporaries        = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
     
-    Value* selfObjectPtr = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
-    Value* selfObject    = builder.CreateLoad(selfObjectPtr, "selfObject");
-    Value* selfFields    = builder.CreateStructGEP(selfObject, 2, "selfFields");
-    context.self         = builder.CreateCall(objectGetFields, selfFields, "self");
+    Value* selfObjectPtr       = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
+    Value* selfObject          = builder.CreateLoad(selfObjectPtr, "selfObject");
+    Value* selfFields          = builder.CreateStructGEP(selfObject, 2, "selfFields");
+    context.self               = builder.CreateCall(objectGetFields, selfFields, "self");
 }
 
 void MethodCompiler::scanForBranches(TJITContext& jitContext)
 {
+    // First analyzing pass. Scans the bytecode for the branch sites and
+    // collects branch targets. Creates target basic blocks beforehand.
+    // Target blocks are collected in the m_targetToBlockMap map with
+    // target bytecode offset as a key.
+
     TByteObject& byteCodes   = * jitContext.method->byteCodes;
     uint32_t     byteCount   = byteCodes.getSize();
 
@@ -162,9 +167,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             // basic block and start a new one, linking previous 
             // basic block to a new one.
 
-            BasicBlock* newBlock = iBlock->second;   // Picking a basic block
-            builder.CreateBr(newBlock);       // Linking blocks together
-            builder.SetInsertPoint(newBlock); // and switching to a new block
+            BasicBlock* newBlock = iBlock->second; // Picking a basic block
+            builder.CreateBr(newBlock);            // Linking current block to a new one
+            builder.SetInsertPoint(newBlock);      // and switching builder to a new block
         }
         
         // First of all decoding the pending instruction
@@ -388,7 +393,7 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
 
 void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
-    TByteObject& byteCodes   = * jitContext.method->byteCodes;
+    TByteObject& byteCodes = * jitContext.method->byteCodes;
     
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {

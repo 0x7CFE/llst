@@ -106,7 +106,10 @@ private:
             return value;
         }
         
-        TJITContext(TMethod* method) : method(method), bytePointer(0) {
+        TJITContext(TMethod* method) : method(method),
+            bytePointer(0), function(0), methodObject(0), arguments(0),
+            temporaries(0), literals(0), self(0)
+        {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
         };
