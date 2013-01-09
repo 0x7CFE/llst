@@ -34,7 +34,7 @@
 
 #include <jit.h>
 
-#include "llvm/Support/TargetSelect.h"
+#include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/IRReader.h>
 #include <llvm/Analysis/Verifier.h>
 
@@ -82,7 +82,9 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
 
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
+    m_methodCompiler = new MethodCompiler( m_JITModule, m_TypeModule,
+                                           m_newOrdinaryObjectFunction,
+                                           m_newBinaryObjectFunction );
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -124,6 +126,34 @@ TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
+
+TObject* sendMessage(TSymbol* message, TObjectArray* arguments) {
+    SmalltalkVM* vm = JITRuntime::Instance()->getVM();
     
+    // First of all we need to find the actual method object
+    TObject* receiver = arguments->getField(0);
+    TClass*  receiverClass = globals.smallIntClass;
+    if (! isSmallInteger(receiver))
+        receiverClass = receiver->getClass();
+
+    // Searching for the actual method to be called
+    TMethod* method = vm->lookupMethod(message, receiverClass);
+    // TODO #doesNotUnderstand:
+
+    llvm::Function* function = 0;
+
+    // Checking if we have the llvm code compiled
+    TByteArray* bitCode = method->llvmBitcode;
+    if (bitCode == globals.nilObject) {
+        // Compiling the method into LLVM IR
+        function = JITRuntime::Instance()->getCompiler()->compileMethod(method);
+    } else {
+        // Method is already compiled, parsing the IR and loading function
+        
+    }
+
+    // TODO Call the method
+}
+
 }
 

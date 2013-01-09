@@ -132,8 +132,8 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
 
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
-    TByteObject& byteCodes   = * method->byteCodes;
-    uint32_t     byteCount   = byteCodes.getSize();
+    TByteObject& byteCodes = * method->byteCodes;
+    uint32_t     byteCount = byteCodes.getSize();
     
     TJITContext jitContext(method);
     
@@ -254,7 +254,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
-                Value* value  = jitContext.lastValue();
+                Value* value = jitContext.lastValue();
                 Value* temporaryAddress = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
                 builder.CreateStore(value, temporaryAddress);
             } break;
@@ -273,11 +273,17 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 // FIXME May be we may unroll the arguments array and pass the values directly.
                 //       However, in some cases this may lead to additional architectural problems.
-                Value* arrayClass = 0; // TODO Get global object Array
-                Value* args[] = { arrayClass, builder.getInt32(2) };
 
-                //builder.CreateCall();
-                Value* arguments = 0; // TODO create call equivalent to newObject<TObjectArray>(argumentsCount)
+                // Acquiring the array class to be used in new object creation
+                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+                Value* arrayClassPtr = builder.CreateStructGEP(globals, 0);
+                Value* arrayClass    = builder.CreateLoad(arrayClassPtr);
+
+                // Instantinating new array object
+                Value* args[] = { arrayClass, builder.getInt32(argumentsCount) };
+                Value* arguments = builder.CreateCall(m_newOrdinaryObjectFunction, args);
+
+                // Filling object with contents
                 uint8_t index = argumentsCount;
                 while (index > 0)
                     builder.CreateInsertValue(arguments, jitContext.popValue(), index);

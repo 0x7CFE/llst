@@ -196,13 +196,12 @@ private:
     uint32_t m_messagesSent;
 
     bool checkRoot(TObject* value, TObject** objectSlot);
-    
+
     // fast method lookup in the method cache
     TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
-    // if not found then
-    // locate the method in the hierarchy of the class
-    TMethod* lookupMethod       (TSymbol* selector, TClass* klass);
-    
+public:
+    TMethod* lookupMethod(TSymbol* selector, TClass* klass);
+private:    
     
     void updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method);
     

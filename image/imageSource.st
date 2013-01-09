@@ -62,7 +62,7 @@ CLASS False         Boolean
 CLASS Process       Object context state result
 CLASS Context       Object method arguments temporaries stack bytePointer stackTop previousContext
 CLASS Block         Context argumentLocation creatingContext oldBytePointer
-CLASS Method        Object name byteCodes literals stackSize temporarySize class text package
+CLASS Method        Object name byteCodes literals stackSize temporarySize class text package llvmBitcode
 CLASS Magnitude     Object
 RAWCLASS MetaSymbol    Class         MetaMagnitude     symbols
 RAWCLASS Symbol        MetaSymbol    Magnitude

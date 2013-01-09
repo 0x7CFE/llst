@@ -122,7 +122,9 @@ private:
     void scanForBranches(TJITContext& jitContext);
 
     TObjectTypes ot;
-
+    llvm::Function* m_newOrdinaryObjectFunction;
+    llvm::Function* m_newBinaryObjectFunction;
+    
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
     void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
     
@@ -131,8 +133,15 @@ private:
 public:
     llvm::Function* compileMethod(TMethod* method);
 
-    MethodCompiler(llvm::Module* JITModule, llvm::Module* TypeModule)
-        : m_JITModule(JITModule), m_TypeModule(TypeModule)
+    MethodCompiler(
+        llvm::Module* JITModule,
+        llvm::Module* TypeModule,
+        llvm::Function* newOrdinaryObjectFunction,
+        llvm::Function* newBinaryObjectFunction
+    )
+        : m_JITModule(JITModule), m_TypeModule(TypeModule),
+          m_newOrdinaryObjectFunction(newOrdinaryObjectFunction),
+          m_newBinaryObjectFunction(newBinaryObjectFunction)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -149,6 +158,7 @@ public:
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    TObject*     sendMessage(TSymbol* message, TObjectArray* arguments);
 }
 
 class JITRuntime {
@@ -169,6 +179,7 @@ private:
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    friend TObject*     sendMessage(TSymbol* message, TObjectArray* arguments);
     static JITRuntime* Instance() { return s_instance; }
 public:
     
