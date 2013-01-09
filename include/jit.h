@@ -158,7 +158,7 @@ public:
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    TObject*     sendMessage(TSymbol* message, TObjectArray* arguments);
+    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
 }
 
 class JITRuntime {
@@ -177,9 +177,11 @@ private:
     
     static JITRuntime* s_instance;
 
+    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    friend TObject*     sendMessage(TSymbol* message, TObjectArray* arguments);
+    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     static JITRuntime* Instance() { return s_instance; }
 public:
     
