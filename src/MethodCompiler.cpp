@@ -230,6 +230,8 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             case SmalltalkVM::opPushConstant: {
                 const uint8_t constant = instruction.low;
                 Value* constantValue   = 0;
+
+                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
                 switch (constant) {
                     case 0:
                     case 1:
@@ -245,6 +247,21 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                         constantValue       = builder.CreateIntToPtr(integerValue, ot.object);
                     } break;
 
+                    case SmalltalkVM::nilConst: {
+                        Value* objectPtr = builder.CreateStructGEP(globals, 0);
+                        constantValue    = builder.CreateLoad(objectPtr);
+                    } break;
+
+                    case SmalltalkVM::trueConst: {
+                        Value* objectPtr = builder.CreateStructGEP(globals, 1);
+                        constantValue    = builder.CreateLoad(objectPtr);
+                    } break;
+
+                    case SmalltalkVM::falseConst: {
+                        Value* objectPtr = builder.CreateStructGEP(globals, 2);
+                        constantValue    = builder.CreateLoad(objectPtr);
+                    } break;
+                    
                     // TODO access to global image objects such as nil, true, false, etc.
                     /* case nilConst:   stack[ec.stackTop++] = globals.nilObject;   break;
                     case trueConst:  stack[ec.stackTop++] = globals.trueObject;  break;

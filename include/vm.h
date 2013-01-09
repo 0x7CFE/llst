@@ -91,13 +91,12 @@ public:
         notNil = 1
     };
     
-private:
     enum {
         nilConst = 10,
         trueConst,
         falseConst
     };
-    
+private:
     enum SmallIntOpcode {
         smallIntAdd = 10,
         smallIntDiv,
