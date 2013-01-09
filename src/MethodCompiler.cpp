@@ -454,7 +454,16 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
             BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jitContext.function);
 
             // Creating condition check
-            Value* boolObject = 0; // TODO = (opcode == SmalltalkVM::branchIfTrue) ? trueObject : falseObject
+            Value* boolObject = 0;
+            GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+            if (opcode == SmalltalkVM::branchIfTrue) {
+                Value* truePtr    = builder.CreateStructGEP(globals, 1);
+                Value* boolObject = builder.CreateLoad(truePtr);
+            } else {
+                Value* falsePtr   = builder.CreateStructGEP(globals, 2);
+                Value* boolObject = builder.CreateLoad(falsePtr);
+            }
+            
             Value* condition = jitContext.popValue();
             Value* boolValue = builder.CreateXor(condition, boolObject);
             builder.CreateCondBr(boolValue, targetBlock, skipBlock);
