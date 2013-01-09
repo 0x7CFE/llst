@@ -262,10 +262,6 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                         constantValue    = builder.CreateLoad(objectPtr);
                     } break;
                     
-                    // TODO access to global image objects such as nil, true, false, etc.
-                    /* case nilConst:   stack[ec.stackTop++] = globals.nilObject;   break;
-                    case trueConst:  stack[ec.stackTop++] = globals.trueObject;  break;
-                    case falseConst: stack[ec.stackTop++] = globals.falseObject; break; */
                     default:
                         fprintf(stderr, "JIT: unknown push constant %d\n", constant);
                 }
