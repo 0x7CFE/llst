@@ -457,13 +457,13 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
             Value* boolObject = 0;
             GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
             if (opcode == SmalltalkVM::branchIfTrue) {
-                Value* truePtr    = builder.CreateStructGEP(globals, 1);
-                Value* boolObject = builder.CreateLoad(truePtr);
+                Value* truePtr = builder.CreateStructGEP(globals, 1);
+                boolObject = builder.CreateLoad(truePtr);
             } else {
-                Value* falsePtr   = builder.CreateStructGEP(globals, 2);
-                Value* boolObject = builder.CreateLoad(falsePtr);
+                Value* falsePtr = builder.CreateStructGEP(globals, 2);
+                boolObject = builder.CreateLoad(falsePtr);
             }
-            
+                                                                
             Value* condition = jitContext.popValue();
             Value* boolValue = builder.CreateXor(condition, boolObject);
             builder.CreateCondBr(boolValue, targetBlock, skipBlock);
