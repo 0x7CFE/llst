@@ -287,7 +287,6 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 // FIXME May be we may unroll the arguments array and pass the values directly.
                 //       However, in some cases this may lead to additional architectural problems.
-
                 Value* arguments = createArray(builder, argumentsCount);
 
                 // Filling object with contents
@@ -373,8 +372,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 Value* arguments = createArray(builder, 2);
                 builder.CreateInsertValue(arguments, jitContext.popValue(), 0);
                 builder.CreateInsertValue(arguments, jitContext.popValue(), 1);
-                Value* callBinaryResult = builder.CreateCall(m_sendMessageFunction, arguments);
-                
+                Value* sendMessageResult = builder.CreateCall(m_sendMessageFunction, arguments);
                 // Jumping out the sendBinaryBlock to the value aggregator
                 builder.CreateBr(resultBlock);
                 
@@ -385,7 +383,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 // will be then selected as a return value
                 PHINode* phi = builder.CreatePHI(ot.object, 2);
                 phi->addIncoming(intResult, integersBlock);
-                phi->addIncoming(callBinaryResult, sendBinaryBlock);
+                phi->addIncoming(sendMessageResult, sendBinaryBlock);
                 
                 jitContext.pushValue(phi);
             } break;
