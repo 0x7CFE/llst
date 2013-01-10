@@ -180,16 +180,15 @@ Function* MethodCompiler::compileMethod(TMethod* method)
         }
         
         // First of all decoding the pending instruction
-        TInstruction instruction;
-        instruction.low = (instruction.high = byteCodes[jitContext.bytePointer++]) & 0x0F;
-        instruction.high >>= 4;
-        if (instruction.high == SmalltalkVM::opExtended) {
-            instruction.high = instruction.low;
-            instruction.low  = byteCodes[jitContext.bytePointer++];
+        jitContext.instruction.low = (jitContext.instruction.high = byteCodes[jitContext.bytePointer++]) & 0x0F;
+        jitContext.instruction.high >>= 4;
+        if (jitContext.instruction.high == SmalltalkVM::opExtended) {
+            jitContext.instruction.high =  jitContext.instruction.low;
+            jitContext.instruction.low  =  byteCodes[jitContext.bytePointer++];
         }
 
         // Then writing the code
-        switch (instruction.high) {
+        switch (jitContext.instruction.high) {
             case SmalltalkVM::opPushInstance:    doPushInstance(builder, jitContext);    break;
             case SmalltalkVM::opPushArgument:    doPushArgument(builder, jitContext);    break;
             case SmalltalkVM::opPushTemporary:   doPushTemporary(builder, jitContext);   break;
@@ -205,11 +204,11 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             case SmalltalkVM::opSendBinary:      doSendBinary(builder, jitContext);      break;
             case SmalltalkVM::opSendMessage:     doSendMessage(builder, jitContext);     break;
 
-            case SmalltalkVM::opDoSpecial:       doSpecial(instruction.low, builder, jitContext); break;
+            case SmalltalkVM::opDoSpecial:       doSpecial(jitContext.instruction.low, builder, jitContext); break;
             
             default:
                 fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s",
-                        instruction.high, jitContext.bytePointer, method->name->toString().c_str());
+                        jitContext.instruction.high, jitContext.bytePointer, method->name->toString().c_str());
                 exit(1);
         }
     }
