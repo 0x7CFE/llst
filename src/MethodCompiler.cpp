@@ -54,8 +54,11 @@ Function* MethodCompiler::createFunction(TMethod* method)
     return cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType) );
 }
 
-void MethodCompiler::writePreamble(TJITContext& jit)
+void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 {
+    if(isBlock) {
+        jit.llvmContext = jit.builder->CreateBitCast(jit.llvmBlockContext, ot.context->getPointerTo());
+    }
     jit.methodObject = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
     
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
@@ -380,13 +383,13 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     m_blockFunctions[blockFunctionName] = blockContext.function;
 
     // First argument of every block function is a pointer to TBlock object
-    blockContext.llvmContext = (Value*) (blockContext.function->arg_begin());
-    blockContext.llvmContext->setName("blockContext");
+    blockContext.llvmBlockContext = (Value*) (blockContext.function->arg_begin());
+    blockContext.llvmBlockContext->setName("blockContext");
     
     // Creating the basic block and inserting it into the function
     BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", blockContext.function);
     blockContext.builder = new IRBuilder<>(preamble);
-    writePreamble(blockContext); // TODO Replace with writeBlockPreamble();
+    writePreamble(blockContext, true);
 
     writeFunctionBody(blockContext, newBytePointer);
     
