@@ -106,7 +106,10 @@ private:
             return value;
         }
         
-        TJITContext(TMethod* method) : method(method), bytePointer(0) {
+        TJITContext(TMethod* method) : method(method),
+            bytePointer(0), function(0), methodObject(0), arguments(0),
+            temporaries(0), literals(0), self(0)
+        {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
         };
@@ -119,17 +122,30 @@ private:
     void scanForBranches(TJITContext& jitContext);
 
     TObjectTypes ot;
-
+    llvm::Function* m_newOrdinaryObjectFunction;
+    llvm::Function* m_newBinaryObjectFunction;
+    llvm::Function* m_sendMessageFunction;
+    
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
     void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
     
+    llvm::Value*    createArray(llvm::IRBuilder<>& builder, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);
 public:
     llvm::Function* compileMethod(TMethod* method);
 
-    MethodCompiler(llvm::Module* JITModule, llvm::Module* TypeModule)
-        : m_JITModule(JITModule), m_TypeModule(TypeModule)
+    MethodCompiler(
+        llvm::Module* JITModule,
+        llvm::Module* TypeModule,
+        llvm::Function* newOrdinaryObjectFunction,
+        llvm::Function* newBinaryObjectFunction,
+        llvm::Function* sendMessageFunction
+    )
+        : m_JITModule(JITModule), m_TypeModule(TypeModule),
+          m_newOrdinaryObjectFunction(newOrdinaryObjectFunction),
+          m_newBinaryObjectFunction(newBinaryObjectFunction),
+          m_sendMessageFunction(sendMessageFunction)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -146,6 +162,7 @@ public:
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
 }
 
 class JITRuntime {
@@ -156,16 +173,21 @@ private:
 
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
+
     llvm::Function* m_newOrdinaryObjectFunction;
     llvm::Function* m_newBinaryObjectFunction;
-
+    llvm::Function* m_sendMessageFunction;
+    
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;
     
     static JITRuntime* s_instance;
 
+    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
+    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     static JITRuntime* Instance() { return s_instance; }
 public:
     

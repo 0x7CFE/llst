@@ -65,29 +65,34 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
     
     // TODO maybe we shuld rewrite arguments[idx] using TArrayObject::getField ?
 
-    Value* argsObjectPtr   = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
-    Value* argsObjectArray = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
-    Value* argsObject      = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
-    context.arguments      = builder.CreateCall(objectGetFields, argsObject, "arguments");
+    Value* argsObjectPtr       = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
+    Value* argsObjectArray     = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
+    Value* argsObject          = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
+    context.arguments          = builder.CreateCall(objectGetFields, argsObject, "arguments");
     
     Value* literalsObjectPtr   = builder.CreateStructGEP(contextObject, 3, "literalsObjectPtr");
     Value* literalsSymbolArray = builder.CreateLoad(literalsObjectPtr, "literalsSymbolArray");
     Value* literalsObject      = builder.CreateBitCast(literalsSymbolArray, ot.object->getPointerTo());
     context.literals           = builder.CreateCall(objectGetFields, literalsObject, "literals");
     
-    Value* tempsObjectPtr   = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
-    Value* tempsObjectArray = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
-    Value* tempsObject      = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo());
-    context.temporaries     = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
+    Value* tempsObjectPtr      = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
+    Value* tempsObjectArray    = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
+    Value* tempsObject         = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo());
+    context.temporaries        = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
     
-    Value* selfObjectPtr = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
-    Value* selfObject    = builder.CreateLoad(selfObjectPtr, "selfObject");
-    Value* selfFields    = builder.CreateStructGEP(selfObject, 2, "selfFields");
-    context.self         = builder.CreateCall(objectGetFields, selfFields, "self");
+    Value* selfObjectPtr       = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
+    Value* selfObject          = builder.CreateLoad(selfObjectPtr, "selfObject");
+    Value* selfFields          = builder.CreateStructGEP(selfObject, 2, "selfFields");
+    context.self               = builder.CreateCall(objectGetFields, selfFields, "self");
 }
 
 void MethodCompiler::scanForBranches(TJITContext& jitContext)
 {
+    // First analyzing pass. Scans the bytecode for the branch sites and
+    // collects branch targets. Creates target basic blocks beforehand.
+    // Target blocks are collected in the m_targetToBlockMap map with
+    // target bytecode offset as a key.
+
     TByteObject& byteCodes   = * jitContext.method->byteCodes;
     uint32_t     byteCount   = byteCodes.getSize();
 
@@ -125,10 +130,24 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
     }
 }
 
+Value* MethodCompiler::createArray(IRBuilder<>& builder, uint32_t elementsCount)
+{
+    // Acquiring the array class to be used in new object creation
+    GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+    Value* arrayClassPtr = builder.CreateStructGEP(globals, 0);
+    Value* arrayClass    = builder.CreateLoad(arrayClassPtr);
+    
+    // Instantinating new array object
+    Value* args[] = { arrayClass, builder.getInt32(elementsCount) };
+    Value* arrayObject = builder.CreateCall(m_newOrdinaryObjectFunction, args);
+
+    return arrayObject;
+}
+
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
-    TByteObject& byteCodes   = * method->byteCodes;
-    uint32_t     byteCount   = byteCodes.getSize();
+    TByteObject& byteCodes = * method->byteCodes;
+    uint32_t     byteCount = byteCodes.getSize();
     
     TJITContext jitContext(method);
     
@@ -162,9 +181,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             // basic block and start a new one, linking previous 
             // basic block to a new one.
 
-            BasicBlock* newBlock = iBlock->second;   // Picking a basic block
-            builder.CreateBr(newBlock);       // Linking blocks together
-            builder.SetInsertPoint(newBlock); // and switching to a new block
+            BasicBlock* newBlock = iBlock->second; // Picking a basic block
+            builder.CreateBr(newBlock);            // Linking current block to a new one
+            builder.SetInsertPoint(newBlock);      // and switching builder to a new block
         }
         
         // First of all decoding the pending instruction
@@ -211,6 +230,8 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             case SmalltalkVM::opPushConstant: {
                 const uint8_t constant = instruction.low;
                 Value* constantValue   = 0;
+
+                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
                 switch (constant) {
                     case 0:
                     case 1:
@@ -226,10 +247,21 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                         constantValue       = builder.CreateIntToPtr(integerValue, ot.object);
                     } break;
 
-                    // TODO access to global image objects such as nil, true, false, etc.
-                    /* case nilConst:   stack[ec.stackTop++] = globals.nilObject;   break;
-                    case trueConst:  stack[ec.stackTop++] = globals.trueObject;  break;
-                    case falseConst: stack[ec.stackTop++] = globals.falseObject; break; */
+                    case SmalltalkVM::nilConst: {
+                        Value* objectPtr = builder.CreateStructGEP(globals, 0);
+                        constantValue    = builder.CreateLoad(objectPtr);
+                    } break;
+
+                    case SmalltalkVM::trueConst: {
+                        Value* objectPtr = builder.CreateStructGEP(globals, 1);
+                        constantValue    = builder.CreateLoad(objectPtr);
+                    } break;
+
+                    case SmalltalkVM::falseConst: {
+                        Value* objectPtr = builder.CreateStructGEP(globals, 2);
+                        constantValue    = builder.CreateLoad(objectPtr);
+                    } break;
+                    
                     default:
                         fprintf(stderr, "JIT: unknown push constant %d\n", constant);
                 }
@@ -249,7 +281,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             } break;
             
             case SmalltalkVM::opAssignTemporary: {
-                Value* value  = jitContext.lastValue();
+                Value* value = jitContext.lastValue();
                 Value* temporaryAddress = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
                 builder.CreateStore(value, temporaryAddress);
             } break;
@@ -268,11 +300,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 // FIXME May be we may unroll the arguments array and pass the values directly.
                 //       However, in some cases this may lead to additional architectural problems.
-                Value* arrayClass = 0; // TODO Get global object Array
-                Value* args[] = { arrayClass, builder.getInt32(2) };
+                Value* arguments = createArray(builder, argumentsCount);
 
-                //builder.CreateCall();
-                Value* arguments = 0; // TODO create call equivalent to newObject<TObjectArray>(argumentsCount)
+                // Filling object with contents
                 uint8_t index = argumentsCount;
                 while (index > 0)
                     builder.CreateInsertValue(arguments, jitContext.popValue(), index);
@@ -350,8 +380,12 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
                 // Now the sendBinary block
                 builder.SetInsertPoint(sendBinaryBlock);
-                // TODO Do the sendMessage call in sendBinaryBlock and store the result in callBinaryResult
-                Value* callBinaryResult = 0;
+                // We need to create an arguments array and fill it with argument objects
+                // Then send the message just like ordinary one
+                Value* arguments = createArray(builder, 2);
+                builder.CreateInsertValue(arguments, jitContext.popValue(), 0);
+                builder.CreateInsertValue(arguments, jitContext.popValue(), 1);
+                Value* sendMessageResult = builder.CreateCall(m_sendMessageFunction, arguments);
                 // Jumping out the sendBinaryBlock to the value aggregator
                 builder.CreateBr(resultBlock);
                 
@@ -362,9 +396,15 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                 // will be then selected as a return value
                 PHINode* phi = builder.CreatePHI(ot.object, 2);
                 phi->addIncoming(intResult, integersBlock);
-                phi->addIncoming(callBinaryResult, sendBinaryBlock);
+                phi->addIncoming(sendMessageResult, sendBinaryBlock);
                 
                 jitContext.pushValue(phi);
+            } break;
+
+            case SmalltalkVM::opSendMessage: {
+                Value* arguments = jitContext.popValue();
+                Value* result = builder.CreateCall(m_sendMessageFunction, arguments);
+                jitContext.pushValue(result);
             } break;
 
             case SmalltalkVM::opDoSpecial: doSpecial(instruction.low, builder, jitContext);
@@ -388,7 +428,7 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
 
 void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
 {
-    TByteObject& byteCodes   = * jitContext.method->byteCodes;
+    TByteObject& byteCodes = * jitContext.method->byteCodes;
     
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {
@@ -427,7 +467,16 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
             BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jitContext.function);
 
             // Creating condition check
-            Value* boolObject = 0; // TODO = (opcode == SmalltalkVM::branchIfTrue) ? trueObject : falseObject
+            Value* boolObject = 0;
+            GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+            if (opcode == SmalltalkVM::branchIfTrue) {
+                Value* truePtr = builder.CreateStructGEP(globals, 1);
+                boolObject = builder.CreateLoad(truePtr);
+            } else {
+                Value* falsePtr = builder.CreateStructGEP(globals, 2);
+                boolObject = builder.CreateLoad(falsePtr);
+            }
+                                                                
             Value* condition = jitContext.popValue();
             Value* boolValue = builder.CreateXor(condition, boolObject);
             builder.CreateCondBr(boolValue, targetBlock, skipBlock);

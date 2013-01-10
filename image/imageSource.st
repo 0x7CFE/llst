@@ -62,7 +62,7 @@ CLASS False         Boolean
 CLASS Process       Object context state result
 CLASS Context       Object method arguments temporaries stack bytePointer stackTop previousContext
 CLASS Block         Context argumentLocation creatingContext oldBytePointer
-CLASS Method        Object name byteCodes literals stackSize temporarySize class text package
+CLASS Method        Object name byteCodes literals stackSize temporarySize class text package llvmBitcode
 CLASS Magnitude     Object
 RAWCLASS MetaSymbol    Class         MetaMagnitude     symbols
 RAWCLASS Symbol        MetaSymbol    Magnitude
@@ -1639,7 +1639,6 @@ sort: criteria | left right mediane |
     right <- right sort: criteria.
             
     right add: mediane.
-    "left reverseDo: [ :x | right add: x ]."
     ^ left appendList: right
 !
 
@@ -1970,6 +1969,10 @@ break: separators  | words word |
 	^ words
 !
 METHOD String
+words
+    ^self break: ' '
+!
+METHOD String
 collect: transformationBlock
 	^ (super collect: transformationBlock) asString
 !
@@ -2129,11 +2132,14 @@ firstLink
 !
 METHOD List
 appendList: aList | element |
-    (elements isNil) ifTrue: [ elements <- aList firstLink. ^self ].
+    (elements isNil)
+        ifTrue: [ elements <- aList firstLink. ^self ].
 
     element <- elements.
-    [element next isNil] whileFalse: [element <- element next].
+    [element next isNil]
+        whileFalse: [element <- element next].
     element next: aList firstLink.
+
     ^self
 !
 METHOD List

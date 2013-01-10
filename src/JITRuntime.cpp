@@ -34,9 +34,10 @@
 
 #include <jit.h>
 
-#include "llvm/Support/TargetSelect.h"
+#include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/IRReader.h>
 #include <llvm/Analysis/Verifier.h>
+#include <llvm/ExecutionEngine/GenericValue.h>
 
 using namespace llvm;
 
@@ -80,9 +81,13 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Creating function references
     m_newOrdinaryObjectFunction = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-
+    m_sendMessageFunction       = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule);
+    m_methodCompiler = new MethodCompiler( m_JITModule, m_TypeModule,
+                                           m_newOrdinaryObjectFunction,
+                                           m_newBinaryObjectFunction,
+                                           m_sendMessageFunction );
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -92,9 +97,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     }
 
     // Mapping the function references to actual functions
-    m_executionEngine->addGlobalMapping(m_newOrdinaryObjectFunction, reinterpret_cast<void*>(&newOrdinaryObject));
-    m_executionEngine->addGlobalMapping(m_newBinaryObjectFunction, reinterpret_cast<void*>(&newBinaryObject));
-
+    m_executionEngine->addGlobalMapping(m_newOrdinaryObjectFunction, reinterpret_cast<void*>(& ::newOrdinaryObject));
+    m_executionEngine->addGlobalMapping(m_newBinaryObjectFunction, reinterpret_cast<void*>(& ::newBinaryObject));
+    m_executionEngine->addGlobalMapping(m_sendMessageFunction, reinterpret_cast<void*>(& ::sendMessage));
+    
     ot.initializeFromModule(m_TypeModule);
     
     // Mapping the globals into the JIT module
@@ -115,6 +121,53 @@ JITRuntime::~JITRuntime() {
     // TODO Finalize stuff and dispose memory
 }
 
+TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
+{
+    // First of all we need to find the actual method object
+    TObject* receiver = arguments->getField(0);
+    TClass*  receiverClass = globals.smallIntClass;
+    if (! isSmallInteger(receiver))
+        receiverClass = receiver->getClass();
+
+    // Searching for the actual method to be called
+    hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
+    // TODO #doesNotUnderstand:
+
+    llvm::Function* function = 0;
+    TByteArray* bitCode = method->llvmBitcode;
+
+    // Checking if we already have the compiled llvm code 
+    if (bitCode == globals.nilObject) {
+        // Compiling the method into LLVM IR
+        function = JITRuntime::Instance()->getCompiler()->compileMethod(method);
+        // TODO Store the bitCode into the object
+    } else {
+        // Method is already compiled, parsing the IR and loading function
+        // TODO function = parseBitcode(method->llvmBitcode);
+    }
+
+    // Preparing the context objects. Because we do not call the software
+    // implementation here, we do not need to allocate the stack object
+    // because it is not used by JIT runtime. We also may skip the proper
+    // initialization of various objects such as stackTop and bytePointer.
+    
+    // Protecting the pointer
+    hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
+    hptr<TContext>     newContext = m_softVM->newObject<TContext>();
+    hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+    
+    newContext->temporaries       = newTemps;
+    newContext->arguments         = messageArguments;
+    newContext->method            = method;
+    newContext->previousContext   = callingContext;
+    
+    // Calling the method and returning the result
+    std::vector<GenericValue> args;
+    args.push_back(GenericValue(newContext));
+    GenericValue result = m_executionEngine->runFunction(function, args);
+    return (TObject*) GVTOP(result);
+}
+
 extern "C" {
     
 TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
@@ -124,6 +177,10 @@ TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
-    
+
+TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments) {
+    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
+}
+
 }
 
