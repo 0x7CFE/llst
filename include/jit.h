@@ -126,6 +126,7 @@ private:
         // Builder inserts instructions into basic blocks
         llvm::IRBuilder<>*  builder;
         llvm::Value*        llvmContext;
+        llvm::Value*        llvmBlockContext;
         
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -164,7 +165,7 @@ private:
     TJITGlobals  m_globals;
     TRuntimeAPI  m_RuntimeAPI;
     
-    void writePreamble(TJITContext& jit);
+    void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
 
     void doPushInstance(TJITContext& jit);
