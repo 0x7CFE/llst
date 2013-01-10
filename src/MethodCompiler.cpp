@@ -122,8 +122,6 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
                 // Creating the referred basic block and inserting it into the function
                 // Later it will be filled with instructions and linked to other blocks
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jitContext.function);
-                //FIXME BasicBlock::Create (3 args) inserts basic block at the end of the function.
-                // We have to use 4 args to place blocks in the correct order.
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
             } break;
         }
@@ -446,7 +444,15 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
             }
                                                                 
             Value* condition = jitContext.popValue();
-            Value* boolValue = builder.CreateXor(condition, boolObject);
+            Value* boolValue = builder.CreateICmpEQ(condition, boolObject);
+            
+            /*
+            Value* boolObjectValue = builder.CreateXor(condition, boolObject); // why XOR ?!? 
+                                                                               // if you want to use xor, you have to add more code:
+            Value* boolIntValue    = builder.CreateBitCast(boolObjectValue, builder.getInt32Ty());
+            Value* boolValue       = builder.CreateICmpEQ(boolIntValue, builder.getInt32(0));
+            */
+            
             builder.CreateCondBr(boolValue, targetBlock, skipBlock);
 
             // Switching to a newly created block
