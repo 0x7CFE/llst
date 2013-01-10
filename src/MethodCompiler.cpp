@@ -132,13 +132,8 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
 
 Value* MethodCompiler::createArray(IRBuilder<>& builder, uint32_t elementsCount)
 {
-    // Acquiring the array class to be used in new object creation
-    GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
-    Value* arrayClassPtr = builder.CreateStructGEP(globals, 0);
-    Value* arrayClass    = builder.CreateLoad(arrayClassPtr);
-    
     // Instantinating new array object
-    Value* args[] = { arrayClass, builder.getInt32(elementsCount) };
+    Value* args[] = { m_globals.arrayClass, builder.getInt32(elementsCount) };
     Value* arrayObject = builder.CreateCall(m_newOrdinaryObjectFunction, args);
 
     return arrayObject;
@@ -230,8 +225,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             case SmalltalkVM::opPushConstant: {
                 const uint8_t constant = instruction.low;
                 Value* constantValue   = 0;
-
-                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
+                
                 switch (constant) {
                     case 0:
                     case 1:
@@ -247,20 +241,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
                         constantValue       = builder.CreateIntToPtr(integerValue, ot.object);
                     } break;
 
-                    case SmalltalkVM::nilConst: {
-                        Value* objectPtr = builder.CreateStructGEP(globals, 0);
-                        constantValue    = builder.CreateLoad(objectPtr);
-                    } break;
-
-                    case SmalltalkVM::trueConst: {
-                        Value* objectPtr = builder.CreateStructGEP(globals, 1);
-                        constantValue    = builder.CreateLoad(objectPtr);
-                    } break;
-
-                    case SmalltalkVM::falseConst: {
-                        Value* objectPtr = builder.CreateStructGEP(globals, 2);
-                        constantValue    = builder.CreateLoad(objectPtr);
-                    } break;
+                    case SmalltalkVM::nilConst: constantValue = m_globals.nilObject;     break;
+                    case SmalltalkVM::trueConst: constantValue = m_globals.trueObject;   break;
+                    case SmalltalkVM::falseConst: constantValue = m_globals.falseObject; break;
                     
                     default:
                         fprintf(stderr, "JIT: unknown push constant %d\n", constant);
@@ -311,31 +294,19 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             } break;
 
             case SmalltalkVM::opSendUnary: {
-                GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
-                
-                //FIXME hairy
-                
-                Value* nilPtr    = builder.CreateStructGEP(globals, 0);
-                Value* nilVal    = builder.CreateLoad(nilPtr);
-                
-                Value* truePtr   = builder.CreateStructGEP(globals, 1);
-                Value* trueVal   = builder.CreateLoad(truePtr);
-                
-                Value* falsePtr  = builder.CreateStructGEP(globals, 2);
-                Value* falseVal  = builder.CreateLoad(falsePtr);
                 
                 Value* value     = jitContext.popValue();
                 Value* condition = 0;
                 
                 switch ((SmalltalkVM::UnaryOpcode) instruction.low) {
-                    case SmalltalkVM::isNil:  condition = builder.CreateICmpEQ(value, nilVal); break;
-                    case SmalltalkVM::notNil: condition = builder.CreateICmpNE(value, nilVal); break;
+                    case SmalltalkVM::isNil:  condition = builder.CreateICmpEQ(value, m_globals.nilObject); break;
+                    case SmalltalkVM::notNil: condition = builder.CreateICmpNE(value, m_globals.nilObject); break;
                         
                     default:
                         fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", instruction.low);
                 }
                 
-                Value* result = builder.CreateSelect(condition, trueVal, falseVal);
+                Value* result = builder.CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
                 
                 jitContext.pushValue(result);
             }; break;
@@ -468,13 +439,10 @@ void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext
 
             // Creating condition check
             Value* boolObject = 0;
-            GlobalValue* globals = m_JITModule->getGlobalVariable("globals");
             if (opcode == SmalltalkVM::branchIfTrue) {
-                Value* truePtr = builder.CreateStructGEP(globals, 1);
-                boolObject = builder.CreateLoad(truePtr);
+                boolObject = m_globals.trueObject;
             } else {
-                Value* falsePtr = builder.CreateStructGEP(globals, 2);
-                boolObject = builder.CreateLoad(falsePtr);
+                boolObject = m_globals.falseObject;
             }
                                                                 
             Value* condition = jitContext.popValue();

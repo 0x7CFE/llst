@@ -83,12 +83,6 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
     m_sendMessageFunction       = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "sendMessage", m_JITModule);
     
-    // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler( m_JITModule, m_TypeModule,
-                                           m_newOrdinaryObjectFunction,
-                                           m_newBinaryObjectFunction,
-                                           m_sendMessageFunction );
-    
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
     if(!m_executionEngine) {
@@ -103,12 +97,13 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     ot.initializeFromModule(m_TypeModule);
     
-    // Mapping the globals into the JIT module
-    GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
-    m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
+    initializeGlobals();
     
-    //TODO prettify globals' names
-    //m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object)
+    // Initializing the method compiler
+    m_methodCompiler = new MethodCompiler( m_JITModule, m_TypeModule,
+                                           m_newOrdinaryObjectFunction,
+                                           m_newBinaryObjectFunction,
+                                           m_sendMessageFunction );
 }
 
 void JITRuntime::dumpJIT()
@@ -166,6 +161,26 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     args.push_back(GenericValue(newContext));
     GenericValue result = m_executionEngine->runFunction(function, args);
     return (TObject*) GVTOP(result);
+}
+
+void JITRuntime::initializeGlobals() {
+    GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
+    m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
+    
+    GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", ot.object) );
+    m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(&globals.nilObject));
+    
+    GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object) );
+    m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(&globals.trueObject));
+    
+    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.false", ot.object) );
+    m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(&globals.falseObject));
+    
+    GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", ot.klass) );
+    m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(&globals.smallIntClass));
+
+    GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", ot.klass) );
+    m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(&globals.arrayClass));
 }
 
 extern "C" {

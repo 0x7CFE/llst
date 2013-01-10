@@ -72,6 +72,25 @@ struct TObjectTypes {
     }
 };
 
+struct TJITGlobals {
+    llvm::GlobalValue* nilObject;
+    llvm::GlobalValue* trueObject;
+    llvm::GlobalValue* falseObject;
+    llvm::GlobalValue* smallIntClass;
+    llvm::GlobalValue* arrayClass;
+    
+    
+    void initializeFromModule(llvm::Module* module) {
+        nilObject       = module->getGlobalVariable("globals.nilObject");
+        trueObject      = module->getGlobalVariable("globals.trueObject");
+        falseObject     = module->getGlobalVariable("globals.falseObject");
+        smallIntClass   = module->getGlobalVariable("globals.smallIntClass");
+        arrayClass      = module->getGlobalVariable("globals.arrayClass");
+        
+      //badMethodSymbol =
+    }
+};
+
 class MethodCompiler {
 private:
     llvm::Module* m_JITModule;
@@ -122,6 +141,8 @@ private:
     void scanForBranches(TJITContext& jitContext);
 
     TObjectTypes ot;
+    TJITGlobals  m_globals;
+    
     llvm::Function* m_newOrdinaryObjectFunction;
     llvm::Function* m_newBinaryObjectFunction;
     llvm::Function* m_sendMessageFunction;
@@ -156,6 +177,7 @@ public:
         }
         */
         ot.initializeFromModule(m_TypeModule);
+        m_globals.initializeFromModule(m_JITModule);
     }
 };
 
@@ -189,6 +211,8 @@ private:
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     static JITRuntime* Instance() { return s_instance; }
+    
+    void initializeGlobals();
 public:
     
     MethodCompiler* getCompiler() { return m_methodCompiler; }
