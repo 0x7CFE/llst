@@ -52,6 +52,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     LLVMContext& llvmContext = getGlobalContext();
 
+    printf("Initializing types...");
+    
     // Initializing types module
     SMDiagnostic Err;
     m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
@@ -59,6 +61,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         Err.print("JITRuntime.cpp", errs());
         exit(1);
     }
+
+    printf("done\n");
     
     // Initializing JIT module.
     // All JIT functions will be created here
@@ -67,10 +71,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Providing the memory management interface to the JIT module
     // FIXME Think about interfacing the MemoryManager directly
 
+    printf("Loading struct types...");
     // These are then used as an allocator function return types
     StructType* objectType     = m_TypeModule->getTypeByName("struct.TObject");
     StructType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject");
-
+    printf("done\n");
+    
     Type* params[] = {
         objectType->getPointerTo(),   // klass
         Type::getInt32Ty(llvmContext) // size

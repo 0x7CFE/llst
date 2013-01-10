@@ -149,23 +149,32 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Creating the basic block and inserting it into the function
     BasicBlock* currentBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
 
+    printf("Creating IR builder...");
     jit.builder = new IRBuilder<>(currentBasicBlock);
+    printf("done\n");
     
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
+    printf("Writing preamble...");
     writePreamble(jit);
-
+    printf("done\n");
+    
     // First analyzing pass. Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
+    printf("Scanning for branches...");
     scanForBranches(jit);
+    printf("done\n");
     jit.bytePointer = 0; // TODO bytePointer != 0 if we compile Block
     
     // Processing the method's bytecodes
     while (jit.bytePointer < byteCount) {
         uint32_t currentOffset = jit.bytePointer;
 
+        //printf("Processing instruction %d of %d : ", currentOffset + 1, byteCount);
+        //printOpcode(jit.instruction);
+        
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
             // Somewhere in the code we have a branch instruction that
@@ -189,22 +198,22 @@ Function* MethodCompiler::compileMethod(TMethod* method)
         // Then writing the code
         switch (jit.instruction.high) {
             // TODO Boundary checks against container's real size
-            case SmalltalkVM::opPushInstance:    doPushInstance(jit);    break;
-            case SmalltalkVM::opPushArgument:    doPushArgument(jit);    break;
-            case SmalltalkVM::opPushTemporary:   doPushTemporary(jit);   break;
-            case SmalltalkVM::opPushLiteral:     doPushLiteral(jit);     break;
-            case SmalltalkVM::opPushConstant:    doPushConstant(jit);    break;
-            case SmalltalkVM::opPushBlock:       doPushBlock(jit);       break;
+            case SmalltalkVM::opPushInstance:      doPushInstance(jit);    break;
+            case SmalltalkVM::opPushArgument:      doPushArgument(jit);    break;
+            case SmalltalkVM::opPushTemporary:     doPushTemporary(jit);   break;
+            case SmalltalkVM::opPushLiteral:       doPushLiteral(jit);     break;
+            case SmalltalkVM::opPushConstant:      doPushConstant(jit);    break;
+            case SmalltalkVM::opPushBlock:         doPushBlock(jit);       break;
             
-            case SmalltalkVM::opAssignTemporary: doAssignTemporary(jit); break;
-            case SmalltalkVM::opAssignInstance:  doAssignInstance(jit);  break; // TODO checkRoot
+            case SmalltalkVM::opAssignTemporary:   doAssignTemporary(jit); break;
+            case SmalltalkVM::opAssignInstance:    doAssignInstance(jit);  break; // TODO checkRoot
 
-            case SmalltalkVM::opMarkArguments:   doMarkArguments(jit);   break;
-            case SmalltalkVM::opSendUnary:       doSendUnary(jit);       break;
-            case SmalltalkVM::opSendBinary:      doSendBinary(jit);      break;
-            case SmalltalkVM::opSendMessage:     doSendMessage(jit);     break;
+            case SmalltalkVM::opMarkArguments:     doMarkArguments(jit);   break;
+            case SmalltalkVM::opSendUnary:         doSendUnary(jit);       break;
+            case SmalltalkVM::opSendBinary:        doSendBinary(jit);      break;
+            case SmalltalkVM::opSendMessage:       doSendMessage(jit);     break;
 
-            case SmalltalkVM::opDoSpecial:       doSpecial(jit); break;
+            case SmalltalkVM::opDoSpecial:         doSpecial(jit); break;
             
             default:
                 fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s",
@@ -216,6 +225,33 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // TODO Write the function epilogue and do the remaining job
 
     return jit.function;
+}
+
+void MethodCompiler::printOpcode(TInstruction instruction)
+{
+    switch (instruction.high) {
+        // TODO Boundary checks against container's real size
+        case SmalltalkVM::opPushInstance:    printf("doPushInstance %d\n", instruction.low);  break;
+        case SmalltalkVM::opPushArgument:    printf("doPushArgument %d\n", instruction.low);  break;
+        case SmalltalkVM::opPushTemporary:   printf("doPushTemporary %d\n", instruction.low); break;
+        case SmalltalkVM::opPushLiteral:     printf("doPushLiteral %d\n", instruction.low);   break;
+        case SmalltalkVM::opPushConstant:    printf("doPushConstant %d\n", instruction.low);  break;
+        case SmalltalkVM::opPushBlock:       printf("doPushBlock %d\n", instruction.low);     break;
+                                                    
+        case SmalltalkVM::opAssignTemporary: printf("doAssignTemporary %d\n", instruction.low); break;
+        case SmalltalkVM::opAssignInstance:  printf("doAssignInstance %d\n", instruction.low);  break; // TODO checkRoot
+                                                    
+        case SmalltalkVM::opMarkArguments:   printf("doMarkArguments %d\n", instruction.low); break;
+
+        case SmalltalkVM::opSendUnary:       printf("doSendUnary\n");     break;
+        case SmalltalkVM::opSendBinary:      printf("doSendBinary\n");    break;
+        case SmalltalkVM::opSendMessage:     printf("doSendMessage\n");   break;
+                                                    
+        case SmalltalkVM::opDoSpecial:       printf("doSpecial\n"); break;
+                                                    
+        default:
+            fprintf(stderr, "Unknown opcode %d", instruction.high);
+    }
 }
 
 void MethodCompiler::doPushInstance(TJITContext& jit)
@@ -333,7 +369,7 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     // Filling object with contents
     uint8_t index = argumentsCount;
     while (index > 0)
-        jit.builder->CreateInsertValue(arguments, jit.popValue(), index);
+        jit.builder->CreateInsertValue(arguments, jit.popValue(), --index);
     
     jit.pushValue(arguments);
 }

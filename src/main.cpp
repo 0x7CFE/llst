@@ -53,10 +53,7 @@ int main(int argc, char **argv) {
     
     JITRuntime runtime;
 
-    printf("Initializing runtime...");
     runtime.initialize(&vm);
-    printf("done\n");
-    
     MethodCompiler* compiler = runtime.getCompiler();
 
     printf("Acquiring class and method...");
