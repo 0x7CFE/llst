@@ -204,7 +204,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
             case SmalltalkVM::opSendBinary:      doSendBinary(jit);      break;
             case SmalltalkVM::opSendMessage:     doSendMessage(jit);     break;
 
-            case SmalltalkVM::opDoSpecial:       doSpecial(jit.instruction.low, jit); break;
+            case SmalltalkVM::opDoSpecial:       doSpecial(jit); break;
             
             default:
                 fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s",
@@ -430,9 +430,10 @@ Function* MethodCompiler::compileBlock(TJITContext& context)
     return 0; // TODO
 }
 
-void MethodCompiler::doSpecial(uint8_t opcode, TJITContext& jit)
+void MethodCompiler::doSpecial(TJITContext& jit)
 {
     TByteObject& byteCodes = * jit.method->byteCodes;
+    uint8_t opcode = jit.instruction.low;
     
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {

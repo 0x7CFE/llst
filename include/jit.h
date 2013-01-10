@@ -166,7 +166,7 @@ private:
     void doSendUnary(TJITContext& jit);
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
-    void doSpecial(uint8_t opcode, TJITContext& jit);
+    void doSpecial(TJITContext& jit);
     
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
