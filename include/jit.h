@@ -99,8 +99,6 @@ private:
     // This structure contains working data which is
     // used during the compilation process.
     struct TJITContext {
-        TInstruction instruction;         // currently processed instruction
-        
         TMethod*            method;       // Smalltalk method we're currently processing
         uint32_t            bytePointer;
         uint32_t            byteCount;
@@ -111,6 +109,10 @@ private:
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
+        
+        TInstruction instruction;         // currently processed instruction
+        // Builder inserts instructions into basic blocks
+        llvm::IRBuilder<>*  builder;
         
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -129,12 +131,13 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodObject(0), arguments(0),
-            temporaries(0), literals(0), self(0)
+            temporaries(0), literals(0), self(0), builder(0)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
         };
-        
+
+        ~TJITContext() { if (builder) delete builder; }
     private:    
         std::vector<llvm::Value*> valueStack;
     };
@@ -149,23 +152,23 @@ private:
     llvm::Function* m_newBinaryObjectFunction;
     llvm::Function* m_sendMessageFunction;
     
-    void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
+    void writePreamble(TJITContext& context);
 
-    void doPushInstance(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doPushArgument(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doPushTemporary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doPushLiteral(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doPushConstant(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doPushBlock(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doAssignTemporary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doAssignInstance(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doMarkArguments(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doSendUnary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doSendBinary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doSendMessage(llvm::IRBuilder<>& builder, TJITContext& jitContext);
-    void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
+    void doPushInstance(TJITContext& jitContext);
+    void doPushArgument(TJITContext& jitContext);
+    void doPushTemporary(TJITContext& jitContext);
+    void doPushLiteral(TJITContext& jitContext);
+    void doPushConstant(TJITContext& jitContext);
+    void doPushBlock(TJITContext& jitContext);
+    void doAssignTemporary(TJITContext& jitContext);
+    void doAssignInstance(TJITContext& jitContext);
+    void doMarkArguments(TJITContext& jitContext);
+    void doSendUnary(TJITContext& jitContext);
+    void doSendBinary(TJITContext& jitContext);
+    void doSendMessage(TJITContext& jitContext);
+    void doSpecial(uint8_t opcode, TJITContext& context);
     
-    llvm::Value*    createArray(llvm::IRBuilder<>& builder, uint32_t elementsCount);
+    llvm::Value*    createArray(TJITContext& jitContext, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);
 public:
