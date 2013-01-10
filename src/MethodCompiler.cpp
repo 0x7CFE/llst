@@ -67,23 +67,22 @@ void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& cont
 
     Value* argsObjectPtr       = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
     Value* argsObjectArray     = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
-    Value* argsObject          = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo());
+    Value* argsObject          = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo(), "argsObject");
     context.arguments          = builder.CreateCall(objectGetFields, argsObject, "arguments");
     
     Value* literalsObjectPtr   = builder.CreateStructGEP(contextObject, 3, "literalsObjectPtr");
-    Value* literalsSymbolArray = builder.CreateLoad(literalsObjectPtr, "literalsSymbolArray");
-    Value* literalsObject      = builder.CreateBitCast(literalsSymbolArray, ot.object->getPointerTo());
+    Value* literalsObjectArray = builder.CreateLoad(literalsObjectPtr, "literalsObjectArray");
+    Value* literalsObject      = builder.CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
     context.literals           = builder.CreateCall(objectGetFields, literalsObject, "literals");
     
     Value* tempsObjectPtr      = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
     Value* tempsObjectArray    = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
-    Value* tempsObject         = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo());
+    Value* tempsObject         = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo(), "tempsObject");
     context.temporaries        = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
     
-    Value* selfObjectPtr       = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObject");
+    Value* selfObjectPtr       = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObjectPtr");
     Value* selfObject          = builder.CreateLoad(selfObjectPtr, "selfObject");
-    Value* selfFields          = builder.CreateStructGEP(selfObject, 2, "selfFields");
-    context.self               = builder.CreateCall(objectGetFields, selfFields, "self");
+    context.self               = builder.CreateCall(objectGetFields, selfObject, "self");
 }
 
 void MethodCompiler::scanForBranches(TJITContext& jitContext)
@@ -162,6 +161,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
     scanForBranches(jitContext);
+    jitContext.bytePointer = 0; // TODO bytePointer != 0 if we compile Block
     
     // Processing the method's bytecodes
     while (jitContext.bytePointer < byteCount) {
