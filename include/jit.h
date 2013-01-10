@@ -62,6 +62,7 @@ struct TObjectTypes {
     llvm::StructType* object;
     llvm::StructType* klass;
     llvm::StructType* context;
+    llvm::StructType* block;
     llvm::StructType* dictionary;
     llvm::StructType* method;
     llvm::StructType* symbol;
@@ -73,6 +74,7 @@ struct TObjectTypes {
         object      = module->getTypeByName("struct.TObject");
         klass       = module->getTypeByName("struct.TClass");
         context     = module->getTypeByName("struct.TContext");
+        block       = module->getTypeByName("struct.TBlock");
         dictionary  = module->getTypeByName("struct.TDictionary");
         method      = module->getTypeByName("struct.TMethod");
         symbol      = module->getTypeByName("struct.TSymbol");
@@ -123,6 +125,7 @@ private:
         TInstruction instruction;         // currently processed instruction
         // Builder inserts instructions into basic blocks
         llvm::IRBuilder<>*  builder;
+        llvm::Value*        llvmContext;
         
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -141,7 +144,7 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodObject(0), arguments(0),
-            temporaries(0), literals(0), self(0), builder(0)
+            temporaries(0), literals(0), self(0), builder(0), llvmContext(0)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
@@ -155,18 +158,21 @@ private:
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit);
 
+    std::map<std::string, llvm::Function*> m_blockFunctions;
+    
     TObjectTypes ot;
     TJITGlobals  m_globals;
     TRuntimeAPI  m_RuntimeAPI;
     
     void writePreamble(TJITContext& jit);
+    void writeFunctionBody(TJITContext& jit);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
     void doPushTemporary(TJITContext& jit);
     void doPushLiteral(TJITContext& jit);
     void doPushConstant(TJITContext& jit);
-    void doPushBlock(TJITContext& jit);
+    void doPushBlock(uint32_t currentOffset, TJITContext& jit);
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
     void doMarkArguments(TJITContext& jit);
@@ -207,6 +213,7 @@ extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    TBlock*      createBlock(TContext* callingContext, TMethod* method, uint32_t bytecodeOffset);
 }
 
 class JITRuntime {
