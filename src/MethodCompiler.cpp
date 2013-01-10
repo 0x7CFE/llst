@@ -131,7 +131,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
     // Instantinating new array object
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
-    Value* arrayObject = jit.builder->CreateCall(m_newOrdinaryObjectFunction, args);
+    Value* arrayObject = jit.builder->CreateCall(m_RuntimeAPI.newOrdinaryObject, args);
 
     return arrayObject;
 }
@@ -401,7 +401,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* arguments = createArray(jit, 2);
     jit.builder->CreateInsertValue(arguments, jit.popValue(), 0);
     jit.builder->CreateInsertValue(arguments, jit.popValue(), 1);
-    Value* sendMessageResult = jit.builder->CreateCall(m_sendMessageFunction, arguments);
+    Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
     // Jumping out the sendBinaryBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
     
@@ -420,7 +420,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
     Value* arguments = jit.popValue();
-    Value* result    = jit.builder->CreateCall(m_sendMessageFunction, arguments);
+    Value* result    = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
     jit.pushValue(result);
 }
 

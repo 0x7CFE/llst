@@ -48,6 +48,16 @@
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
 
+// These functions are used in the IR code
+// as a bindings between the VM and the object world
+// TJITRuntime provides this API to the MethodCompiler
+// which in turn uses it to build calls in functions
+struct TRuntimeAPI {
+    llvm::Function* newOrdinaryObject;
+    llvm::Function* newBinaryObject;
+    llvm::Function* sendMessage;
+};
+
 struct TObjectTypes {
     llvm::StructType* object;
     llvm::StructType* klass;
@@ -147,10 +157,7 @@ private:
 
     TObjectTypes ot;
     TJITGlobals  m_globals;
-    
-    llvm::Function* m_newOrdinaryObjectFunction;
-    llvm::Function* m_newBinaryObjectFunction;
-    llvm::Function* m_sendMessageFunction;
+    TRuntimeAPI  m_RuntimeAPI;
     
     void writePreamble(TJITContext& jit);
 
@@ -177,14 +184,9 @@ public:
     MethodCompiler(
         llvm::Module* JITModule,
         llvm::Module* TypeModule,
-        llvm::Function* newOrdinaryObjectFunction,
-        llvm::Function* newBinaryObjectFunction,
-        llvm::Function* sendMessageFunction
+        TRuntimeAPI   api
     )
-        : m_JITModule(JITModule), m_TypeModule(TypeModule),
-          m_newOrdinaryObjectFunction(newOrdinaryObjectFunction),
-          m_newBinaryObjectFunction(newBinaryObjectFunction),
-          m_sendMessageFunction(sendMessageFunction)
+        : m_JITModule(JITModule), m_TypeModule(TypeModule), m_RuntimeAPI(api)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -214,9 +216,7 @@ private:
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
 
-    llvm::Function* m_newOrdinaryObjectFunction;
-    llvm::Function* m_newBinaryObjectFunction;
-    llvm::Function* m_sendMessageFunction;
+    TRuntimeAPI m_RuntimeAPI;
     
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;

@@ -79,9 +79,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
     
     // Creating function references
-    m_newOrdinaryObjectFunction = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
-    m_newBinaryObjectFunction   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-    m_sendMessageFunction       = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    
+    m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
+    m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
+    m_RuntimeAPI.sendMessage       = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "sendMessage", m_JITModule);
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -91,19 +92,16 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     }
 
     // Mapping the function references to actual functions
-    m_executionEngine->addGlobalMapping(m_newOrdinaryObjectFunction, reinterpret_cast<void*>(& ::newOrdinaryObject));
-    m_executionEngine->addGlobalMapping(m_newBinaryObjectFunction, reinterpret_cast<void*>(& ::newBinaryObject));
-    m_executionEngine->addGlobalMapping(m_sendMessageFunction, reinterpret_cast<void*>(& ::sendMessage));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
     
     ot.initializeFromModule(m_TypeModule);
     
     initializeGlobals();
     
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler( m_JITModule, m_TypeModule,
-                                           m_newOrdinaryObjectFunction,
-                                           m_newBinaryObjectFunction,
-                                           m_sendMessageFunction );
+    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI);
 }
 
 void JITRuntime::dumpJIT()
