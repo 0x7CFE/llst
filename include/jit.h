@@ -143,7 +143,7 @@ private:
     };
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
-    void scanForBranches(TJITContext& jitContext);
+    void scanForBranches(TJITContext& jit);
 
     TObjectTypes ot;
     TJITGlobals  m_globals;
@@ -152,23 +152,23 @@ private:
     llvm::Function* m_newBinaryObjectFunction;
     llvm::Function* m_sendMessageFunction;
     
-    void writePreamble(TJITContext& context);
+    void writePreamble(TJITContext& jit);
 
-    void doPushInstance(TJITContext& jitContext);
-    void doPushArgument(TJITContext& jitContext);
-    void doPushTemporary(TJITContext& jitContext);
-    void doPushLiteral(TJITContext& jitContext);
-    void doPushConstant(TJITContext& jitContext);
-    void doPushBlock(TJITContext& jitContext);
-    void doAssignTemporary(TJITContext& jitContext);
-    void doAssignInstance(TJITContext& jitContext);
-    void doMarkArguments(TJITContext& jitContext);
-    void doSendUnary(TJITContext& jitContext);
-    void doSendBinary(TJITContext& jitContext);
-    void doSendMessage(TJITContext& jitContext);
-    void doSpecial(uint8_t opcode, TJITContext& context);
+    void doPushInstance(TJITContext& jit);
+    void doPushArgument(TJITContext& jit);
+    void doPushTemporary(TJITContext& jit);
+    void doPushLiteral(TJITContext& jit);
+    void doPushConstant(TJITContext& jit);
+    void doPushBlock(TJITContext& jit);
+    void doAssignTemporary(TJITContext& jit);
+    void doAssignInstance(TJITContext& jit);
+    void doMarkArguments(TJITContext& jit);
+    void doSendUnary(TJITContext& jit);
+    void doSendBinary(TJITContext& jit);
+    void doSendMessage(TJITContext& jit);
+    void doSpecial(uint8_t opcode, TJITContext& jit);
     
-    llvm::Value*    createArray(TJITContext& jitContext, uint32_t elementsCount);
+    llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);
 public:
