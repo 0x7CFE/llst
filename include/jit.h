@@ -165,7 +165,7 @@ private:
     TRuntimeAPI  m_RuntimeAPI;
     
     void writePreamble(TJITContext& jit);
-    void writeFunctionBody(TJITContext& jit);
+    void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
