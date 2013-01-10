@@ -22,7 +22,7 @@ execute_process(COMMAND ${CONFIG_COMMAND} --libs all
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_LIBS)
 
-set (COMPILER_FLAGS "-m32 -march=native -mtune=native -flto -fno-rtti -funroll-loops -Wall ${LLVM_CXX_FLAGS} ")
+set (COMPILER_FLAGS "-g -m32 -march=native -mtune=native -flto -fno-rtti -funroll-loops -Wall ${LLVM_CXX_FLAGS} ")
 set (LINKER_FLAGS   "-m32 -L/usr/lib32 -flto -Wall ${LLVM_LD_FLAGS}")
 
 add_subdirectory(src)

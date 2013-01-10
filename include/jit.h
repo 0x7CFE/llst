@@ -48,10 +48,21 @@
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
 
+// These functions are used in the IR code
+// as a bindings between the VM and the object world
+// TJITRuntime provides this API to the MethodCompiler
+// which in turn uses it to build calls in functions
+struct TRuntimeAPI {
+    llvm::Function* newOrdinaryObject;
+    llvm::Function* newBinaryObject;
+    llvm::Function* sendMessage;
+};
+
 struct TObjectTypes {
     llvm::StructType* object;
     llvm::StructType* klass;
     llvm::StructType* context;
+    llvm::StructType* block;
     llvm::StructType* dictionary;
     llvm::StructType* method;
     llvm::StructType* symbol;
@@ -63,6 +74,7 @@ struct TObjectTypes {
         object      = module->getTypeByName("struct.TObject");
         klass       = module->getTypeByName("struct.TClass");
         context     = module->getTypeByName("struct.TContext");
+        block       = module->getTypeByName("struct.TBlock");
         dictionary  = module->getTypeByName("struct.TDictionary");
         method      = module->getTypeByName("struct.TMethod");
         symbol      = module->getTypeByName("struct.TSymbol");
@@ -110,6 +122,11 @@ private:
         llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
         
+        TInstruction instruction;         // currently processed instruction
+        // Builder inserts instructions into basic blocks
+        llvm::IRBuilder<>*  builder;
+        llvm::Value*        llvmContext;
+        
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
         // Instead we're interpriting the push, pop and assign instructions
@@ -127,30 +144,46 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodObject(0), arguments(0),
-            temporaries(0), literals(0), self(0)
+            temporaries(0), literals(0), self(0), builder(0), llvmContext(0)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
         };
-        
+
+        ~TJITContext() { if (builder) delete builder; }
     private:    
         std::vector<llvm::Value*> valueStack;
     };
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
-    void scanForBranches(TJITContext& jitContext);
+    void scanForBranches(TJITContext& jit);
 
+    std::map<std::string, llvm::Function*> m_blockFunctions;
+    
     TObjectTypes ot;
     TJITGlobals  m_globals;
+    TRuntimeAPI  m_RuntimeAPI;
     
-    llvm::Function* m_newOrdinaryObjectFunction;
-    llvm::Function* m_newBinaryObjectFunction;
-    llvm::Function* m_sendMessageFunction;
+    void writePreamble(TJITContext& jit);
+    void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
+
+    void doPushInstance(TJITContext& jit);
+    void doPushArgument(TJITContext& jit);
+    void doPushTemporary(TJITContext& jit);
+    void doPushLiteral(TJITContext& jit);
+    void doPushConstant(TJITContext& jit);
+    void doPushBlock(uint32_t currentOffset, TJITContext& jit);
+    void doAssignTemporary(TJITContext& jit);
+    void doAssignInstance(TJITContext& jit);
+    void doMarkArguments(TJITContext& jit);
+    void doSendUnary(TJITContext& jit);
+    void doSendBinary(TJITContext& jit);
+    void doSendMessage(TJITContext& jit);
+    void doSpecial(TJITContext& jit);
+
+    void printOpcode(TInstruction instruction);
     
-    void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
-    void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
-    
-    llvm::Value*    createArray(llvm::IRBuilder<>& builder, uint32_t elementsCount);
+    llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
     llvm::Function* compileBlock(TJITContext& context);
 public:
@@ -159,14 +192,9 @@ public:
     MethodCompiler(
         llvm::Module* JITModule,
         llvm::Module* TypeModule,
-        llvm::Function* newOrdinaryObjectFunction,
-        llvm::Function* newBinaryObjectFunction,
-        llvm::Function* sendMessageFunction
+        TRuntimeAPI   api
     )
-        : m_JITModule(JITModule), m_TypeModule(TypeModule),
-          m_newOrdinaryObjectFunction(newOrdinaryObjectFunction),
-          m_newBinaryObjectFunction(newBinaryObjectFunction),
-          m_sendMessageFunction(sendMessageFunction)
+        : m_JITModule(JITModule), m_TypeModule(TypeModule), m_RuntimeAPI(api)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -185,6 +213,7 @@ extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    TBlock*      createBlock(TContext* callingContext, TMethod* method, uint32_t bytecodeOffset);
 }
 
 class JITRuntime {
@@ -196,9 +225,7 @@ private:
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
 
-    llvm::Function* m_newOrdinaryObjectFunction;
-    llvm::Function* m_newBinaryObjectFunction;
-    llvm::Function* m_sendMessageFunction;
+    TRuntimeAPI m_RuntimeAPI;
     
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;

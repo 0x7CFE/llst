@@ -53,10 +53,7 @@ int main(int argc, char **argv) {
     
     JITRuntime runtime;
 
-    printf("Initializing runtime...");
     runtime.initialize(&vm);
-    printf("done\n");
-    
     MethodCompiler* compiler = runtime.getCompiler();
 
     printf("Acquiring class and method...");
@@ -65,11 +62,13 @@ int main(int argc, char **argv) {
     printf("done\n");
     
     printf("Compiling!..");
-    compiler->compileMethod(main);
+    llvm::Function* function = compiler->compileMethod(main);
     printf("done\n");
-    
+   
     printf("And here goes the listing (hopefully...)\n");
-    runtime.dumpJIT();
+    function->print(llvm::outs());
+    
+    //runtime.dumpJIT();
     
     exit(0);
     

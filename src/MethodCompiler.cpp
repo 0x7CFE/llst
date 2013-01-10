@@ -35,6 +35,7 @@
 
 #include <jit.h>
 #include <vm.h>
+#include <stdarg.h>
 
 using namespace llvm;
 
@@ -53,57 +54,53 @@ Function* MethodCompiler::createFunction(TMethod* method)
     return cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType) );
 }
 
-void MethodCompiler::writePreamble(llvm::IRBuilder<>& builder, TJITContext& context)
+void MethodCompiler::writePreamble(TJITContext& jit)
 {
-    // First argument of every function is a pointer to TContext object
-    Value* contextObject = (Value*) (context.function->arg_begin());
-    contextObject->setName("context");
-    
-    context.methodObject = builder.CreateStructGEP(contextObject, 1, "method");
+    jit.methodObject = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
     
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
     
     // TODO maybe we shuld rewrite arguments[idx] using TArrayObject::getField ?
 
-    Value* argsObjectPtr       = builder.CreateStructGEP(contextObject, 2, "argObjectPtr");
-    Value* argsObjectArray     = builder.CreateLoad(argsObjectPtr, "argsObjectArray");
-    Value* argsObject          = builder.CreateBitCast(argsObjectArray, ot.object->getPointerTo(), "argsObject");
-    context.arguments          = builder.CreateCall(objectGetFields, argsObject, "arguments");
+    Value* argsObjectPtr       = jit.builder->CreateStructGEP(jit.llvmContext, 2, "argObjectPtr");
+    Value* argsObjectArray     = jit.builder->CreateLoad(argsObjectPtr, "argsObjectArray");
+    Value* argsObject          = jit.builder->CreateBitCast(argsObjectArray, ot.object->getPointerTo(), "argsObject");
+    jit.arguments              = jit.builder->CreateCall(objectGetFields, argsObject, "arguments");
     
-    Value* literalsObjectPtr   = builder.CreateStructGEP(contextObject, 3, "literalsObjectPtr");
-    Value* literalsObjectArray = builder.CreateLoad(literalsObjectPtr, "literalsObjectArray");
-    Value* literalsObject      = builder.CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
-    context.literals           = builder.CreateCall(objectGetFields, literalsObject, "literals");
+    Value* literalsObjectPtr   = jit.builder->CreateStructGEP(jit.llvmContext, 3, "literalsObjectPtr");
+    Value* literalsObjectArray = jit.builder->CreateLoad(literalsObjectPtr, "literalsObjectArray");
+    Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
+    jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");
     
-    Value* tempsObjectPtr      = builder.CreateStructGEP(contextObject, 4, "tempsObjectPtr");
-    Value* tempsObjectArray    = builder.CreateLoad(tempsObjectPtr, "tempsObjectArray");
-    Value* tempsObject         = builder.CreateBitCast(tempsObjectArray, ot.object->getPointerTo(), "tempsObject");
-    context.temporaries        = builder.CreateCall(objectGetFields, tempsObject, "temporaries");
+    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.llvmContext, 4, "tempsObjectPtr");
+    Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
+    Value* tempsObject         = jit.builder->CreateBitCast(tempsObjectArray, ot.object->getPointerTo(), "tempsObject");
+    jit.temporaries            = jit.builder->CreateCall(objectGetFields, tempsObject, "temporaries");
     
-    Value* selfObjectPtr       = builder.CreateGEP(context.arguments, builder.getInt32(0), "selfObjectPtr");
-    Value* selfObject          = builder.CreateLoad(selfObjectPtr, "selfObject");
-    context.self               = builder.CreateCall(objectGetFields, selfObject, "self");
+    Value* selfObjectPtr       = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(0), "selfObjectPtr");
+    Value* selfObject          = jit.builder->CreateLoad(selfObjectPtr, "selfObject");
+    jit.self                   = jit.builder->CreateCall(objectGetFields, selfObject, "self");
 }
 
-void MethodCompiler::scanForBranches(TJITContext& jitContext)
+void MethodCompiler::scanForBranches(TJITContext& jit)
 {
     // First analyzing pass. Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with
     // target bytecode offset as a key.
 
-    TByteObject& byteCodes   = * jitContext.method->byteCodes;
+    TByteObject& byteCodes   = * jit.method->byteCodes;
     uint32_t     byteCount   = byteCodes.getSize();
 
     // Processing the method's bytecodes
-    while (jitContext.bytePointer < byteCount) {
+    while (jit.bytePointer < byteCount) {
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
-        instruction.low = (instruction.high = byteCodes[jitContext.bytePointer++]) & 0x0F;
+        instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
         instruction.high >>= 4;
         if (instruction.high == SmalltalkVM::opExtended) {
             instruction.high = instruction.low;
-            instruction.low  = byteCodes[jitContext.bytePointer++];
+            instruction.low  = byteCodes[jit.bytePointer++];
         }
 
         // We're now looking only for branch bytecodes
@@ -115,352 +112,480 @@ void MethodCompiler::scanForBranches(TJITContext& jitContext)
             case SmalltalkVM::branchIfTrue:
             case SmalltalkVM::branchIfFalse: {
                 // Loading branch target bytecode offset
-                uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
-                jitContext.bytePointer += 2; // skipping the branch offset data
+                uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+                jit.bytePointer += 2; // skipping the branch offset data
                 
                 // Creating the referred basic block and inserting it into the function
                 // Later it will be filled with instructions and linked to other blocks
-                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jitContext.function);
+                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jit.function);
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
             } break;
         }
     }
 }
 
-Value* MethodCompiler::createArray(IRBuilder<>& builder, uint32_t elementsCount)
+Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
     // Instantinating new array object
-    Value* args[] = { m_globals.arrayClass, builder.getInt32(elementsCount) };
-    Value* arrayObject = builder.CreateCall(m_newOrdinaryObjectFunction, args);
+    Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
+    Value* arrayObject = jit.builder->CreateCall(m_RuntimeAPI.newOrdinaryObject, args);
 
     return arrayObject;
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
-    TByteObject& byteCodes = * method->byteCodes;
-    uint32_t     byteCount = byteCodes.getSize();
+//     TByteObject& byteCodes = * method->byteCodes;
+//     uint32_t     byteCount = byteCodes.getSize();
     
-    TJITContext jitContext(method);
+    TJITContext  jit(method);
     
     // Creating the function named as "Class>>method"
-    jitContext.function = createFunction(method);
+    jit.function = createFunction(method);
+
+    // First argument of every function is a pointer to TContext object
+    jit.llvmContext = (Value*) (jit.function->arg_begin());
+    jit.llvmContext->setName("context");
 
     // Creating the basic block and inserting it into the function
-    BasicBlock* currentBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jitContext.function);
+    BasicBlock* currentBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
 
-    // Builder inserts instructions into basic blocks
-    IRBuilder<> builder(currentBasicBlock);
+    jit.builder = new IRBuilder<>(currentBasicBlock);
     
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
-    writePreamble(builder, jitContext);
-
+    writePreamble(jit);
+    
     // First analyzing pass. Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
-    scanForBranches(jitContext);
-    jitContext.bytePointer = 0; // TODO bytePointer != 0 if we compile Block
+    scanForBranches(jit);
+
+    jit.bytePointer = 0;
     
     // Processing the method's bytecodes
-    while (jitContext.bytePointer < byteCount) {
-        uint32_t currentOffset = jitContext.bytePointer;
+    writeFunctionBody(jit);
+    
+    // TODO Write the function epilogue and do the remaining job
 
+    return jit.function;
+}
+
+void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 0*/)
+{
+    TByteObject& byteCodes   = * jit.method->byteCodes;
+    uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
+    
+    while (jit.bytePointer < stopPointer) {
+        uint32_t currentOffset = jit.bytePointer;
+        printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+        
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
             // Somewhere in the code we have a branch instruction that
             // points to the current offset. We need to end the current
-            // basic block and start a new one, linking previous 
+            // basic block and start a new one, linking previous
             // basic block to a new one.
-
+            
             BasicBlock* newBlock = iBlock->second; // Picking a basic block
-            builder.CreateBr(newBlock);            // Linking current block to a new one
-            builder.SetInsertPoint(newBlock);      // and switching builder to a new block
+            jit.builder->CreateBr(newBlock);       // Linking current block to a new one
+            jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
         
         // First of all decoding the pending instruction
-        TInstruction instruction;
-        instruction.low = (instruction.high = byteCodes[jitContext.bytePointer++]) & 0x0F;
-        instruction.high >>= 4;
-        if (instruction.high == SmalltalkVM::opExtended) {
-            instruction.high = instruction.low;
-            instruction.low  = byteCodes[jitContext.bytePointer++];
+        jit.instruction.low = (jit.instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
+        jit.instruction.high >>= 4;
+        if (jit.instruction.high == SmalltalkVM::opExtended) {
+            jit.instruction.high =  jit.instruction.low;
+            jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
+        printOpcode(jit.instruction);
+        
         // Then writing the code
-        switch (instruction.high) {
-            case SmalltalkVM::opPushInstance: {
-                // Self is interprited as object array. 
-                // Array elements are instance variables
-                // TODO Boundary check against self size
-                Value* valuePointer     = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
-                Value* instanceVariable = builder.CreateLoad(valuePointer);
-                jitContext.pushValue(instanceVariable);
-            } break;
+        switch (jit.instruction.high) {
+            // TODO Boundary checks against container's real size
+            case SmalltalkVM::opPushInstance:      doPushInstance(jit);    break;
+            case SmalltalkVM::opPushArgument:      doPushArgument(jit);    break;
+            case SmalltalkVM::opPushTemporary:     doPushTemporary(jit);   break;
+            case SmalltalkVM::opPushLiteral:       doPushLiteral(jit);     break;
+            case SmalltalkVM::opPushConstant:      doPushConstant(jit);    break;
             
-            case SmalltalkVM::opPushArgument: {
-                // TODO Boundary check against arguments size
-                Value* valuePointer = builder.CreateGEP(jitContext.arguments, builder.getInt32(instruction.low));
-                Value* argument     = builder.CreateLoad(valuePointer);
-                jitContext.pushValue(argument);
-            } break;
+            case SmalltalkVM::opPushBlock:         doPushBlock(currentOffset, jit); break;
             
-            case SmalltalkVM::opPushTemporary: {
-                // TODO Boundary check against temporaries size
-                Value* valuePointer = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
-                Value* temporary    = builder.CreateLoad(valuePointer);
-                jitContext.pushValue(temporary);
-            }; break;
+            case SmalltalkVM::opAssignTemporary:   doAssignTemporary(jit); break;
+            case SmalltalkVM::opAssignInstance:    doAssignInstance(jit);  break; // TODO checkRoot
             
-            case SmalltalkVM::opPushLiteral: {
-                // TODO Boundary check against literals size
-                Value* valuePointer = builder.CreateGEP(jitContext.literals, builder.getInt32(instruction.low));
-                Value* literal      = builder.CreateLoad(valuePointer);
-                jitContext.pushValue(literal);
-            } break;
-
-            case SmalltalkVM::opPushConstant: {
-                const uint8_t constant = instruction.low;
-                Value* constantValue   = 0;
-                
-                switch (constant) {
-                    case 0:
-                    case 1:
-                    case 2:
-                    case 3:
-                    case 4:
-                    case 5:
-                    case 6:
-                    case 7:
-                    case 8:
-                    case 9: {
-                        Value* integerValue = builder.getInt32(newInteger(constant));
-                        constantValue       = builder.CreateIntToPtr(integerValue, ot.object);
-                    } break;
-
-                    case SmalltalkVM::nilConst: constantValue = m_globals.nilObject;     break;
-                    case SmalltalkVM::trueConst: constantValue = m_globals.trueObject;   break;
-                    case SmalltalkVM::falseConst: constantValue = m_globals.falseObject; break;
-                    
-                    default:
-                        fprintf(stderr, "JIT: unknown push constant %d\n", constant);
-                }
-
-                jitContext.pushValue(constantValue);
-            } break;
-
-            case SmalltalkVM::opPushBlock: {
-                uint16_t newBytePointer = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
-                jitContext.bytePointer += 2;
-                
-                //Value* blockFunction = compileBlock(jitContext);
-                // FIXME We need to push a block object initialized 
-                //       with the IR code in additional field
-                // jitContext.pushValue(blockFunction);
-                jitContext.bytePointer = newBytePointer;
-            } break;
+            case SmalltalkVM::opMarkArguments:     doMarkArguments(jit);   break; // -
+            case SmalltalkVM::opSendUnary:         doSendUnary(jit);       break; // -
+            case SmalltalkVM::opSendBinary:        doSendBinary(jit);      break;
+            case SmalltalkVM::opSendMessage:       doSendMessage(jit);     break;
             
-            case SmalltalkVM::opAssignTemporary: {
-                Value* value = jitContext.lastValue();
-                Value* temporaryAddress = builder.CreateGEP(jitContext.temporaries, builder.getInt32(instruction.low));
-                builder.CreateStore(value, temporaryAddress);
-            } break;
-
-            case SmalltalkVM::opAssignInstance: {
-                Value* value = jitContext.lastValue();
-                Value* instanceVariableAddress = builder.CreateGEP(jitContext.self, builder.getInt32(instruction.low));
-                builder.CreateStore(value, instanceVariableAddress);
-                // TODO analog of checkRoot()
-            } break;
-
-            case SmalltalkVM::opMarkArguments: {
-                // Here we need to create the arguments array from the values on the stack
-                
-                uint8_t argumentsCount = instruction.low;
-
-                // FIXME May be we may unroll the arguments array and pass the values directly.
-                //       However, in some cases this may lead to additional architectural problems.
-                Value* arguments = createArray(builder, argumentsCount);
-
-                // Filling object with contents
-                uint8_t index = argumentsCount;
-                while (index > 0)
-                    builder.CreateInsertValue(arguments, jitContext.popValue(), index);
-
-                jitContext.pushValue(arguments);
-            } break;
-
-            case SmalltalkVM::opSendUnary: {
-                
-                Value* value     = jitContext.popValue();
-                Value* condition = 0;
-                
-                switch ((SmalltalkVM::UnaryOpcode) instruction.low) {
-                    case SmalltalkVM::isNil:  condition = builder.CreateICmpEQ(value, m_globals.nilObject); break;
-                    case SmalltalkVM::notNil: condition = builder.CreateICmpNE(value, m_globals.nilObject); break;
-                        
-                    default:
-                        fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", instruction.low);
-                }
-                
-                Value* result = builder.CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
-                
-                jitContext.pushValue(result);
-            }; break;
+            case SmalltalkVM::opDoSpecial:         doSpecial(jit); break;         // -
             
-            case SmalltalkVM::opSendBinary: {
-                // TODO Extract this code into subroutines. 
-                //      Replace the operation with call to LLVM function
-                
-                Value* rightValue = jitContext.popValue();
-                Value* leftValue  = jitContext.popValue();
-
-                // Checking if values are both small integers
-                Function* isSmallInt  = m_TypeModule->getFunction("isSmallInteger()");
-                Value*    rightIsInt  = builder.CreateCall(isSmallInt, rightValue);
-                Value*    leftIsInt   = builder.CreateCall(isSmallInt, leftValue);
-                Value*    isSmallInts = builder.CreateAnd(rightIsInt, leftIsInt);
-                
-                BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers",   jitContext.function);
-                BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jitContext.function);
-                BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result",     jitContext.function);
-
-                // Dpending on the contents we may either do the integer operations
-                // directly or create a send message call using operand objects
-                builder.CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
-
-                // Now the integers part
-                builder.SetInsertPoint(integersBlock);
-                Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
-                Value*    rightInt    = builder.CreateCall(getIntValue, rightValue);
-                Value*    leftInt     = builder.CreateCall(getIntValue, leftValue);
-                
-                Value* intResult = 0;
-                switch (instruction.low) {
-                    case 0: intResult = builder.CreateICmpSLT(leftInt, rightInt); // operator <
-                    case 1: intResult = builder.CreateICmpSLE(leftInt, rightInt); // operator <=
-                    case 2: intResult = builder.CreateAdd(leftInt, rightInt);     // operator +
-                    default:
-                        fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", instruction.low);
-                }
-                // Jumping out the integersBlock to the value aggregator
-                builder.CreateBr(resultBlock);
-
-                // Now the sendBinary block
-                builder.SetInsertPoint(sendBinaryBlock);
-                // We need to create an arguments array and fill it with argument objects
-                // Then send the message just like ordinary one
-                Value* arguments = createArray(builder, 2);
-                builder.CreateInsertValue(arguments, jitContext.popValue(), 0);
-                builder.CreateInsertValue(arguments, jitContext.popValue(), 1);
-                Value* sendMessageResult = builder.CreateCall(m_sendMessageFunction, arguments);
-                // Jumping out the sendBinaryBlock to the value aggregator
-                builder.CreateBr(resultBlock);
-                
-                // Now the value aggregator block
-                builder.SetInsertPoint(resultBlock);
-                // We do not know now which way the program will be executed,
-                // so we need to aggregate two possible results one of which 
-                // will be then selected as a return value
-                PHINode* phi = builder.CreatePHI(ot.object, 2);
-                phi->addIncoming(intResult, integersBlock);
-                phi->addIncoming(sendMessageResult, sendBinaryBlock);
-                
-                jitContext.pushValue(phi);
-            } break;
-
-            case SmalltalkVM::opSendMessage: {
-                Value* arguments = jitContext.popValue();
-                Value* result = builder.CreateCall(m_sendMessageFunction, arguments);
-                jitContext.pushValue(result);
-            } break;
-
-            case SmalltalkVM::opDoSpecial: doSpecial(instruction.low, builder, jitContext);
+            case SmalltalkVM::opDoPrimitive: /* TODO */ break;
             
             default:
-                fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s",
-                        instruction.high, jitContext.bytePointer, method->name->toString().c_str());
+                fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
+                        jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
                 exit(1);
         }
     }
-
-    // TODO Write the function epilogue and do the remaining job
-
-    return jitContext.function;
 }
+
+void MethodCompiler::printOpcode(TInstruction instruction)
+{
+    switch (instruction.high) {
+        // TODO Boundary checks against container's real size
+        case SmalltalkVM::opPushInstance:    printf("doPushInstance %d\n", instruction.low);  break;
+        case SmalltalkVM::opPushArgument:    printf("doPushArgument %d\n", instruction.low);  break;
+        case SmalltalkVM::opPushTemporary:   printf("doPushTemporary %d\n", instruction.low); break;
+        case SmalltalkVM::opPushLiteral:     printf("doPushLiteral %d\n", instruction.low);   break;
+        case SmalltalkVM::opPushConstant:    printf("doPushConstant %d\n", instruction.low);  break;
+        case SmalltalkVM::opPushBlock:       printf("doPushBlock %d\n", instruction.low);     break;
+                                                    
+        case SmalltalkVM::opAssignTemporary: printf("doAssignTemporary %d\n", instruction.low); break;
+        case SmalltalkVM::opAssignInstance:  printf("doAssignInstance %d\n", instruction.low);  break; // TODO checkRoot
+                                                    
+        case SmalltalkVM::opMarkArguments:   printf("doMarkArguments %d\n", instruction.low); break;
+
+        case SmalltalkVM::opSendUnary:       printf("doSendUnary\n");     break;
+        case SmalltalkVM::opSendBinary:      printf("doSendBinary\n");    break;
+        case SmalltalkVM::opSendMessage:     printf("doSendMessage\n");   break;
+                                                    
+        case SmalltalkVM::opDoSpecial:       printf("doSpecial\n"); break;
+                                                    
+        default:
+            fprintf(stderr, "Unknown opcode %d\n", instruction.high);
+    }
+}
+
+void MethodCompiler::doPushInstance(TJITContext& jit)
+{
+    // Self is interpreted as object array.
+    // Array elements are instance variables
+
+    uint8_t index = jit.instruction.low;
+    
+    Value* valuePointer     = jit.builder->CreateGEP(jit.self, jit.builder->getInt32(index));
+    Value* instanceVariable = jit.builder->CreateLoad(valuePointer);
+    jit.pushValue(instanceVariable);
+}
+
+void MethodCompiler::doPushArgument(TJITContext& jit)
+{
+    uint8_t index = jit.instruction.low;
+
+    Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
+    Value* argument     = jit.builder->CreateLoad(valuePointer);
+    jit.pushValue(argument);
+}
+
+void MethodCompiler::doPushTemporary(TJITContext& jit)
+{
+    uint8_t index = jit.instruction.low;
+
+    Value* valuePointer = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
+    Value* temporary    = jit.builder->CreateLoad(valuePointer);
+    jit.pushValue(temporary);
+}
+
+void MethodCompiler::doPushLiteral(TJITContext& jit)
+{
+    uint8_t index = jit.instruction.low;
+
+    Value* valuePointer = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(index));
+    Value* literal      = jit.builder->CreateLoad(valuePointer);
+    jit.pushValue(literal);
+}
+
+void MethodCompiler::doPushConstant(TJITContext& jit)
+{
+    const uint8_t constant = jit.instruction.low;
+    Value* constantValue   = 0;
+    
+    switch (constant) {
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9: {
+            Value* integerValue = jit.builder->getInt32(newInteger(constant));
+            constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object);
+        } break;
+        
+        case SmalltalkVM::nilConst:   constantValue = m_globals.nilObject;   break;
+        case SmalltalkVM::trueConst:  constantValue = m_globals.trueObject;  break;
+        case SmalltalkVM::falseConst: constantValue = m_globals.falseObject; break;
+        
+        default:
+            fprintf(stderr, "JIT: unknown push constant %d\n", constant);
+    }
+    
+    jit.pushValue(constantValue);
+}
+
+std::string stringPrint(const std::string &fmt, ...) {
+    int size = 100;
+    std::string str;
+    va_list ap;
+    while (1) {
+        str.resize(size);
+        va_start(ap, fmt);
+        int n = vsnprintf((char *)str.c_str(), size, fmt.c_str(), ap);
+        va_end(ap);
+        if (n > -1 && n < size) {
+            str.resize(n);
+            return str;
+        }
+        if (n > -1)
+            size = n + 1;
+        else
+            size *= 2;
+    }
+    return str;
+}
+
+void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
+{
+    TByteObject& byteCodes = * jit.method->byteCodes;
+    uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+    jit.bytePointer += 2;
+
+    TJITContext blockContext(jit.method);
+    blockContext.bytePointer = jit.bytePointer;
+
+    // Creating block function named Class>>method@offset
+    std::string blockFunctionName;
+    stringPrint(blockFunctionName, "%s>>%s@%d",
+                jit.method->klass->name->toString().c_str(),
+                jit.method->name->toString().c_str(),
+                currentOffset);
+
+    std::vector<Type*> blockParams;
+    blockParams.push_back(ot.block->getPointerTo()); // block object with context information
+    
+    FunctionType* blockFunctionType = FunctionType::get(
+        ot.object->getPointerTo(), // block return value
+        blockParams,               // parameters
+        false                      // we're not dealing with vararg
+    );
+    blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
+    m_blockFunctions[blockFunctionName] = blockContext.function;
+
+    // First argument of every block function is a pointer to TBlock object
+    blockContext.llvmContext = (Value*) (blockContext.function->arg_begin());
+    blockContext.llvmContext->setName("blockContext");
+    
+    // Creating the basic block and inserting it into the function
+    BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", blockContext.function);
+    blockContext.builder = new IRBuilder<>(preamble);
+    writePreamble(blockContext); // TODO Replace with writeBlockPreamble();
+
+    writeFunctionBody(blockContext, newBytePointer);
+    
+    // Create block object and fill it with context information
+//     Value* args[] = {  };
+//     Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
+//    jit.pushValue(blockObject);
+    jit.pushValue(m_globals.nilObject); // FIXME dummy
+    
+    jit.bytePointer = newBytePointer;
+}
+
+void MethodCompiler::doAssignTemporary(TJITContext& jit)
+{
+    uint8_t index = jit.instruction.low;
+    Value* value  = jit.lastValue();
+    
+    Value* temporaryAddress = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
+    jit.builder->CreateStore(value, temporaryAddress);
+}
+
+void MethodCompiler::doAssignInstance(TJITContext& jit)
+{
+    uint8_t index = jit.instruction.low;
+    Value* value  = jit.lastValue();
+    
+    Value* instanceVariableAddress = jit.builder->CreateGEP(jit.self, jit.builder->getInt32(index));
+    jit.builder->CreateStore(value, instanceVariableAddress);
+    // TODO analog of checkRoot()
+}
+
+void MethodCompiler::doMarkArguments(TJITContext& jit)
+{
+    // Here we need to create the arguments array from the values on the stack
+    
+    uint8_t argumentsCount = jit.instruction.low;
+    
+    // FIXME May be we may unroll the arguments array and pass the values directly.
+    //       However, in some cases this may lead to additional architectural problems.
+    Value* arguments = createArray(jit, argumentsCount);
+    
+    // Filling object with contents
+    uint8_t index = argumentsCount;
+    while (index > 0)
+        jit.builder->CreateInsertValue(arguments, jit.popValue(), --index);
+    
+    jit.pushValue(arguments);
+}
+
+void MethodCompiler::doSendUnary(TJITContext& jit)
+{
+    Value* value     = jit.popValue();
+    Value* condition = 0;
+    
+    switch ((SmalltalkVM::UnaryOpcode) jit.instruction.low) {
+        case SmalltalkVM::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject); break;
+        case SmalltalkVM::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject); break;
+        
+        default:
+            fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
+    }
+    
+    Value* result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
+    jit.pushValue(result);
+}
+
+void MethodCompiler::doSendBinary(TJITContext& jit)
+{
+    // TODO Extract this code into subroutines.
+    //      Replace the operation with call to LLVM function
+    
+    Value* rightValue = jit.popValue();
+    Value* leftValue  = jit.popValue();
+    
+    // Checking if values are both small integers
+    Function* isSmallInt  = m_TypeModule->getFunction("isSmallInteger()");
+    Value*    rightIsInt  = jit.builder->CreateCall(isSmallInt, rightValue);
+    Value*    leftIsInt   = jit.builder->CreateCall(isSmallInt, leftValue);
+    Value*    isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
+    
+    BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers",   jit.function);
+    BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jit.function);
+    BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result",     jit.function);
+    
+    // Dpending on the contents we may either do the integer operations
+    // directly or create a send message call using operand objects
+    jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
+    
+    // Now the integers part
+    jit.builder->SetInsertPoint(integersBlock);
+    Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
+    Value*    rightInt    = jit.builder->CreateCall(getIntValue, rightValue);
+    Value*    leftInt     = jit.builder->CreateCall(getIntValue, leftValue);
+    
+    Value* intResult = 0;
+    switch (jit.instruction.low) {
+        case 0: intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); // operator <
+        case 1: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); // operator <=
+        case 2: intResult = jit.builder->CreateAdd(leftInt, rightInt);     // operator +
+        default:
+            fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", jit.instruction.low);
+    }
+    // Jumping out the integersBlock to the value aggregator
+    jit.builder->CreateBr(resultBlock);
+    
+    // Now the sendBinary block
+    jit.builder->SetInsertPoint(sendBinaryBlock);
+    // We need to create an arguments array and fill it with argument objects
+    // Then send the message just like ordinary one
+    Value* arguments = createArray(jit, 2);
+    jit.builder->CreateInsertValue(arguments, jit.popValue(), 0);
+    jit.builder->CreateInsertValue(arguments, jit.popValue(), 1);
+    Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
+    // Jumping out the sendBinaryBlock to the value aggregator
+    jit.builder->CreateBr(resultBlock);
+    
+    // Now the value aggregator block
+    jit.builder->SetInsertPoint(resultBlock);
+    // We do not know now which way the program will be executed,
+    // so we need to aggregate two possible results one of which
+    // will be then selected as a return value
+    PHINode* phi = jit.builder->CreatePHI(ot.object, 2);
+    phi->addIncoming(intResult, integersBlock);
+    phi->addIncoming(sendMessageResult, sendBinaryBlock);
+    
+    jit.pushValue(phi);
+}
+
+void MethodCompiler::doSendMessage(TJITContext& jit)
+{
+    Value* arguments = jit.popValue();
+    Value* result    = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
+    jit.pushValue(result);
+}
+
 
 Function* MethodCompiler::compileBlock(TJITContext& context)
 {
     return 0; // TODO
 }
 
-void MethodCompiler::doSpecial(uint8_t opcode, IRBuilder<>& builder, TJITContext& jitContext)
+void MethodCompiler::doSpecial(TJITContext& jit)
 {
-    TByteObject& byteCodes = * jitContext.method->byteCodes;
-    
+    TByteObject& byteCodes = * jit.method->byteCodes;
+    uint8_t opcode = jit.instruction.low;
+
+    printf("Special opcode = %d\n", opcode);
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {
-            Value* selfPtr = builder.CreateGEP(jitContext.arguments, 0);
-            Value* self    = builder.CreateLoad(selfPtr);
-            builder.CreateRet(self);
+            Value* selfPtr = jit.builder->CreateGEP(jit.arguments, 0);
+            Value* self    = jit.builder->CreateLoad(selfPtr);
+            jit.builder->CreateRet(self);
         } break;
-        case SmalltalkVM::stackReturn: builder.CreateRet(jitContext.popValue()); break;
-        case SmalltalkVM::blockReturn: /* TODO */ break;
-        case SmalltalkVM::duplicate:   jitContext.pushValue(jitContext.lastValue()); break;
-        case SmalltalkVM::popTop:      jitContext.popValue(); break;
+        
+        case SmalltalkVM::stackReturn: jit.builder->CreateRet(jit.popValue()); break;
+        case SmalltalkVM::blockReturn: jit.popValue(); /* TODO */ break;
+        case SmalltalkVM::duplicate:   jit.pushValue(jit.lastValue()); break;
+        case SmalltalkVM::popTop:      jit.popValue(); break;
 
         case SmalltalkVM::branch: {
             // Loading branch target bytecode offset
-            uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
-            jitContext.bytePointer += 2; // skipping the branch offset data
+            uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+            jit.bytePointer += 2; // skipping the branch offset data
 
-            // Finding appropriate branch target 
+            // Finding appropriate branch target
             // from the previously stored basic blocks
             BasicBlock* target = m_targetToBlockMap[targetOffset];
-            builder.CreateBr(target);
+            jit.builder->CreateBr(target);
         } break;
 
         case SmalltalkVM::branchIfTrue:
         case SmalltalkVM::branchIfFalse: {
             // Loading branch target bytecode offset
-            uint32_t targetOffset  = byteCodes[jitContext.bytePointer] | (byteCodes[jitContext.bytePointer+1] << 8);
-            jitContext.bytePointer += 2; // skipping the branch offset data
-            
+            uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+            jit.bytePointer += 2; // skipping the branch offset data
+
             // Finding appropriate branch target
             // from the previously stored basic blocks
             BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
 
             // This is a block that goes right after the branch instruction.
             // If branch condition is not met execution continues right after
-            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jitContext.function);
+            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jit.function);
 
             // Creating condition check
-            Value* boolObject = 0;
-            if (opcode == SmalltalkVM::branchIfTrue) {
-                boolObject = m_globals.trueObject;
-            } else {
-                boolObject = m_globals.falseObject;
-            }
-                                                                
-            Value* condition = jitContext.popValue();
-            Value* boolValue = builder.CreateICmpEQ(condition, boolObject);
-            
-            /*
-            Value* boolObjectValue = builder.CreateXor(condition, boolObject); // why XOR ?!? 
-                                                                               // if you want to use xor, you have to add more code:
-            Value* boolIntValue    = builder.CreateBitCast(boolObjectValue, builder.getInt32Ty());
-            Value* boolValue       = builder.CreateICmpEQ(boolIntValue, builder.getInt32(0));
-            */
-            
-            builder.CreateCondBr(boolValue, targetBlock, skipBlock);
+            Value* boolObject = (opcode == SmalltalkVM::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
+            Value* condition  = jit.popValue();
+            Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
+            jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
             // Switching to a newly created block
-            builder.SetInsertPoint(skipBlock);
+            jit.builder->SetInsertPoint(skipBlock);
         } break;
 
         case SmalltalkVM::breakpoint:
             // TODO
             break;
+
+        default:
+            printf("JIT: unknown special opcode %d", opcode);
     }
 }

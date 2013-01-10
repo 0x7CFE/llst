@@ -336,9 +336,9 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     newBlock->blockBytePointer = newInteger(ec.bytePointer);
     
     // TODO Describe why these are 0
-    newBlock->bytePointer      = 0;
-    newBlock->stackTop         = 0;
-    newBlock->previousContext  = 0;
+//     newBlock->bytePointer      = 0;
+//     newBlock->stackTop         = 0;
+//     newBlock->previousContext  = 0;
     
     // Assigning creatingContext depending on the hierarchy
     // Nested blocks inherit the outer creating context
