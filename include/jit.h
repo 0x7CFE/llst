@@ -99,6 +99,8 @@ private:
     // This structure contains working data which is
     // used during the compilation process.
     struct TJITContext {
+        TInstruction instruction;         // currently processed instruction
+        
         TMethod*            method;       // Smalltalk method we're currently processing
         uint32_t            bytePointer;
         uint32_t            byteCount;
@@ -148,6 +150,19 @@ private:
     llvm::Function* m_sendMessageFunction;
     
     void writePreamble(llvm::IRBuilder<>& builder, TJITContext& context);
+
+    void doPushInstance(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doPushArgument(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doPushTemporary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doPushLiteral(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doPushConstant(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doPushBlock(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doAssignTemporary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doAssignInstance(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doMarkArguments(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doSendUnary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doSendBinary(llvm::IRBuilder<>& builder, TJITContext& jitContext);
+    void doSendMessage(llvm::IRBuilder<>& builder, TJITContext& jitContext);
     void doSpecial(uint8_t opcode, llvm::IRBuilder<>& builder, TJITContext& context);
     
     llvm::Value*    createArray(llvm::IRBuilder<>& builder, uint32_t elementsCount);
