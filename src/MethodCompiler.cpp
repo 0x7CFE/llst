@@ -170,14 +170,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
     jit.bytePointer = 0;
     
-    outs() << *preamble << "\n";
-    
     // Processing the method's bytecodes
     writeFunctionBody(jit);
 
-   // outs() << *body << "\n";
-    
-    
     // TODO Write the function epilogue and do the remaining job
 
     return jit.function;
@@ -288,8 +283,11 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 
     uint8_t index = jit.instruction.low;
     
-    Value* valuePointer     = jit.builder->CreateGEP(jit.self, jit.builder->getInt32(index));
-    Value* instanceVariable = jit.builder->CreateLoad(valuePointer);
+    Value* valuePointer      = jit.builder->CreateGEP(jit.self, jit.builder->getInt32(index));
+    Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
+    std::string variableName = jit.method->klass->variables->getField(index)->toString();
+    instanceVariable->setName(variableName);
+    
     jit.pushValue(instanceVariable);
 }
 
@@ -299,6 +297,15 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
 
     Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
     Value* argument     = jit.builder->CreateLoad(valuePointer);
+
+    if (index == 0)
+        argument->setName("self.");
+    else {
+        std::ostringstream ss;
+        ss << "arg" << (uint32_t)index << ").";
+        argument->setName(ss.str());
+    }
+    
     jit.pushValue(argument);
 }
 
@@ -308,6 +315,12 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
 
     Value* valuePointer = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
     Value* temporary    = jit.builder->CreateLoad(valuePointer);
+
+    std::ostringstream ss;
+    ss << "temp" << (uint32_t)index << ".";
+    temporary->setName(ss.str());
+//     temporary->setName("temp.");
+    
     jit.pushValue(temporary);
 }
 
@@ -317,6 +330,12 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
 
     Value* valuePointer = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(index));
     Value* literal      = jit.builder->CreateLoad(valuePointer);
+
+    std::ostringstream ss;
+//     ss << "lit" << jit.method->literals->getField(index)->toString() << ".";
+    ss << "lit" << (uint32_t)index << ".";
+    literal->setName("lit.");
+    
     jit.pushValue(literal);
 }
 
@@ -339,9 +358,10 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             Value* integerValue = jit.builder->getInt32(newInteger(constant));
             constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object);
 
-            std::ostringstream ss;
-            ss << "intc(" << constant << ")";
-            constantValue->setName(ss.str());
+//             std::ostringstream ss;
+//             ss << "intc(" << constant << ")";
+//             constantValue->setName(ss.str());
+            constantValue->setName("const.");
         } break;
         
         case SmalltalkVM::nilConst:   constantValue = m_globals.nilObject;   break;
@@ -437,7 +457,7 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     uint8_t index = argumentsCount;
     while (index > 0)
         arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), --index);
-    arguments->setName("args");
+    arguments->setName("margs.");
 
     jit.pushValue(arguments);
 }
@@ -446,12 +466,10 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 {
     Value* value     = jit.popValue();
     Value* condition = 0;
-
-    //outs() << "value=" << value << ", true=" << m_globals.nilObject << ", false=" <<  m_globals.falseObject << "\n";
     
     switch ((SmalltalkVM::UnaryOpcode) jit.instruction.low) {
-        case SmalltalkVM::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject); break;
-        case SmalltalkVM::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject); break;
+        case SmalltalkVM::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
+        case SmalltalkVM::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
         
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
@@ -507,7 +525,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* arguments = createArray(jit, 2);
            arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), 0);
            arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), 1);
-           arguments->setName("binargs");
+           arguments->setName("args.");
     Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
     // Jumping out the sendBinaryBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
@@ -532,7 +550,10 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
     Value*    getFieldArgs[]   = { jit.literals, jit.builder->getInt32(jit.instruction.low) };
     Value*    messageSelector  = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
-              messageSelector->setName("selector");
+
+    std::ostringstream ss;
+    ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
+    messageSelector->setName(ss.str());
 
     // Now performing a message call
     Value*    sendMessageArgs[] = {
