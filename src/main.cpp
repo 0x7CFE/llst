@@ -66,10 +66,21 @@ int main(int argc, char **argv) {
     printf("done\n");
    
     printf("And here goes the listing (hopefully...)\n");
-    function->print(llvm::outs());
+
+    for (llvm::Function::iterator iBlock = function->begin(), e = function->end(); iBlock != e; ++iBlock) {
+        llvm::outs() << "Basic block (name=" << iBlock->getName() << ") has " << iBlock->size() << " instructions:\n";
+
+        //llvm::outs() << *iBlock;
+        
+        for (llvm::BasicBlock::iterator i = iBlock->begin(), e = iBlock->end(); i != e; ++i)
+            //i->
+            
+            llvm::outs() << *i << "\n";
+    } 
     
     //runtime.dumpJIT();
-    
+    //function->print(llvm::outs());
+
     exit(0);
     
     

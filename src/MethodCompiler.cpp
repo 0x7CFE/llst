@@ -41,9 +41,7 @@ using namespace llvm;
 
 Function* MethodCompiler::createFunction(TMethod* method)
 {
-    std::vector<Type*> methodParams;
-    methodParams.push_back(ot.context->getPointerTo());
-
+    Type* methodParams[] = { ot.context->getPointerTo() };
     FunctionType* functionType = FunctionType::get(
         ot.object->getPointerTo(), // function return value
         methodParams,              // parameters
@@ -56,9 +54,9 @@ Function* MethodCompiler::createFunction(TMethod* method)
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 {
-    if(isBlock) {
+    if (isBlock)
         jit.llvmContext = jit.builder->CreateBitCast(jit.llvmBlockContext, ot.context->getPointerTo());
-    }
+
     jit.methodObject = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
     
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
@@ -138,9 +136,6 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 
 Function* MethodCompiler::compileMethod(TMethod* method)
 {
-//     TByteObject& byteCodes = * method->byteCodes;
-//     uint32_t     byteCount = byteCodes.getSize();
-    
     TJITContext  jit(method);
     
     // Creating the function named as "Class>>method"
@@ -151,14 +146,20 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     jit.llvmContext->setName("context");
 
     // Creating the basic block and inserting it into the function
-    BasicBlock* currentBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
+    BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
 
-    jit.builder = new IRBuilder<>(currentBasicBlock);
+    jit.builder = new IRBuilder<>(preamble);
     
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
     writePreamble(jit);
+
     
+    // Switching builder context to the body's basic block
+    BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
+    jit.builder->CreateBr(body);
+    jit.builder->SetInsertPoint(body);
+
     // First analyzing pass. Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with 
@@ -167,8 +168,13 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
     jit.bytePointer = 0;
     
+    outs() << *preamble << "\n";
+    
     // Processing the method's bytecodes
     writeFunctionBody(jit);
+
+   // outs() << *body << "\n";
+    
     
     // TODO Write the function epilogue and do the remaining job
 
@@ -179,10 +185,11 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 {
     TByteObject& byteCodes   = * jit.method->byteCodes;
     uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
+    // printf("Bytecodes size = %d\n", byteCodes.getSize());
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+        //printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
@@ -204,7 +211,9 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        printOpcode(jit.instruction);
+        // printOpcode(jit.instruction);
+
+        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
         
         // Then writing the code
         switch (jit.instruction.high) {
@@ -232,8 +241,14 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             default:
                 fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
-                exit(1);
+                //exit(1);
+                //return;
         }
+
+        uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
+
+        if (instCountAfter > instCountBefore)
+            outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }
 
@@ -341,7 +356,7 @@ std::string stringPrint(const std::string &fmt, ...) {
     while (1) {
         str.resize(size);
         va_start(ap, fmt);
-        int n = vsnprintf((char *)str.c_str(), size, fmt.c_str(), ap);
+        int n = vsnprintf((char *)str.data(), size, fmt.c_str(), ap);
         va_end(ap);
         if (n > -1 && n < size) {
             str.resize(n);
@@ -365,11 +380,11 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.bytePointer = jit.bytePointer;
 
     // Creating block function named Class>>method@offset
-    std::string blockFunctionName;
-    stringPrint(blockFunctionName, "%s>>%s@%d",
-                jit.method->klass->name->toString().c_str(),
-                jit.method->name->toString().c_str(),
-                currentOffset);
+    std::string blockFunctionName = jit.method->klass->name->toString() + ">>" + jit.method->name->toString() + "@block";
+//     stringPrint(blockFunctionName, "%s>>%s@%d",
+//                 jit.method->klass->name->toString().c_str(),
+//                 jit.method->name->toString().c_str(),
+//                 currentOffset);
 
     std::vector<Type*> blockParams;
     blockParams.push_back(ot.block->getPointerTo()); // block object with context information
@@ -387,11 +402,15 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.llvmBlockContext->setName("blockContext");
     
     // Creating the basic block and inserting it into the function
-    BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", blockContext.function);
-    blockContext.builder = new IRBuilder<>(preamble);
+    BasicBlock* blockPreamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
+    blockContext.builder = new IRBuilder<>(blockPreamble);
     writePreamble(blockContext, true);
 
-    writeFunctionBody(blockContext, newBytePointer);
+    BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
+    blockContext.builder->CreateBr(blockBody);
+    blockContext.builder->SetInsertPoint(blockBody);
+    
+    writeFunctionBody(blockContext, newBytePointer - currentOffset);
     
     // Create block object and fill it with context information
 //     Value* args[] = {  };
@@ -443,6 +462,8 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 {
     Value* value     = jit.popValue();
     Value* condition = 0;
+
+    //outs() << "value=" << value << ", true=" << m_globals.nilObject << ", false=" <<  m_globals.falseObject << "\n";
     
     switch ((SmalltalkVM::UnaryOpcode) jit.instruction.low) {
         case SmalltalkVM::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject); break;
@@ -521,7 +542,19 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
     Value* arguments = jit.popValue();
-    Value* result    = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
+
+    // First of all we need to get the actual message selector
+    Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
+    Value*    getFieldArgs[]   = { jit.literals, jit.builder->getInt32(jit.instruction.low) };
+    Value*    messageSelector  = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
+
+    // Now performing a message call
+    Value*    sendMessageArgs[] = {
+        jit.llvmContext, // calling context
+        messageSelector, // selector
+        arguments        // message arguments
+    };
+    Value* result = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
     jit.pushValue(result);
 }
 
@@ -536,12 +569,13 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     TByteObject& byteCodes = * jit.method->byteCodes;
     uint8_t opcode = jit.instruction.low;
 
-    printf("Special opcode = %d\n", opcode);
+//     printf("Special opcode = %d\n", opcode);
     switch (opcode) {
         case SmalltalkVM::selfReturn:  {
-            Value* selfPtr = jit.builder->CreateGEP(jit.arguments, 0);
-            Value* self    = jit.builder->CreateLoad(selfPtr);
-            jit.builder->CreateRet(self);
+            //Value* selfPtr = jit.builder->CreateGEP(jit.arguments, 0);
+            //Value* self    = jit.builder->CreateLoad(selfPtr);
+            jit.builder->CreateRet(jit.self);
+            //outs() << selfPtr << "," << self << "\n";
         } break;
         
         case SmalltalkVM::stackReturn: jit.builder->CreateRet(jit.popValue()); break;

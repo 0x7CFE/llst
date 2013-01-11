@@ -73,22 +73,30 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     printf("Loading struct types...");
     // These are then used as an allocator function return types
-    StructType* objectType     = m_TypeModule->getTypeByName("struct.TObject");
-    StructType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject");
+    PointerType* objectType     = m_TypeModule->getTypeByName("struct.TObject")->getPointerTo();
+    PointerType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject")->getPointerTo();
     printf("done\n");
     
     Type* params[] = {
         objectType->getPointerTo(),   // klass
         Type::getInt32Ty(llvmContext) // size
     };
-    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType, params, false);
+    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
     FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
+
+
+    Type* sendParams[] = {
+        m_TypeModule->getTypeByName("struct.TContext")->getPointerTo(),     // callingContext
+        m_TypeModule->getTypeByName("struct.TSymbol")->getPointerTo(),      // message selector
+        m_TypeModule->getTypeByName("struct.TObjectArray")->getPointerTo()  // arguments
+    };
+    FunctionType* sendMessageType  = FunctionType::get(objectType, params, false);
     
     // Creating function references
     
     m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-    m_RuntimeAPI.sendMessage       = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    m_RuntimeAPI.sendMessage       = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -177,7 +185,7 @@ void JITRuntime::initializeGlobals() {
     GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object) );
     m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(&globals.trueObject));
     
-    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.false", ot.object) );
+    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", ot.object) );
     m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(&globals.falseObject));
     
     GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", ot.klass) );
