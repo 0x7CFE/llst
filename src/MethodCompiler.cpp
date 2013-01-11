@@ -36,6 +36,8 @@
 #include <jit.h>
 #include <vm.h>
 #include <stdarg.h>
+#include <iostream>
+#include <sstream>
 
 using namespace llvm;
 
@@ -336,6 +338,10 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case 9: {
             Value* integerValue = jit.builder->getInt32(newInteger(constant));
             constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object);
+
+            std::ostringstream ss;
+            ss << "intc(" << constant << ")";
+            constantValue->setName(ss.str());
         } break;
         
         case SmalltalkVM::nilConst:   constantValue = m_globals.nilObject;   break;
@@ -349,27 +355,6 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
     jit.pushValue(constantValue);
 }
 
-std::string stringPrint(const std::string &fmt, ...) {
-    int size = 100;
-    std::string str;
-    va_list ap;
-    while (1) {
-        str.resize(size);
-        va_start(ap, fmt);
-        int n = vsnprintf((char *)str.data(), size, fmt.c_str(), ap);
-        va_end(ap);
-        if (n > -1 && n < size) {
-            str.resize(n);
-            return str;
-        }
-        if (n > -1)
-            size = n + 1;
-        else
-            size *= 2;
-    }
-    return str;
-}
-
 void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
 {
     TByteObject& byteCodes = * jit.method->byteCodes;
@@ -380,11 +365,9 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.bytePointer = jit.bytePointer;
 
     // Creating block function named Class>>method@offset
-    std::string blockFunctionName = jit.method->klass->name->toString() + ">>" + jit.method->name->toString() + "@block";
-//     stringPrint(blockFunctionName, "%s>>%s@%d",
-//                 jit.method->klass->name->toString().c_str(),
-//                 jit.method->name->toString().c_str(),
-//                 currentOffset);
+    std::ostringstream ss;
+    ss << jit.function->getName().str() << "@" << currentOffset;
+    std::string blockFunctionName = ss.str();
 
     std::vector<Type*> blockParams;
     blockParams.push_back(ot.block->getPointerTo()); // block object with context information
@@ -453,8 +436,9 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     // Filling object with contents
     uint8_t index = argumentsCount;
     while (index > 0)
-        jit.builder->CreateInsertValue(arguments, jit.popValue(), --index);
-    
+        arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), --index);
+    arguments->setName("args");
+
     jit.pushValue(arguments);
 }
 
@@ -521,8 +505,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // We need to create an arguments array and fill it with argument objects
     // Then send the message just like ordinary one
     Value* arguments = createArray(jit, 2);
-    jit.builder->CreateInsertValue(arguments, jit.popValue(), 0);
-    jit.builder->CreateInsertValue(arguments, jit.popValue(), 1);
+           arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), 0);
+           arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), 1);
+           arguments->setName("binargs");
     Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
     // Jumping out the sendBinaryBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
@@ -547,6 +532,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
     Value*    getFieldArgs[]   = { jit.literals, jit.builder->getInt32(jit.instruction.low) };
     Value*    messageSelector  = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
+              messageSelector->setName("selector");
 
     // Now performing a message call
     Value*    sendMessageArgs[] = {
