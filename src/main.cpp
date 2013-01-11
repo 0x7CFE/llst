@@ -57,8 +57,8 @@ int main(int argc, char **argv) {
     MethodCompiler* compiler = runtime.getCompiler();
 
     printf("Acquiring class and method...");
-    TClass*  undefined = (TClass*)  testImage->getGlobal("Undefined");
-    TMethod* main      = (TMethod*) undefined->methods->find("main");
+    TClass*  undefined = (TClass*)  testImage->getGlobal("Collection");
+    TMethod* main      = (TMethod*) undefined->methods->find("sort:");
     printf("done\n");
     
     printf("Compiling!..");

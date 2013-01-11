@@ -183,6 +183,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     TByteObject& byteCodes   = * jit.method->byteCodes;
     uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
     // printf("Bytecodes size = %d\n", byteCodes.getSize());
+
+    BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
@@ -208,7 +210,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        // printOpcode(jit.instruction);
+        //printOpcode(jit.instruction);
 
         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
         
@@ -247,6 +249,9 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
         if (instCountAfter > instCountBefore)
             outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
+
+   // printf("Done processing at offset %d\n", stopPointer);
+    
 }
 
 void MethodCompiler::printOpcode(TInstruction instruction)
@@ -302,7 +307,7 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
         argument->setName("self.");
     else {
         std::ostringstream ss;
-        ss << "arg" << (uint32_t)index << ").";
+        ss << "arg" << (uint32_t)index << ".";
         argument->setName(ss.str());
     }
     
@@ -319,7 +324,6 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
     std::ostringstream ss;
     ss << "temp" << (uint32_t)index << ".";
     temporary->setName(ss.str());
-//     temporary->setName("temp.");
     
     jit.pushValue(temporary);
 }
@@ -334,7 +338,7 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
     std::ostringstream ss;
 //     ss << "lit" << jit.method->literals->getField(index)->toString() << ".";
     ss << "lit" << (uint32_t)index << ".";
-    literal->setName("lit.");
+    literal->setName(ss.str());
     
     jit.pushValue(literal);
 }
@@ -358,10 +362,9 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             Value* integerValue = jit.builder->getInt32(newInteger(constant));
             constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object);
 
-//             std::ostringstream ss;
-//             ss << "intc(" << constant << ")";
-//             constantValue->setName(ss.str());
-            constantValue->setName("const.");
+            std::ostringstream ss;
+            ss << "const" << constant << ".";
+            constantValue->setName(ss.str());
         } break;
         
         case SmalltalkVM::nilConst:   constantValue = m_globals.nilObject;   break;
@@ -413,12 +416,15 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.builder->CreateBr(blockBody);
     blockContext.builder->SetInsertPoint(blockBody);
     
-    writeFunctionBody(blockContext, newBytePointer - currentOffset);
+    writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
     
     // Create block object and fill it with context information
 //     Value* args[] = {  };
 //     Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
 //    jit.pushValue(blockObject);
+
+    outs() << "block body processed\n";
+    
     jit.pushValue(m_globals.nilObject); // FIXME dummy
     
     jit.bytePointer = newBytePointer;
