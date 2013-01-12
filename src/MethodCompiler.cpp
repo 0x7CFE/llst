@@ -59,6 +59,8 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     if (isBlock)
         jit.llvmContext = jit.builder->CreateBitCast(jit.llvmBlockContext, ot.context->getPointerTo());
 
+    
+
     jit.methodObject = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
     
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
@@ -107,6 +109,14 @@ void MethodCompiler::scanForBranches(TJITContext& jit)
             instruction.low  = byteCodes[jit.bytePointer++];
         }
 
+        if (instruction.high == SmalltalkVM::opPushBlock) {
+            // We need to skip the bytepointer data which is
+            // not instruction. In order to continue corrently
+            // we should jump right after it (to the block's code).
+            jit.bytePointer += 2;
+            continue;
+        }
+        
         // We're now looking only for branch bytecodes
         if (instruction.high != SmalltalkVM::opDoSpecial)
             continue;
