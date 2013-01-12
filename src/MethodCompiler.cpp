@@ -133,7 +133,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     // Instantinating new array object
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
     Value* arrayObject = jit.builder->CreateCall(m_RuntimeAPI.newOrdinaryObject, args);
-           arrayObject = jit.builder->CreateBitCast(arrayObject, ot.objectArray->getPointerTo());
+          // arrayObject = jit.builder->CreateBitCast(arrayObject, ot.objectArray->getPointerTo());
 
     return arrayObject;
 }

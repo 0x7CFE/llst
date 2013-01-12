@@ -74,11 +74,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     printf("Loading struct types...");
     // These are then used as an allocator function return types
     PointerType* objectType     = m_TypeModule->getTypeByName("struct.TObject")->getPointerTo();
+    PointerType* classType     = m_TypeModule->getTypeByName("struct.TClass")->getPointerTo();
     PointerType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject")->getPointerTo();
     printf("done\n");
     
     Type* params[] = {
-        objectType->getPointerTo(),   // klass
+        classType->getPointerTo(),   // klass
         Type::getInt32Ty(llvmContext) // size
     };
     FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
