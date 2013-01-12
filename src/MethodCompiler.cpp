@@ -88,7 +88,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.selfFields             = jit.builder->CreateCall(objectGetFields, jit.self, "selfFields");
 }
 
-void MethodCompiler::scanForBranches(TJITContext& jit)
+void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*/)
 {
     // First analyzing pass. Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
@@ -96,10 +96,11 @@ void MethodCompiler::scanForBranches(TJITContext& jit)
     // target bytecode offset as a key.
 
     TByteObject& byteCodes   = * jit.method->byteCodes;
-    uint32_t     byteCount   = byteCodes.getSize();
+    //uint32_t     byteCount   = byteCodes.getSize();
+    uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
 
     // Processing the method's bytecodes
-    while (jit.bytePointer < byteCount) {
+    while (jit.bytePointer < stopPointer) {
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
         instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
@@ -110,10 +111,10 @@ void MethodCompiler::scanForBranches(TJITContext& jit)
         }
 
         if (instruction.high == SmalltalkVM::opPushBlock) {
-            // We need to skip the bytepointer data which is
-            // not instruction. In order to continue corrently
-            // we should jump right after it (to the block's code).
-            jit.bytePointer += 2;
+            // Skipping the inline block instructions. 
+            // They will be processed on the next pass.
+            uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+            jit.bytePointer = newBytePointer;
             continue;
         }
         
@@ -194,8 +195,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 {
     TByteObject& byteCodes   = * jit.method->byteCodes;
     uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
-    // printf("Bytecodes size = %d\n", byteCodes.getSize());
-
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
@@ -422,6 +421,10 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     // First argument of every block function is a pointer to TBlock object
     blockContext.llvmBlockContext = (Value*) (blockContext.function->arg_begin());
     blockContext.llvmBlockContext->setName("blockContext");
+
+    uint32_t currentBytePointer = blockContext.bytePointer; // storing the position
+    scanForBranches(blockContext, newBytePointer - jit.bytePointer);
+    blockContext.bytePointer = currentBytePointer; // restoring after the pass
     
     // Creating the basic block and inserting it into the function
     BasicBlock* blockPreamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);

@@ -170,7 +170,7 @@ private:
     };
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
-    void scanForBranches(TJITContext& jit);
+    void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
     
