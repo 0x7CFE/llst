@@ -226,3 +226,8 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
 
 }
 
+
+void JITRuntime::runTest(TContext* context)
+{
+    
+}

@@ -547,9 +547,12 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", jit.instruction.low);
     }
+    intResult->setName("int.");
 
     // Interpreting raw integer value as a pointer
-    intResult = jit.builder->CreateIntToPtr(intResult, ot.object->getPointerTo());
+    Function* newInteger = m_TypeModule->getFunction("newInteger()");
+    Value* intAsPtr = jit.builder->CreateCall(newInteger, intResult, "intAsPtr.");
+    //intResult = jit.builder->CreateIntToPtr(intResult, ot.object->getPointerTo());
 
     
     // Jumping out the integersBlock to the value aggregator
@@ -591,7 +594,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
     PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2);
-    phi->addIncoming(intResult, integersBlock);
+    phi->addIncoming(intAsPtr, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
     
     jit.pushValue(phi);

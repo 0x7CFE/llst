@@ -258,8 +258,10 @@ public:
     
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }
+    llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
     
     void dumpJIT();
+    void runTest(TContext* context);
     
     void initialize(SmalltalkVM* softVM);
     ~JITRuntime();

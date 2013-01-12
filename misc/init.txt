@@ -34,6 +34,35 @@ test1: arg1  | temp1 |
 0028 DoSpecial selfReturn
 
 
+METHOD LLVMTest
+test2: arg1  | temp1 |
+    temp1 <- 42.
+    ^arg1 + temp1
+!
+
+-> LLVMTest methods at: #test2:; disassemble
+0000 PushLiteral 0
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushArgument 1
+0004 PushTemporary 0
+0005 SendBinary +
+0006 DoSpecial stackReturn
+0007 DoSpecial popTop
+0008 DoSpecial selfReturn
+
+
+
+
+
+
+
+
+
+
+
+
+
 METHOD Collection
 sort: criteria | left right mediane |
     (self isEmpty) ifTrue: [^self].

@@ -1099,6 +1099,12 @@ test1: arg1  | temp1 |
     ^self
 !
 
+METHOD LLVMTest
+test2: arg1  | temp1 |
+    temp1 <- 42.
+    ^arg1 + temp1
+!
+
 
 METHOD Undefined
 main    | command x y allMethods |
