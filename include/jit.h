@@ -124,6 +124,7 @@ private:
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
+        llvm::Value*        selfFields;   // LLVM representation for current object's fields
         
         TInstruction instruction;         // currently processed instruction
         // Builder inserts instructions into basic blocks
@@ -157,7 +158,7 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodObject(0), arguments(0),
-            temporaries(0), literals(0), self(0), builder(0), llvmContext(0)
+            temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);

@@ -66,7 +66,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     // Initializing JIT module.
     // All JIT functions will be created here
-    m_JITModule = new Module("jit", llvmContext);
+   // m_JITModule = new Module("jit", llvmContext);
+    m_JITModule = m_TypeModule;
 
     // Providing the memory management interface to the JIT module
     // FIXME Think about interfacing the MemoryManager directly
@@ -74,24 +75,28 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     printf("Loading struct types...");
     // These are then used as an allocator function return types
     PointerType* objectType     = m_TypeModule->getTypeByName("struct.TObject")->getPointerTo();
-    PointerType* classType     = m_TypeModule->getTypeByName("struct.TClass")->getPointerTo();
+    PointerType* classType      = m_TypeModule->getTypeByName("struct.TClass")->getPointerTo();
     PointerType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject")->getPointerTo();
     printf("done\n");
     
     Type* params[] = {
-        classType->getPointerTo(),   // klass
+        classType,                    // klass
         Type::getInt32Ty(llvmContext) // size
     };
     FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
     FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
 
-
+    
     Type* sendParams[] = {
         m_TypeModule->getTypeByName("struct.TContext")->getPointerTo(),     // callingContext
         m_TypeModule->getTypeByName("struct.TSymbol")->getPointerTo(),      // message selector
         m_TypeModule->getTypeByName("struct.TObjectArray")->getPointerTo()  // arguments
     };
     FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
+    
+    outs() << "ordinary: " << *newOrdinaryObjectType << "\n";
+    outs() << "binary: "   << *newBinaryObjectType << "\n";
+    outs() << "sendMessage: " << *sendMessageType << "\n";
     
     // Creating function references
     

@@ -82,8 +82,8 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.temporaries            = jit.builder->CreateCall(objectGetFields, tempsObject, "temporaries");
     
     Value* selfObjectPtr       = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(0), "selfObjectPtr");
-    Value* selfObject          = jit.builder->CreateLoad(selfObjectPtr, "selfObject");
-    jit.self                   = jit.builder->CreateCall(objectGetFields, selfObject, "self");
+    jit.self                   = jit.builder->CreateLoad(selfObjectPtr, "self");
+    jit.selfFields             = jit.builder->CreateCall(objectGetFields, jit.self, "selfFields");
 }
 
 void MethodCompiler::scanForBranches(TJITContext& jit)
@@ -290,7 +290,7 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 
     uint8_t index = jit.instruction.low;
     
-    Value* valuePointer      = jit.builder->CreateGEP(jit.self, jit.builder->getInt32(index));
+    Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
     Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
     std::string variableName = jit.method->klass->variables->getField(index)->toString();
     instanceVariable->setName(variableName);
@@ -448,7 +448,7 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
     uint8_t index = jit.instruction.low;
     Value* value  = jit.lastValue();
     
-    Value* instanceVariableAddress = jit.builder->CreateGEP(jit.self, jit.builder->getInt32(index));
+    Value* instanceVariableAddress = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
     jit.builder->CreateStore(value, instanceVariableAddress);
     // TODO analog of checkRoot()
 }
@@ -533,6 +533,10 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", jit.instruction.low);
     }
 
+    // Interpreting raw integer value as a pointer
+    intResult = jit.builder->CreateIntToPtr(intResult, ot.object->getPointerTo());
+
+    
     // Jumping out the integersBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
     
@@ -571,7 +575,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // We do not know now which way the program will be executed,
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
-    PHINode* phi = jit.builder->CreatePHI(ot.object, 2);
+    PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2);
     phi->addIncoming(intResult, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
     
