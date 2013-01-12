@@ -73,8 +73,8 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* literalsObjectPtr   = jit.builder->CreateStructGEP(jit.llvmContext, 3, "literalsObjectPtr");
     Value* literalsObjectArray = jit.builder->CreateLoad(literalsObjectPtr, "literalsObjectArray");
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
-    jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject);
-    jit.literals = jit.builder->CreateBitCast(jit.literals, ot.symbolArray->getPointerTo(), "literals");
+    jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");
+//    jit.literals = jit.builder->CreateBitCast(jit.literals, ot.objectArray, "literals");
     
     Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.llvmContext, 4, "tempsObjectPtr");
     Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
@@ -589,10 +589,14 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* arguments = jit.popValue();
 
     // First of all we need to get the actual message selector
-    Function* getFieldFunction = m_TypeModule->getFunction("TSymbolArray::getField(int)");
-    Value*    getFieldArgs[]   = { jit.literals, jit.builder->getInt32(jit.instruction.low) };
+    Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
+
+    Value*    literalArray     = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
+    Value*    getFieldArgs[]   = { literalArray, jit.builder->getInt32(jit.instruction.low) };
     Value*    messageSelector  = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
 
+    messageSelector = jit.builder->CreateBitCast(messageSelector, ot.symbol->getPointerTo());
+    
     std::ostringstream ss;
     ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
     messageSelector->setName(ss.str());
@@ -619,18 +623,24 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     uint8_t opcode = jit.instruction.low;
 
 //     printf("Special opcode = %d\n", opcode);
+    BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
+    --iInst;
+    
     switch (opcode) {
-        case SmalltalkVM::selfReturn:  jit.builder->CreateRet(jit.self); break;
+        case SmalltalkVM::selfReturn:
+            if (! iInst->isTerminator())
+                jit.builder->CreateRet(jit.self); break;
         
         case SmalltalkVM::stackReturn:
-            if (jit.hasValue())
+            if ( !iInst->isTerminator() && jit.hasValue() )
                 jit.builder->CreateRet(jit.popValue());
             break;
             
         case SmalltalkVM::blockReturn:
-            if (jit.hasValue())
+            if ( !iInst->isTerminator() && jit.hasValue())
                 jit.popValue();
             /* TODO unwind */
+            jit.builder->CreateRet(m_globals.nilObject);
             break;
         
         case SmalltalkVM::duplicate:   jit.pushValue(jit.lastValue()); break;

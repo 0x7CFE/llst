@@ -1092,6 +1092,7 @@ CLASS LLVMTest Object field1
 
 METHOD LLVMTest
 test1: arg1  | temp1 |
+    temp1 <- 42.
     (arg1 < temp1)
         ifTrue:  [self doSomething]
         ifFalse: [arg1 do: [ :x | ^field1 theOtherThing: x ] ].
