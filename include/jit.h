@@ -69,7 +69,7 @@ struct TObjectTypes {
     llvm::StructType* objectArray;
     llvm::StructType* symbolArray;
     llvm::StructType* globals;
-    
+
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("struct.TObject");
         klass       = module->getTypeByName("struct.TClass");
@@ -90,14 +90,17 @@ struct TJITGlobals {
     llvm::GlobalValue* falseObject;
     llvm::GlobalValue* smallIntClass;
     llvm::GlobalValue* arrayClass;
-    
+    llvm::GlobalValue* binarySelectors[3];
     
     void initializeFromModule(llvm::Module* module) {
-        nilObject       = module->getGlobalVariable("globals.nilObject");
-        trueObject      = module->getGlobalVariable("globals.trueObject");
-        falseObject     = module->getGlobalVariable("globals.falseObject");
-        smallIntClass   = module->getGlobalVariable("globals.smallIntClass");
-        arrayClass      = module->getGlobalVariable("globals.arrayClass");
+        nilObject          = module->getGlobalVariable("globals.nilObject");
+        trueObject         = module->getGlobalVariable("globals.trueObject");
+        falseObject        = module->getGlobalVariable("globals.falseObject");
+        smallIntClass      = module->getGlobalVariable("globals.smallIntClass");
+        arrayClass         = module->getGlobalVariable("globals.arrayClass");
+        binarySelectors[0] = module->getGlobalVariable("globals.<");
+        binarySelectors[1] = module->getGlobalVariable("globals.<=");
+        binarySelectors[2] = module->getGlobalVariable("globals.+");
         
       //badMethodSymbol =
     }
@@ -135,9 +138,18 @@ private:
         // two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
         // will be linked together with effect of instanceVariables[2] = temporaries[1]
 
+        bool hasValue() { return !valueStack.empty(); }
         void pushValue(llvm::Value* value) { valueStack.push_back(value); }
         llvm::Value* lastValue() { return valueStack.back(); }
         llvm::Value* popValue() {
+            if (valueStack.empty()) {
+                // Stack underflow due to continiuoslypopping the values, 
+                // like in blockReturn stackReturn
+                // FIXME Do this in a more clever way
+                //return m_globals.nilObject;
+                printf("JIT: Value stack underflow!\n");
+            }
+            
             llvm::Value* value = valueStack.back();
             valueStack.pop_back();
             return value;

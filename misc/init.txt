@@ -1,3 +1,146 @@
+METHOD LLVMTest
+test1: arg1  | temp1 |
+    (arg1 < temp1)
+        ifTrue:  [self doSomething]
+        ifFalse: [arg1 do: [ :x | ^field1 theOtherThing: x ] ].
+    ^self
+!
+
+0000 PushArgument 1
+0001 PushTemporary 0
+0002 SendBinary <
+0003 DoSpecial branchIfFalse 12
+0006 PushArgument 0
+0007 MarkArguments 1
+0008 SendMessage doSomething
+0009 DoSpecial branch 24
+0012 PushArgument 1
+0013 PushBlock
+0016     PushInstance 0
+0017     PushTemporary 1
+0018     MarkArguments 2
+0019     SendMessage theOtherThing:
+0020     DoSpecial blockReturn
+0021     DoSpecial stackReturn
+0022 MarkArguments 2
+0023 SendMessage do:
+0024 DoSpecial popTop
+0025 PushArgument 0
+0026 DoSpecial stackReturn
+0027 DoSpecial popTop
+0028 DoSpecial selfReturn
+
+
+METHOD Collection
+sort: criteria | left right mediane |
+    (self isEmpty) ifTrue: [^self].
+
+    mediane <- self popFirst.
+
+    left  <- List new.
+    right <- List new.
+    self do: [ :x |
+        (criteria value: x value: mediane)
+            ifTrue:  [ left  add: x ]
+            ifFalse: [ right add: x ] ].
+
+    left  <- left  sort: criteria.
+    right <- right sort: criteria.
+
+    right add: mediane.
+    ^ left appendList: right
+!
+
+-> Collection methods at: #sort: ; disassemble
+    0000 PushArgument 0
+    0001 MarkArguments 1
+    0002 SendMessage isEmpty
+    0003 DoSpecial branchIfFalse 11
+    0006 PushArgument 0
+    0007 DoSpecial stackReturn
+    0008 DoSpecial branch 12
+    
+    0011 PushConstant nil
+    0012 DoSpecial popTop
+    0013 PushArgument 0
+    0014 MarkArguments 1
+    0015 SendMessage popFirst
+    0016 AssignTemporary 2
+    0017 DoSpecial popTop
+    0018 PushLiteral 2
+    0019 MarkArguments 1
+    0020 SendMessage new
+    0021 AssignTemporary 0
+    0022 DoSpecial popTop
+    0023 PushLiteral 4
+    0024 MarkArguments 1
+    0025 SendMessage new
+    0026 AssignTemporary 1
+    0027 DoSpecial popTop
+    0028 PushArgument 0
+    0029 PushBlock
+    0032     PushArgument 1
+    0033     PushTemporary 3
+    0034     PushTemporary 2
+    0035     MarkArguments 3
+    0036     SendMessage value:value:
+    0037     DoSpecial branchIfFalse 47
+    0040     PushTemporary 0
+    0041     PushTemporary 3
+    0042     MarkArguments 2
+    0043     SendMessage add:
+    0044     DoSpecial branch 51
+    0047     PushTemporary 1
+    0048     PushTemporary 3
+    0049     MarkArguments 2
+    0050     SendMessage add:
+    0051     DoSpecial stackReturn
+    0052 MarkArguments 2
+    0053 SendMessage do:
+    0054 DoSpecial popTop
+    0055 PushTemporary 0
+    0056 PushArgument 1
+    0057 MarkArguments 2
+    0058 SendMessage sort:
+    0059 AssignTemporary 0
+    0060 DoSpecial popTop
+    0061 PushTemporary 1
+    0062 PushArgument 1
+    0063 MarkArguments 2
+    0064 SendMessage sort:
+    0065 AssignTemporary 1
+    0066 DoSpecial popTop
+    0067 PushTemporary 1
+    0068 PushTemporary 2
+    0069 MarkArguments 2
+    0070 SendMessage add:
+    0071 DoSpecial popTop
+    0072 PushTemporary 0
+    0073 PushTemporary 1
+    0074 MarkArguments 2
+    0075 SendMessage appendList:
+    0076 DoSpecial stackReturn
+    0077 DoSpecial popTop
+    0078 DoSpecial selfReturn
+Method
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Undefined>>main
     ...
     0059 SendMessage name

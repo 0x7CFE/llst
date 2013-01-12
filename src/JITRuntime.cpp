@@ -193,6 +193,15 @@ void JITRuntime::initializeGlobals() {
 
     GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", ot.klass) );
     m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(&globals.arrayClass));
+
+    GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", ot.symbol) );
+    m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(&globals.binaryMessages[0]));
+    
+    GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", ot.symbol) );
+    m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(&globals.binaryMessages[1]));
+
+    GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", ot.symbol) );
+    m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(&globals.binaryMessages[2]));
 }
 
 extern "C" {

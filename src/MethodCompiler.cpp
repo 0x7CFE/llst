@@ -73,7 +73,8 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* literalsObjectPtr   = jit.builder->CreateStructGEP(jit.llvmContext, 3, "literalsObjectPtr");
     Value* literalsObjectArray = jit.builder->CreateLoad(literalsObjectPtr, "literalsObjectArray");
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
-    jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");
+    jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject);
+    jit.literals = jit.builder->CreateBitCast(jit.literals, ot.symbolArray->getPointerTo(), "literals");
     
     Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.llvmContext, 4, "tempsObjectPtr");
     Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
@@ -132,6 +133,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     // Instantinating new array object
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
     Value* arrayObject = jit.builder->CreateCall(m_RuntimeAPI.newOrdinaryObject, args);
+           arrayObject = jit.builder->CreateBitCast(arrayObject, ot.objectArray->getPointerTo());
 
     return arrayObject;
 }
@@ -326,6 +328,8 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
     temporary->setName(ss.str());
     
     jit.pushValue(temporary);
+
+    outs() << "last value: " << jit.lastValue() << "\n";
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
@@ -454,18 +458,26 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     // Here we need to create the arguments array from the values on the stack
     
     uint8_t argumentsCount = jit.instruction.low;
-    
+
     // FIXME May be we may unroll the arguments array and pass the values directly.
     //       However, in some cases this may lead to additional architectural problems.
-    Value* arguments = createArray(jit, argumentsCount);
-    
+    Value* argumentsPtr      = createArray(jit, argumentsCount);
+    //Value* argumentsArrayPtr = jit.builder->CreateBitCast(argumentsPtr, ot.objectArray->getPointerTo());
+    //Value* argumentsObject   = jit.builder->CreateLoad(argumentsArrayPtr);
+
+    Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
+    Value* argumentsFields    = jit.builder->CreateCall(objectGetFields, argumentsPtr);
+
     // Filling object with contents
     uint8_t index = argumentsCount;
-    while (index > 0)
-        arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), --index);
-    arguments->setName("margs.");
+    while (index > 0) {
+        Value* value = jit.popValue();
+        Value* elementPtr = jit.builder->CreateGEP(argumentsFields, jit.builder->getInt32(--index));
+        jit.builder->CreateStore(value, elementPtr);
+    }
 
-    jit.pushValue(arguments);
+    argumentsPtr->setName("margs.");
+    jit.pushValue(argumentsPtr);
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
@@ -515,12 +527,13 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     Value* intResult = 0;
     switch (jit.instruction.low) {
-        case 0: intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); // operator <
-        case 1: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); // operator <=
-        case 2: intResult = jit.builder->CreateAdd(leftInt, rightInt);     // operator +
+        case 0: intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break; // operator <
+        case 1: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break; // operator <=
+        case 2: intResult = jit.builder->CreateAdd(leftInt, rightInt);     break; // operator +
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", jit.instruction.low);
     }
+
     // Jumping out the integersBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
     
@@ -528,11 +541,28 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     jit.builder->SetInsertPoint(sendBinaryBlock);
     // We need to create an arguments array and fill it with argument objects
     // Then send the message just like ordinary one
-    Value* arguments = createArray(jit, 2);
-           arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), 0);
-           arguments = jit.builder->CreateInsertValue(arguments, jit.popValue(), 1);
-           arguments->setName("args.");
-    Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments);
+
+    Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
+    
+    Value* arguments   = createArray(jit, 2);
+    Value* argFields   = jit.builder->CreateCall(objectGetFields, arguments);
+
+    Value* element0Ptr = jit.builder->CreateGEP(argFields, jit.builder->getInt32(0));
+    jit.builder->CreateStore(leftValue, element0Ptr);
+
+    Value* element1Ptr = jit.builder->CreateGEP(argFields, jit.builder->getInt32(1));
+    jit.builder->CreateStore(rightValue, element1Ptr);
+    
+    // Now performing a message call
+    Value*    sendMessageArgs[] = {
+        jit.llvmContext, // calling context
+        m_globals.binarySelectors[jit.instruction.low],
+        arguments
+    };
+    outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
+    Value* sendMessageResult  = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
+
+    //Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments); 
     // Jumping out the sendBinaryBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
     
@@ -553,7 +583,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* arguments = jit.popValue();
 
     // First of all we need to get the actual message selector
-    Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
+    Function* getFieldFunction = m_TypeModule->getFunction("TSymbolArray::getField(int)");
     Value*    getFieldArgs[]   = { jit.literals, jit.builder->getInt32(jit.instruction.low) };
     Value*    messageSelector  = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
 
@@ -584,17 +614,24 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
 //     printf("Special opcode = %d\n", opcode);
     switch (opcode) {
-        case SmalltalkVM::selfReturn:  {
-            //Value* selfPtr = jit.builder->CreateGEP(jit.arguments, 0);
-            //Value* self    = jit.builder->CreateLoad(selfPtr);
-            jit.builder->CreateRet(jit.self);
-            //outs() << selfPtr << "," << self << "\n";
-        } break;
+        case SmalltalkVM::selfReturn:  jit.builder->CreateRet(jit.self); break;
         
-        case SmalltalkVM::stackReturn: jit.builder->CreateRet(jit.popValue()); break;
-        case SmalltalkVM::blockReturn: jit.popValue(); /* TODO */ break;
+        case SmalltalkVM::stackReturn:
+            if (jit.hasValue())
+                jit.builder->CreateRet(jit.popValue());
+            break;
+            
+        case SmalltalkVM::blockReturn:
+            if (jit.hasValue())
+                jit.popValue();
+            /* TODO unwind */
+            break;
+        
         case SmalltalkVM::duplicate:   jit.pushValue(jit.lastValue()); break;
-        case SmalltalkVM::popTop:      jit.popValue(); break;
+        case SmalltalkVM::popTop:
+            if (jit.hasValue())
+                jit.popValue();
+            break;
 
         case SmalltalkVM::branch: {
             // Loading branch target bytecode offset

@@ -57,8 +57,8 @@ int main(int argc, char **argv) {
     MethodCompiler* compiler = runtime.getCompiler();
 
     printf("Acquiring class and method...");
-    TClass*  undefined = (TClass*)  testImage->getGlobal("Collection");
-    TMethod* main      = (TMethod*) undefined->methods->find("sort:");
+    TClass*  undefined = (TClass*)  testImage->getGlobal("LLVMTest");
+    TMethod* main      = (TMethod*) undefined->methods->find("test1:");
     printf("done\n");
     
     printf("Compiling!..");
@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
             llvm::outs() << *i << "\n";
     } 
     
-    //runtime.dumpJIT();
+    runtime.dumpJIT();
     //function->print(llvm::outs());
 
     exit(0);

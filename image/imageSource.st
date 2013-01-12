@@ -1057,6 +1057,12 @@ benchmark2: random | dict ms |
     ms printNl
 !
 
+METHOD Undefined
+benchmark3: count | ms |
+    ms <- Timer millisecondsToRun: [ Number primes: count ].
+    'Found in ms: ' print. ms printNl.
+!
+
 METHOD Number
 isPrime
         ((self rem: 2) = 0) ifTrue: [ ^ false ].
@@ -1081,6 +1087,17 @@ primes: n | cand count |
         ].
         Char newline print
 !
+
+CLASS LLVMTest Object field1
+
+METHOD LLVMTest
+test1: arg1  | temp1 |
+    (arg1 < temp1)
+        ifTrue:  [self doSomething]
+        ifFalse: [arg1 do: [ :x | ^field1 theOtherThing: x ] ].
+    ^self
+!
+
 
 METHOD Undefined
 main    | command x y allMethods |
