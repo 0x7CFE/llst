@@ -91,7 +91,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         m_TypeModule->getTypeByName("struct.TSymbol")->getPointerTo(),      // message selector
         m_TypeModule->getTypeByName("struct.TObjectArray")->getPointerTo()  // arguments
     };
-    FunctionType* sendMessageType  = FunctionType::get(objectType, params, false);
+    FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
     
     // Creating function references
     

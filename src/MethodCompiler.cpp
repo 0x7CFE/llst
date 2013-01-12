@@ -461,12 +461,9 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
 
     // FIXME May be we may unroll the arguments array and pass the values directly.
     //       However, in some cases this may lead to additional architectural problems.
-    Value* argumentsPtr      = createArray(jit, argumentsCount);
-    //Value* argumentsArrayPtr = jit.builder->CreateBitCast(argumentsPtr, ot.objectArray->getPointerTo());
-    //Value* argumentsObject   = jit.builder->CreateLoad(argumentsArrayPtr);
-
+    Value* argumentsObject    = createArray(jit, argumentsCount);
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
-    Value* argumentsFields    = jit.builder->CreateCall(objectGetFields, argumentsPtr);
+    Value* argumentsFields    = jit.builder->CreateCall(objectGetFields, argumentsObject);
 
     // Filling object with contents
     uint8_t index = argumentsCount;
@@ -476,8 +473,10 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
         jit.builder->CreateStore(value, elementPtr);
     }
 
-    argumentsPtr->setName("margs.");
-    jit.pushValue(argumentsPtr);
+    Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, ot.objectArray->getPointerTo());
+    
+    argumentsArray->setName("margs.");
+    jit.pushValue(argumentsArray);
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
@@ -544,22 +543,23 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
     
-    Value* arguments   = createArray(jit, 2);
-    Value* argFields   = jit.builder->CreateCall(objectGetFields, arguments);
+    Value* argumentsObject   = createArray(jit, 2);
+    Value* argFields   = jit.builder->CreateCall(objectGetFields, argumentsObject);
 
     Value* element0Ptr = jit.builder->CreateGEP(argFields, jit.builder->getInt32(0));
     jit.builder->CreateStore(leftValue, element0Ptr);
 
     Value* element1Ptr = jit.builder->CreateGEP(argFields, jit.builder->getInt32(1));
     jit.builder->CreateStore(rightValue, element1Ptr);
-    
+
+    Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, ot.objectArray->getPointerTo());
     // Now performing a message call
     Value*    sendMessageArgs[] = {
         jit.llvmContext, // calling context
         m_globals.binarySelectors[jit.instruction.low],
-        arguments
+        argumentsArray
     };
-    outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
+    //outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
     Value* sendMessageResult  = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
 
     //Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments); 
