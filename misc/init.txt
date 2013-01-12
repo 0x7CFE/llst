@@ -24,9 +24,11 @@ test1: arg1  | temp1 |
 0021     DoSpecial stackReturn
 0022 MarkArguments 2
 0023 SendMessage do:
+
 0024 DoSpecial popTop
 0025 PushArgument 0
 0026 DoSpecial stackReturn
+
 0027 DoSpecial popTop
 0028 DoSpecial selfReturn
 

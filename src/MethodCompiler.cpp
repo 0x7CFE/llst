@@ -186,7 +186,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
     // printf("Bytecodes size = %d\n", byteCodes.getSize());
 
-    BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
@@ -198,9 +197,12 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             // points to the current offset. We need to end the current
             // basic block and start a new one, linking previous
             // basic block to a new one.
+
+            BasicBlock::iterator iInst = --jit.builder->GetInsertPoint();
             
             BasicBlock* newBlock = iBlock->second; // Picking a basic block
-            jit.builder->CreateBr(newBlock);       // Linking current block to a new one
+            if (! iInst->isTerminator())
+                jit.builder->CreateBr(newBlock);       // Linking current block to a new one
             jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
         
