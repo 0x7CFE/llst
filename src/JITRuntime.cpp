@@ -167,18 +167,19 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     // because it is not used by JIT runtime. We also may skip the proper
     // initialization of various objects such as stackTop and bytePointer.
     
-    // Protecting the pointer
+    // Protecting the pointers before allocation
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
+    hptr<TContext>     previousContext  = callingContext;
 
     // Creating context object and temporaries
-    hptr<TContext>     newContext       = m_softVM->newObject<TContext>();
-    hptr<TObjectArray> newTemps         = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+    hptr<TContext>     newContext = m_softVM->newObject<TContext>();
+    hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
 
     // Initializing context variables
     newContext->temporaries       = newTemps;
     newContext->arguments         = messageArguments;
     newContext->method            = method;
-    newContext->previousContext   = callingContext;
+    newContext->previousContext   = previousContext;
     
     // Calling the method and returning the result
     TMethodFunction methodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(function));
