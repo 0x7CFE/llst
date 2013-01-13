@@ -239,6 +239,10 @@ private:
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
 
+    typedef std::map<std::string, llvm::Function*> TFunctionMap;
+    typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
+    TFunctionMap m_compiledFunctions;
+    
     TRuntimeAPI m_RuntimeAPI;
     
     TObjectTypes ot;
@@ -255,6 +259,7 @@ private:
     
     void initializeGlobals();
 public:
+    typedef TObject* (*TMethodFunction)(TContext*);
     
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }

@@ -66,7 +66,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     // Initializing JIT module.
     // All JIT functions will be created here
-   // m_JITModule = new Module("jit", llvmContext);
+    // m_JITModule = new Module("jit", llvmContext);
     m_JITModule = m_TypeModule;
 
     // Providing the memory management interface to the JIT module
@@ -146,19 +146,22 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
     // TODO #doesNotUnderstand:
 
+    // Searching for the jit compiled function
+    // TODO Fast 1-way lookup cache
+    std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+    TFunctionMapIterator iFunction = m_compiledFunctions.find(functionName);
     llvm::Function* function = 0;
-    TByteArray* bitCode = method->llvmBitcode;
-
-    // Checking if we already have the compiled llvm code 
-    if (bitCode == globals.nilObject) {
-        // Compiling the method into LLVM IR
-        function = JITRuntime::Instance()->getCompiler()->compileMethod(method);
-        // TODO Store the bitCode into the object
+    
+    if (iFunction != m_compiledFunctions.end()) {
+        // Function was found in the map.
+        // No need to compile it again
+        function = iFunction->second;
     } else {
-        // Method is already compiled, parsing the IR and loading function
-        // TODO function = parseBitcode(method->llvmBitcode);
+        // Compiling function and storing it to the table for further use
+        function = m_methodCompiler->compileMethod(method);
+        m_compiledFunctions[functionName] = function;
     }
-
+    
     // Preparing the context objects. Because we do not call the software
     // implementation here, we do not need to allocate the stack object
     // because it is not used by JIT runtime. We also may skip the proper
@@ -166,19 +169,20 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     
     // Protecting the pointer
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
-    hptr<TContext>     newContext = m_softVM->newObject<TContext>();
-    hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
-    
+
+    // Creating context object and temporaries
+    hptr<TContext>     newContext       = m_softVM->newObject<TContext>();
+    hptr<TObjectArray> newTemps         = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+
+    // Initializing context variables
     newContext->temporaries       = newTemps;
     newContext->arguments         = messageArguments;
     newContext->method            = method;
     newContext->previousContext   = callingContext;
     
     // Calling the method and returning the result
-    std::vector<GenericValue> args;
-    args.push_back(GenericValue(newContext));
-    GenericValue result = m_executionEngine->runFunction(function, args);
-    return (TObject*) GVTOP(result);
+    TMethodFunction methodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(function));
+    return methodFunction(newContext);
 }
 
 void JITRuntime::initializeGlobals() {

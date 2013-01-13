@@ -92,10 +92,10 @@ int main(int argc, char **argv) {
     
     runtime.dumpJIT();
 
-    TObject* (*testFunction)(TContext*);
+    JITRuntime::TMethodFunction testFunction;
     
     printf("Receiving function address\n");
-    testFunction = reinterpret_cast<TObject* (*)(TContext*)>(runtime.getExecutionEngine()->getPointerToFunction(function));
+    testFunction = reinterpret_cast<JITRuntime::TMethodFunction>(runtime.getExecutionEngine()->getPointerToFunction(function));
     printf("Test function is at %p\n", &testFunction);
     
     printf("Executing it! :S\n", &testFunction);
