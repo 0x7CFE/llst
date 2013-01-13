@@ -47,6 +47,7 @@
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
+#include <llvm/PassManager.h>
 
 // These functions are used in the IR code
 // as a bindings between the VM and the object world
@@ -199,7 +200,6 @@ private:
     
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
-    llvm::Function* compileBlock(TJITContext& context);
 public:
     llvm::Function* compileMethod(TMethod* method);
 
@@ -232,6 +232,8 @@ extern "C" {
 
 class JITRuntime {
 private:
+    llvm::FunctionPassManager* m_functionPassManager;
+    
     SmalltalkVM* m_softVM;
     llvm::ExecutionEngine* m_executionEngine;
     MethodCompiler* m_methodCompiler;

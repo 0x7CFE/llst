@@ -39,6 +39,10 @@
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 
+#include <llvm/PassManager.h>
+#include <llvm/Target/TargetData.h>
+#include <llvm/LinkAllPasses.h>
+
 using namespace llvm;
 
 JITRuntime* JITRuntime::s_instance = 0;
@@ -121,8 +125,42 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     initializeGlobals();
     
+    // Initializing function passes (optimizations)
+
+    m_functionPassManager = new FunctionPassManager(m_JITModule);
+    // Set up the optimizer pipeline.
+    // Start with registering info about how the
+    // target lays out data structures.
+    /*m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
+
+    // Basic AliasAnslysis support for GVN.
+    m_functionPassManager->add(llvm::createBasicAliasAnalysisPass());
+    
+    // Promote allocas to registers.
+    m_functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
+    
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    m_functionPassManager->add(llvm::createInstructionCombiningPass());
+    
+    // Reassociate expressions.
+    m_functionPassManager->add(llvm::createReassociatePass());
+    
+    // Eliminate Common SubExpressions.
+    m_functionPassManager->add(llvm::createGVNPass());
+    
+    // Simplify the control flow graph (deleting unreachable
+    // blocks, etc).
+    m_functionPassManager->add(llvm::createCFGSimplificationPass()); */
+    
+//     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
+//     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
+//     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
+    
+    m_functionPassManager->doInitialization();
+
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI);
+    
 }
 
 void JITRuntime::dumpJIT()
@@ -132,7 +170,9 @@ void JITRuntime::dumpJIT()
 }
 
 JITRuntime::~JITRuntime() {
-    // TODO Finalize stuff and dispose memory
+    // Finalize stuff and dispose memory
+    if (m_functionPassManager)
+        delete m_functionPassManager;
 }
 
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
@@ -160,6 +200,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     } else {
         // Compiling function and storing it to the table for further use
         function = m_methodCompiler->compileMethod(method);
+        // Running the optimization passes on a function
+        //m_functionPassManager->run(*function);
+        // Storing the function for further use
         m_compiledFunctions[functionName] = function;
     }
 

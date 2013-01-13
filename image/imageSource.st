@@ -1118,7 +1118,26 @@ returnFourtyTwo
 !
 
 METHOD LLVMTest
+toDoTest |x|
+    x <- 0.
+    1 to: 11 do: [ x <- x + 1 ].
+    ^x
+!
+
+METHOD LLVMTest
+loopTest | i sum |
+    i   <- 1.
+    sum <- 0.
+
+    [ i < 101 ] whileTrue:
+        [ sum <- sum + i ].
+        
+    ^sum
+!
+
+METHOD LLVMTest
 test3
+    "^ LLVM sendMessage: #loopTest withArguments: (Array with: self)."
     "^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self)."
     ^ LLVM sendMessage: ('test2:' asSymbol) withArguments: (Array with: self with: 1).
 !
@@ -1145,10 +1164,10 @@ main    | command x |
         x <- LLVMTest new test3.
         x printNl.
         
-        " main execution loop 
+        " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ]"
+                        ifFalse: [ command doIt printNl ] ]
         
         ^nil.                  
 !

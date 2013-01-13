@@ -626,12 +626,6 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     jit.pushValue(result);
 }
 
-
-Function* MethodCompiler::compileBlock(TJITContext& context)
-{
-    return 0; // TODO
-}
-
 void MethodCompiler::doSpecial(TJITContext& jit)
 {
     TByteObject& byteCodes = * jit.method->byteCodes;
