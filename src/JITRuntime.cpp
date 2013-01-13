@@ -45,6 +45,7 @@ JITRuntime* JITRuntime::s_instance = 0;
 
 void JITRuntime::initialize(SmalltalkVM* softVM)
 {
+    s_instance = this;
     m_softVM = softVM;
     
     // Initializing LLVM subsystem
@@ -169,7 +170,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     
     // Protecting the pointers before allocation
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
-    hptr<TContext>     previousContext  = callingContext;
+    hptr<TContext>     previousContext  = m_softVM->newPointer(callingContext);
 
     // Creating context object and temporaries
     hptr<TContext>     newContext = m_softVM->newObject<TContext>();
@@ -183,7 +184,10 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     
     // Calling the method and returning the result
     TMethodFunction methodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(function));
-    return methodFunction(newContext);
+    TObject* result = methodFunction(newContext);
+
+    printf("Function result: %p\n", result);
+    printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
 }
 
 void JITRuntime::initializeGlobals() {
@@ -218,14 +222,17 @@ void JITRuntime::initializeGlobals() {
 extern "C" {
     
 TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
+    printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
+    printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
 TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments) {
+    printf("sendMessage(%p, #%s, %p)\n", callingContext, message->toString().c_str(), arguments);
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
 }
 

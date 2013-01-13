@@ -41,7 +41,7 @@
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(65536 * 32);
+    memoryManager->initializeHeap(65536 * 128);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -74,7 +74,7 @@ int main(int argc, char **argv) {
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42, false);
 
-    initContext->arguments = vm.newObject<TObjectArray>(1);
+    /*initContext->arguments = vm.newObject<TObjectArray>(1);
     initContext->arguments->putField(0, reinterpret_cast<TObject*>(newInteger(42)));
 
     MethodCompiler* compiler = runtime.getCompiler();
@@ -101,7 +101,7 @@ int main(int argc, char **argv) {
     printf("Executing it! :S\n", &testFunction);
     TObject* functionResult = testFunction(initContext);
     printf("Wow o_O We're still here! Function returned a value: %d\n", getIntegerValue(reinterpret_cast<TInteger>(functionResult)));
-    exit(0);
+    exit(0); */
     
     vm.pushProcess(initProcess);
     

@@ -1088,7 +1088,14 @@ primes: n | cand count |
         Char newline print
 !
 
+CLASS LLVM Object
 CLASS LLVMTest Object field1
+
+METHOD MetaLLVM
+sendMessage: aSelector withArguments: anArguments
+    "calling context will be taken from VM"
+    <252 aSelector anArguments>
+!
 
 METHOD LLVMTest
 test1: arg1  | temp1 |
@@ -1105,16 +1112,25 @@ test2: arg1  | temp1 |
     ^arg1 + temp1
 !
 
+METHOD LLVMTest
+returnFourtyTwo
+    ^42
+!
+
+METHOD LLVMTest
+test3
+    ^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self).
+!
 
 METHOD Undefined
-main    | command x y allMethods |
+main    | command x |
         " initialize classes "
         
         Char initialize.
         
         "nil testArrayAllMethods."
         
-        CompareTest      new runAll.
+        "CompareTest      new runAll.
         SmallIntTest     new runAll.
         LoopTest         new runAll.
         ClassTest        new runAll.
@@ -1123,12 +1139,15 @@ main    | command x y allMethods |
         ArrayTest        new runAll.
         GCTest           new runAll.
         ContextTest      new runAll.
-        PrimitiveTest    new runAll.
+        PrimitiveTest    new runAll."
+
+        x <- LLVMTest new test3.
+        x printNl.
         
-        " main execution loop "
+        " main execution loop 
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ]
+                        ifFalse: [ command doIt printNl ] ]"
         
         ^nil.                  
 !
