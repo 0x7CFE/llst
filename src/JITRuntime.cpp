@@ -190,6 +190,8 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 
     printf("Function result: %p\n", result);
     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
+
+    return result;
 }
 
 void JITRuntime::initializeGlobals() {

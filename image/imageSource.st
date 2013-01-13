@@ -1119,7 +1119,8 @@ returnFourtyTwo
 
 METHOD LLVMTest
 test3
-    ^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self).
+    "^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self)."
+    ^ LLVM sendMessage: ('test2:' asSymbol) withArguments: (Array with: self with: 1).
 !
 
 METHOD Undefined

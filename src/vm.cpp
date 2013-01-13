@@ -746,6 +746,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
                 process->result   = ec.returnedValue;
                 return returnReturned;
             }
+
+//             if (opcode == 252)
+//                 printf("returnedValue = %d\n", ec.returnedValue.rawptr());
             
             // Inject the result...
             ec.stackTop = getIntegerValue(ec.currentContext->stackTop);
