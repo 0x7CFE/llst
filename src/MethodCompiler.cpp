@@ -59,9 +59,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     if (isBlock)
         jit.llvmContext = jit.builder->CreateBitCast(jit.llvmBlockContext, ot.context->getPointerTo());
 
-    
-
-    jit.methodObject = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
+    jit.methodPtr = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
     
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
     
@@ -71,8 +69,9 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* argsObjectArray     = jit.builder->CreateLoad(argsObjectPtr, "argsObjectArray");
     Value* argsObject          = jit.builder->CreateBitCast(argsObjectArray, ot.object->getPointerTo(), "argsObject");
     jit.arguments              = jit.builder->CreateCall(objectGetFields, argsObject, "arguments");
-    
-    Value* literalsObjectPtr   = jit.builder->CreateStructGEP(jit.llvmContext, 3, "literalsObjectPtr");
+
+    Value* methodObject        = jit.builder->CreateLoad(jit.methodPtr);
+    Value* literalsObjectPtr   = jit.builder->CreateStructGEP(methodObject, 3, "literalsObjectPtr");
     Value* literalsObjectArray = jit.builder->CreateLoad(literalsObjectPtr, "literalsObjectArray");
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
     jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");

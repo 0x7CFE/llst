@@ -788,7 +788,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TObjectArray* args = (TObjectArray*) stack[--ec.stackTop];
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
             return sendMessage(ec.currentContext, selector, args);
-        }
+        } break;
         
         case objectsAreEqual: { // 1
             TObject* arg2 = stack[--ec.stackTop];

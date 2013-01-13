@@ -119,7 +119,7 @@ private:
         uint32_t            byteCount;
         
         llvm::Function*     function;     // LLVM function that is created based on method
-        llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
+        llvm::Value*        methodPtr; // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
@@ -157,7 +157,7 @@ private:
         }
         
         TJITContext(TMethod* method) : method(method),
-            bytePointer(0), function(0), methodObject(0), arguments(0),
+            bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0)
         {
             byteCount = method->byteCodes->getSize();

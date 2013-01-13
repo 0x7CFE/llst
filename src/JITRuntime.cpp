@@ -162,6 +162,8 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         function = m_methodCompiler->compileMethod(method);
         m_compiledFunctions[functionName] = function;
     }
+
+    outs() << *function;
     
     // Preparing the context objects. Because we do not call the software
     // implementation here, we do not need to allocate the stack object
