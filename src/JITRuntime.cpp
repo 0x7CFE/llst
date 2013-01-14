@@ -82,6 +82,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     PointerType* objectType     = m_TypeModule->getTypeByName("struct.TObject")->getPointerTo();
     PointerType* classType      = m_TypeModule->getTypeByName("struct.TClass")->getPointerTo();
     PointerType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject")->getPointerTo();
+    PointerType* contextType    = m_TypeModule->getTypeByName("struct.TContext")->getPointerTo();
+    PointerType* blockType      = m_TypeModule->getTypeByName("struct.TBlock")->getPointerTo();
     printf("done\n");
     
     Type* params[] = {
@@ -98,6 +100,20 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         m_TypeModule->getTypeByName("struct.TObjectArray")->getPointerTo()  // arguments
     };
     FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
+
+    Type* createBlockParams[] = {
+        contextType,                  // callingContext
+        Type::getInt8Ty(llvmContext), // argLocation
+        Type::getInt16Ty(llvmContext) // bytePointer
+    };
+    FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams);
+
+    Type* emitBlockReturnParams[] = {
+        objectType, // value
+        contextType // targetContext
+    };
+    FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams);
+    
     
     outs() << "ordinary: " << *newOrdinaryObjectType << "\n";
     outs() << "binary: "   << *newBinaryObjectType << "\n";
@@ -108,6 +124,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
     m_RuntimeAPI.sendMessage       = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    m_RuntimeAPI.createBlock       = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
+    m_RuntimeAPI.emitBlockReturn   = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -120,6 +138,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     
     ot.initializeFromModule(m_TypeModule);
     

@@ -57,6 +57,8 @@ struct TRuntimeAPI {
     llvm::Function* newOrdinaryObject;
     llvm::Function* newBinaryObject;
     llvm::Function* sendMessage;
+    llvm::Function* createBlock;
+    llvm::Function* emitBlockReturn;
 };
 
 struct TObjectTypes {
