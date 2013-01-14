@@ -72,6 +72,7 @@ struct TObjectTypes {
     llvm::StructType* objectArray;
     llvm::StructType* symbolArray;
     llvm::StructType* globals;
+    llvm::StructType* byteObject;
 
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("struct.TObject");
@@ -84,6 +85,7 @@ struct TObjectTypes {
         objectArray = module->getTypeByName("struct.TObjectArray");
         symbolArray = module->getTypeByName("struct.TSymbolArray");
         globals     = module->getTypeByName("struct.TGlobals");
+        byteObject  = module->getTypeByName("struct.TByteObject");
     }
 };
 
@@ -266,6 +268,8 @@ private:
     
     void initializeGlobals();
     void initializePassManager();
+    //uses ot file. dont forget to init it before calling this method
+    void initializeRuntimeAPI();
 public:
     typedef TObject* (*TMethodFunction)(TContext*);
     

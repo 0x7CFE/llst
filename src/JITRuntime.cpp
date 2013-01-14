@@ -56,8 +56,6 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     InitializeNativeTarget();
     
     LLVMContext& llvmContext = getGlobalContext();
-
-    printf("Initializing types...");
     
     // Initializing types module
     SMDiagnostic Err;
@@ -66,8 +64,6 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         Err.print("JITRuntime.cpp", errs());
         exit(1);
     }
-
-    printf("done\n");
     
     // Initializing JIT module.
     // All JIT functions will be created here
@@ -76,56 +72,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     // Providing the memory management interface to the JIT module
     // FIXME Think about interfacing the MemoryManager directly
-
-    printf("Loading struct types...");
     // These are then used as an allocator function return types
-    PointerType* objectType     = m_TypeModule->getTypeByName("struct.TObject")->getPointerTo();
-    PointerType* classType      = m_TypeModule->getTypeByName("struct.TClass")->getPointerTo();
-    PointerType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject")->getPointerTo();
-    PointerType* contextType    = m_TypeModule->getTypeByName("struct.TContext")->getPointerTo();
-    PointerType* blockType      = m_TypeModule->getTypeByName("struct.TBlock")->getPointerTo();
-    printf("done\n");
-    
-    Type* params[] = {
-        classType,                    // klass
-        Type::getInt32Ty(llvmContext) // size
-    };
-    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
-    FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
-
-    
-    Type* sendParams[] = {
-        m_TypeModule->getTypeByName("struct.TContext")->getPointerTo(),     // callingContext
-        m_TypeModule->getTypeByName("struct.TSymbol")->getPointerTo(),      // message selector
-        m_TypeModule->getTypeByName("struct.TObjectArray")->getPointerTo()  // arguments
-    };
-    FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
-
-    Type* createBlockParams[] = {
-        contextType,                  // callingContext
-        Type::getInt8Ty(llvmContext), // argLocation
-        Type::getInt16Ty(llvmContext) // bytePointer
-    };
-    FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams);
-
-    Type* emitBlockReturnParams[] = {
-        objectType, // value
-        contextType // targetContext
-    };
-    FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams);
-    
-    
-    outs() << "ordinary: " << *newOrdinaryObjectType << "\n";
-    outs() << "binary: "   << *newBinaryObjectType << "\n";
-    outs() << "sendMessage: " << *sendMessageType << "\n";
-    
-    // Creating function references
-    
-    m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
-    m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-    m_RuntimeAPI.sendMessage       = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
-    m_RuntimeAPI.createBlock       = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
-    m_RuntimeAPI.emitBlockReturn   = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -133,18 +80,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         errs() << error;
         exit(1);
     }
-
-    // Mapping the function references to actual functions
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     
     ot.initializeFromModule(m_TypeModule);
     
     initializeGlobals();
     initializePassManager();
+    initializeRuntimeAPI();
 
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI);
@@ -303,6 +244,66 @@ void JITRuntime::initializePassManager() {
 //     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
     
     m_functionPassManager->doInitialization();
+}
+
+void JITRuntime::initializeRuntimeAPI() {
+    LLVMContext& llvmContext = getGlobalContext();
+    
+    PointerType* objectType     = ot.object->getPointerTo();
+    PointerType* classType      = ot.klass->getPointerTo();
+    PointerType* byteObjectType = ot.byteObject->getPointerTo();
+    PointerType* contextType    = ot.context->getPointerTo();
+    PointerType* blockType      = ot.block->getPointerTo();
+    
+    
+    
+    Type* params[] = {
+        classType,                    // klass
+        Type::getInt32Ty(llvmContext) // size
+    };
+    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
+    FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
+
+    
+    Type* sendParams[] = {
+        contextType,                    // callingContext
+        ot.symbol->getPointerTo(),      // message selector
+        ot.objectArray->getPointerTo()  // arguments
+    };
+    FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
+
+    Type* createBlockParams[] = {
+        contextType,                  // callingContext
+        Type::getInt8Ty(llvmContext), // argLocation
+        Type::getInt16Ty(llvmContext) // bytePointer
+    };
+    FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams, false);
+
+    Type* emitBlockReturnParams[] = {
+        objectType, // value
+        contextType // targetContext
+    };
+    FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
+    
+    
+    outs() << "ordinary: " << *newOrdinaryObjectType << "\n";
+    outs() << "binary: "   << *newBinaryObjectType << "\n";
+    outs() << "sendMessage: " << *sendMessageType << "\n";
+    
+    
+    // Creating function references
+    m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
+    m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
+    m_RuntimeAPI.sendMessage       = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    m_RuntimeAPI.createBlock       = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
+    m_RuntimeAPI.emitBlockReturn   = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
+    
+    // Mapping the function references to actual functions
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
 }
 
 extern "C" {
