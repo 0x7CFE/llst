@@ -175,6 +175,30 @@ JITRuntime::~JITRuntime() {
         delete m_functionPassManager;
 }
 
+TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
+{
+    // Protecting pointer
+    hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
+
+    // Creating new context object and inheriting context variables
+    // NOTE We do not allocating stack because it's not used in LLVM
+    hptr<TBlock> newBlock      = m_softVM->newObject<TBlock>();
+    newBlock->argumentLocation = newInteger(argLocation);
+    newBlock->bytePointer      = newInteger(bytePointer);
+    newBlock->method           = previousContext->method;
+    newBlock->arguments        = previousContext->arguments;
+    newBlock->temporaries      = previousContext->temporaries;
+
+    // Assigning creatingContext depending on the hierarchy
+    // Nested blocks inherit the outer creating context
+    if (previousContext->getClass() == globals.blockClass)
+        newBlock->creatingContext = previousContext.cast<TBlock>()->creatingContext;
+    else
+        newBlock->creatingContext = previousContext;
+    
+    return newBlock;
+}
+
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
 {
     // First of all we need to find the actual method object
@@ -282,6 +306,16 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
     printf("sendMessage(%p, #%s, %p)\n", callingContext, message->toString().c_str(), arguments);
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
 }
+
+TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer) {
+    printf("createBlock(%p, %d, %d, %d)",
+        callingContext,
+        (uint32_t) argLocation,
+        (uint32_t) bytePointer );
+
+    return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
+}
+
 
 }
 
