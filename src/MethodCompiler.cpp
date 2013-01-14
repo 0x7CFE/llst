@@ -634,21 +634,20 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     uint8_t opcode = jit.instruction.low;
 
 //     printf("Special opcode = %d\n", opcode);
-    BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
-    --iInst;
+    Instruction* previousInst = jit.builder->GetInsertPoint()->getPrevNode();
     
     switch (opcode) {
         case SmalltalkVM::selfReturn:
-            if (! iInst->isTerminator())
+            if (! previousInst->isTerminator())
                 jit.builder->CreateRet(jit.self); break;
         
         case SmalltalkVM::stackReturn:
-            if ( !iInst->isTerminator() && jit.hasValue() )
+            if ( !previousInst->isTerminator() && jit.hasValue() )
                 jit.builder->CreateRet(jit.popValue());
             break;
             
         case SmalltalkVM::blockReturn:
-            if ( !iInst->isTerminator() && jit.hasValue()) {
+            if ( !previousInst->isTerminator() && jit.hasValue()) {
                 // Peeking the return value from the stack
                 Value* value = jit.popValue();
 
