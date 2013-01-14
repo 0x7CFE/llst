@@ -271,8 +271,15 @@ public:
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
     
     void dumpJIT();
-    void runTest(TContext* context);
     
     void initialize(SmalltalkVM* softVM);
     ~JITRuntime();
 };
+
+struct TBlockReturn {
+    TObject*  value;
+    TContext* targetContext;
+    TBlockReturn(TObject* value, TContext* targetContext)
+        : value(value), targetContext(targetContext) { }
+};
+

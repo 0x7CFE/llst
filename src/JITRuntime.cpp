@@ -316,11 +316,8 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
-
+void emitBlockReturn(TObject* value, TContext* targetContext) {
+    throw TBlockReturn(value, targetContext);
 }
 
-
-void JITRuntime::runTest(TContext* context)
-{
-    
 }
