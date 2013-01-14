@@ -244,9 +244,9 @@ private:
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
 
-    typedef std::map<std::string, llvm::Function*> TFunctionMap;
-    typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
-    TFunctionMap m_compiledFunctions;
+    //typedef std::map<std::string, llvm::Function*> TFunctionMap;
+    //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
+    //TFunctionMap m_compiledFunctions; //TODO useless var?
     
     TRuntimeAPI m_RuntimeAPI;
     

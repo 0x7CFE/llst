@@ -234,20 +234,13 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     // Searching for the jit compiled function
     // TODO Fast 1-way lookup cache
     std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-    TFunctionMapIterator iFunction = m_compiledFunctions.find(functionName);
-    llvm::Function* function = 0;
+    llvm::Function* function = m_JITModule->getFunction(functionName);
     
-    if (iFunction != m_compiledFunctions.end()) {
-        // Function was found in the map.
-        // No need to compile it again
-        function = iFunction->second;
-    } else {
+    if (!function) {
         // Compiling function and storing it to the table for further use
         function = m_methodCompiler->compileMethod(method);
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
-        // Storing the function for further use
-        m_compiledFunctions[functionName] = function;
     }
 
     outs() << *function;
