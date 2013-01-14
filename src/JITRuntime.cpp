@@ -144,39 +144,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     ot.initializeFromModule(m_TypeModule);
     
     initializeGlobals();
-    
-    // Initializing function passes (optimizations)
-
-    m_functionPassManager = new FunctionPassManager(m_JITModule);
-    // Set up the optimizer pipeline.
-    // Start with registering info about how the
-    // target lays out data structures.
-    /*m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
-
-    // Basic AliasAnslysis support for GVN.
-    m_functionPassManager->add(llvm::createBasicAliasAnalysisPass());
-    
-    // Promote allocas to registers.
-    m_functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
-    
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
-    m_functionPassManager->add(llvm::createInstructionCombiningPass());
-    
-    // Reassociate expressions.
-    m_functionPassManager->add(llvm::createReassociatePass());
-    
-    // Eliminate Common SubExpressions.
-    m_functionPassManager->add(llvm::createGVNPass());
-    
-    // Simplify the control flow graph (deleting unreachable
-    // blocks, etc).
-    m_functionPassManager->add(llvm::createCFGSimplificationPass()); */
-    
-//     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
-//     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
-//     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
-    
-    m_functionPassManager->doInitialization();
+    initializePassManager();
 
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI);
@@ -303,6 +271,40 @@ void JITRuntime::initializeGlobals() {
     m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(&globals.binaryMessages[2]));
 }
 
+void JITRuntime::initializePassManager() {
+    m_functionPassManager = new FunctionPassManager(m_JITModule);
+    
+    // Set up the optimizer pipeline.
+    // Start with registering info about how the
+    // target lays out data structures.
+    /*m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
+
+    // Basic AliasAnslysis support for GVN.
+    m_functionPassManager->add(llvm::createBasicAliasAnalysisPass());
+    
+    // Promote allocas to registers.
+    m_functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
+    
+    // Do simple "peephole" optimizations and bit-twiddling optzns.
+    m_functionPassManager->add(llvm::createInstructionCombiningPass());
+    
+    // Reassociate expressions.
+    m_functionPassManager->add(llvm::createReassociatePass());
+    
+    // Eliminate Common SubExpressions.
+    m_functionPassManager->add(llvm::createGVNPass());
+    
+    // Simplify the control flow graph (deleting unreachable
+    // blocks, etc).
+    m_functionPassManager->add(llvm::createCFGSimplificationPass()); */
+    
+//     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
+//     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
+//     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
+    
+    m_functionPassManager->doInitialization();
+}
+
 extern "C" {
     
 TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
@@ -321,7 +323,7 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
 }
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer) {
-    printf("createBlock(%p, %d, %d, %d)",
+    printf("createBlock(%p, %d, %d)",
         callingContext,
         (uint32_t) argLocation,
         (uint32_t) bytePointer );

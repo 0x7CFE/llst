@@ -265,6 +265,7 @@ private:
     static JITRuntime*  Instance() { return s_instance; }
     
     void initializeGlobals();
+    void initializePassManager();
 public:
     typedef TObject* (*TMethodFunction)(TContext*);
     
