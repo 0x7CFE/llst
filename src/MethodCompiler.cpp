@@ -437,13 +437,15 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
     
     // Create block object and fill it with context information
-//     Value* args[] = {  };
-//     Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
-//    jit.pushValue(blockObject);
+    Value* args[] = {
+        jit.llvmContext,                           // creatingContext
+        jit.builder->getInt8(jit.instruction.low), // arg offset
+        jit.builder->getInt16(jit.bytePointer)     // bytePointer
+    };
+    Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
+    jit.pushValue(blockObject);
 
     outs() << "block body processed\n";
-    
-    jit.pushValue(m_globals.nilObject); // FIXME dummy
     
     jit.bytePointer = newBytePointer;
 }
@@ -646,10 +648,20 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
             
         case SmalltalkVM::blockReturn:
-            if ( !iInst->isTerminator() && jit.hasValue())
-                jit.popValue();
-            /* TODO unwind */
-            jit.builder->CreateRet(m_globals.nilObject);
+            if ( !iInst->isTerminator() && jit.hasValue()) {
+                // Peeking the return value from the stack
+                Value* value = jit.popValue();
+
+                // Loading the target context information
+                Value* creatingContextPtr = jit.builder->CreateGEP(jit.llvmBlockContext, jit.builder->getInt32(2));
+                Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
+
+                // Emitting the TBlockReturn exception
+                jit.builder->CreateCall2(m_RuntimeAPI.emitBlockReturn, value, targetContext);
+
+                // This will never be called
+                jit.builder->CreateUnreachable();
+            }
             break;
         
         case SmalltalkVM::duplicate:   jit.pushValue(jit.lastValue()); break;

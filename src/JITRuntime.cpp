@@ -82,6 +82,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     PointerType* objectType     = m_TypeModule->getTypeByName("struct.TObject")->getPointerTo();
     PointerType* classType      = m_TypeModule->getTypeByName("struct.TClass")->getPointerTo();
     PointerType* byteObjectType = m_TypeModule->getTypeByName("struct.TByteObject")->getPointerTo();
+    PointerType* contextType    = m_TypeModule->getTypeByName("struct.TContext")->getPointerTo();
+    PointerType* blockType      = m_TypeModule->getTypeByName("struct.TBlock")->getPointerTo();
     printf("done\n");
     
     Type* params[] = {
@@ -98,6 +100,20 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         m_TypeModule->getTypeByName("struct.TObjectArray")->getPointerTo()  // arguments
     };
     FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
+
+    Type* createBlockParams[] = {
+        contextType,                  // callingContext
+        Type::getInt8Ty(llvmContext), // argLocation
+        Type::getInt16Ty(llvmContext) // bytePointer
+    };
+    FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams);
+
+    Type* emitBlockReturnParams[] = {
+        objectType, // value
+        contextType // targetContext
+    };
+    FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams);
+    
     
     outs() << "ordinary: " << *newOrdinaryObjectType << "\n";
     outs() << "binary: "   << *newBinaryObjectType << "\n";
@@ -108,6 +124,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
     m_RuntimeAPI.sendMessage       = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    m_RuntimeAPI.createBlock       = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
+    m_RuntimeAPI.emitBlockReturn   = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
@@ -120,6 +138,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
+    m_executionEngine->addGlobalMapping(m_RuntimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     
     ot.initializeFromModule(m_TypeModule);
     
@@ -173,6 +193,30 @@ JITRuntime::~JITRuntime() {
     // Finalize stuff and dispose memory
     if (m_functionPassManager)
         delete m_functionPassManager;
+}
+
+TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
+{
+    // Protecting pointer
+    hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
+
+    // Creating new context object and inheriting context variables
+    // NOTE We do not allocating stack because it's not used in LLVM
+    hptr<TBlock> newBlock      = m_softVM->newObject<TBlock>();
+    newBlock->argumentLocation = newInteger(argLocation);
+    newBlock->bytePointer      = newInteger(bytePointer);
+    newBlock->method           = previousContext->method;
+    newBlock->arguments        = previousContext->arguments;
+    newBlock->temporaries      = previousContext->temporaries;
+
+    // Assigning creatingContext depending on the hierarchy
+    // Nested blocks inherit the outer creating context
+    if (previousContext->getClass() == globals.blockClass)
+        newBlock->creatingContext = previousContext.cast<TBlock>()->creatingContext;
+    else
+        newBlock->creatingContext = previousContext;
+    
+    return newBlock;
 }
 
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
@@ -283,10 +327,17 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
 }
 
+TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer) {
+    printf("createBlock(%p, %d, %d, %d)",
+        callingContext,
+        (uint32_t) argLocation,
+        (uint32_t) bytePointer );
+
+    return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
+void emitBlockReturn(TObject* value, TContext* targetContext) {
+    throw TBlockReturn(value, targetContext);
+}
 
-void JITRuntime::runTest(TContext* context)
-{
-    
 }

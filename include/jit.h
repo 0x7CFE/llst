@@ -57,6 +57,8 @@ struct TRuntimeAPI {
     llvm::Function* newOrdinaryObject;
     llvm::Function* newBinaryObject;
     llvm::Function* sendMessage;
+    llvm::Function* createBlock;
+    llvm::Function* emitBlockReturn;
 };
 
 struct TObjectTypes {
@@ -227,7 +229,8 @@ extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
-    TBlock*      createBlock(TContext* callingContext, TMethod* method, uint32_t bytecodeOffset);
+    TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+    void         emitBlockReturn(TObject* value, TContext* targetContext);
 }
 
 class JITRuntime {
@@ -253,11 +256,13 @@ private:
     static JITRuntime* s_instance;
 
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
-    static JITRuntime* Instance() { return s_instance; }
+    friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+    static JITRuntime*  Instance() { return s_instance; }
     
     void initializeGlobals();
 public:
@@ -268,8 +273,15 @@ public:
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
     
     void dumpJIT();
-    void runTest(TContext* context);
     
     void initialize(SmalltalkVM* softVM);
     ~JITRuntime();
 };
+
+struct TBlockReturn {
+    TObject*  value;
+    TContext* targetContext;
+    TBlockReturn(TObject* value, TContext* targetContext)
+        : value(value), targetContext(targetContext) { }
+};
+
