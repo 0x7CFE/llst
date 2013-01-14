@@ -646,10 +646,20 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
             
         case SmalltalkVM::blockReturn:
-            if ( !iInst->isTerminator() && jit.hasValue())
-                jit.popValue();
-            /* TODO unwind */
-            jit.builder->CreateRet(m_globals.nilObject);
+            if ( !iInst->isTerminator() && jit.hasValue()) {
+                // Peeking the return value from the stack
+                Value* value = jit.popValue();
+
+                // Loading the target context information
+                Value* creatingContextPtr = jit.builder->CreateGEP(jit.llvmBlockContext, jit.builder->getInt32(2));
+                Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
+
+                // Emitting the TBlockReturn exception
+                jit.builder->CreateCall2(m_RuntimeAPI.emitBlockReturn, value, targetContext);
+
+                // This will never be called
+                jit.builder->CreateUnreachable();
+            }
             break;
         
         case SmalltalkVM::duplicate:   jit.pushValue(jit.lastValue()); break;
