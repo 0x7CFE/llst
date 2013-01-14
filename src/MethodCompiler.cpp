@@ -437,13 +437,15 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
     
     // Create block object and fill it with context information
-//     Value* args[] = {  };
-//     Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
-//    jit.pushValue(blockObject);
+    Value* args[] = {
+        jit.llvmContext,                           // creatingContext
+        jit.builder->getInt8(jit.instruction.low), // arg offset
+        jit.builder->getInt16(jit.bytePointer)     // bytePointer
+    };
+    Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
+    jit.pushValue(blockObject);
 
     outs() << "block body processed\n";
-    
-    jit.pushValue(m_globals.nilObject); // FIXME dummy
     
     jit.bytePointer = newBytePointer;
 }
