@@ -30,8 +30,8 @@ loopTest | i sum |
 0022 AssignTemporary 1
 0023 DoSpecial popTop
 0024 DoSpecial branch 13
-0027 PushConstant 0
-0028 DoSpecial popTop
+0027 PushConstant 0         ; these two are thrown out
+0028 DoSpecial popTop       ; at the compilation time
 0029 PushTemporary 1
 0030 DoSpecial stackReturn
 0031 DoSpecial popTop

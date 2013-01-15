@@ -177,6 +177,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     TMethodFunction methodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(function));
     TObject* result = methodFunction(newContext);
 
+    printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
     printf("Function result: %p\n", result);
     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
 
@@ -188,28 +189,28 @@ void JITRuntime::initializeGlobals() {
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
     
     GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", ot.object) );
-    m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(&globals.nilObject));
+    m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(globals.nilObject));
     
     GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object) );
-    m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(&globals.trueObject));
+    m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(globals.trueObject));
     
     GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", ot.object) );
-    m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(&globals.falseObject));
+    m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(globals.falseObject));
     
     GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", ot.klass) );
-    m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(&globals.smallIntClass));
+    m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(globals.smallIntClass));
 
     GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", ot.klass) );
-    m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(&globals.arrayClass));
+    m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(globals.arrayClass));
 
     GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", ot.symbol) );
-    m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(&globals.binaryMessages[0]));
+    m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(globals.binaryMessages[0]));
     
     GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", ot.symbol) );
-    m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(&globals.binaryMessages[1]));
+    m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(globals.binaryMessages[1]));
 
     GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", ot.symbol) );
-    m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(&globals.binaryMessages[2]));
+    m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(globals.binaryMessages[2]));
 }
 
 void JITRuntime::initializePassManager() {
