@@ -152,7 +152,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         //m_functionPassManager->run(*function);
     }
 
-    outs() << *function;
+    outs() << *m_JITModule;
     
     // Preparing the context objects. Because we do not call the software
     // implementation here, we do not need to allocate the stack object
@@ -308,22 +308,26 @@ void JITRuntime::initializeRuntimeAPI() {
 
 extern "C" {
     
-TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
+TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
+{
     printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
-TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
+TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
+{
     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments) {
+TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
+{
     printf("sendMessage(%p, #%s, %p)\n", callingContext, message->toString().c_str(), arguments);
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
 }
 
-TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer) {
+TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
+{
     printf("createBlock(%p, %d, %d)",
         callingContext,
         (uint32_t) argLocation,
@@ -332,7 +336,8 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
-void emitBlockReturn(TObject* value, TContext* targetContext) {
+void emitBlockReturn(TObject* value, TContext* targetContext)
+{
     throw TBlockReturn(value, targetContext);
 }
 
