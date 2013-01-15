@@ -1142,6 +1142,15 @@ test3
     ^ LLVM sendMessage: ('test2:' asSymbol) withArguments: (Array with: self with: 1).
 !
 
+METHOD LLVMTest
+test4 |arr|
+   arr <- Array new: 1.
+   arr at: 1 put: [^42].
+
+   arr at: 1; value.
+   ^0.
+!
+
 METHOD Undefined
 main    | command x |
         " initialize classes "
