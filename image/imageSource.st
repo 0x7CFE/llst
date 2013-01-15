@@ -1137,8 +1137,8 @@ loopTest | i sum |
 
 METHOD LLVMTest
 test3
-    ^ LLVM sendMessage: ('test42Lt:' asSymbol) withArguments: (Array with: self with: 50).
-    "^ LLVM sendMessage: #loopTest withArguments: (Array with: self)."
+    "^ LLVM sendMessage: ('test42Lt:' asSymbol) withArguments: (Array with: self with: 40)."
+    ^ LLVM sendMessage: #loopTest withArguments: (Array with: self).
     "^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self)."
     "^ LLVM sendMessage: ('test2:' asSymbol) withArguments: (Array with: self with: 1)."
 !
