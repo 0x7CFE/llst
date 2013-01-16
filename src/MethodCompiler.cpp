@@ -292,8 +292,6 @@ void MethodCompiler::writeLandingpadBB(TJITContext& jit)
     jit.landingpadBB = BasicBlock::Create(m_JITModule->getContext(), "landingpadBB", jit.function);
     jit.builder->SetInsertPoint(jit.landingpadBB);
     
-    LLVMContext& llvmContext = m_JITModule->getContext();
-    
     Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
     
@@ -309,12 +307,12 @@ void MethodCompiler::writeLandingpadBB(TJITContext& jit)
     Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
     Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);
     Value* targetContextPtr = jit.builder->CreateStructGEP(blockResult, 1);
-    Value* targetContext    = jit.builder->CreateLoad(targetContext);
+    Value* targetContext    = jit.builder->CreateLoad(targetContextPtr);
     
     jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
 
-    BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return.",  jit.function);
-    BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow.", jit.function);
+    BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
+    BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
     
     Value* compareTargets = jit.builder->CreateICmpEQ(jit.llvmContext, targetContext);
     jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
