@@ -86,9 +86,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     initializeGlobals();
     initializePassManager();
     initializeRuntimeAPI();
+    initializeExceptionAPI();
 
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI);
+    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI, m_ExceptionAPI);
     
 }
 
@@ -305,6 +306,14 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
     m_executionEngine->addGlobalMapping(m_RuntimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
+}
+
+void JITRuntime::initializeExceptionAPI() {
+    LLVMContext& llvmContext = getGlobalContext();
+    
+    m_ExceptionAPI.gxx_personality = Function::Create(FunctionType::get(Type::getInt32Ty(llvmContext), true), Function::ExternalLinkage, "__gxx_personality_v0", m_JITModule);
+    m_ExceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Type::getInt8PtrTy(llvmContext), Type::getInt8PtrTy(llvmContext), false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
+    m_ExceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
 }
 
 extern "C" {
