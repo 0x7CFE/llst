@@ -1129,8 +1129,8 @@ loopTest | i sum |
     i   <- 1.
     sum <- 0.
 
-    [ i < 101 ] whileTrue:
-        [ sum <- sum + i ].
+    [ i < 1001 ] whileTrue:
+        [ sum <- sum + i. i <- i + 1 ].
         
     ^sum
 !
