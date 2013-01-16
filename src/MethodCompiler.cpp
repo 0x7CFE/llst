@@ -138,7 +138,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
-               // outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
+                outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
             } break;
 
             case SmalltalkVM::blockReturn:
@@ -224,12 +224,16 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             // basic block and start a new one, linking previous
             // basic block to a new one.
 
-            BasicBlock::iterator iInst = --jit.builder->GetInsertPoint();
-            
-            BasicBlock* newBlock = iBlock->second; // Picking a basic block
-            if (! iInst->isTerminator())
-                jit.builder->CreateBr(newBlock);       // Linking current block to a new one
-            jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
+            BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
+            if (iInst != jit.builder->GetInsertBlock()->begin()) {
+                --iInst;
+                
+                BasicBlock* newBlock = iBlock->second; // Picking a basic block
+                if (! iInst->isTerminator())
+                    jit.builder->CreateBr(newBlock);       // Linking current block to a new one
+
+                jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
+            }
         }
         
         // First of all decoding the pending instruction
@@ -695,20 +699,22 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     uint8_t opcode = jit.instruction.low;
 
 //     printf("Special opcode = %d\n", opcode);
-    Instruction* previousInst = (--jit.builder->GetInsertPoint()); //->getPrevNode();
+    BasicBlock::iterator iPreviousInst = jit.builder->GetInsertPoint();
+    if (iPreviousInst != jit.builder->GetInsertBlock()->begin())
+        --iPreviousInst;
     
     switch (opcode) {
         case SmalltalkVM::selfReturn:
-            if (! previousInst->isTerminator())
+            if (! iPreviousInst->isTerminator())
                 jit.builder->CreateRet(jit.self); break;
         
         case SmalltalkVM::stackReturn:
-            if ( !previousInst->isTerminator() && jit.hasValue() )
+            if ( !iPreviousInst->isTerminator() && jit.hasValue() )
                 jit.builder->CreateRet(jit.popValue());
             break;
             
         case SmalltalkVM::blockReturn:
-            if ( !previousInst->isTerminator() && jit.hasValue()) {
+            if ( !iPreviousInst->isTerminator() && jit.hasValue()) {
                 // Peeking the return value from the stack
                 Value* value = jit.popValue();
 

@@ -1138,8 +1138,8 @@ loopTest | i sum |
 METHOD LLVMTest
 test3
     "^ LLVM sendMessage: ('test42Lt:' asSymbol) withArguments: (Array with: self with: 40)."
-    ^ LLVM sendMessage: #loopTest withArguments: (Array with: self).
-    "^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self)."
+    "^ LLVM sendMessage: #loopTest withArguments: (Array with: self)."
+    ^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self).
     "^ LLVM sendMessage: ('test2:' asSymbol) withArguments: (Array with: self with: 1)."
 !
 
@@ -1179,10 +1179,10 @@ main    | command x |
         x <- LLVMTest new test3.
         x printNl.
         
-        " main execution loop  
+        " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ] "
+                        ifFalse: [ command doIt printNl ] ] 
         
         ^nil.                  
 !

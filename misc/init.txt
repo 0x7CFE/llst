@@ -99,8 +99,18 @@ test2: arg1  | temp1 |
 
 
 
+METHOD LLVMTest
+returnFourtyTwo
+    ^42
+!
 
 
+-> LLVMTest methods at: #returnFourtyTwo; disassemble
+0000 PushLiteral 0
+0001 DoSpecial stackReturn
+0002 DoSpecial popTop
+0003 DoSpecial selfReturn
+Method
 
 
 

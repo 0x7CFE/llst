@@ -287,12 +287,6 @@ void JITRuntime::initializeRuntimeAPI() {
     };
     FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
     
-    
-    outs() << "ordinary: " << *newOrdinaryObjectType << "\n";
-    outs() << "binary: "   << *newBinaryObjectType << "\n";
-    outs() << "sendMessage: " << *sendMessageType << "\n";
-    
-    
     // Creating function references
     m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
