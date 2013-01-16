@@ -145,7 +145,7 @@ private:
         llvm::Value*        llvmBlockContext;
         
         llvm::BasicBlock*   landingpadBB;
-        
+        bool                methodHasBlockReturn;
         
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.

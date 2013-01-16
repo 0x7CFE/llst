@@ -94,6 +94,8 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
     // Target blocks are collected in the m_targetToBlockMap map with
     // target bytecode offset as a key.
 
+    uint32_t previousBytePointer = jit.bytePointer;
+    
     TByteObject& byteCodes   = * jit.method->byteCodes;
     //uint32_t     byteCount   = byteCodes.getSize();
     uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
@@ -112,11 +114,11 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
         }
 
         if (instruction.high == SmalltalkVM::opPushBlock) {
-            // Skipping the inline block instructions. 
-            // They will be processed on the next pass.
+            // We need to track the blockReturn so we need to check the
+            // block bytecodes for the corresponding instruction opcode
+
             uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-            jit.bytePointer = newBytePointer;
-            continue;
+            jit.bytePointer += 2; // Skipping the bytePointer immediate value data
         }
         
         // We're now looking only for branch bytecodes
@@ -136,11 +138,17 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
-               outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
+               // outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
             } break;
+
+            case SmalltalkVM::blockReturn:
+                jit.methodHasBlockReturn = true;
+                break;
         }
     }
-    jit.bytePointer = 0;
+
+    // Resetting bytePointer to an old value
+    jit.bytePointer = previousBytePointer;
 }
 
 bool MethodCompiler::methodContainsBlockReturn(TJITContext& jit)
@@ -373,12 +381,20 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
+    Value* literal = 0; // here will be the value
 
-    Value* valuePointer = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(index));
-    Value* literal      = jit.builder->CreateLoad(valuePointer);
+    // Checking whether requested literal is a small integer value.
+    // If this is true just pushing the immediate constant value instead
+    TObject* literalObject = jit.method->literals->getField(index);
+    if (isSmallInteger(literalObject)) {
+        Value* constant = jit.builder->getInt32(reinterpret_cast<uint32_t>(literalObject));
+        literal = jit.builder->CreateIntToPtr(constant, ot.object->getPointerTo());
+    } else {
+        Value* valuePointer = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(index));
+        literal = jit.builder->CreateLoad(valuePointer);
+    }
 
     std::ostringstream ss;
-//     ss << "lit" << jit.method->literals->getField(index)->toString() << ".";
     ss << "lit" << (uint32_t)index << ".";
     literal->setName(ss.str());
     
@@ -628,7 +644,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     };
     //outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
     Value* sendMessageResult  = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
-           sendMessageResult->setName("result.");
+           sendMessageResult->setName("reply.");
 
     //Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments); 
     // Jumping out the sendBinaryBlock to the value aggregator
@@ -713,11 +729,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
 
         case SmalltalkVM::popTop:
-            outs() << "pop top 1 \n";
-            if (jit.hasValue()) {
-                outs() << "pop top 2\n";
+            if (jit.hasValue())
                 jit.popValue();
-            }
             break;
 
         case SmalltalkVM::branch: {
