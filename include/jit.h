@@ -61,6 +61,13 @@ struct TRuntimeAPI {
     llvm::Function* emitBlockReturn;
 };
 
+struct TExceptionAPI {
+    llvm::Function* gxx_personality;
+    llvm::Function* cxa_begin_catch;
+    llvm::Function* cxa_end_catch;
+    
+};
+
 struct TObjectTypes {
     llvm::StructType* object;
     llvm::StructType* klass;
@@ -137,6 +144,9 @@ private:
         llvm::Value*        llvmContext;
         llvm::Value*        llvmBlockContext;
         
+        llvm::BasicBlock*   landingpadBB;
+        
+        
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
         // Instead we're interpriting the push, pop and assign instructions
@@ -163,7 +173,8 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
-            temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0)
+            temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0),
+            landingpadBB(0)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
@@ -176,15 +187,18 @@ private:
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
+    bool methodContainsBlockReturn(TJITContext& jit);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
     
     TObjectTypes ot;
-    TJITGlobals  m_globals;
-    TRuntimeAPI  m_RuntimeAPI;
+    TJITGlobals    m_globals;
+    TRuntimeAPI    m_RuntimeAPI;
+    TExceptionAPI  m_ExceptionAPI;
     
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
+    void writeLandingpadBB(TJITContext& jit);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
@@ -210,9 +224,11 @@ public:
     MethodCompiler(
         llvm::Module* JITModule,
         llvm::Module* TypeModule,
-        TRuntimeAPI   api
+        TRuntimeAPI   api,
+        TExceptionAPI exceptionApi
     )
-        : m_JITModule(JITModule), m_TypeModule(TypeModule), m_RuntimeAPI(api)
+        : m_JITModule(JITModule), m_TypeModule(TypeModule),
+          m_RuntimeAPI(api), m_ExceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -250,7 +266,8 @@ private:
     //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
     //TFunctionMap m_compiledFunctions; //TODO useless var?
     
-    TRuntimeAPI m_RuntimeAPI;
+    TRuntimeAPI   m_RuntimeAPI;
+    TExceptionAPI m_ExceptionAPI;
     
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;
@@ -268,8 +285,10 @@ private:
     
     void initializeGlobals();
     void initializePassManager();
-    //uses ot file. dont forget to init it before calling this method
+    //uses ot types. dont forget to init it before calling this method
     void initializeRuntimeAPI();
+    void initializeExceptionAPI();
+    
 public:
     typedef TObject* (*TMethodFunction)(TContext*);
     

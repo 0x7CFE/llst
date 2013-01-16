@@ -140,6 +140,13 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
             } break;
         }
     }
+    jit.bytePointer = 0;
+}
+
+bool MethodCompiler::methodContainsBlockReturn(TJITContext& jit)
+{
+    //TODO
+    return false;
 }
 
 Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
@@ -171,7 +178,6 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
     writePreamble(jit);
-
     
     // Switching builder context to the body's basic block
     BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
@@ -183,8 +189,8 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
     scanForBranches(jit);
-
-    jit.bytePointer = 0;
+    
+    writeLandingpadBB(jit);
     
     // Processing the method's bytecodes
     writeFunctionBody(jit);
@@ -268,6 +274,24 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
    // printf("Done processing at offset %d\n", stopPointer);
     
+}
+
+void MethodCompiler::writeLandingpadBB(TJITContext& jit)
+{
+    bool methodHandlesExceptions = methodContainsBlockReturn(jit);
+    if (!methodHandlesExceptions)
+        return;
+    
+    jit.landingpadBB = BasicBlock::Create(m_JITModule->getContext(), "landingpadBB", jit.function);
+    jit.builder->SetInsertPoint(jit.landingpadBB);
+    
+    LLVMContext& llvmContext = m_JITModule->getContext();
+    
+    Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_ExceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
+    Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
+    
+    LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
+    //TODO
 }
 
 void MethodCompiler::printOpcode(TInstruction instruction)
