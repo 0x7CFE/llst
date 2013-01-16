@@ -448,6 +448,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
         jit.builder->getInt16(jit.bytePointer)     // bytePointer
     };
     Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
+    blockObject->setName("block.");
     jit.pushValue(blockObject);
 
     outs() << "block body processed\n";
@@ -568,11 +569,12 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         Function* newInteger = m_TypeModule->getFunction("newInteger()");
         Value*  smalltalkInt = jit.builder->CreateCall(newInteger, intResult, "intAsPtr.");
         intResultObject = jit.builder->CreateIntToPtr(smalltalkInt, ot.object->getPointerTo());
+        intResultObject->setName("sum.");
     } else {
         // Returning a bool object depending on the compare operation result
         intResultObject = jit.builder->CreateSelect(intResult, m_globals.trueObject, m_globals.falseObject);
+        intResultObject->setName("bool.");
     }
-    intResultObject->setName("int.");
     
     // Jumping out the integersBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);

@@ -82,7 +82,7 @@ define i1 @"isSmallInteger()"(%struct.TObject* %value) {
 
 define i32 @"getIntegerValue()"(%struct.TObject* %value) {
     %int = ptrtoint %struct.TObject* %value to i32
-    %result = lshr i32 %int, 1
+    %result = ashr i32 %int, 1
     ret i32 %result
 }
 
