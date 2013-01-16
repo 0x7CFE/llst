@@ -600,7 +600,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value*    isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
     
     BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
-    BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",   jit.function);
+    BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
     BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
     
     // Dpending on the contents we may either do the integer operations
@@ -670,7 +670,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     Value* sendMessageResult = 0;
     if (jit.methodHasBlockReturn) {
-        sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.landingpadBB);
+        sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.landingpadBB, sendMessageArgs);
     } else {
         sendMessageResult = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
 
@@ -714,7 +714,18 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         messageSelector, // selector
         arguments        // message arguments
     };
-    Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
+
+    BasicBlock* nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+    
+    Value* result = 0;
+    if (jit.methodHasBlockReturn) {
+        result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.landingpadBB, sendMessageArgs);
+    } else {
+        result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
+        jit.builder->CreateBr(nextBlock);
+    }
+
+    jit.builder->SetInsertPoint(nextBlock);
     jit.pushValue(result);
 }
 
