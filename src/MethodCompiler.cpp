@@ -281,8 +281,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 void MethodCompiler::writeLandingpadBB(TJITContext& jit)
 {
-    jit.landingpadBB = BasicBlock::Create(m_JITModule->getContext(), "landingpadBB", jit.function);
-    jit.builder->SetInsertPoint(jit.landingpadBB);
+    jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingpadBB", jit.function);
+    jit.builder->SetInsertPoint(jit.exceptionLandingPad);
     
     Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
@@ -649,11 +649,10 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         m_globals.binarySelectors[jit.instruction.low],
         argumentsArray
     };
-    //outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
 
     Value* sendMessageResult = 0;
     if (jit.methodHasBlockReturn) {
-        sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.landingpadBB, sendMessageArgs);
+        sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.exceptionLandingPad, sendMessageArgs);
     } else {
         sendMessageResult = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
 
@@ -702,7 +701,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     
     Value* result = 0;
     if (jit.methodHasBlockReturn) {
-        result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.landingpadBB, sendMessageArgs);
+        result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.exceptionLandingPad, sendMessageArgs);
     } else {
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
         jit.builder->CreateBr(nextBlock);

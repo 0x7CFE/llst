@@ -148,7 +148,7 @@ private:
         llvm::Value*        llvmContext;
         llvm::Value*        llvmBlockContext;
         
-        llvm::BasicBlock*   landingpadBB;
+        llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
         
         // Value stack is used as a FIFO value holder during the compilation process.
@@ -178,7 +178,7 @@ private:
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0),
-            landingpadBB(0), methodHasBlockReturn(false)
+            exceptionLandingPad(0), methodHasBlockReturn(false)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
