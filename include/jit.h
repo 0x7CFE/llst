@@ -196,7 +196,7 @@ private:
     
     TObjectTypes ot;
     TJITGlobals    m_globals;
-    TRuntimeAPI    m_RuntimeAPI;
+    TRuntimeAPI    m_runtimeAPI;
     TExceptionAPI  m_exceptionAPI;
     
     void writePreamble(TJITContext& jit, bool isBlock = false);
@@ -231,7 +231,7 @@ public:
         TExceptionAPI exceptionApi
     )
         : m_JITModule(JITModule), m_TypeModule(TypeModule),
-          m_RuntimeAPI(api), m_exceptionAPI(exceptionApi)
+          m_runtimeAPI(api), m_exceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;

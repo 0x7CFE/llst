@@ -155,7 +155,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
     // Instantinating new array object
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
-    Value* arrayObject = jit.builder->CreateCall(m_RuntimeAPI.newOrdinaryObject, args);
+    Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
           // arrayObject = jit.builder->CreateBitCast(arrayObject, ot.objectArray->getPointerTo());
 
     return arrayObject;
@@ -181,19 +181,23 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // commonly used pointers such as method arguments or temporaries
     writePreamble(jit);
     
-    // Switching builder context to the body's basic block
+    // Switching builder context to the body's basic block from the preamble
     BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
     jit.builder->CreateBr(body);
-    jit.builder->SetInsertPoint(body);
 
+    // Writing exception handlers for the
+    // correct operation of block return
+    if (jit.methodHasBlockReturn)
+        writeLandingpadBB(jit);
+
+    // Resetting the builder to the body
+    jit.builder->SetInsertPoint(body);
+    
     // First analyzing pass. Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
     scanForBranches(jit);
-
-    if (jit.methodHasBlockReturn)
-        writeLandingpadBB(jit);
     
     // Processing the method's bytecodes
     writeFunctionBody(jit);
@@ -295,7 +299,7 @@ void MethodCompiler::writeLandingpadBB(TJITContext& jit)
     
     LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
 
-    Value* typeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
+    Value* typeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo.");
     caughtResult->addClause(typeInfo);
     
     Value* thrownException = jit.builder->CreateExtractValue(caughtResult, 0);
@@ -507,7 +511,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
         jit.builder->getInt8(jit.instruction.low), // arg offset
         jit.builder->getInt16(jit.bytePointer)     // bytePointer
     };
-    Value* blockObject = jit.builder->CreateCall(m_RuntimeAPI.createBlock, args);
+    Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
     blockObject->setName("block.");
     jit.pushValue(blockObject);
 
@@ -663,12 +667,17 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         argumentsArray
     };
     //outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
-    Value* sendMessageResult  = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
-           sendMessageResult->setName("reply.");
 
-    //Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments); 
-    // Jumping out the sendBinaryBlock to the value aggregator
-    jit.builder->CreateBr(resultBlock);
+    Value* sendMessageResult = 0;
+    if (jit.methodHasBlockReturn) {
+        sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.landingpadBB);
+    } else {
+        sendMessageResult = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
+
+        // Jumping out the sendBinaryBlock to the value aggregator
+        jit.builder->CreateBr(resultBlock);
+    }
+    sendMessageResult->setName("reply.");
     
     // Now the value aggregator block
     jit.builder->SetInsertPoint(resultBlock);
@@ -705,7 +714,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         messageSelector, // selector
         arguments        // message arguments
     };
-    Value* result = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
+    Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     jit.pushValue(result);
 }
 
@@ -739,7 +748,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception
-                jit.builder->CreateCall2(m_RuntimeAPI.emitBlockReturn, value, targetContext);
+                jit.builder->CreateCall2(m_runtimeAPI.emitBlockReturn, value, targetContext);
 
                 // This will never be called
                 jit.builder->CreateUnreachable();
