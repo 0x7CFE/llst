@@ -89,7 +89,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     initializeExceptionAPI();
 
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_RuntimeAPI, m_ExceptionAPI);
+    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_runtimeAPI, m_exceptionAPI);
     
 }
 
@@ -288,26 +288,39 @@ void JITRuntime::initializeRuntimeAPI() {
     FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
     
     // Creating function references
-    m_RuntimeAPI.newOrdinaryObject = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
-    m_RuntimeAPI.newBinaryObject   = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-    m_RuntimeAPI.sendMessage       = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
-    m_RuntimeAPI.createBlock       = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
-    m_RuntimeAPI.emitBlockReturn   = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
+    m_runtimeAPI.newOrdinaryObject  = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
+    m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
+    m_runtimeAPI.sendMessage        = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
+    m_runtimeAPI.createBlock        = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
+    m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     
     // Mapping the function references to actual functions
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
-    m_executionEngine->addGlobalMapping(m_RuntimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
 }
 
 void JITRuntime::initializeExceptionAPI() {
     LLVMContext& llvmContext = getGlobalContext();
     
-    m_ExceptionAPI.gxx_personality = Function::Create(FunctionType::get(Type::getInt32Ty(llvmContext), true), Function::ExternalLinkage, "__gxx_personality_v0", m_JITModule);
-    m_ExceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Type::getInt8PtrTy(llvmContext), Type::getInt8PtrTy(llvmContext), false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
-    m_ExceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
+    m_exceptionAPI.gxx_personality = Function::Create(FunctionType::get(Type::getInt32Ty(llvmContext), true), Function::ExternalLinkage, "__gxx_personality_v0", m_JITModule);
+    m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Type::getInt8PtrTy(llvmContext), Type::getInt8PtrTy(llvmContext), false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
+    m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
+
+    m_exceptionAPI.getBlockReturnType = Function::Create(
+        FunctionType::get(Type::getVoidTy(llvmContext)->getPointerTo(), false),
+        Function::ExternalLinkage, "getBlockReturnType", m_JITModule);
+    m_executionEngine->addGlobalMapping(m_exceptionAPI.getBlockReturnType, reinterpret_cast<void*>(& ::getBlockReturnType));
+
+    m_exceptionAPI.blockReturnType = StructType::create(llvmContext, "struct.TBlockReturn");
+    Type* blockReturnFields[] = {
+        ot.object->getPointerTo(), // value
+        ot.context->getPointerTo() // targetContext
+    };
+    m_exceptionAPI.blockReturnType->setBody(blockReturnFields);
+    
 }
 
 extern "C" {
@@ -343,6 +356,11 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
 void emitBlockReturn(TObject* value, TContext* targetContext)
 {
     throw TBlockReturn(value, targetContext);
+}
+
+const void* getBlockReturnType()
+{
+    return TBlockReturn::getBlockReturnType();
 }
 
 }

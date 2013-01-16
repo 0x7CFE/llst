@@ -117,7 +117,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
             // We need to track the blockReturn so we need to check the
             // block bytecodes for the corresponding instruction opcode
 
-            uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+            //uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
             jit.bytePointer += 2; // Skipping the bytePointer immediate value data
         }
         
@@ -149,12 +149,6 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     // Resetting bytePointer to an old value
     jit.bytePointer = previousBytePointer;
-}
-
-bool MethodCompiler::methodContainsBlockReturn(TJITContext& jit)
-{
-    //TODO
-    return false;
 }
 
 Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
@@ -197,8 +191,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
     scanForBranches(jit);
-    
-    writeLandingpadBB(jit);
+
+    if (jit.methodHasBlockReturn)
+        writeLandingpadBB(jit);
     
     // Processing the method's bytecodes
     writeFunctionBody(jit);
@@ -290,20 +285,41 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 void MethodCompiler::writeLandingpadBB(TJITContext& jit)
 {
-    bool methodHandlesExceptions = methodContainsBlockReturn(jit);
-    if (!methodHandlesExceptions)
-        return;
-    
     jit.landingpadBB = BasicBlock::Create(m_JITModule->getContext(), "landingpadBB", jit.function);
     jit.builder->SetInsertPoint(jit.landingpadBB);
     
     LLVMContext& llvmContext = m_JITModule->getContext();
     
-    Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_ExceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
+    Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
     
     LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
-    //TODO
+
+    Value* typeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
+    caughtResult->addClause(typeInfo);
+    
+    Value* thrownException = jit.builder->CreateExtractValue(caughtResult, 0);
+    Value* exceptionObject = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
+    Value* blockResult     = jit.builder->CreateBitCast(exceptionObject, m_exceptionAPI.blockReturnType->getPointerTo());
+
+    Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
+    Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);
+    Value* targetContextPtr = jit.builder->CreateStructGEP(blockResult, 1);
+    Value* targetContext    = jit.builder->CreateLoad(targetContext);
+    
+    jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
+
+    BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return.",  jit.function);
+    BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow.", jit.function);
+    
+    Value* compareTargets = jit.builder->CreateICmpEQ(jit.llvmContext, targetContext);
+    jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
+
+    jit.builder->SetInsertPoint(returnBlock);
+    jit.builder->CreateRet(returnValue);
+
+    jit.builder->SetInsertPoint(rethrowBlock);
+    jit.builder->CreateResume(blockResult);
 }
 
 void MethodCompiler::printOpcode(TInstruction instruction)

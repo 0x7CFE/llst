@@ -34,9 +34,11 @@
 
 #include <types.h>                    
 #include "vm.h"
+
+#include <typeinfo>
+
 #include <map>
 #include <list>
-
 #include <stdio.h>
 
 #include <llvm/Function.h>
@@ -65,7 +67,9 @@ struct TExceptionAPI {
     llvm::Function* gxx_personality;
     llvm::Function* cxa_begin_catch;
     llvm::Function* cxa_end_catch;
-    
+    llvm::Function* getBlockReturnType;
+
+    llvm::StructType* blockReturnType;
 };
 
 struct TObjectTypes {
@@ -174,7 +178,7 @@ private:
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0),
-            landingpadBB(0)
+            landingpadBB(0), methodHasBlockReturn(false)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
@@ -187,14 +191,13 @@ private:
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
-    bool methodContainsBlockReturn(TJITContext& jit);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
     
     TObjectTypes ot;
     TJITGlobals    m_globals;
     TRuntimeAPI    m_RuntimeAPI;
-    TExceptionAPI  m_ExceptionAPI;
+    TExceptionAPI  m_exceptionAPI;
     
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
@@ -228,7 +231,7 @@ public:
         TExceptionAPI exceptionApi
     )
         : m_JITModule(JITModule), m_TypeModule(TypeModule),
-          m_RuntimeAPI(api), m_ExceptionAPI(exceptionApi)
+          m_RuntimeAPI(api), m_exceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -249,6 +252,7 @@ extern "C" {
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
+    const void*  getBlockReturnType();
 }
 
 class JITRuntime {
@@ -266,8 +270,8 @@ private:
     //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
     //TFunctionMap m_compiledFunctions; //TODO useless var?
     
-    TRuntimeAPI   m_RuntimeAPI;
-    TExceptionAPI m_ExceptionAPI;
+    TRuntimeAPI   m_runtimeAPI;
+    TExceptionAPI m_exceptionAPI;
     
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;
@@ -285,6 +289,7 @@ private:
     
     void initializeGlobals();
     void initializePassManager();
+    
     //uses ot types. dont forget to init it before calling this method
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
@@ -307,5 +312,9 @@ struct TBlockReturn {
     TContext* targetContext;
     TBlockReturn(TObject* value, TContext* targetContext)
         : value(value), targetContext(targetContext) { }
+
+    static const void* getBlockReturnType() {
+        return reinterpret_cast<const void*>( &typeid(TBlockReturn) ) ;
+    }
 };
 
