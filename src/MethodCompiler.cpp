@@ -100,6 +100,8 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
+        uint32_t currentOffset = jit.bytePointer;
+        
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
         instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
@@ -133,6 +135,8 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 // Later it will be filled with instructions and linked to other blocks
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jit.function);
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
+
+               outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
             } break;
         }
     }
@@ -197,7 +201,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        //printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+        printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
@@ -222,7 +226,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        //printOpcode(jit.instruction);
+        printOpcode(jit.instruction);
 
         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
         
@@ -373,11 +377,12 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case 7:
         case 8:
         case 9: {
-            Value* integerValue = jit.builder->getInt32(newInteger(constant));
-            constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object);
-
+            Value* integerValue = jit.builder->getInt32(newInteger((uint32_t)constant));
+            constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object->getPointerTo());
+            outs() << "const " << (uint32_t) constant << ", value " << *constantValue << "\n";
+            
             std::ostringstream ss;
-            ss << "const" << constant << ".";
+            ss << "const" << (uint32_t) constant << ".";
             constantValue->setName(ss.str());
         } break;
         
@@ -516,6 +521,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 {
     // TODO Extract this code into subroutines.
     //      Replace the operation with call to LLVM function
+
+    // 0, 1 or 2 for '<', '<=' or '+' respectively
+    uint8_t opcode = jit.instruction.low;
     
     Value* rightValue = jit.popValue();
     Value* leftValue  = jit.popValue();
@@ -540,21 +548,31 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value*    rightInt    = jit.builder->CreateCall(getIntValue, rightValue);
     Value*    leftInt     = jit.builder->CreateCall(getIntValue, leftValue);
     
-    Value* intResult = 0;
-    switch (jit.instruction.low) {
+    Value* intResult = 0;       // this will be an immediate operation result
+    Value* intResultObject = 0; // this will be actual object to return
+    switch (opcode) {
         case 0: intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break; // operator <
         case 1: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break; // operator <=
         case 2: intResult = jit.builder->CreateAdd(leftInt, rightInt);     break; // operator +
         default:
-            fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", jit.instruction.low);
+            fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
     }
-    intResult->setName("int.");
 
-    // Interpreting raw integer value as a pointer
-    Function* newInteger = m_TypeModule->getFunction("newInteger()");
-    Value* intAsPtr = jit.builder->CreateCall(newInteger, intResult, "intAsPtr.");
-    //intResult = jit.builder->CreateIntToPtr(intResult, ot.object->getPointerTo());
+    // Checking which operation was performed and
+    // processing the intResult object in the proper way
+    if (opcode == 2) {
+        // Result of + operation will be number. 
+        // We need to create TInteger value and cast it to the pointer
 
+        // Interpreting raw integer value as a pointer
+        Function* newInteger = m_TypeModule->getFunction("newInteger()");
+        Value*  smalltalkInt = jit.builder->CreateCall(newInteger, intResult, "intAsPtr.");
+        intResultObject = jit.builder->CreateIntToPtr(smalltalkInt, ot.object->getPointerTo());
+    } else {
+        // Returning a bool object depending on the compare operation result
+        intResultObject = jit.builder->CreateSelect(intResult, m_globals.trueObject, m_globals.falseObject);
+    }
+    intResultObject->setName("int.");
     
     // Jumping out the integersBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
@@ -595,7 +613,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
     PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2);
-    phi->addIncoming(intAsPtr, integersBlock);
+    phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
     
     jit.pushValue(phi);
@@ -634,7 +652,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     uint8_t opcode = jit.instruction.low;
 
 //     printf("Special opcode = %d\n", opcode);
-    Instruction* previousInst = jit.builder->GetInsertPoint()->getPrevNode();
+    Instruction* previousInst = (--jit.builder->GetInsertPoint()); //->getPrevNode();
     
     switch (opcode) {
         case SmalltalkVM::selfReturn:
@@ -663,10 +681,16 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             }
             break;
         
-        case SmalltalkVM::duplicate:   jit.pushValue(jit.lastValue()); break;
+        case SmalltalkVM::duplicate:
+            jit.pushValue(jit.lastValue());
+            break;
+
         case SmalltalkVM::popTop:
-            if (jit.hasValue())
+            outs() << "pop top 1 \n";
+            if (jit.hasValue()) {
+                outs() << "pop top 2\n";
                 jit.popValue();
+            }
             break;
 
         case SmalltalkVM::branch: {

@@ -1,4 +1,44 @@
 METHOD LLVMTest
+loopTest | i sum |
+    i   <- 1.
+    sum <- 0.
+
+    [ i < 101 ] whileTrue:
+        [ sum <- sum + i ].
+
+    ^sum
+!
+
+0000 PushConstant 1
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushConstant 0
+0004 AssignTemporary 1
+0005 DoSpecial popTop
+0006 PushBlock
+0009     PushTemporary 0
+0010     PushLiteral 0
+0011     SendBinary <
+0012     DoSpecial stackReturn
+0013 PushTemporary 0
+0014 PushLiteral 1
+0015 SendBinary <
+0016 DoSpecial branchIfFalse 27
+0019 PushTemporary 1
+0020 PushTemporary 0
+0021 SendBinary +
+0022 AssignTemporary 1
+0023 DoSpecial popTop
+0024 DoSpecial branch 13
+0027 PushConstant 0         ; these two are thrown out
+0028 DoSpecial popTop       ; at the compilation time
+0029 PushTemporary 1
+0030 DoSpecial stackReturn
+0031 DoSpecial popTop
+0032 DoSpecial selfReturn
+
+
+METHOD LLVMTest
 test1: arg1  | temp1 |
     temp1 <- 42.
     (arg1 < temp1)

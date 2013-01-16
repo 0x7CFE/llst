@@ -152,7 +152,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         //m_functionPassManager->run(*function);
     }
 
-    outs() << *function;
+    outs() << *m_JITModule;
     
     // Preparing the context objects. Because we do not call the software
     // implementation here, we do not need to allocate the stack object
@@ -177,6 +177,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     TMethodFunction methodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(function));
     TObject* result = methodFunction(newContext);
 
+    printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
     printf("Function result: %p\n", result);
     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
 
@@ -188,28 +189,28 @@ void JITRuntime::initializeGlobals() {
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
     
     GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", ot.object) );
-    m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(&globals.nilObject));
+    m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(globals.nilObject));
     
     GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object) );
-    m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(&globals.trueObject));
+    m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(globals.trueObject));
     
     GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", ot.object) );
-    m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(&globals.falseObject));
+    m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(globals.falseObject));
     
     GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", ot.klass) );
-    m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(&globals.smallIntClass));
+    m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(globals.smallIntClass));
 
     GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", ot.klass) );
-    m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(&globals.arrayClass));
+    m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(globals.arrayClass));
 
     GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", ot.symbol) );
-    m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(&globals.binaryMessages[0]));
+    m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(globals.binaryMessages[0]));
     
     GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", ot.symbol) );
-    m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(&globals.binaryMessages[1]));
+    m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(globals.binaryMessages[1]));
 
     GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", ot.symbol) );
-    m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(&globals.binaryMessages[2]));
+    m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(globals.binaryMessages[2]));
 }
 
 void JITRuntime::initializePassManager() {
@@ -308,22 +309,26 @@ void JITRuntime::initializeRuntimeAPI() {
 
 extern "C" {
     
-TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize) {
+TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
+{
     printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
-TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize) {
+TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
+{
     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments) {
+TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
+{
     printf("sendMessage(%p, #%s, %p)\n", callingContext, message->toString().c_str(), arguments);
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
 }
 
-TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer) {
+TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
+{
     printf("createBlock(%p, %d, %d)",
         callingContext,
         (uint32_t) argLocation,
@@ -332,7 +337,8 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
-void emitBlockReturn(TObject* value, TContext* targetContext) {
+void emitBlockReturn(TObject* value, TContext* targetContext)
+{
     throw TBlockReturn(value, targetContext);
 }
 
