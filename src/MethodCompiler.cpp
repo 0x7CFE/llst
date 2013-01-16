@@ -75,7 +75,6 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* literalsObjectArray = jit.builder->CreateLoad(literalsObjectPtr, "literalsObjectArray");
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
     jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");
-//    jit.literals = jit.builder->CreateBitCast(jit.literals, ot.objectArray, "literals");
     
     Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.llvmContext, 4, "tempsObjectPtr");
     Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
@@ -97,7 +96,6 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
     uint32_t previousBytePointer = jit.bytePointer;
     
     TByteObject& byteCodes   = * jit.method->byteCodes;
-    //uint32_t     byteCount   = byteCodes.getSize();
     uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
 
     // Processing the method's bytecodes
@@ -156,7 +154,6 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     // Instantinating new array object
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
     Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
-          // arrayObject = jit.builder->CreateBitCast(arrayObject, ot.objectArray->getPointerTo());
 
     return arrayObject;
 }
@@ -214,7 +211,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+        // printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
@@ -243,7 +240,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        printOpcode(jit.instruction);
+        // printOpcode(jit.instruction);
 
         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
         
@@ -273,8 +270,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             default:
                 fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
-                //exit(1);
-                //return;
         }
 
         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
@@ -282,9 +277,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
         if (instCountAfter > instCountBefore)
             outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
-
-   // printf("Done processing at offset %d\n", stopPointer);
-    
 }
 
 void MethodCompiler::writeLandingpadBB(TJITContext& jit)
@@ -300,9 +292,9 @@ void MethodCompiler::writeLandingpadBB(TJITContext& jit)
     Value* typeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo.");
     caughtResult->addClause(typeInfo);
     
-    Value* thrownException = jit.builder->CreateExtractValue(caughtResult, 0);
-    Value* exceptionObject = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
-    Value* blockResult     = jit.builder->CreateBitCast(exceptionObject, m_exceptionAPI.blockReturnType->getPointerTo());
+    Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
+    Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
+    Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, m_exceptionAPI.blockReturnType->getPointerTo());
 
     Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
     Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);
@@ -396,8 +388,6 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
     temporary->setName(ss.str());
     
     jit.pushValue(temporary);
-
-    outs() << "last value: " << jit.lastValue() << "\n";
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
@@ -513,8 +503,6 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockObject->setName("block.");
     jit.pushValue(blockObject);
 
-    outs() << "block body processed\n";
-    
     jit.bytePointer = newBytePointer;
 }
 
@@ -582,9 +570,6 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
-    // TODO Extract this code into subroutines.
-    //      Replace the operation with call to LLVM function
-
     // 0, 1 or 2 for '<', '<=' or '+' respectively
     uint8_t opcode = jit.instruction.low;
     
@@ -732,7 +717,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     TByteObject& byteCodes = * jit.method->byteCodes;
     uint8_t opcode = jit.instruction.low;
 
-//     printf("Special opcode = %d\n", opcode);
     BasicBlock::iterator iPreviousInst = jit.builder->GetInsertPoint();
     if (iPreviousInst != jit.builder->GetInsertBlock()->begin())
         --iPreviousInst;
