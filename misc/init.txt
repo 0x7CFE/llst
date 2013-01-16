@@ -4,7 +4,7 @@ loopTest | i sum |
     sum <- 0.
 
     [ i < 101 ] whileTrue:
-        [ sum <- sum + i ].
+        [ sum <- sum + i. i <- i + 1. ].
 
     ^sum
 !
@@ -29,6 +29,11 @@ loopTest | i sum |
 0021 SendBinary +
 0022 AssignTemporary 1
 0023 DoSpecial popTop
+     PushTemporary 0
+     PushConstant 1
+     SendBinary +
+     AssignTemporary 0
+     DoSpecial popTop
 0024 DoSpecial branch 13
 0027 PushConstant 0         ; these two are thrown out
 0028 DoSpecial popTop       ; at the compilation time

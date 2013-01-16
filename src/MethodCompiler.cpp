@@ -133,7 +133,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 
                 // Creating the referred basic block and inserting it into the function
                 // Later it will be filled with instructions and linked to other blocks
-                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "target", jit.function);
+                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
                outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
@@ -559,9 +559,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value*    leftIsInt   = jit.builder->CreateCall(isSmallInt, leftValue);
     Value*    isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
     
-    BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "integers",   jit.function);
-    BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "sendBinary", jit.function);
-    BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result",     jit.function);
+    BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
+    BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",   jit.function);
+    BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
     
     // Dpending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
@@ -628,6 +628,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     };
     //outs() << "selector " << m_globals.binarySelectors[jit.instruction.low] << "\n";
     Value* sendMessageResult  = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, sendMessageArgs);
+           sendMessageResult->setName("result.");
 
     //Value* sendMessageResult = jit.builder->CreateCall(m_RuntimeAPI.sendMessage, arguments); 
     // Jumping out the sendBinaryBlock to the value aggregator
@@ -742,7 +743,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
             // This is a block that goes right after the branch instruction.
             // If branch condition is not met execution continues right after
-            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip", jit.function);
+            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip.", jit.function);
 
             // Creating condition check
             Value* boolObject = (opcode == SmalltalkVM::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
