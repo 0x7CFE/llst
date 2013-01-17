@@ -57,15 +57,15 @@ Function* MethodCompiler::createFunction(TMethod* method)
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 {
     if (isBlock)
-        jit.llvmContext = jit.builder->CreateBitCast(jit.llvmBlockContext, ot.context->getPointerTo());
+        jit.context = jit.builder->CreateBitCast(jit.blockContext, ot.context->getPointerTo());
 
-    jit.methodPtr = jit.builder->CreateStructGEP(jit.llvmContext, 1, "method");
+    jit.methodPtr = jit.builder->CreateStructGEP(jit.context, 1, "method");
     
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
     
     // TODO maybe we shuld rewrite arguments[idx] using TArrayObject::getField ?
 
-    Value* argsObjectPtr       = jit.builder->CreateStructGEP(jit.llvmContext, 2, "argObjectPtr");
+    Value* argsObjectPtr       = jit.builder->CreateStructGEP(jit.context, 2, "argObjectPtr");
     Value* argsObjectArray     = jit.builder->CreateLoad(argsObjectPtr, "argsObjectArray");
     Value* argsObject          = jit.builder->CreateBitCast(argsObjectArray, ot.object->getPointerTo(), "argsObject");
     jit.arguments              = jit.builder->CreateCall(objectGetFields, argsObject, "arguments");
@@ -76,7 +76,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
     jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");
     
-    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.llvmContext, 4, "tempsObjectPtr");
+    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.context, 4, "tempsObjectPtr");
     Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
     Value* tempsObject         = jit.builder->CreateBitCast(tempsObjectArray, ot.object->getPointerTo(), "tempsObject");
     jit.temporaries            = jit.builder->CreateCall(objectGetFields, tempsObject, "temporaries");
@@ -166,8 +166,8 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     jit.function = createFunction(method);
 
     // First argument of every function is a pointer to TContext object
-    jit.llvmContext = (Value*) (jit.function->arg_begin());
-    jit.llvmContext->setName("context");
+    jit.context = (Value*) (jit.function->arg_begin());
+    jit.context->setName("context");
 
     // Creating the basic block and inserting it into the function
     BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
@@ -306,7 +306,7 @@ void MethodCompiler::writeLandingpadBB(TJITContext& jit)
     BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
     BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
     
-    Value* compareTargets = jit.builder->CreateICmpEQ(jit.llvmContext, targetContext);
+    Value* compareTargets = jit.builder->CreateICmpEQ(jit.context, targetContext);
     jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
 
     jit.builder->SetInsertPoint(returnBlock);
@@ -474,8 +474,8 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     m_blockFunctions[blockFunctionName] = blockContext.function;
 
     // First argument of every block function is a pointer to TBlock object
-    blockContext.llvmBlockContext = (Value*) (blockContext.function->arg_begin());
-    blockContext.llvmBlockContext->setName("blockContext");
+    blockContext.blockContext = (Value*) (blockContext.function->arg_begin());
+    blockContext.blockContext->setName("blockContext");
 
     uint32_t currentBytePointer = blockContext.bytePointer; // storing the position
     scanForBranches(blockContext, newBytePointer - jit.bytePointer);
@@ -494,7 +494,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     
     // Create block object and fill it with context information
     Value* args[] = {
-        jit.llvmContext,                           // creatingContext
+        jit.context,                           // creatingContext
         jit.builder->getInt8(jit.instruction.low), // arg offset
         jit.builder->getInt16(jit.bytePointer)     // bytePointer
     };
@@ -644,7 +644,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, ot.objectArray->getPointerTo());
     // Now performing a message call
     Value*    sendMessageArgs[] = {
-        jit.llvmContext, // calling context
+        jit.context, // calling context
         m_globals.binarySelectors[jit.instruction.low],
         argumentsArray
     };
@@ -691,7 +691,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     // Forming a message parameters
     Value* sendMessageArgs[] = {
-        jit.llvmContext, // calling context
+        jit.context, // calling context
         messageSelector, // selector
         arguments        // message arguments
     };
@@ -739,7 +739,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* value = jit.popValue();
 
                 // Loading the target context information
-                Value* creatingContextPtr = jit.builder->CreateGEP(jit.llvmBlockContext, jit.builder->getInt32(2));
+                Value* creatingContextPtr = jit.builder->CreateGEP(jit.blockContext, jit.builder->getInt32(2));
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception

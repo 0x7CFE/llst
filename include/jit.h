@@ -61,6 +61,7 @@ struct TRuntimeAPI {
     llvm::Function* sendMessage;
     llvm::Function* createBlock;
     llvm::Function* emitBlockReturn;
+    llvm::Function* checkRoot;
 };
 
 struct TExceptionAPI {
@@ -145,8 +146,8 @@ private:
         TInstruction instruction;         // currently processed instruction
         // Builder inserts instructions into basic blocks
         llvm::IRBuilder<>*  builder;
-        llvm::Value*        llvmContext;
-        llvm::Value*        llvmBlockContext;
+        llvm::Value*        context;
+        llvm::Value*        blockContext;
         
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
@@ -177,7 +178,7 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
-            temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0),
+            temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
             exceptionLandingPad(0), methodHasBlockReturn(false)
         {
             byteCount = method->byteCodes->getSize();
@@ -253,6 +254,7 @@ extern "C" {
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
     const void*  getBlockReturnType();
+    void         checkRoot(TObject* value, TObject** objectSlot);
 }
 
 class JITRuntime {
@@ -285,7 +287,6 @@ private:
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    static JITRuntime*  Instance() { return s_instance; }
     
     void initializeGlobals();
     void initializePassManager();
@@ -295,6 +296,8 @@ private:
     void initializeExceptionAPI();
     
 public:
+    static JITRuntime* Instance() { return s_instance; }
+    
     typedef TObject* (*TMethodFunction)(TContext*);
     
     MethodCompiler* getCompiler() { return m_methodCompiler; }
