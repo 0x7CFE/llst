@@ -521,7 +521,7 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
     
     Value* instanceVariableAddress = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
     jit.builder->CreateStore(value, instanceVariableAddress);
-    // TODO analog of checkRoot()
+    jit.builder->CreateCall2(m_runtimeAPI.checkRoot, value, instanceVariableAddress);
 }
 
 void MethodCompiler::doMarkArguments(TJITContext& jit)
