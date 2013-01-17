@@ -154,7 +154,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     // Instantinating new array object
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
     Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
-
+    
     return arrayObject;
 }
 
@@ -365,9 +365,9 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
     Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
     Value* argument     = jit.builder->CreateLoad(valuePointer);
 
-    if (index == 0)
+    if (index == 0) {
         argument->setName("self.");
-    else {
+    } else {
         std::ostringstream ss;
         ss << "arg" << (uint32_t)index << ".";
         argument->setName(ss.str());
@@ -431,7 +431,6 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case 9: {
             Value* integerValue = jit.builder->getInt32(newInteger((uint32_t)constant));
             constantValue       = jit.builder->CreateIntToPtr(integerValue, ot.object->getPointerTo());
-            outs() << "const " << (uint32_t) constant << ", value " << *constantValue << "\n";
             
             std::ostringstream ss;
             ss << "const" << (uint32_t) constant << ".";
@@ -690,24 +689,28 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
     messageSelector->setName(ss.str());
 
-    // Now performing a message call
-    Value*    sendMessageArgs[] = {
+    // Forming a message parameters
+    Value* sendMessageArgs[] = {
         jit.llvmContext, // calling context
         messageSelector, // selector
         arguments        // message arguments
     };
 
-    BasicBlock* nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
-    
     Value* result = 0;
     if (jit.methodHasBlockReturn) {
+        // Creating basic block that will be branched to on normal invoke
+        BasicBlock* nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+
+        // Performing a function invoke
         result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.exceptionLandingPad, sendMessageArgs);
+
+        // Switching builder to new block
+        jit.builder->SetInsertPoint(nextBlock);
     } else {
+        // Just calling the function. No block switching required
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
-        jit.builder->CreateBr(nextBlock);
     }
 
-    jit.builder->SetInsertPoint(nextBlock);
     jit.pushValue(result);
 }
 
