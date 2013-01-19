@@ -69,8 +69,6 @@ struct TExceptionAPI {
     llvm::Function* cxa_begin_catch;
     llvm::Function* cxa_end_catch;
     llvm::Function* getBlockReturnType;
-
-    llvm::StructType* blockReturnType;
 };
 
 struct TObjectTypes {
@@ -86,6 +84,9 @@ struct TObjectTypes {
     llvm::StructType* globals;
     llvm::StructType* byteObject;
 
+    llvm::StructType* blockReturn;
+    
+
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("struct.TObject");
         klass       = module->getTypeByName("struct.TClass");
@@ -98,6 +99,7 @@ struct TObjectTypes {
         symbolArray = module->getTypeByName("struct.TSymbolArray");
         globals     = module->getTypeByName("struct.TGlobals");
         byteObject  = module->getTypeByName("struct.TByteObject");
+        blockReturn = module->getTypeByName("struct.TBlockReturn");
     }
 };
 
@@ -136,20 +138,20 @@ private:
         uint32_t            byteCount;
         
         llvm::Function*     function;     // LLVM function that is created based on method
-        llvm::Value*        methodPtr; // LLVM representation for Smalltalk's method object
+        llvm::Value*        methodPtr;    // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
         llvm::Value*        selfFields;   // LLVM representation for current object's fields
         
-        TInstruction instruction;         // currently processed instruction
-        // Builder inserts instructions into basic blocks
-        llvm::IRBuilder<>*  builder;
+        TInstruction        instruction;  // currently processed instruction
+        llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
         llvm::Value*        context;
         llvm::Value*        blockContext;
         
         llvm::BasicBlock*   exceptionLandingPad;
+        //llvm::Value*        blockReturnTypeInfo;
         bool                methodHasBlockReturn;
         
         // Value stack is used as a FIFO value holder during the compilation process.
@@ -179,7 +181,7 @@ private:
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
-            exceptionLandingPad(0), methodHasBlockReturn(false)
+            exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);

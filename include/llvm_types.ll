@@ -70,6 +70,11 @@
                           %struct.TSymbol* ; badMethodSymbol
                         }
 
+%struct.TBlockReturn = type {
+    %struct.TObject*, ; value
+    %struct.TContext* ; targetContext
+}
+                        
 ; We can use extern C++ function but
 ; llvm passes may optimize/inline IR code.
 

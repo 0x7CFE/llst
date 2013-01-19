@@ -281,20 +281,19 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 void MethodCompiler::writeLandingpadBB(TJITContext& jit)
 {
-    jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingpadBB", jit.function);
+    jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
     
     Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
-    
-    LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
 
-    Value* typeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo.");
-    caughtResult->addClause(typeInfo);
+    Value* blockReturntypeInfo   = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
+    LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
+    caughtResult->addClause(blockReturntypeInfo);
     
     Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
     Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
-    Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, m_exceptionAPI.blockReturnType->getPointerTo());
+    Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, ot.blockReturn);
 
     Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
     Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);

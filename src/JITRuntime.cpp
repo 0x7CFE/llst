@@ -315,14 +315,6 @@ void JITRuntime::initializeExceptionAPI() {
         FunctionType::get(Type::getVoidTy(llvmContext)->getPointerTo(), false),
         Function::ExternalLinkage, "getBlockReturnType", m_JITModule);
     m_executionEngine->addGlobalMapping(m_exceptionAPI.getBlockReturnType, reinterpret_cast<void*>(& ::getBlockReturnType));
-
-    m_exceptionAPI.blockReturnType = StructType::create(llvmContext, "struct.TBlockReturn");
-    Type* blockReturnFields[] = {
-        ot.object->getPointerTo(), // value
-        ot.context->getPointerTo() // targetContext
-    };
-    m_exceptionAPI.blockReturnType->setBody(blockReturnFields);
-    
 }
 
 extern "C" {
@@ -347,7 +339,7 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
-    printf("createBlock(%p, %d, %d)",
+    printf("createBlock(%p, %d, %d)\n",
         callingContext,
         (uint32_t) argLocation,
         (uint32_t) bytePointer );
@@ -357,6 +349,7 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
 
 void emitBlockReturn(TObject* value, TContext* targetContext)
 {
+    printf("emitBlockReturn(%p, %p)\n", value, targetContext);
     throw TBlockReturn(value, targetContext);
 }
 
