@@ -556,7 +556,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     
     // Create block object and fill it with context information
     Value* args[] = {
-        jit.context,                           // creatingContext
+        jit.context,                               // creatingContext
         jit.builder->getInt8(jit.instruction.low), // arg offset
         jit.builder->getInt16(jit.bytePointer)     // bytePointer
     };
@@ -590,10 +590,9 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
 void MethodCompiler::doMarkArguments(TJITContext& jit)
 {
     // Here we need to create the arguments array from the values on the stack
-    
     uint8_t argumentsCount = jit.instruction.low;
 
-    // FIXME May be we may unroll the arguments array and pass the values directly.
+    // FIXME Probably we may unroll the arguments array and pass the values directly.
     //       However, in some cases this may lead to additional architectural problems.
     Value* argumentsObject    = createArray(jit, argumentsCount);
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
@@ -654,11 +653,11 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     // Now the integers part
     jit.builder->SetInsertPoint(integersBlock);
-    Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
-    Value*    rightInt    = jit.builder->CreateCall(getIntValue, rightValue);
-    Value*    leftInt     = jit.builder->CreateCall(getIntValue, leftValue);
+    Function* getIntValue  = m_TypeModule->getFunction("getIntegerValue()");
+    Value*    rightInt     = jit.builder->CreateCall(getIntValue, rightValue);
+    Value*    leftInt      = jit.builder->CreateCall(getIntValue, leftValue);
     
-    Value* intResult = 0;       // this will be an immediate operation result
+    Value* intResult       = 0;  // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
     switch (opcode) {
         case 0: intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break; // operator <
@@ -695,8 +694,8 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
     
-    Value* argumentsObject   = createArray(jit, 2);
-    Value* argFields   = jit.builder->CreateCall(objectGetFields, argumentsObject);
+    Value* argumentsObject = createArray(jit, 2);
+    Value* argFields       = jit.builder->CreateCall(objectGetFields, argumentsObject);
 
     Value* element0Ptr = jit.builder->CreateGEP(argFields, jit.builder->getInt32(0));
     jit.builder->CreateStore(leftValue, element0Ptr);
@@ -704,14 +703,14 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* element1Ptr = jit.builder->CreateGEP(argFields, jit.builder->getInt32(1));
     jit.builder->CreateStore(rightValue, element1Ptr);
 
-    Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, ot.objectArray->getPointerTo());
-    // Now performing a message call
-    Value*    sendMessageArgs[] = {
+    Value* argumentsArray    = jit.builder->CreateBitCast(argumentsObject, ot.objectArray->getPointerTo());
+    Value* sendMessageArgs[] = {
         jit.context, // calling context
         m_globals.binarySelectors[jit.instruction.low],
         argumentsArray
     };
 
+    // Now performing a message call
     Value* sendMessageResult = 0;
     if (jit.methodHasBlockReturn) {
         sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.exceptionLandingPad, sendMessageArgs);
@@ -725,13 +724,15 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     // Now the value aggregator block
     jit.builder->SetInsertPoint(resultBlock);
+    
     // We do not know now which way the program will be executed,
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
     PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2);
     phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
-    
+
+    // Result of sendBinary will be the value of phi function
     jit.pushValue(phi);
 }
 
@@ -742,9 +743,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     // First of all we need to get the actual message selector
     Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
 
-    Value*    literalArray     = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
-    Value*    getFieldArgs[]   = { literalArray, jit.builder->getInt32(jit.instruction.low) };
-    Value*    messageSelector  = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
+    Value* literalArray    = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
+    Value* getFieldArgs[]  = { literalArray, jit.builder->getInt32(jit.instruction.low) };
+    Value* messageSelector = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
 
     messageSelector = jit.builder->CreateBitCast(messageSelector, ot.symbol->getPointerTo());
     
@@ -754,7 +755,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     // Forming a message parameters
     Value* sendMessageArgs[] = {
-        jit.context, // calling context
+        jit.context,     // calling context
         messageSelector, // selector
         arguments        // message arguments
     };
@@ -770,7 +771,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         // Switching builder to new block
         jit.builder->SetInsertPoint(nextBlock);
     } else {
-        // Just calling the function. No block switching required
+        // Just calling the function. No block switching is required
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
 
@@ -789,7 +790,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     switch (opcode) {
         case SmalltalkVM::selfReturn:
             if (! iPreviousInst->isTerminator())
-                jit.builder->CreateRet(jit.self); break;
+                jit.builder->CreateRet(jit.self);
+            break;
         
         case SmalltalkVM::stackReturn:
             if ( !iPreviousInst->isTerminator() && jit.hasValue() )
@@ -866,6 +868,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
 
         default:
-            printf("JIT: unknown special opcode %d", opcode);
+            printf("JIT: unknown special opcode %d\n", opcode);
     }
 }
