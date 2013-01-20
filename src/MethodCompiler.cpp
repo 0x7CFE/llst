@@ -86,6 +86,50 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.selfFields             = jit.builder->CreateCall(objectGetFields, jit.self, "selfFields");
 }
 
+bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
+{
+    uint32_t previousBytePointer = jit.bytePointer;
+    bool result = false;
+
+    TByteObject& byteCodes   = * jit.method->byteCodes;
+    uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
+    
+    // Processing the method's bytecodes
+    while (jit.bytePointer < stopPointer) {
+        // Decoding the pending instruction (TODO move to a function)
+        TInstruction instruction;
+        instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
+        instruction.high >>= 4;
+        if (instruction.high == SmalltalkVM::opExtended) {
+            instruction.high = instruction.low;
+            instruction.low  = byteCodes[jit.bytePointer++];
+        }
+        
+        if (instruction.high == SmalltalkVM::opPushBlock) {
+            uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+            jit.bytePointer += 2;
+
+            // Recursively processing the nested block
+            if (scanForBlockReturn(jit, newBytePointer - jit.bytePointer)) {
+                result = true;
+                break;
+            }
+            
+            jit.bytePointer = newBytePointer;
+        }
+
+        // We're now looking only for blockReturn bytecodes
+        if (instruction.high == SmalltalkVM::opDoSpecial && instruction.low == SmalltalkVM::blockReturn) {
+            result = true;
+            break;
+        }
+    }
+
+    // Resetting bytePointer to an old value
+    jit.bytePointer = previousBytePointer;
+    return result;
+}
+
 void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*/)
 {
     // First analyzing pass. Scans the bytecode for the branch sites and
@@ -112,11 +156,10 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
         }
 
         if (instruction.high == SmalltalkVM::opPushBlock) {
-            // We need to track the blockReturn so we need to check the
-            // block bytecodes for the corresponding instruction opcode
-
-            //uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-            jit.bytePointer += 2; // Skipping the bytePointer immediate value data
+            // Skipping the nested block's bytecodes
+            uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+            jit.bytePointer = newBytePointer;
+            continue;
         }
         
         // We're now looking only for branch bytecodes
@@ -138,10 +181,6 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
                 outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
             } break;
-
-            case SmalltalkVM::blockReturn:
-                jit.methodHasBlockReturn = true;
-                break;
         }
     }
 
@@ -182,19 +221,24 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
     jit.builder->CreateBr(body);
 
+    // Checking whether method contains inline blocks that has blockReturn instruction.
+    // If this is true we need to put an exception handler into the method and treat
+    // all send message operations as invokes, not just simple calls
+    jit.methodHasBlockReturn = scanForBlockReturn(jit);
+    
     // Writing exception handlers for the
     // correct operation of block return
     if (jit.methodHasBlockReturn)
-        writeLandingpadBB(jit);
+        writeLandingPad(jit);
 
     // Resetting the builder to the body
     jit.builder->SetInsertPoint(body);
     
-    // First analyzing pass. Scans the bytecode for the branch sites and
+    // Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with 
     // target bytecode offset as a key.
-    scanForBranches(jit);
+    scanForBranches(jit, false);
     
     // Processing the method's bytecodes
     writeFunctionBody(jit);
@@ -211,7 +255,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        // printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+         printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
@@ -240,7 +284,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        // printOpcode(jit.instruction);
+         printOpcode(jit.instruction);
 
         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
         
@@ -274,12 +318,12 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 
-        if (instCountAfter > instCountBefore)
-            outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
+      if (instCountAfter > instCountBefore)
+          outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }
 
-void MethodCompiler::writeLandingpadBB(TJITContext& jit)
+void MethodCompiler::writeLandingPad(TJITContext& jit)
 {
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
@@ -287,9 +331,9 @@ void MethodCompiler::writeLandingpadBB(TJITContext& jit)
     Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
 
-    Value* blockReturntypeInfo   = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
+    Value*   blockReturnTypeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
     LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
-    caughtResult->addClause(blockReturntypeInfo);
+    caughtResult->addClause(blockReturnTypeInfo);
     
     Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
     Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
@@ -436,14 +480,14 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             constantValue->setName(ss.str());
         } break;
         
-        case SmalltalkVM::nilConst:   constantValue = m_globals.nilObject;   break;
-        case SmalltalkVM::trueConst:  constantValue = m_globals.trueObject;  break;
-        case SmalltalkVM::falseConst: constantValue = m_globals.falseObject; break;
+        case SmalltalkVM::nilConst:   outs() << "nil ";   constantValue = m_globals.nilObject;   break;
+        case SmalltalkVM::trueConst:  outs() << "true ";  constantValue = m_globals.trueObject;  break;
+        case SmalltalkVM::falseConst: outs() << "false "; constantValue = m_globals.falseObject; break;
         
         default:
             fprintf(stderr, "JIT: unknown push constant %d\n", constant);
     }
-    
+
     jit.pushValue(constantValue);
 }
 
@@ -476,9 +520,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.blockContext = (Value*) (blockContext.function->arg_begin());
     blockContext.blockContext->setName("blockContext");
 
-    uint32_t currentBytePointer = blockContext.bytePointer; // storing the position
     scanForBranches(blockContext, newBytePointer - jit.bytePointer);
-    blockContext.bytePointer = currentBytePointer; // restoring after the pass
     
     // Creating the basic block and inserting it into the function
     BasicBlock* blockPreamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
@@ -739,11 +781,12 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
                 // Loading the target context information
                 Value* creatingContextPtr = jit.builder->CreateGEP(jit.blockContext, jit.builder->getInt32(2));
+
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception
                 jit.builder->CreateCall2(m_runtimeAPI.emitBlockReturn, value, targetContext);
-
+                
                 // This will never be called
                 jit.builder->CreateUnreachable();
             }

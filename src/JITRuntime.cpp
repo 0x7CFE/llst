@@ -149,6 +149,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     if (!function) {
         // Compiling function and storing it to the table for further use
         function = m_methodCompiler->compileMethod(method);
+        verifyModule(*m_JITModule);
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
     }

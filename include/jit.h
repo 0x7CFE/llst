@@ -194,6 +194,7 @@ private:
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
+    bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
     
@@ -204,7 +205,7 @@ private:
     
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
-    void writeLandingpadBB(TJITContext& jit);
+    void writeLandingPad(TJITContext& jit);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
