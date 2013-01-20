@@ -286,13 +286,13 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             BasicBlock* newBlock = iBlock->second; // Picking a basic block
             BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
 
-            if (iInst != jit.builder->GetInsertBlock()->begin()) {
+            if (iInst != jit.builder->GetInsertBlock()->begin())
                 --iInst;
-                outs() << "Prev is: " << *newBlock << "\n";
-                if (! iInst->isTerminator())
-                    outs() << *jit.builder->CreateBr(newBlock) << "\n"; // Linking current block to a new one
-            }
 
+            outs() << "Prev is: " << *newBlock << "\n";
+            if (! iInst->isTerminator())
+                outs() << *jit.builder->CreateBr(newBlock) << "\n"; // Linking current block to a new one
+                
             jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
         
@@ -803,7 +803,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
                 // Loading the target context information
                 Value* creatingContextPtr = jit.builder->CreateGEP(jit.blockContext, jit.builder->getInt32(2));
-
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception
