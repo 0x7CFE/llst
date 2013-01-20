@@ -219,23 +219,23 @@ Function* MethodCompiler::compileMethod(TMethod* method)
 
     jit.builder = new IRBuilder<>(preamble);
     
-    // Writing the function preamble and initializing
-    // commonly used pointers such as method arguments or temporaries
-    writePreamble(jit);
-    
-    // Switching builder context to the body's basic block from the preamble
-    BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
-    jit.builder->CreateBr(body);
-
     // Checking whether method contains inline blocks that has blockReturn instruction.
     // If this is true we need to put an exception handler into the method and treat
     // all send message operations as invokes, not just simple calls
     jit.methodHasBlockReturn = scanForBlockReturn(jit);
     
+    // Writing the function preamble and initializing
+    // commonly used pointers such as method arguments or temporaries
+    writePreamble(jit);
+    
     // Writing exception handlers for the
     // correct operation of block return
     if (jit.methodHasBlockReturn)
         writeLandingPad(jit);
+    
+    // Switching builder context to the body's basic block from the preamble
+    BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
+    jit.builder->CreateBr(body);
 
     // Resetting the builder to the body
     jit.builder->SetInsertPoint(body);
@@ -332,6 +332,9 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 void MethodCompiler::writeLandingPad(TJITContext& jit)
 {
     outs() << "Writing landing pad\n";
+
+    // written to preamble
+    Value*   blockReturnTypeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
     
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
@@ -339,7 +342,6 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
 
-    Value*   blockReturnTypeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
     LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
     caughtResult->addClause(blockReturnTypeInfo);
     
@@ -549,6 +551,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
         jit.builder->getInt16(jit.bytePointer)     // bytePointer
     };
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
+    blockObject = jit.builder->CreateBitCast(blockObject, ot.object->getPointerTo());
     blockObject->setName("block.");
     jit.pushValue(blockObject);
 
