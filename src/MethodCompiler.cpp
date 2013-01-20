@@ -118,15 +118,27 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
                 result = true;
                 break;
             }
-            
+
+            // Skipping block's bytecodes
             jit.bytePointer = newBytePointer;
         }
+        
+        // We're now looking only for branch bytecodes
+        if (instruction.high != SmalltalkVM::opDoSpecial)
+            continue;
+        
+        switch (instruction.low) {
+            case SmalltalkVM::blockReturn:
+                outs() << "Found a block return at offset " << currentOffset << "\n";
+                jit.bytePointer = previousBytePointer;
+                return true;
 
-        // We're now looking only for blockReturn bytecodes
-        if (instruction.high == SmalltalkVM::opDoSpecial && instruction.low == SmalltalkVM::blockReturn) {
-            outs() << "Found a block return at offset " << currentOffset << "\n";
-            result = true;
-            break;
+            case SmalltalkVM::branch:
+            case SmalltalkVM::branchIfFalse:
+            case SmalltalkVM::branchIfTrue:
+                //uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
+                jit.bytePointer += 2; // skipping the branch offset data
+                continue;
         }
     }
 
@@ -271,16 +283,17 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             // basic block and start a new one, linking previous
             // basic block to a new one.
 
+            BasicBlock* newBlock = iBlock->second; // Picking a basic block
             BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
+
             if (iInst != jit.builder->GetInsertBlock()->begin()) {
                 --iInst;
-                
-                BasicBlock* newBlock = iBlock->second; // Picking a basic block
+                outs() << "Prev is: " << *newBlock << "\n";
                 if (! iInst->isTerminator())
-                    jit.builder->CreateBr(newBlock);       // Linking current block to a new one
-
-                jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
+                    outs() << *jit.builder->CreateBr(newBlock) << "\n"; // Linking current block to a new one
             }
+
+            jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
         
         // First of all decoding the pending instruction
