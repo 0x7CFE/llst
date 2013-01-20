@@ -802,7 +802,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* value = jit.popValue();
 
                 // Loading the target context information
-                Value* creatingContextPtr = jit.builder->CreateGEP(jit.blockContext, jit.builder->getInt32(2));
+                Value* creatingContextPtr = jit.builder->CreateStructGEP(jit.blockContext, 2);
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception
