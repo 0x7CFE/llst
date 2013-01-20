@@ -89,6 +89,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
 {
     uint32_t previousBytePointer = jit.bytePointer;
+    
     bool result = false;
 
     TByteObject& byteCodes   = * jit.method->byteCodes;
@@ -96,6 +97,9 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
     
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
+        uint32_t currentOffset = jit.bytePointer;
+        printf("scanForBlockReturn: Processing offset %d / %d \n", currentOffset, stopPointer);
+        
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
         instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
@@ -120,6 +124,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
         // We're now looking only for blockReturn bytecodes
         if (instruction.high == SmalltalkVM::opDoSpecial && instruction.low == SmalltalkVM::blockReturn) {
+            outs() << "Found a block return at offset " << currentOffset << "\n";
             result = true;
             break;
         }
@@ -145,6 +150,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
+        printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
         
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
@@ -255,7 +261,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-         printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+        printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
@@ -325,6 +331,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 void MethodCompiler::writeLandingPad(TJITContext& jit)
 {
+    outs() << "Writing landing pad\n";
+    
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
     
@@ -337,10 +345,11 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     
     Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
     Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
-    Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, ot.blockReturn);
-
+    Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, ot.blockReturn->getPointerTo());
+    
     Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
     Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);
+    
     Value* targetContextPtr = jit.builder->CreateStructGEP(blockResult, 1);
     Value* targetContext    = jit.builder->CreateLoad(targetContextPtr);
     
