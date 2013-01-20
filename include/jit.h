@@ -65,10 +65,10 @@ struct TRuntimeAPI {
 };
 
 struct TExceptionAPI {
-    llvm::Function* gxx_personality;
-    llvm::Function* cxa_begin_catch;
-    llvm::Function* cxa_end_catch;
-    llvm::Function* getBlockReturnType;
+    llvm::Function*    gxx_personality;
+    llvm::Function*    cxa_begin_catch;
+    llvm::Function*    cxa_end_catch;
+    llvm::GlobalValue* blockReturnType;
 };
 
 struct TObjectTypes {
@@ -319,8 +319,8 @@ struct TBlockReturn {
     TBlockReturn(TObject* value, TContext* targetContext)
         : value(value), targetContext(targetContext) { }
 
-    static const void* getBlockReturnType() {
-        return reinterpret_cast<const void*>( &typeid(TBlockReturn) ) ;
+    static void* getBlockReturnType() {
+        return const_cast<void*>(reinterpret_cast<const void*>( &typeid(TBlockReturn) ));
     }
 };
 
