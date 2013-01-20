@@ -827,10 +827,12 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
             jit.bytePointer += 2; // skipping the branch offset data
 
-            // Finding appropriate branch target
-            // from the previously stored basic blocks
-            BasicBlock* target = m_targetToBlockMap[targetOffset];
-            jit.builder->CreateBr(target);
+            if (!iPreviousInst->isTerminator()) {
+                // Finding appropriate branch target
+                // from the previously stored basic blocks
+                BasicBlock* target = m_targetToBlockMap[targetOffset];
+                jit.builder->CreateBr(target);
+            }
         } break;
 
         case SmalltalkVM::branchIfTrue:
@@ -839,22 +841,24 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
             jit.bytePointer += 2; // skipping the branch offset data
 
-            // Finding appropriate branch target
-            // from the previously stored basic blocks
-            BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
+            if (!iPreviousInst->isTerminator()) {
+                // Finding appropriate branch target
+                // from the previously stored basic blocks
+                BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
 
-            // This is a block that goes right after the branch instruction.
-            // If branch condition is not met execution continues right after
-            BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip.", jit.function);
+                // This is a block that goes right after the branch instruction.
+                // If branch condition is not met execution continues right after
+                BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip.", jit.function);
 
-            // Creating condition check
-            Value* boolObject = (opcode == SmalltalkVM::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
-            Value* condition  = jit.popValue();
-            Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
-            jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
+                // Creating condition check
+                Value* boolObject = (opcode == SmalltalkVM::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
+                Value* condition  = jit.popValue();
+                Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
+                jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
-            // Switching to a newly created block
-            jit.builder->SetInsertPoint(skipBlock);
+                // Switching to a newly created block
+                jit.builder->SetInsertPoint(skipBlock);
+            }
         } break;
 
         case SmalltalkVM::breakpoint:
