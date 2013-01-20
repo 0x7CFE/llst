@@ -235,6 +235,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     
     // Switching builder context to the body's basic block from the preamble
     BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
+    jit.builder->SetInsertPoint(preamble);
     jit.builder->CreateBr(body);
 
     // Resetting the builder to the body
