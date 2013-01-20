@@ -34,9 +34,11 @@
 
 #include <types.h>                    
 #include "vm.h"
+
+#include <typeinfo>
+
 #include <map>
 #include <list>
-
 #include <stdio.h>
 
 #include <llvm/Function.h>
@@ -59,13 +61,14 @@ struct TRuntimeAPI {
     llvm::Function* sendMessage;
     llvm::Function* createBlock;
     llvm::Function* emitBlockReturn;
+    llvm::Function* checkRoot;
 };
 
 struct TExceptionAPI {
     llvm::Function* gxx_personality;
     llvm::Function* cxa_begin_catch;
     llvm::Function* cxa_end_catch;
-    
+    llvm::Function* getBlockReturnType;
 };
 
 struct TObjectTypes {
@@ -81,6 +84,9 @@ struct TObjectTypes {
     llvm::StructType* globals;
     llvm::StructType* byteObject;
 
+    llvm::StructType* blockReturn;
+    
+
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("struct.TObject");
         klass       = module->getTypeByName("struct.TClass");
@@ -93,6 +99,7 @@ struct TObjectTypes {
         symbolArray = module->getTypeByName("struct.TSymbolArray");
         globals     = module->getTypeByName("struct.TGlobals");
         byteObject  = module->getTypeByName("struct.TByteObject");
+        blockReturn = module->getTypeByName("struct.TBlockReturn");
     }
 };
 
@@ -131,21 +138,21 @@ private:
         uint32_t            byteCount;
         
         llvm::Function*     function;     // LLVM function that is created based on method
-        llvm::Value*        methodPtr; // LLVM representation for Smalltalk's method object
+        llvm::Value*        methodPtr;    // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
         llvm::Value*        selfFields;   // LLVM representation for current object's fields
         
-        TInstruction instruction;         // currently processed instruction
-        // Builder inserts instructions into basic blocks
-        llvm::IRBuilder<>*  builder;
-        llvm::Value*        llvmContext;
-        llvm::Value*        llvmBlockContext;
+        TInstruction        instruction;  // currently processed instruction
+        llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
+        llvm::Value*        context;
+        llvm::Value*        blockContext;
         
-        llvm::BasicBlock*   landingpadBB;
-        
+        llvm::BasicBlock*   exceptionLandingPad;
+        //llvm::Value*        blockReturnTypeInfo;
+        bool                methodHasBlockReturn;
         
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -173,8 +180,8 @@ private:
         
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
-            temporaries(0), literals(0), self(0), selfFields(0), builder(0), llvmContext(0),
-            landingpadBB(0)
+            temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
+            exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false)
         {
             byteCount = method->byteCodes->getSize();
             valueStack.reserve(method->stackSize);
@@ -187,18 +194,18 @@ private:
 
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
-    bool methodContainsBlockReturn(TJITContext& jit);
+    bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
     
     TObjectTypes ot;
     TJITGlobals    m_globals;
-    TRuntimeAPI    m_RuntimeAPI;
-    TExceptionAPI  m_ExceptionAPI;
+    TRuntimeAPI    m_runtimeAPI;
+    TExceptionAPI  m_exceptionAPI;
     
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
-    void writeLandingpadBB(TJITContext& jit);
+    void writeLandingPad(TJITContext& jit);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
@@ -228,7 +235,7 @@ public:
         TExceptionAPI exceptionApi
     )
         : m_JITModule(JITModule), m_TypeModule(TypeModule),
-          m_RuntimeAPI(api), m_ExceptionAPI(exceptionApi)
+          m_runtimeAPI(api), m_exceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -249,6 +256,8 @@ extern "C" {
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
+    const void*  getBlockReturnType();
+    void         checkRoot(TObject* value, TObject** objectSlot);
 }
 
 class JITRuntime {
@@ -266,8 +275,8 @@ private:
     //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
     //TFunctionMap m_compiledFunctions; //TODO useless var?
     
-    TRuntimeAPI   m_RuntimeAPI;
-    TExceptionAPI m_ExceptionAPI;
+    TRuntimeAPI   m_runtimeAPI;
+    TExceptionAPI m_exceptionAPI;
     
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;
@@ -281,15 +290,17 @@ private:
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    static JITRuntime*  Instance() { return s_instance; }
     
     void initializeGlobals();
     void initializePassManager();
+    
     //uses ot types. dont forget to init it before calling this method
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
     
 public:
+    static JITRuntime* Instance() { return s_instance; }
+    
     typedef TObject* (*TMethodFunction)(TContext*);
     
     MethodCompiler* getCompiler() { return m_methodCompiler; }
@@ -307,5 +318,9 @@ struct TBlockReturn {
     TContext* targetContext;
     TBlockReturn(TObject* value, TContext* targetContext)
         : value(value), targetContext(targetContext) { }
+
+    static const void* getBlockReturnType() {
+        return reinterpret_cast<const void*>( &typeid(TBlockReturn) ) ;
+    }
 };
 

@@ -1118,6 +1118,11 @@ returnFourtyTwo
 !
 
 METHOD LLVMTest
+returnNil
+    ^nil
+!
+
+METHOD LLVMTest
 toDoTest |x|
     x <- 0.
     1 to: 11 do: [ x <- x + 1 ].
@@ -1157,6 +1162,16 @@ test42Lt: arg
     ^ 42 < arg
 !
 
+METHOD LLVMTest
+testBlockReturn
+    LLVM sendMessage: #asNumber withArguments: (Array with: '123').
+!
+
+METHOD LLVMTest
+testNil
+    LLVM sendMessage: #returnNil withArguments: (Array with: self).
+!
+
 METHOD Undefined
 main    | command x |
         " initialize classes "
@@ -1176,13 +1191,16 @@ main    | command x |
         ContextTest      new runAll.
         PrimitiveTest    new runAll."
 
-        x <- LLVMTest new test3.
-        x printNl.
+        "x <- LLVMTest new test3.
+        x printNl."
+
+        "LLVMTest new testNil."
+        LLVMTest new testBlockReturn.
         
-        " main execution loop  
+        " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ] "
+                        ifFalse: [ command doIt printNl ] ] 
         
         ^nil.                  
 !

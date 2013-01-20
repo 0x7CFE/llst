@@ -1,10 +1,59 @@
+METHOD String
+asNumber | val |
+    " parse a base-10 ASCII number, return nil on failure "
+    val <- 0.
+    self do: [:c|
+        c isDigit ifFalse: [^nil].
+        val <- (val * 10) + (c value - 48)
+    ].
+    ^val
+!
+
+0000 PushConstant 0
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushArgument 0
+0004 PushBlock
+0007     PushTemporary 1
+0008     MarkArguments 1
+0009     SendMessage isDigit
+0010     DoSpecial branchIfTrue 18
+0013     PushConstant nil
+0014     DoSpecial blockReturn         "!"
+0015     DoSpecial branch 19
+0018     PushConstant nil
+0019     DoSpecial popTop
+0020     PushTemporary 0
+0021     PushLiteral 1
+0022     MarkArguments 2
+0023     SendMessage *
+0024     PushTemporary 1
+0025     MarkArguments 1
+0026     SendMessage value
+0027     PushLiteral 4
+0028     MarkArguments 2
+0029     SendMessage -
+0030     SendBinary +
+0031     AssignTemporary 0
+0032     DoSpecial stackReturn
+0033 MarkArguments 2
+0034 SendMessage do:
+0035 DoSpecial popTop
+0036 PushTemporary 0
+0037 DoSpecial stackReturn
+0038 DoSpecial popTop
+0039 DoSpecial selfReturn
+
+
+
+
 METHOD LLVMTest
 loopTest | i sum |
     i   <- 1.
     sum <- 0.
 
     [ i < 101 ] whileTrue:
-        [ sum <- sum + i ].
+        [ sum <- sum + i. i <- i + 1. ].
 
     ^sum
 !
@@ -29,6 +78,11 @@ loopTest | i sum |
 0021 SendBinary +
 0022 AssignTemporary 1
 0023 DoSpecial popTop
+     PushTemporary 0
+     PushConstant 1
+     SendBinary +
+     AssignTemporary 0
+     DoSpecial popTop
 0024 DoSpecial branch 13
 0027 PushConstant 0         ; these two are thrown out
 0028 DoSpecial popTop       ; at the compilation time
@@ -94,8 +148,18 @@ test2: arg1  | temp1 |
 
 
 
+METHOD LLVMTest
+returnFourtyTwo
+    ^42
+!
 
 
+-> LLVMTest methods at: #returnFourtyTwo; disassemble
+0000 PushLiteral 0
+0001 DoSpecial stackReturn
+0002 DoSpecial popTop
+0003 DoSpecial selfReturn
+Method
 
 
 
