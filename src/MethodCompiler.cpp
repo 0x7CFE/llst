@@ -333,9 +333,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 void MethodCompiler::writeLandingPad(TJITContext& jit)
 {
     outs() << "Writing landing pad\n";
-
-    // written to preamble
-    Value*   blockReturnTypeInfo = jit.builder->CreateCall(m_exceptionAPI.getBlockReturnType, "typeInfo");
     
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
@@ -344,7 +341,7 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
 
     LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
-    caughtResult->addClause(blockReturnTypeInfo);
+    caughtResult->addClause(m_exceptionAPI.blockReturnType);
     
     Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
     Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
@@ -531,13 +528,12 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     // First argument of every block function is a pointer to TBlock object
     blockContext.blockContext = (Value*) (blockContext.function->arg_begin());
     blockContext.blockContext->setName("blockContext");
-
-    scanForBranches(blockContext, newBytePointer - jit.bytePointer);
     
     // Creating the basic block and inserting it into the function
     BasicBlock* blockPreamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
     blockContext.builder = new IRBuilder<>(blockPreamble);
     writePreamble(blockContext, true);
+    scanForBranches(blockContext, newBytePointer - jit.bytePointer);
 
     BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
     blockContext.builder->CreateBr(blockBody);

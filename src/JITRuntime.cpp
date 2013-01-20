@@ -149,6 +149,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     if (!function) {
         // Compiling function and storing it to the table for further use
         function = m_methodCompiler->compileMethod(method);
+        
+        llvm::Function* asNumberBlock = m_JITModule->getFunction("String>>asNumber@4");
+        outs() << *asNumberBlock;
         verifyModule(*m_JITModule);
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
@@ -312,10 +315,9 @@ void JITRuntime::initializeExceptionAPI() {
     m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Type::getInt8PtrTy(llvmContext), Type::getInt8PtrTy(llvmContext), false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
     m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
 
-    m_exceptionAPI.getBlockReturnType = Function::Create(
-        FunctionType::get(Type::getVoidTy(llvmContext)->getPointerTo(), false),
-        Function::ExternalLinkage, "getBlockReturnType", m_JITModule);
-    m_executionEngine->addGlobalMapping(m_exceptionAPI.getBlockReturnType, reinterpret_cast<void*>(& ::getBlockReturnType));
+    
+    m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Type::getInt8Ty(llvmContext)));
+    m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, reinterpret_cast<void*>( TBlockReturn::getBlockReturnType() ));
 }
 
 extern "C" {
@@ -352,11 +354,6 @@ void emitBlockReturn(TObject* value, TContext* targetContext)
 {
     printf("emitBlockReturn(%p, %p)\n", value, targetContext);
     throw TBlockReturn(value, targetContext);
-}
-
-const void* getBlockReturnType()
-{
-    return TBlockReturn::getBlockReturnType();
 }
 
 void checkRoot(TObject* value, TObject** objectSlot)
