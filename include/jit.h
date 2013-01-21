@@ -32,7 +32,7 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <types.h>                    
+#include <types.h>
 #include "vm.h"
 
 #include <typeinfo>
@@ -85,7 +85,7 @@ struct TObjectTypes {
     llvm::StructType* byteObject;
 
     llvm::StructType* blockReturn;
-    
+
 
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("struct.TObject");
@@ -110,7 +110,7 @@ struct TJITGlobals {
     llvm::GlobalValue* smallIntClass;
     llvm::GlobalValue* arrayClass;
     llvm::GlobalValue* binarySelectors[3];
-    
+
     void initializeFromModule(llvm::Module* module) {
         nilObject          = module->getGlobalVariable("globals.nilObject");
         trueObject         = module->getGlobalVariable("globals.trueObject");
@@ -120,7 +120,7 @@ struct TJITGlobals {
         binarySelectors[0] = module->getGlobalVariable("globals.<");
         binarySelectors[1] = module->getGlobalVariable("globals.<=");
         binarySelectors[2] = module->getGlobalVariable("globals.+");
-        
+
       //badMethodSymbol =
     }
 };
@@ -136,7 +136,7 @@ private:
         TMethod*            method;       // Smalltalk method we're currently processing
         uint32_t            bytePointer;
         uint32_t            byteCount;
-        
+
         llvm::Function*     function;     // LLVM function that is created based on method
         llvm::Value*        methodPtr;    // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
@@ -144,16 +144,16 @@ private:
         llvm::Value*        literals;     // LLVM representation for method literals array
         llvm::Value*        self;         // LLVM representation for current object
         llvm::Value*        selfFields;   // LLVM representation for current object's fields
-        
+
         TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
         llvm::Value*        context;
         llvm::Value*        blockContext;
-        
+
         llvm::BasicBlock*   exceptionLandingPad;
         //llvm::Value*        blockReturnTypeInfo;
         bool                methodHasBlockReturn;
-        
+
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
         // Instead we're interpriting the push, pop and assign instructions
@@ -166,18 +166,18 @@ private:
         llvm::Value* lastValue() { return valueStack.back(); }
         llvm::Value* popValue() {
             if (valueStack.empty()) {
-                // Stack underflow due to continiuoslypopping the values, 
+                // Stack underflow due to continiuoslypopping the values,
                 // like in blockReturn stackReturn
                 // FIXME Do this in a more clever way
                 //return m_globals.nilObject;
                 printf("JIT: Value stack underflow!\n");
             }
-            
+
             llvm::Value* value = valueStack.back();
             valueStack.pop_back();
             return value;
         }
-        
+
         TJITContext(TMethod* method) : method(method),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
@@ -188,7 +188,7 @@ private:
         };
 
         ~TJITContext() { if (builder) delete builder; }
-    private:    
+    private:
         std::vector<llvm::Value*> valueStack;
     };
 
@@ -197,12 +197,12 @@ private:
     bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
-    
+
     TObjectTypes ot;
     TJITGlobals    m_globals;
     TRuntimeAPI    m_runtimeAPI;
     TExceptionAPI  m_exceptionAPI;
-    
+
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);
@@ -220,9 +220,10 @@ private:
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
     void doSpecial(TJITContext& jit);
+	void doPrimitive(TJITContext& jit);
 
     void printOpcode(TInstruction instruction);
-    
+
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
 public:
@@ -263,7 +264,7 @@ extern "C" {
 class JITRuntime {
 private:
     llvm::FunctionPassManager* m_functionPassManager;
-    
+
     SmalltalkVM* m_softVM;
     llvm::ExecutionEngine* m_executionEngine;
     MethodCompiler* m_methodCompiler;
@@ -274,41 +275,41 @@ private:
     //typedef std::map<std::string, llvm::Function*> TFunctionMap;
     //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
     //TFunctionMap m_compiledFunctions; //TODO useless var?
-    
+
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
-    
+
     TObjectTypes ot;
     llvm::GlobalVariable* m_jitGlobals;
-    
+
     static JITRuntime* s_instance;
 
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    
+
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    
+
     void initializeGlobals();
     void initializePassManager();
-    
+
     //uses ot types. dont forget to init it before calling this method
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
-    
+
 public:
     static JITRuntime* Instance() { return s_instance; }
-    
+
     typedef TObject* (*TMethodFunction)(TContext*);
-    
+
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
-    
+
     void dumpJIT();
-    
+
     void initialize(SmalltalkVM* softVM);
     ~JITRuntime();
 };
