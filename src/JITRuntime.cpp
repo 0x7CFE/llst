@@ -261,8 +261,6 @@ void JITRuntime::initializeRuntimeAPI() {
     PointerType* contextType    = ot.context->getPointerTo();
     PointerType* blockType      = ot.block->getPointerTo();
     
-    
-    
     Type* params[] = {
         classType,                    // klass
         Type::getInt32Ty(llvmContext) // size
@@ -291,6 +289,15 @@ void JITRuntime::initializeRuntimeAPI() {
     };
     FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
     
+    Type* bulkReplaceParams[] = {
+        objectType, // destination
+        objectType, // sourceStartOffset
+        objectType, // source
+        objectType, // destinationStopOffset
+        objectType  // destinationStartOffset
+    };
+    FunctionType* bulkReplaceType = FunctionType::get(Type::getInt1Ty(llvmContext), bulkReplaceParams, false);
+    
     // Creating function references
     m_runtimeAPI.newOrdinaryObject  = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
@@ -298,6 +305,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.createBlock        = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     m_runtimeAPI.checkRoot          = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "checkRoot", m_JITModule );
+    m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
     
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -359,6 +367,19 @@ void emitBlockReturn(TObject* value, TContext* targetContext)
 void checkRoot(TObject* value, TObject** objectSlot)
 {
     JITRuntime::Instance()->getVM()->checkRoot(value, objectSlot);
+}
+
+bool bulkReplace(TObject* destination,
+                 TObject* destinationStartOffset,
+                 TObject* destinationStopOffset,
+                 TObject* source,
+                 TObject* sourceStartOffset)
+{
+    return JITRuntime::Instance()->getVM()->doBulkReplace(destination,
+                                                          destinationStartOffset,
+                                                          destinationStopOffset,
+                                                          source,
+                                                          sourceStartOffset);
 }
 
 }

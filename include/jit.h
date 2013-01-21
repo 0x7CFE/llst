@@ -62,6 +62,7 @@ struct TRuntimeAPI {
     llvm::Function* createBlock;
     llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
+    llvm::Function* bulkReplace;
 };
 
 struct TExceptionAPI {
@@ -259,6 +260,12 @@ extern "C" {
     void         emitBlockReturn(TObject* value, TContext* targetContext);
     const void*  getBlockReturnType();
     void         checkRoot(TObject* value, TObject** objectSlot);
+
+    bool         bulkReplace(TObject* destination,
+                               TObject* destinationStartOffset,
+                               TObject* destinationStopOffset,
+                               TObject* source,
+                               TObject* sourceStartOffset);
 }
 
 class JITRuntime {

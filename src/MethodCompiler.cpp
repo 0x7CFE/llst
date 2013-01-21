@@ -945,6 +945,19 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 			jit.builder->CreateRet(clone);
 		} break;
 
+        case SmalltalkVM::bulkReplace: {
+            Value* destination            = jit.popValue();
+            Value* sourceStartOffset      = jit.popValue();
+            Value* source                 = jit.popValue();
+            Value* destinationStopOffset  = jit.popValue();
+            Value* destinationStartOffset = jit.popValue();
+
+            Value* arguments[]  = { destination, sourceStartOffset, source, destinationStopOffset, destinationStartOffset };
+            Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "succeeded.");
+            Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
+            jit.builder->CreateRet(resultObject);
+        }
+
 		default:
 			outs() << "JIT: Unknown primitive code " << opcode;
 	}

@@ -231,11 +231,10 @@ private:
     bool m_lastGCOccured;
     void onCollectionOccured();
 
-
-    bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
-
     std::list<TObject*> rootStack;
 public:
+    bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
+
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
     TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
