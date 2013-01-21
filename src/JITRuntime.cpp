@@ -297,6 +297,13 @@ void JITRuntime::initializeRuntimeAPI() {
         objectType  // destinationStartOffset
     };
     FunctionType* bulkReplaceType = FunctionType::get(Type::getInt1Ty(llvmContext), bulkReplaceParams, false);
+
+    Type* performSmallIntParams[] = {
+        Type::getInt8Ty(llvmContext), // opcode
+        objectType,        // leftOperand
+        objectType,        // rightOperand
+    };
+    FunctionType* performSmallIntType = FunctionType::get(objectType, performSmallIntParams, false);
     
     // Creating function references
     m_runtimeAPI.newOrdinaryObject  = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
@@ -306,6 +313,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     m_runtimeAPI.checkRoot          = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
+    m_runtimeAPI.bulkReplace        = Function::Create(performSmallIntType, Function::ExternalLinkage, "performSmallInt", m_JITModule);
     
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -380,6 +388,13 @@ bool bulkReplace(TObject* destination,
                                                           destinationStopOffset,
                                                           source,
                                                           sourceStartOffset);
+}
+
+TObject* performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject)
+{
+    int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
+    int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
+    return JITRuntime::Instance()->getVM()->doSmallInt((SmalltalkVM::SmallIntOpcode) opcode, leftOperand, rightOperand);
 }
 
 }

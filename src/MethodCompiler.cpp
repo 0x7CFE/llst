@@ -945,6 +945,40 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 			jit.builder->CreateRet(clone);
 		} break;
 
+        case SmalltalkVM::integerNew:
+            jit.builder->CreateRet(jit.popValue()); // TODO long integers
+            break;
+        
+        case SmalltalkVM::smallIntAdd:        // 10
+        case SmalltalkVM::smallIntDiv:        // 11
+        case SmalltalkVM::smallIntMod:        // 12
+        case SmalltalkVM::smallIntLess:       // 13
+        case SmalltalkVM::smallIntEqual:      // 14
+        case SmalltalkVM::smallIntMul:        // 15
+        case SmalltalkVM::smallIntSub:        // 16
+        case SmalltalkVM::smallIntBitOr:      // 36
+        case SmalltalkVM::smallIntBitAnd:     // 37
+        case SmalltalkVM::smallIntBitShift: { // 39
+            Value* rightOperand = jit.popValue();
+            Value* leftOperand  = jit.popValue();
+
+            Function* isSmallInt  = m_TypeModule->getFunction("isSmallInteger()");
+            Value*    conjunction = jit.builder->CreateAnd(leftOperand, rightOperand);
+            Value*    value       = jit.builder->CreateCall(isSmallInt, conjunction);
+
+            BasicBlock* notInts = BasicBlock::Create(m_JITModule->getContext(), "notInts.", jit.function);
+            BasicBlock* areInts = BasicBlock::Create(m_JITModule->getContext(), "areInts.", jit.function);
+            jit.builder->CreateCondBr(value, areInts, notInts);
+
+            jit.builder->SetInsertPoint(notInts);
+            jit.builder->CreateRet(m_globals.nilObject);
+
+            jit.builder->SetInsertPoint(areInts);
+            Value* arguments[] = { jit.builder->getInt8(opcode), leftOperand, rightOperand };
+            Value* result      = jit.builder->CreateCall(m_runtimeAPI.performSmallInt, arguments, "succeeded.");
+            jit.builder->CreateRet(result);
+        } break;
+        
         case SmalltalkVM::bulkReplace: {
             Value* destination            = jit.popValue();
             Value* sourceStartOffset      = jit.popValue();
@@ -956,7 +990,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "succeeded.");
             Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
             jit.builder->CreateRet(resultObject);
-        }
+        } break;
 
 		default:
 			outs() << "JIT: Unknown primitive code " << opcode;

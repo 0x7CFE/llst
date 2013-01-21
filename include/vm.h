@@ -112,7 +112,7 @@ public:
 		flushCache        = 34,
 		bulkReplace       = 38
 	};
-private:
+
     enum SmallIntOpcode {
         smallIntAdd = 10,
         smallIntDiv,
@@ -125,6 +125,7 @@ private:
         smallIntBitAnd = 37,
         smallIntBitShift = 39
     };
+private:
 
     enum {
         ioGetChar = 9,
@@ -222,8 +223,6 @@ private:
     TExecuteResult doPrimitive(hptr<TProcess>& process, TVMExecutionContext& ec);
     TExecuteResult doSpecial         (hptr<TProcess>& process, TVMExecutionContext& ec);
 
-    // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
 
     Image*          m_image;
     IMemoryManager* m_memoryManager;
@@ -234,7 +233,9 @@ private:
     std::list<TObject*> rootStack;
 public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
-
+    // The result may be nil if the opcode execution fails (division by zero etc)
+    TObject* doSmallInt(SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
+    
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
     TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
