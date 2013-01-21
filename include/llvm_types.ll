@@ -101,13 +101,10 @@ define %struct.TObject* @"newInteger()"(i32 %value) {
 define i32 @"getSlotSize()"(i32 %fieldsCount) {
     ;sizeof(TObject) + fieldsCount * sizeof(TObject*)
 
-	%ptrSize    = i32 4 ; sizeof(TObject*) TODO
-	%objectSize = i32 8 ; sizeof(TObject)
+    %fieldsSize = mul i32 4, %fieldsCount
+    %slotSize   = add i32 8, %fieldsSize
 
-	%fieldsSize = i32 mul %ptrSize, %fieldsCount
-	%slotSize   = i32 add %fieldsSize, %ptrsize
-
-	ret i32 %slotSize
+    ret i32 %slotSize
 }
 
 
