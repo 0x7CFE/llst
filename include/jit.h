@@ -60,7 +60,8 @@ struct TRuntimeAPI {
     llvm::Function* newBinaryObject;
     llvm::Function* sendMessage;
     llvm::Function* createBlock;
-    llvm::Function* emitBlockReturn;
+	llvm::Function* invokeBlock;
+	llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
 
     llvm::Function* bulkReplace;
@@ -259,7 +260,8 @@ extern "C" {
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    void         emitBlockReturn(TObject* value, TContext* targetContext);
+	TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+	void         emitBlockReturn(TObject* value, TContext* targetContext);
     const void*  getBlockReturnType();
     void         checkRoot(TObject* value, TObject** objectSlot);
 
@@ -297,11 +299,13 @@ private:
 
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+	TObject* invokeBlock(TBlock* block, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+	friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
 
     void initializeGlobals();
     void initializePassManager();
@@ -314,6 +318,7 @@ public:
     static JITRuntime* Instance() { return s_instance; }
 
     typedef TObject* (*TMethodFunction)(TContext*);
+	typedef TObject* (*TBlockFunction)(TBlock*);
 
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }

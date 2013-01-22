@@ -524,7 +524,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
 
     // Creating block function named Class>>method@offset
     std::ostringstream ss;
-    ss << jit.function->getName().str() << "@" << currentOffset;
+	ss << jit.function->getName().str() << "@" << jit.bytePointer; //currentOffset;
     std::string blockFunctionName = ss.str();
 
     std::vector<Type*> blockParams;
@@ -948,7 +948,37 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case SmalltalkVM::integerNew:
             jit.builder->CreateRet(jit.popValue()); // TODO long integers
             break;
-        
+
+		case SmalltalkVM::blockInvoke: {
+			Value* block  = jit.popValue();
+
+			int32_t argCount = jit.instruction.low - 1;
+
+			Value* blockAsContext = jit.builder->CreateBitCast(block, ot.context->getPointerTo());
+			Value* blockTempsPtr  = jit.builder->CreateStructGEP(blockAsContext, 3);
+			Value* blockTemps     = jit.builder->CreateLoad(blockTempsPtr);
+
+			Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
+			Value*    fields    = jit.builder->CreateCall(getFields, blockTemps);
+
+			Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
+			Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
+
+			// Storing values in the block's wrapping context
+			for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
+			{
+				// (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
+				Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
+				Value* fieldPtr   = jit.builder->CreateGEP(fields, fieldIndex);
+				Value* argument   = jit.popValue();
+				jit.builder->CreateStore(argument, fieldPtr);
+			}
+
+			Value* args[] = { jit.context, block };
+			Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
+			jit.builder->CreateRet(result);
+		} break;
+
         case SmalltalkVM::smallIntAdd:        // 10
         case SmalltalkVM::smallIntDiv:        // 11
         case SmalltalkVM::smallIntMod:        // 12
@@ -978,7 +1008,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* result      = jit.builder->CreateCall(m_runtimeAPI.performSmallInt, arguments, "succeeded.");
             jit.builder->CreateRet(result);
         } break;
-        
+
         case SmalltalkVM::bulkReplace: {
             Value* destination            = jit.popValue();
             Value* sourceStartOffset      = jit.popValue();
@@ -995,4 +1025,11 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 		default:
 			outs() << "JIT: Unknown primitive code " << opcode;
 	}
+
+	// Appending the fallback block
+// 	BasicBlock* fallback = BasicBlock::Create(m_JITModule->getContext(), "primitiveFallback", jit.function);
+// 	jit.builder->CreateBr(fallback);
+// 	jit.builder->SetInsertPoint(fallback);
+
+
 }
