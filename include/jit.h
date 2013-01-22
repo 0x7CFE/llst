@@ -1,36 +1,36 @@
 /*
- *    jit.h
- *
- *    LLVM related routines
- *
- *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
- *
- *    LLST is
- *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
- *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
- *
- *    LLST is based on the LittleSmalltalk which is
- *        Copyright (C) 1987-2005 by Timothy A. Budd
- *        Copyright (C) 2007 by Charles R. Childers
- *        Copyright (C) 2005-2007 by Danny Reinhold
- *
- *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *
- *
- *    This file is part of LLST.
- *    LLST is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
- *
- *    LLST is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
- */
+*    jit.h
+*
+*    LLVM related routines
+*
+*    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+*
+*    LLST is
+*        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
+*        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+*
+*    LLST is based on the LittleSmalltalk which is
+*        Copyright (C) 1987-2005 by Timothy A. Budd
+*        Copyright (C) 2007 by Charles R. Childers
+*        Copyright (C) 2005-2007 by Danny Reinhold
+*
+*    Original license of LittleSmalltalk may be found in the LICENSE file.
+*
+*
+*    This file is part of LLST.
+*    LLST is free software: you can redistribute it and/or modify
+*    it under the terms of the GNU General Public License as published by
+*    the Free Software Foundation, either version 3 of the License, or
+*    (at your option) any later version.
+*
+*    LLST is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU General Public License for more details.
+*
+*    You should have received a copy of the GNU General Public License
+*    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <types.h>
 #include "vm.h"
@@ -60,8 +60,8 @@ struct TRuntimeAPI {
     llvm::Function* newBinaryObject;
     llvm::Function* sendMessage;
     llvm::Function* createBlock;
-	llvm::Function* invokeBlock;
-	llvm::Function* emitBlockReturn;
+    llvm::Function* invokeBlock;
+    llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
 
     llvm::Function* bulkReplace;
@@ -125,7 +125,7 @@ struct TJITGlobals {
         binarySelectors[1] = module->getGlobalVariable("globals.<=");
         binarySelectors[2] = module->getGlobalVariable("globals.+");
 
-      //badMethodSymbol =
+    //badMethodSymbol =
     }
 };
 
@@ -224,7 +224,7 @@ private:
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
     void doSpecial(TJITContext& jit);
-	void doPrimitive(TJITContext& jit);
+    void doPrimitive(TJITContext& jit);
 
     void printOpcode(TInstruction instruction);
 
@@ -240,7 +240,7 @@ public:
         TExceptionAPI exceptionApi
     )
         : m_JITModule(JITModule), m_TypeModule(TypeModule),
-          m_runtimeAPI(api), m_exceptionAPI(exceptionApi)
+        m_runtimeAPI(api), m_exceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;
@@ -260,16 +260,16 @@ extern "C" {
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-	TObject*     invokeBlock(TBlock* block, TContext* callingContext);
-	void         emitBlockReturn(TObject* value, TContext* targetContext);
+    TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+    void         emitBlockReturn(TObject* value, TContext* targetContext);
     const void*  getBlockReturnType();
     void         checkRoot(TObject* value, TObject** objectSlot);
 
     bool         bulkReplace(TObject* destination,
-                             TObject* destinationStartOffset,
-                             TObject* destinationStopOffset,
-                             TObject* source,
-                             TObject* sourceStartOffset);
+                            TObject* destinationStartOffset,
+                            TObject* destinationStopOffset,
+                            TObject* source,
+                            TObject* sourceStartOffset);
 
     TObject*     performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject);
 }
@@ -299,13 +299,13 @@ private:
 
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-	TObject* invokeBlock(TBlock* block, TContext* callingContext);
+    TObject* invokeBlock(TBlock* block, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-	friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+    friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
 
     void initializeGlobals();
     void initializePassManager();
@@ -318,7 +318,7 @@ public:
     static JITRuntime* Instance() { return s_instance; }
 
     typedef TObject* (*TMethodFunction)(TContext*);
-	typedef TObject* (*TBlockFunction)(TBlock*);
+    typedef TObject* (*TBlockFunction)(TBlock*);
 
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }

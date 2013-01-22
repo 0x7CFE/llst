@@ -1,37 +1,37 @@
 /*
- *    MethodCompiler.cpp
- *
- *    Implementation of MethodCompiler class which is used to
- *    translate smalltalk bytecodes to LLVM IR code
- *
- *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
- *
- *    LLST is
- *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
- *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
- *
- *    LLST is based on the LittleSmalltalk which is
- *        Copyright (C) 1987-2005 by Timothy A. Budd
- *        Copyright (C) 2007 by Charles R. Childers
- *        Copyright (C) 2005-2007 by Danny Reinhold
- *
- *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *
- *
- *    This file is part of LLST.
- *    LLST is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
- *
- *    LLST is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
- */
+*    MethodCompiler.cpp
+*
+*    Implementation of MethodCompiler class which is used to
+*    translate smalltalk bytecodes to LLVM IR code
+*
+*    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+*
+*    LLST is
+*        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
+*        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+*
+*    LLST is based on the LittleSmalltalk which is
+*        Copyright (C) 1987-2005 by Timothy A. Budd
+*        Copyright (C) 2007 by Charles R. Childers
+*        Copyright (C) 2005-2007 by Danny Reinhold
+*
+*    Original license of LittleSmalltalk may be found in the LICENSE file.
+*
+*
+*    This file is part of LLST.
+*    LLST is free software: you can redistribute it and/or modify
+*    it under the terms of the GNU General Public License as published by
+*    the Free Software Foundation, either version 3 of the License, or
+*    (at your option) any later version.
+*
+*    LLST is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU General Public License for more details.
+*
+*    You should have received a copy of the GNU General Public License
+*    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <jit.h>
 #include <vm.h>
@@ -113,9 +113,9 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
             // Recursively processing the nested block
             if (scanForBlockReturn(jit, newBytePointer - jit.bytePointer)) {
-				// Resetting bytePointer to an old value
-				jit.bytePointer = previousBytePointer;
-				return true;
+                // Resetting bytePointer to an old value
+                jit.bytePointer = previousBytePointer;
+                return true;
             }
 
             // Skipping block's bytecodes
@@ -128,11 +128,11 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
         switch (instruction.low) {
             case SmalltalkVM::blockReturn:
-                 outs() << "Found a block return at offset " << currentOffset << "\n";
+                outs() << "Found a block return at offset " << currentOffset << "\n";
 
-				// Resetting bytePointer to an old value
-				jit.bytePointer = previousBytePointer;
-				return true;
+                // Resetting bytePointer to an old value
+                jit.bytePointer = previousBytePointer;
+                return true;
 
             case SmalltalkVM::branch:
             case SmalltalkVM::branchIfFalse:
@@ -231,7 +231,7 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // It will contain basic initialization code (args, temps and so on)
     BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
 
-	// Creating the instruction builder
+    // Creating the instruction builder
     jit.builder = new IRBuilder<>(preamble);
 
     // Checking whether method contains inline blocks that has blockReturn instruction.
@@ -338,8 +338,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 
-      if (instCountAfter > instCountBefore)
-          outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
+    if (instCountAfter > instCountBefore)
+        outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }
 
@@ -524,7 +524,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
 
     // Creating block function named Class>>method@offset
     std::ostringstream ss;
-	ss << jit.function->getName().str() << "@" << jit.bytePointer; //currentOffset;
+    ss << jit.function->getName().str() << "@" << jit.bytePointer; //currentOffset;
     std::string blockFunctionName = ss.str();
 
     std::vector<Type*> blockParams;
@@ -874,110 +874,111 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
-	uint32_t opcode = jit.instruction.low;
-	switch (opcode) {
-		case SmalltalkVM::objectsAreEqual: {
-			Value* object2 = jit.popValue();
-			Value* object1 = jit.popValue();
+    uint32_t opcode = jit.instruction.low;
+    
+    switch (opcode) {
+        case SmalltalkVM::objectsAreEqual: {
+            Value* object2 = jit.popValue();
+            Value* object1 = jit.popValue();
 
-			Value* result    = jit.builder->CreateICmpEQ(object1, object2);
-			Value* boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
-			jit.builder->CreateRet(boolValue);
-		} break;
+            Value* result    = jit.builder->CreateICmpEQ(object1, object2);
+            Value* boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
+            jit.builder->CreateRet(boolValue);
+        } break;
 
-		case SmalltalkVM::getClass: {
-			Value*    object   = jit.popValue();
-			Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
-			Value*    klass    = jit.builder->CreateCall(getClass, object, "class");
-			jit.builder->CreateRet(klass);
-		} break;
+        case SmalltalkVM::getClass: {
+            Value*    object   = jit.popValue();
+            Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
+            Value*    klass    = jit.builder->CreateCall(getClass, object, "class");
+            jit.builder->CreateRet(klass);
+        } break;
 
-		// TODO ioGetchar ioPutChar
+        // TODO ioGetchar ioPutChar
 
-		case SmalltalkVM::getSize: {
-			Value*    object  = jit.popValue();
-			Function* getSize = m_TypeModule->getFunction("TObject::getSize()");
-			Value*    size    = jit.builder->CreateCall(getSize, object, "class");
-			jit.builder->CreateRet(size);
-		} break;
+        case SmalltalkVM::getSize: {
+            Value*    object  = jit.popValue();
+            Function* getSize = m_TypeModule->getFunction("TObject::getSize()");
+            Value*    size    = jit.builder->CreateCall(getSize, object, "class");
+            jit.builder->CreateRet(size);
+        } break;
 
-		// TODO new process
+        // TODO new process
 
-		case SmalltalkVM::allocateObject: { // FIXME pointer safety
-			Value* sizeObject  = jit.popValue();
-			Value* klass       = jit.popValue();
+        case SmalltalkVM::allocateObject: { // FIXME pointer safety
+            Value* sizeObject  = jit.popValue();
+            Value* klass       = jit.popValue();
 
-			Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
-			Value*    size     = jit.builder->CreateCall(getValue, sizeObject, "size.");
+            Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
+            Value*    size     = jit.builder->CreateCall(getValue, sizeObject, "size.");
 
-			Function* getSlotSize = m_TypeModule->getFunction("getSlotSize()");
-			Value*    slotSize    = jit.builder->CreateCall(getSlotSize, size, "slotSize.");
+            Function* getSlotSize = m_TypeModule->getFunction("getSlotSize()");
+            Value*    slotSize    = jit.builder->CreateCall(getSlotSize, size, "slotSize.");
 
-			Value*    args[] = { klass, slotSize };
-			Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
+            Value*    args[] = { klass, slotSize };
+            Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
 
-			jit.builder->CreateRet(newInstance);
-		} break;
+            jit.builder->CreateRet(newInstance);
+        } break;
 
-		case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
-			Value*    sizeObject  = jit.popValue();
-			Value*    klass       = jit.popValue();
+        case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
+            Value*    sizeObject  = jit.popValue();
+            Value*    klass       = jit.popValue();
 
-			Function* getValue    = m_TypeModule->getFunction("getIntegerValue()");
-			Value*    dataSize    = jit.builder->CreateCall(getValue, sizeObject, "dataSize.");
+            Function* getValue    = m_TypeModule->getFunction("getIntegerValue()");
+            Value*    dataSize    = jit.builder->CreateCall(getValue, sizeObject, "dataSize.");
 
-			Value*    args[]      = { klass, dataSize };
-			Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
+            Value*    args[]      = { klass, dataSize };
+            Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
-			jit.builder->CreateRet(newInstance);
-		} break;
+            jit.builder->CreateRet(newInstance);
+        } break;
 
-		case SmalltalkVM::cloneByteObject: { // FIXME pointer safety
-			Value*    klass    = jit.popValue();
-			Value*    original = jit.popValue();
+        case SmalltalkVM::cloneByteObject: { // FIXME pointer safety
+            Value*    klass    = jit.popValue();
+            Value*    original = jit.popValue();
 
-			Function* getSize  = m_TypeModule->getFunction("TObject::getSize()");
-			Value*    dataSize = jit.builder->CreateCall(getSize, original, "dataSize.");
+            Function* getSize  = m_TypeModule->getFunction("TObject::getSize()");
+            Value*    dataSize = jit.builder->CreateCall(getSize, original, "dataSize.");
 
-			Value*    args[]   = { klass, dataSize };
-			Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
+            Value*    args[]   = { klass, dataSize };
+            Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
 
-			jit.builder->CreateRet(clone);
-		} break;
+            jit.builder->CreateRet(clone);
+        } break;
 
         case SmalltalkVM::integerNew:
             jit.builder->CreateRet(jit.popValue()); // TODO long integers
             break;
 
-		case SmalltalkVM::blockInvoke: {
-			Value* block  = jit.popValue();
+        case SmalltalkVM::blockInvoke: {
+            Value* block  = jit.popValue();
 
-			int32_t argCount = jit.instruction.low - 1;
+            int32_t argCount = jit.instruction.low - 1;
 
-			Value* blockAsContext = jit.builder->CreateBitCast(block, ot.context->getPointerTo());
-			Value* blockTempsPtr  = jit.builder->CreateStructGEP(blockAsContext, 3);
-			Value* blockTemps     = jit.builder->CreateLoad(blockTempsPtr);
+            Value* blockAsContext = jit.builder->CreateBitCast(block, ot.context->getPointerTo());
+            Value* blockTempsPtr  = jit.builder->CreateStructGEP(blockAsContext, 3);
+            Value* blockTemps     = jit.builder->CreateLoad(blockTempsPtr);
 
-			Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
-			Value*    fields    = jit.builder->CreateCall(getFields, blockTemps);
+            Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
+            Value*    fields    = jit.builder->CreateCall(getFields, blockTemps);
 
-			Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
-			Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
+            Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
+            Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
 
-			// Storing values in the block's wrapping context
-			for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
-			{
-				// (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
-				Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
-				Value* fieldPtr   = jit.builder->CreateGEP(fields, fieldIndex);
-				Value* argument   = jit.popValue();
-				jit.builder->CreateStore(argument, fieldPtr);
-			}
+            // Storing values in the block's wrapping context
+            for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
+            {
+                // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
+                Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
+                Value* fieldPtr   = jit.builder->CreateGEP(fields, fieldIndex);
+                Value* argument   = jit.popValue();
+                jit.builder->CreateStore(argument, fieldPtr);
+            }
 
-			Value* args[] = { jit.context, block };
-			Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
-			jit.builder->CreateRet(result);
-		} break;
+            Value* args[] = { jit.context, block };
+            Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
+            jit.builder->CreateRet(result);
+        } break;
 
         case SmalltalkVM::smallIntAdd:        // 10
         case SmalltalkVM::smallIntDiv:        // 11
@@ -1022,14 +1023,13 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->CreateRet(resultObject);
         } break;
 
-		default:
-			outs() << "JIT: Unknown primitive code " << opcode;
-	}
+        default:
+            outs() << "JIT: Unknown primitive code " << opcode;
+    }
 
-	// Appending the fallback block
-// 	BasicBlock* fallback = BasicBlock::Create(m_JITModule->getContext(), "primitiveFallback", jit.function);
-// 	jit.builder->CreateBr(fallback);
-// 	jit.builder->SetInsertPoint(fallback);
-
+    // Appending the fallback block
+    // BasicBlock* fallback = BasicBlock::Create(m_JITModule->getContext(), "primitiveFallback", jit.function);
+    // jit.builder->CreateBr(fallback);
+    // jit.builder->SetInsertPoint(fallback);
 
 }

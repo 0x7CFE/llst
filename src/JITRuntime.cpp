@@ -1,36 +1,36 @@
 /*
- *    main.cpp
- *
- *    Program entry point
- *
- *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
- *
- *    LLST is
- *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
- *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
- *
- *    LLST is based on the LittleSmalltalk which is
- *        Copyright (C) 1987-2005 by Timothy A. Budd
- *        Copyright (C) 2007 by Charles R. Childers
- *        Copyright (C) 2005-2007 by Danny Reinhold
- *
- *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *
- *
- *    This file is part of LLST.
- *    LLST is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
- *
- *    LLST is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
- */
+*    main.cpp
+*
+*    Program entry point
+*
+*    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+*
+*    LLST is
+*        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
+*        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+*
+*    LLST is based on the LittleSmalltalk which is
+*        Copyright (C) 1987-2005 by Timothy A. Budd
+*        Copyright (C) 2007 by Charles R. Childers
+*        Copyright (C) 2005-2007 by Danny Reinhold
+*
+*    Original license of LittleSmalltalk may be found in the LICENSE file.
+*
+*
+*    This file is part of LLST.
+*    LLST is free software: you can redistribute it and/or modify
+*    it under the terms of the GNU General Public License as published by
+*    the Free Software Foundation, either version 3 of the License, or
+*    (at your option) any later version.
+*
+*    LLST is distributed in the hope that it will be useful,
+*    but WITHOUT ANY WARRANTY; without even the implied warranty of
+*    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+*    GNU General Public License for more details.
+*
+*    You should have received a copy of the GNU General Public License
+*    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
+*/
 
 #include <jit.h>
 
@@ -134,41 +134,41 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
 
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
-	// Guessing the block function name
-	// TODO Fast 1-way lookup cache
-	std::ostringstream ss;
-	ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << block->bytePointer;
-	std::string blockFunctionName = ss.str();
+    // Guessing the block function name
+    // TODO Fast 1-way lookup cache
+    std::ostringstream ss;
+    ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << block->bytePointer;
+    std::string blockFunctionName = ss.str();
 
-	llvm::Function* blockFunction = m_JITModule->getFunction(blockFunctionName);
-	if (!blockFunction) {
-		// Block functions are created when wrapping method gets compiled.
-		// If function was not found then the whole method needs compilation.
+    llvm::Function* blockFunction = m_JITModule->getFunction(blockFunctionName);
+    if (!blockFunction) {
+        // Block functions are created when wrapping method gets compiled.
+        // If function was not found then the whole method needs compilation.
 
-		// Compiling function and storing it to the table for further use
-		llvm::Function* methodFunction = m_methodCompiler->compileMethod(block->method);
-		blockFunction = m_JITModule->getFunction(blockFunctionName);
-		if (!methodFunction || !blockFunction) {
-			// Something is really wrong!
-			outs() << "JIT: Fatal error in invokeBlock for " << blockFunctionName << "\n";
-			exit(1);
-		}
+        // Compiling function and storing it to the table for further use
+        llvm::Function* methodFunction = m_methodCompiler->compileMethod(block->method);
+        blockFunction = m_JITModule->getFunction(blockFunctionName);
+        if (!methodFunction || !blockFunction) {
+            // Something is really wrong!
+            outs() << "JIT: Fatal error in invokeBlock for " << blockFunctionName << "\n";
+            exit(1);
+        }
 
-		verifyModule(*m_JITModule);
-		// Running the optimization passes on a function
-		//m_functionPassManager->run(*function);
-	}
+        verifyModule(*m_JITModule);
+        // Running the optimization passes on a function
+        //m_functionPassManager->run(*function);
+    }
 
-	block->previousContext = callingContext->previousContext;
+    block->previousContext = callingContext->previousContext;
 
-	TBlockFunction compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
-	TObject* result = compiledBlockFunction(block);
+    TBlockFunction compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
+    TObject* result = compiledBlockFunction(block);
 
-	printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
-	printf("Block function result: %p\n", result);
-	printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
+    printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
+    printf("Block function result: %p\n", result);
+    printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
 
-	return result;
+    return result;
 }
 
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
@@ -326,13 +326,13 @@ void JITRuntime::initializeRuntimeAPI() {
     FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams, false);
 
     Type* invokeBlockParams[] = {
-		blockType,  // block
-		contextType // callingContext
-	};
-	FunctionType* invokeBlockType = FunctionType::get(objectType, invokeBlockParams, false);
+        blockType,  // block
+        contextType // callingContext
+    };
+    FunctionType* invokeBlockType = FunctionType::get(objectType, invokeBlockParams, false);
 
 
-	Type* emitBlockReturnParams[] = {
+    Type* emitBlockReturnParams[] = {
         objectType, // value
         contextType // targetContext
     };
@@ -361,7 +361,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
     m_runtimeAPI.sendMessage        = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
     m_runtimeAPI.createBlock        = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
-	m_runtimeAPI.invokeBlock       =  Function::Create(invokeBlockType, Function::ExternalLinkage, "invokeBlock", m_JITModule);
+    m_runtimeAPI.invokeBlock       =  Function::Create(invokeBlockType, Function::ExternalLinkage, "invokeBlock", m_JITModule);
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     m_runtimeAPI.checkRoot          = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
@@ -372,8 +372,8 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.sendMessage, reinterpret_cast<void*>(& ::sendMessage));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.createBlock, reinterpret_cast<void*>(& ::createBlock));
-	m_executionEngine->addGlobalMapping(m_runtimeAPI.invokeBlock, reinterpret_cast<void*>(& ::invokeBlock));
-	m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.invokeBlock, reinterpret_cast<void*>(& ::invokeBlock));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
 }
 
@@ -420,7 +420,8 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
 
 TObject* invokeBlock(TBlock* block, TContext* callingContext)
 {
-	return JITRuntime::Instance()->invokeBlock(block, callingContext);
+    printf("invokeBlock %p, %p\n", block, callingContext);
+    return JITRuntime::Instance()->invokeBlock(block, callingContext);
 }
 
 void emitBlockReturn(TObject* value, TContext* targetContext)
@@ -431,24 +432,27 @@ void emitBlockReturn(TObject* value, TContext* targetContext)
 
 void checkRoot(TObject* value, TObject** objectSlot)
 {
+    printf("checkRoot %p, %p\n", value, objectSlot);
     JITRuntime::Instance()->getVM()->checkRoot(value, objectSlot);
 }
 
 bool bulkReplace(TObject* destination,
-                 TObject* destinationStartOffset,
-                 TObject* destinationStopOffset,
-                 TObject* source,
-                 TObject* sourceStartOffset)
+                TObject* destinationStartOffset,
+                TObject* destinationStopOffset,
+                TObject* source,
+                TObject* sourceStartOffset)
 {
     return JITRuntime::Instance()->getVM()->doBulkReplace(destination,
-                                                          destinationStartOffset,
-                                                          destinationStopOffset,
-                                                          source,
-                                                          sourceStartOffset);
+                                                        destinationStartOffset,
+                                                        destinationStopOffset,
+                                                        source,
+                                                        sourceStartOffset);
 }
 
 TObject* performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject)
 {
+    printf("performSmallInt %d, %p, %p\n", (uint32_t) opcode, leftObject, rightObject);
+
     int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
     int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
     return JITRuntime::Instance()->getVM()->doSmallInt((SmalltalkVM::SmallIntOpcode) opcode, leftOperand, rightOperand);
