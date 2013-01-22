@@ -1004,9 +1004,10 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->SetInsertPoint(notInts);
             jit.builder->CreateRet(m_globals.nilObject);
 
+            // TODO Reimplement using direct llvm operations
             jit.builder->SetInsertPoint(areInts);
             Value* arguments[] = { jit.builder->getInt8(opcode), leftOperand, rightOperand };
-            Value* result      = jit.builder->CreateCall(m_runtimeAPI.performSmallInt, arguments, "succeeded.");
+            Value* result      = jit.builder->CreateCall(m_runtimeAPI.performSmallInt, arguments, "result.");
             jit.builder->CreateRet(result);
         } break;
 
@@ -1018,7 +1019,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* destinationStartOffset = jit.popValue();
 
             Value* arguments[]  = { destination, sourceStartOffset, source, destinationStopOffset, destinationStartOffset };
-            Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "succeeded.");
+            Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
             Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
             jit.builder->CreateRet(resultObject);
         } break;
