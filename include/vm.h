@@ -235,7 +235,7 @@ public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     // The result may be nil if the opcode execution fails (division by zero etc)
     TObject* doSmallInt(SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
-    
+
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
     TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);

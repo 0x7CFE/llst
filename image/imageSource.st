@@ -12,36 +12,36 @@ COMMENT
 COMMENT Copyright (C) 1987-2005 by Timothy A. Budd
 COMMENT Copyright (C) 2007 by Charles R. Childers
 COMMENT Copyright (C) 2005-2007 by Danny Reinhold
-COMMENT 
+COMMENT
 COMMENT Some parts of this file are
 COMMENT Copyright (C) 2012 Dmitry Kashitsyn   <korvin@deeptown.org>
 COMMENT Copyright (C) 2012 Roman Proskuryakov <humbug@deeptown.org>
 COMMENT
 COMMENT ============================================================================
-COMMENT This license applies to the virtual machine and to the initial image of 
-COMMENT the Little Smalltalk system and to all files in the Little Smalltalk 
+COMMENT This license applies to the virtual machine and to the initial image of
+COMMENT the Little Smalltalk system and to all files in the Little Smalltalk
 COMMENT packages.
 COMMENT ============================================================================
-COMMENT Permission is hereby granted, free of charge, to any person obtaining a copy 
-COMMENT of this software and associated documentation files (the "Software"), to deal 
-COMMENT in the Software without restriction, including without limitation the rights 
-COMMENT to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-COMMENT copies of the Software, and to permit persons to whom the Software is 
+COMMENT Permission is hereby granted, free of charge, to any person obtaining a copy
+COMMENT of this software and associated documentation files (the "Software"), to deal
+COMMENT in the Software without restriction, including without limitation the rights
+COMMENT to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+COMMENT copies of the Software, and to permit persons to whom the Software is
 COMMENT furnished to do so, subject to the following conditions:
 COMMENT
-COMMENT The above copyright notice and this permission notice shall be included in 
+COMMENT The above copyright notice and this permission notice shall be included in
 COMMENT all copies or substantial portions of the Software.
 COMMENT
-COMMENT THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-COMMENT IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-COMMENT FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-COMMENT AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-COMMENT LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-COMMENT FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+COMMENT THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+COMMENT IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+COMMENT FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COMMENT AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+COMMENT LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+COMMENT FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 COMMENT DEALINGS IN THE SOFTWARE.
 COMMENT
 COMMENT
-COMMENT	
+COMMENT
 COMMENT-----------------------------------------------------------
 COMMENT RAWCLASS name   instanceOf subclassOf  (instance variable names)
 COMMENT  or... CLASS name subclassOf (instance vars)
@@ -204,7 +204,7 @@ error: str
 	" print the message "
 	'ERROR' printNl.
 	String newline print.
-	
+
 	str printNl.
 	" then halt "
 	<19>
@@ -303,7 +303,7 @@ METHOD Class
 hierarchy | class list |
     list <- List new.
     class <- self.
-    [class isNil] whileFalse: 
+    [class isNil] whileFalse:
         [ list add: class. class <- class parent ]
     ^list
 !
@@ -489,27 +489,27 @@ assertEq: arg withComment: comment
     header <- header + (method name printString).
 
     comment notNil ifTrue: [ header <- header + '(' + comment + ') ' ].
-    
+
     header print.
-    
+
     headerTab <- 42 - (header size).
     [headerTab > 0] whileTrue: [
         ' ' print.
         headerTab <- headerTab - 1
     ].
-    
+
     result <- self value.
-    
+
     (result = arg)
         ifTrue:  [ 'OK'   printNl ]
         ifFalse: [
                    'FAIL' printNl.
                    ('Expected ' + arg printString + ', ') print.
                    'got ' print. result printNl. String newline print.
-                   
+
                    method text printNl.
                  ]
-               
+
 !
 
 METHOD Block
@@ -586,10 +586,10 @@ METHOD Test
 runAll |reservedNames|
     self init.
     reservedNames <- Array with: #init.
-    
+
     Char newline print.
     'Running ' print. self class printNl.
-    
+
     self class methods
             do: [:m |
                     ( reservedNames includes: (m name) )
@@ -601,7 +601,7 @@ init
     ^nil
 !
 
-COMMENT FIXME make tests be singletons 
+COMMENT FIXME make tests be singletons
 
 COMMENT                                                                                                --------CompareTest----------
 CLASS CompareTest Test
@@ -703,7 +703,7 @@ location: value | low high mid |
                 mid <- (low + high) quo: 2.
                 (self at: mid) < value
                         ifTrue: [ low <- mid + 1 ]
-                        ifFalse: [ high <- mid ] 
+                        ifFalse: [ high <- mid ]
         ].
         ^ low
 !
@@ -714,18 +714,18 @@ CLASS LoopTest Test
 METHOD LoopTest
 loopCount |count|
     count <- SmallInt new.
-    
+
     1 to: 151251 do: [:i| count <- count + 1 ]
-    
+
     [ count ] assertEq: 151251
 !
 
 METHOD LoopTest
 sum |result|
     result <- SmallInt new.
-    
+
     1 to: 100 do: [:i| result <- result + i ]
-    
+
     [ result ] assertEq: 5050
 !
 
@@ -779,7 +779,7 @@ plus
     [ 'fox' + 'baz' + 'bar' ] assertEq: 'foxbazbar' withComment: '7'.
     [ 'fox' + 'baz' + 'bar' + 'bam' ] assertEq: 'foxbazbarbam' withComment: '8'.
     [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '9'.
-    
+
 !
 
 METHOD StringTest
@@ -840,12 +840,12 @@ init
     1 to: 100 do: [:idx|
         arrOfInts at: idx put: idx
     ].
-    
+
     arrOfChars <- Array new: 257.
     1 to: 257 do: [:idx|
         arrOfChars at: idx put: (Char basicNew: idx-1)
     ].
-    
+
 !
 
 METHOD ArrayTest
@@ -954,7 +954,7 @@ METHOD PrimitiveTest
 objectsAreEqual |x|
     x <- Array with: 'a' with: 42.
     [ <1 x x> ] assertWithComment: '1'.
-    
+
     [ <1 $z $z> ] assertEq: false withComment: '2'.
 !
 
@@ -983,7 +983,7 @@ replaceFrom: start to: stop with: replacement startingAt: repStart | base |
 METHOD Undefined
 printHierarchy: aClass | class |
     class <- aClass.
-    [ class isNil ] whileFalse: [ class printNl. class <- class parent ] 
+    [ class isNil ] whileFalse: [ class printNl. class <- class parent ]
 !
 
 CLASS MyDict Dictionary
@@ -1001,7 +1001,7 @@ at: key put: value | position |
 METHOD Undefined
 testArrayAllMethods |allMethods|
     allMethods <- MyDict new.
-    
+
     Object methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from = to ~~"
     Magnitude methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from <= to min:"
     "Collection methods binaryDo: [ :n :m | allMethods at: n put: m ]."
@@ -1049,8 +1049,8 @@ benchmark: size | list ms |
 METHOD Undefined
 benchmark2: random | dict ms |
     dict <- Dictionary new.
-    ms <- Timer millisecondsToRun: [ 
-    random 
+    ms <- Timer millisecondsToRun: [
+    random
         ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
         ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
     dict printNl. 'size ' print. dict size printNl.
@@ -1136,7 +1136,7 @@ loopTest | i sum |
 
     [ i < 1001 ] whileTrue:
         [ sum <- sum + i. i <- i + 1 ].
-        
+
     ^sum
 !
 
@@ -1175,11 +1175,11 @@ testNil
 METHOD Undefined
 main    | command x |
         " initialize classes "
-        
+
         Char initialize.
-        
+
         "nil testArrayAllMethods."
-        
+
         "CompareTest      new runAll.
         SmallIntTest     new runAll.
         LoopTest         new runAll.
@@ -1196,13 +1196,13 @@ main    | command x |
 
         "LLVMTest new testNil."
         LLVMTest new testBlockReturn.
-        
+
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ] 
-        
-        ^nil.                  
+                        ifFalse: [ command doIt printNl ] ]
+
+        ^nil.
 !
 
 
@@ -1758,7 +1758,7 @@ sort: criteria | left right mediane |
 
     left  <- left  sort: criteria.
     right <- right sort: criteria.
-            
+
     right add: mediane.
     ^ left appendList: right
 !
@@ -1769,7 +1769,7 @@ printString | count res |
 	(self respondsTo: #do:) ifFalse: [ ^ res ].
 	count <- 0.
 	res <- res + ' ('.
-	self basicDo: [:elem| 
+	self basicDo: [:elem|
 		(count = 0) ifFalse: [ res <- res + ' ' ].
 		res <- res + elem printString.
 		count <- count + 1.
@@ -1936,10 +1936,10 @@ insert: value at: position | newArray newSize |
 	newArray <- self class new: newSize.
 	newArray replaceFrom: 1 to: position-1 with: self.
 	newArray at: position put: value.
-	newArray 
-        replaceFrom: position+1 
-        to: newSize 
-        with: self 
+	newArray
+        replaceFrom: position+1
+        to: newSize
+        with: self
         startingAt: position.
 	^ newArray
 !
@@ -2446,7 +2446,7 @@ METHOD Dictionary
 printString | count res |
 	res <- self class printString + ' ('.
 	count <- 0.
-	self binaryDo: [:k :elem| 
+	self binaryDo: [:k :elem|
 		(count = 0) ifFalse: [ res <- res + ', ' ].
 		res <- res + (k printString + ' -> ' + elem printString).
 		count <- count + 1.
@@ -3428,7 +3428,7 @@ nextChar
 	^self currentChar
 !
 METHOD Parser
-nextLex	
+nextLex
 	self skipBlanks.
 	tokenType <- self currentChar.
 	tokenType isEOF   " end of input "

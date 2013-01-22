@@ -195,7 +195,7 @@ sort: criteria | left right mediane |
     0006 PushArgument 0
     0007 DoSpecial stackReturn
     0008 DoSpecial branch 12
-    
+
     0011 PushConstant nil
     0012 DoSpecial popTop
     0013 PushArgument 0
@@ -291,7 +291,7 @@ Method>>name
     0002 DoSpecial popTop
     0003 DoSpecial selfReturn
 
-OrderedArray location: value    
+OrderedArray location: value
     0000 PushConstant 1
     0001 AssignTemporary 0              low <- 1
     0002 DoSpecial popTop
@@ -341,10 +341,10 @@ OrderedArray location: value
     0056 DoSpecial stackReturn
     0057 DoSpecial popTop
     0058 DoSpecial selfReturn
-    
-    
+
+
 Dictionary at: index put: value
-    0000 PushInstance 0                 keys  
+    0000 PushInstance 0                 keys
     0001 PushArgument 1                 value
     0002 MarkArguments 2                #(keys value)
     0003 SendMessage location:          keys location: value
@@ -354,7 +354,7 @@ Dictionary at: index put: value
     0007 PushInstance 0                 keys
     0008 MarkArguments 1                #(keys)
     0009 SendMessage size               keys size
-    0010 SendBinary <=                  keys size <= 
+    0010 SendBinary <=                  keys size <=
  *  0011 DoSpecial branchIfFalse 24     position <= keys size
     0014 PushArgument 1
     0015 PushInstance 0
@@ -400,7 +400,7 @@ initialMethod
     pushConstant    10 (nil)
     markArguments   1
     sendMessage     main
-    
+
 nil>>main
     0000 PushLiteral 0              Char
     0001 MarkArguments 1            #(Char)
@@ -408,8 +408,8 @@ nil>>main
     ...
 
 Array new: size
-    0000 PushArgument 0                 self                                                
-    0001 PushArgument 1                 257                                         
+    0000 PushArgument 0                 self
+    0001 PushArgument 1                 257
     0002 DoPrimitive new                <7 self 257>
     0004 DoSpecial popTop               nil? кого вытаскиваем?
     0005 DoSpecial selfReturn
@@ -418,19 +418,19 @@ Block value: arg
     0000 PushArgument 1                  i
     0001 PushArgument 0                  block
     0002 DoPrimitive block invoke
-         TOS : 
+         TOS :
     0004 DoSpecial popTop
     0005 PushArgument 0
     0006 MarkArguments 1
     0007 SendMessage argCount
     0008 DoSpecial popTop
     0009 DoSpecial selfReturn
-    
+
 
 ???
     0000 PushArgument 1                 1
-    0001 PushArgument 0 
-    
+    0001 PushArgument 0
+
 MetaChar
 initialize
     0000 PushInstance 6                 chars
@@ -448,25 +448,25 @@ initialize
     0016     PushInstance 6             chars
     0017     PushTemporary 0            :idx
     0018     PushLiteral 4              Char
-    0019     PushTemporary 0            :idx                                                                                                                      
-    0020     PushConstant 1             1                                                                                                                     
+    0019     PushTemporary 0            :idx
+    0020     PushConstant 1             1
     0021     MarkArguments 2            #(:idx 1)
     0022     SendMessage -              :(idx - 1) SmallInt ?
-    0023     MarkArguments 2                                                                                                                                 
-    0024     SendMessage basicNew:      new_char 
+    0023     MarkArguments 2
+    0024     SendMessage basicNew:      new_char
              TOS : instance of char
     0025     MarkArguments 3            #(chars idx new_char)
-    0026     SendMessage at:put:                                                                                                                             
+    0026     SendMessage at:put:
              TOS : chars
-    0027     DoSpecial stackReturn                                                                                                                           
-    0028 MarkArguments 3                 #(1 257 block)                                                                                                                    
+    0027     DoSpecial stackReturn
+    0028 MarkArguments 3                 #(1 257 block)
     0029 SendMessage to:do:
     0030 DoSpecial branch 34
     0033 PushConstant nil
     0034 DoSpecial popTop
     0035 DoSpecial selfReturn
 
-Number to: limit do: aBlock   
+Number to: limit do: aBlock
     0000 PushArgument 0                  self
     0001 AssignTemporary 0               | i | i <- self
     0002 DoSpecial popTop
@@ -493,34 +493,34 @@ Number to: limit do: aBlock
     0029 PushConstant 0
     0030 DoSpecial popTop
     0031 DoSpecial selfReturn
-    
+
 SmallInt -
     0000 PushArgument 0                  1
     0001 PushArgument 1                  1
     0002 DoPrimitive SmallInt -          1 - 1
     0004 DoSpecial popTop                this should not be executed
-    
 
-MetaChar basicNew:    
+
+MetaChar basicNew:
     0000 PushArgument 0                  MetaChar
     0001 PushArgument 0                  MetaChar
     0002 MarkArguments 1
     0003 SendMessage new                 MetaChar new
-    
+
          TOS: instance of Char
-    
+
     0004 PushConstant 1                  1
     0005 PushArgument 1                  0
     0006 MarkArguments 4                 #(MetaChar new_char 1 0)
     0007 SendMessage in:at:put:
-         
+
          TOS: instance of Char
-         
+
     0008 DoSpecial stackReturn
     0009 DoSpecial popTop
     0010 DoSpecial selfReturn
-    
-Char new  
+
+Char new
     0000 PushArgument 0                 Char
     0001 PushInstance 3                 1
     0002 DoPrimitive new
@@ -532,18 +532,18 @@ MetaObject in:at:put:
     0001 PushArgument 1                 new_char
     0002 PushArgument 2                 1
     0003 DoPrimitive at:put:            <5>
-    
+
     0005 DoSpecial popTop
     0006 DoSpecial selfReturn
 
-Array at: index put: value   
+Array at: index put: value
     0000 PushArgument 2                 char
     0001 PushArgument 0                 chars
     0002 PushArgument 1                 1
     0003 DoPrimitive at:put:            chars at: idx put: (Char basicNew: idx-1)
-    
+
          TOS : chars
-    
+
     0005 DoSpecial popTop
     0006 PushArgument 0
     0007 PushArgument 1
@@ -562,4 +562,3 @@ Array at: index put: value
     0023 SendMessage primitiveFailed
     0024 DoSpecial popTop
     0025 DoSpecial selfReturn
-    
