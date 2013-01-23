@@ -77,8 +77,15 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // FIXME Think about interfacing the MemoryManager directly
     // These are then used as an allocator function return types
 
+    TargetOptions Opts;
+    Opts.JITExceptionHandling = true;
+    
     std::string error;
-    m_executionEngine = EngineBuilder(m_JITModule).setEngineKind(EngineKind::JIT).setErrorStr(&error).create();
+    m_executionEngine = EngineBuilder(m_JITModule)
+                            .setEngineKind(EngineKind::JIT)
+                            .setErrorStr(&error)
+                            .setTargetOptions(Opts)
+                            .create();
     if(!m_executionEngine) {
         errs() << error;
         exit(1);
