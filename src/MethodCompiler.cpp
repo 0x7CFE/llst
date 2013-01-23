@@ -378,7 +378,7 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     jit.builder->CreateRet(returnValue);
 
     jit.builder->SetInsertPoint(rethrowBlock);
-    jit.builder->CreateResume(blockResult);
+    jit.builder->CreateResume(caughtResult);
 }
 
 void MethodCompiler::printOpcode(TInstruction instruction)
