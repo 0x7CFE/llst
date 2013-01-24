@@ -228,8 +228,11 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     newContext->previousContext   = previousContext;
 
     // Calling the method and returning the result
-    TMethodFunction compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
-    TObject* result = compiledMethodFunction(newContext);
+	outs() << "Acquiring function address for " << functionName << " ...\n";
+	TMethodFunction compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
+
+	outs() << "Calling compiled method " << functionName << " ...\n";
+	TObject* result = compiledMethodFunction(newContext);
 
     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
     printf("Function result: %p\n", result);
