@@ -13,7 +13,7 @@ endif()
 execute_process(COMMAND ${CONFIG_COMMAND} --cxxflags
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_CXX_FLAGS)
-                
+
 execute_process(COMMAND ${CONFIG_COMMAND} --ldflags
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_LD_FLAGS)
@@ -22,7 +22,7 @@ execute_process(COMMAND ${CONFIG_COMMAND} --libs all
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_LIBS)
 
-set (COMPILER_FLAGS "-g -m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} -fexceptions")
+set (COMPILER_FLAGS "-g -m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} -fexceptions -frtti")
 set (LINKER_FLAGS   "-m32 -L/usr/lib32 -Wall ${LLVM_LD_FLAGS}")
 
 add_subdirectory(src)
