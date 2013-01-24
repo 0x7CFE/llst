@@ -368,11 +368,11 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
     m_runtimeAPI.sendMessage        = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
     m_runtimeAPI.createBlock        = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
-    m_runtimeAPI.invokeBlock       =  Function::Create(invokeBlockType, Function::ExternalLinkage, "invokeBlock", m_JITModule);
+    m_runtimeAPI.invokeBlock        = Function::Create(invokeBlockType, Function::ExternalLinkage, "invokeBlock", m_JITModule);
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     m_runtimeAPI.checkRoot          = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
-    m_runtimeAPI.bulkReplace        = Function::Create(performSmallIntType, Function::ExternalLinkage, "performSmallInt", m_JITModule);
+    m_runtimeAPI.performSmallInt    = Function::Create(performSmallIntType, Function::ExternalLinkage, "performSmallInt", m_JITModule);
 
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -382,6 +382,8 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.invokeBlock, reinterpret_cast<void*>(& ::invokeBlock));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.performSmallInt, reinterpret_cast<void*>(& ::performSmallInt));
 }
 
 void JITRuntime::initializeExceptionAPI() {
