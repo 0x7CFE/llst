@@ -96,7 +96,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        printf("scanForBlockReturn: Processing offset %d / %d \n", currentOffset, stopPointer);
+        //printf("scanForBlockReturn: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
@@ -128,7 +128,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
         switch (instruction.low) {
             case SmalltalkVM::blockReturn:
-                outs() << "Found a block return at offset " << currentOffset << "\n";
+                // outs() << "Found a block return at offset " << currentOffset << "\n";
 
                 // Resetting bytePointer to an old value
                 jit.bytePointer = previousBytePointer;
@@ -163,7 +163,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
+        // printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
@@ -198,7 +198,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
                 m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
-                outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
+                // outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
             } break;
         }
     }
@@ -266,6 +266,10 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Processing the method's bytecodes
     writeFunctionBody(jit);
 
+	// Cleaning up
+	m_blockFunctions.clear();
+	m_targetToBlockMap.clear();
+
     return jit.function;
 }
 
@@ -276,7 +280,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        printf("Processing offset %d / %d : ", currentOffset, stopPointer);
+        // printf("Processing offset %d / %d : ", currentOffset, stopPointer);
 
         std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
@@ -339,8 +343,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 
-    if (instCountAfter > instCountBefore)
-        outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
+// 		if (instCountAfter > instCountBefore)
+// 			outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }
 

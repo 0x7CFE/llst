@@ -79,7 +79,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     TargetOptions Opts;
     Opts.JITExceptionHandling = true;
-    
+
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule)
                             .setEngineKind(EngineKind::JIT)
@@ -206,7 +206,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         //m_functionPassManager->run(*function);
     }
 
-    outs() << *m_JITModule;
+    // outs() << *m_JITModule;
 
     // Preparing the context objects. Because we do not call the software
     // implementation here, we do not need to allocate the stack object
