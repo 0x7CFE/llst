@@ -211,7 +211,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
     // Instantinating new array object
     uint32_t slotSize = sizeof(TObject) + elementsCount * sizeof(TObject*);
-	Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(slotSize) };
+    Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(slotSize) };
     Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
 
     return arrayObject;
@@ -266,9 +266,9 @@ Function* MethodCompiler::compileMethod(TMethod* method)
     // Processing the method's bytecodes
     writeFunctionBody(jit);
 
-	// Cleaning up
-	m_blockFunctions.clear();
-	m_targetToBlockMap.clear();
+    // Cleaning up
+    m_blockFunctions.clear();
+    m_targetToBlockMap.clear();
 
     return jit.function;
 }
@@ -343,8 +343,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 //         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 
-// 		if (instCountAfter > instCountBefore)
-// 			outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
+//            if (instCountAfter > instCountBefore)
+//                outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }
 
@@ -407,7 +407,7 @@ void MethodCompiler::printOpcode(TInstruction instruction)
         case SmalltalkVM::opSendMessage:     printf("doSendMessage\n");   break;
 
         case SmalltalkVM::opDoSpecial:       printf("doSpecial\n"); break;
-		case SmalltalkVM::opDoPrimitive:    printf("doPrimitive\n", instruction.low); break;
+        case SmalltalkVM::opDoPrimitive:    printf("doPrimitive %d\n", instruction.low); break;
 
         default:
             fprintf(stderr, "JIT: Unknown opcode %d\n", instruction.high);
@@ -752,9 +752,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     //Value* literalArray    = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
     //Value* getFieldArgs[]  = { literalArray, jit.builder->getInt32(jit.instruction.low) };
     //Value* messageSelector = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
-	Value* messageSelectorPtr    = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(jit.instruction.low));
-	Value* messageSelectorObject = jit.builder->CreateLoad(messageSelectorPtr);
-	Value* messageSelector       = jit.builder->CreateBitCast(messageSelectorObject, ot.symbol->getPointerTo());
+    Value* messageSelectorPtr    = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(jit.instruction.low));
+    Value* messageSelectorObject = jit.builder->CreateLoad(messageSelectorPtr);
+    Value* messageSelector       = jit.builder->CreateBitCast(messageSelectorObject, ot.symbol->getPointerTo());
 
     //messageSelector = jit.builder->CreateBitCast(messageSelector, ot.symbol->getPointerTo());
 
@@ -883,8 +883,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
-	uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
-	outs() << "Primitive opcode = " << opcode << "\n";
+    uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
+    outs() << "Primitive opcode = " << opcode << "\n";
 
     Value* primitiveResult = 0;
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
@@ -959,7 +959,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]   = { klass, dataSize };
             Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
 
-	    primitiveResult = clone;
+            primitiveResult = clone;
         } break;
 
         case SmalltalkVM::integerNew:
