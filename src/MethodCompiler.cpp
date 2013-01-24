@@ -210,7 +210,8 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
     // Instantinating new array object
-    Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(elementsCount) };
+    uint32_t slotSize = sizeof(TObject) + elementsCount * sizeof(TObject*);
+	Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(slotSize) };
     Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
 
     return arrayObject;
