@@ -95,7 +95,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
-        uint32_t currentOffset = jit.bytePointer;
+        //uint32_t currentOffset = jit.bytePointer;
         //printf("scanForBlockReturn: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
@@ -162,7 +162,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
-        uint32_t currentOffset = jit.bytePointer;
+        // uint32_t currentOffset = jit.bytePointer;
         // printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
@@ -312,7 +312,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
         printOpcode(jit.instruction);
 
-        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
+//         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
         // Then writing the code
         switch (jit.instruction.high) {
@@ -341,7 +341,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
         }
 
-        uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
+//         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 
 // 		if (instCountAfter > instCountBefore)
 // 			outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
@@ -407,9 +407,10 @@ void MethodCompiler::printOpcode(TInstruction instruction)
         case SmalltalkVM::opSendMessage:     printf("doSendMessage\n");   break;
 
         case SmalltalkVM::opDoSpecial:       printf("doSpecial\n"); break;
+		case SmalltalkVM::opDoPrimitive:    printf("doPrimitive\n", instruction.low); break;
 
         default:
-            fprintf(stderr, "Unknown opcode %d\n", instruction.high);
+            fprintf(stderr, "JIT: Unknown opcode %d\n", instruction.high);
     }
 }
 
@@ -746,7 +747,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* arguments = jit.popValue();
 
     // First of all we need to get the actual message selector
-    Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
+    //Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
 
     //Value* literalArray    = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
     //Value* getFieldArgs[]  = { literalArray, jit.builder->getInt32(jit.instruction.low) };
@@ -882,7 +883,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
-    uint32_t opcode = jit.instruction.low;
+	uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
+	outs() << "Primitive opcode = " << opcode << "\n";
 
     switch (opcode) {
         case SmalltalkVM::objectsAreEqual: {
@@ -1035,6 +1037,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         default:
             outs() << "JIT: Unknown primitive code " << opcode;
     }
+
+    jit.pushValue(m_globals.nilObject);
 
     // Appending the fallback block
     // BasicBlock* fallback = BasicBlock::Create(m_JITModule->getContext(), "primitiveFallback", jit.function);
