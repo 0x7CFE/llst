@@ -886,6 +886,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 	uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
 	outs() << "Primitive opcode = " << opcode << "\n";
 
+    Value* primitiveResult = 0;
+	Value* isPrimitiveSucceeded = jit.builder->getInt1(1);
+
     switch (opcode) {
         case SmalltalkVM::objectsAreEqual: {
             Value* object2 = jit.popValue();
@@ -893,14 +896,16 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value* result    = jit.builder->CreateICmpEQ(object1, object2);
             Value* boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
-            jit.builder->CreateRet(boolValue);
+            //jit.builder->CreateRet(boolValue);
+			primitiveResult = boolValue;
         } break;
 
         case SmalltalkVM::getClass: {
             Value*    object   = jit.popValue();
             Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
             Value*    klass    = jit.builder->CreateCall(getClass, object, "class");
-            jit.builder->CreateRet(klass);
+			primitiveResult = klass;
+            //jit.builder->CreateRet(klass);
         } break;
 
         // TODO ioGetchar ioPutChar
@@ -908,8 +913,10 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case SmalltalkVM::getSize: {
             Value*    object  = jit.popValue();
             Function* getSize = m_TypeModule->getFunction("TObject::getSize()");
-            Value*    size    = jit.builder->CreateCall(getSize, object, "class");
-            jit.builder->CreateRet(size);
+            Value*    size    = jit.builder->CreateCall(getSize, object, "size");
+            Value*    sizeObject = jit.builder->CreateIntToPtr(size, ot.object->getPointerTo());
+			primitiveResult = sizeObject;
+            //jit.builder->CreateRet(sizeObject);
         } break;
 
         // TODO new process
@@ -927,7 +934,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, slotSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
 
-            jit.builder->CreateRet(newInstance);
+	       primitiveResult = newInstance;
+            // jit.builder->CreateRet(newInstance);
         } break;
 
         case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
@@ -940,7 +948,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, dataSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
-            jit.builder->CreateRet(newInstance);
+		    primitiveResult = newInstance;
+            //jit.builder->CreateRet(newInstance);
         } break;
 
         case SmalltalkVM::cloneByteObject: { // FIXME pointer safety
@@ -953,11 +962,13 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]   = { klass, dataSize };
             Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
 
-            jit.builder->CreateRet(clone);
+	       primitiveResult = clone;
+            //jit.builder->CreateRet(clone);
         } break;
 
         case SmalltalkVM::integerNew:
-            jit.builder->CreateRet(jit.popValue()); // TODO long integers
+			primitiveResult = jit.popValue();
+            //jit.builder->CreateRet(jit.popValue()); // TODO long integers
             break;
 
         case SmalltalkVM::blockInvoke: {
@@ -987,7 +998,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value* args[] = { jit.context, block };
             Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
-            jit.builder->CreateRet(result);
+
+			primitiveResult = result;
+			//jit.builder->CreateRet(result);
         } break;
 
         case SmalltalkVM::smallIntAdd:        // 10
@@ -1018,7 +1031,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->SetInsertPoint(areInts);
             Value* arguments[] = { jit.builder->getInt8(opcode), leftOperand, rightOperand };
             Value* result      = jit.builder->CreateCall(m_runtimeAPI.performSmallInt, arguments, "result.");
-            jit.builder->CreateRet(result);
+
+			primitiveResult = result;
+            //jit.builder->CreateRet(result);
         } break;
 
         case SmalltalkVM::bulkReplace: {
@@ -1031,12 +1046,24 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* arguments[]  = { destination, sourceStartOffset, source, destinationStopOffset, destinationStartOffset };
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
             Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
-            jit.builder->CreateRet(resultObject);
+
+			primitiveResult = resultObject;
+            //jit.builder->CreateRet(resultObject);
         } break;
 
         default:
             outs() << "JIT: Unknown primitive code " << opcode;
     }
+
+    BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
+	BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
+
+	jit.builder->CreateCondBr(isPrimitiveSucceeded, primitiveSucceeded, primitiveFailed);
+
+	jit.builder->SetInsertPoint(primitiveSucceeded);
+	jit.builder->CreateRet(primitiveResult);
+
+	jit.builder->SetInsertPoint(primitiveFailed);
 
     jit.pushValue(m_globals.nilObject);
 

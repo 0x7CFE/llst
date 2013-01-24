@@ -201,12 +201,14 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 
         //llvm::Function* asNumberBlock = m_JITModule->getFunction("String>>asNumber@4");
         //outs() << *asNumberBlock;
+		outs() << *methodFunction;
+
         verifyModule(*m_JITModule);
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
     }
 
-    // outs() << *m_JITModule;
+    //outs() << *m_JITModule;
 
     // Preparing the context objects. Because we do not call the software
     // implementation here, we do not need to allocate the stack object
