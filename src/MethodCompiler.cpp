@@ -744,11 +744,14 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     // First of all we need to get the actual message selector
     Function* getFieldFunction = m_TypeModule->getFunction("TObjectArray::getField(int)");
 
-    Value* literalArray    = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
-    Value* getFieldArgs[]  = { literalArray, jit.builder->getInt32(jit.instruction.low) };
-    Value* messageSelector = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
+    //Value* literalArray    = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
+    //Value* getFieldArgs[]  = { literalArray, jit.builder->getInt32(jit.instruction.low) };
+    //Value* messageSelector = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
+	Value* messageSelectorPtr    = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(jit.instruction.low));
+	Value* messageSelectorObject = jit.builder->CreateLoad(messageSelectorPtr);
+	Value* messageSelector       = jit.builder->CreateBitCast(messageSelectorObject, ot.symbol->getPointerTo());
 
-    messageSelector = jit.builder->CreateBitCast(messageSelector, ot.symbol->getPointerTo());
+    //messageSelector = jit.builder->CreateBitCast(messageSelector, ot.symbol->getPointerTo());
 
     std::ostringstream ss;
     ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
