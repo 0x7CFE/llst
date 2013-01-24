@@ -979,18 +979,20 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* blockAsContext = jit.builder->CreateBitCast(block, ot.context->getPointerTo());
             Value* blockTempsPtr  = jit.builder->CreateStructGEP(blockAsContext, 3);
             Value* blockTemps     = jit.builder->CreateLoad(blockTempsPtr);
+            Value* blockTempsObject = jit.builder->CreateBitCast(blockTemps, ot.object->getPointerTo());
 
             Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
-            Value*    fields    = jit.builder->CreateCall(getFields, blockTemps);
+            Value*    fields    = jit.builder->CreateCall(getFields, blockTempsObject);
 
             Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
             Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
+            Value* argumentLocationAsInt = jit.builder->CreatePtrToInt(argumentLocation, Type::getInt32Ty(m_TypeModule->getContext()));
 
             // Storing values in the block's wrapping context
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
             {
                 // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
-                Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
+                Value* fieldIndex = jit.builder->CreateAdd(argumentLocationAsInt, jit.builder->getInt32(index));
                 Value* fieldPtr   = jit.builder->CreateGEP(fields, fieldIndex);
                 Value* argument   = jit.popValue();
                 jit.builder->CreateStore(argument, fieldPtr);
