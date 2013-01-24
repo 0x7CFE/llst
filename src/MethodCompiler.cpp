@@ -914,7 +914,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Function* getSlotSize = m_TypeModule->getFunction("getSlotSize()");
             Value*    slotSize    = jit.builder->CreateCall(getSlotSize, size, "slotSize.");
 
-            Value*    args[] = { klass, slotSize };
+            Value*    args[]      = { klass, slotSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
 
             jit.builder->CreateRet(newInstance);
