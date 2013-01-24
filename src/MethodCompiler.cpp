@@ -433,18 +433,18 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
 
-    Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
-    Value* argument     = jit.builder->CreateLoad(valuePointer);
-
     if (index == 0) {
-        argument->setName("self.");
+        jit.pushValue(jit.self);
     } else {
+        Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
+        Value* argument     = jit.builder->CreateLoad(valuePointer);
+
         std::ostringstream ss;
         ss << "arg" << (uint32_t)index << ".";
         argument->setName(ss.str());
-    }
 
-    jit.pushValue(argument);
+        jit.pushValue(argument);
+    }
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
