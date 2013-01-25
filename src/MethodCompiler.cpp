@@ -407,7 +407,7 @@ void MethodCompiler::printOpcode(TInstruction instruction)
         case SmalltalkVM::opSendMessage:     printf("doSendMessage\n");   break;
 
         case SmalltalkVM::opDoSpecial:       printf("doSpecial\n"); break;
-		case SmalltalkVM::opDoPrimitive:    printf("doPrimitive\n", instruction.low); break;
+		case SmalltalkVM::opDoPrimitive:    printf("doPrimitive\n"); break;
 
         default:
             fprintf(stderr, "JIT: Unknown opcode %d\n", instruction.high);
@@ -1009,6 +1009,62 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 			//jit.builder->CreateRet(result);
         } break;
 
+		case SmalltalkVM::arrayAt:
+		case SmalltalkVM::arrayAtPut: {
+			Value* indexObject = jit.popValue();
+			Value* arrayObject = jit.popValue();
+			Value* valueObejct = 0;
+
+			Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
+			Value*    index    = jit.builder->CreateCall(getValue, indexObject, "index.");
+
+			Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
+			Value*    fields    = jit.builder->CreateCall(getFields, arrayObject);
+			Value*    fieldPtr  = jit.builder->CreateGEP(fields, index);
+
+			// TODO Check boundaries and small ints
+
+			if (opcode == SmalltalkVM::arrayAtPut) {
+				valueObejct = jit.popValue();
+				jit.builder->CreateStore(valueObejct, fieldPtr);
+				primitiveResult = arrayObject; // valueObejct;
+			} else {
+				primitiveResult = jit.builder->CreateLoad(fieldPtr);
+			}
+		} break;
+
+		case SmalltalkVM::stringAt:
+		case SmalltalkVM::stringAtPut: {
+			Value* indexObject = jit.popValue();
+			Value* arrayObject = jit.popValue();
+			Value* valueObejct = 0;
+
+			Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
+			Value*    index    = jit.builder->CreateCall(getValue, indexObject, "index.");
+
+			Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
+			Value*    fields    = jit.builder->CreateCall(getFields, arrayObject);
+			Value*    bytes     = jit.builder->CreateBitCast(fields, Type::getInt8Ty(m_JITModule->getContext())->getPointerTo());
+			Value*    bytePtr   = jit.builder->CreateGEP(bytes, index);
+
+			// TODO Check boundaries and small ints
+
+			if (opcode == SmalltalkVM::arrayAtPut) {
+				valueObejct = jit.popValue();
+				Value* valueInt = jit.builder->CreatePtrToInt(valueObejct, Type::getInt32Ty(m_JITModule->getContext()));
+				Value* byte = jit.builder->CreateTrunc(valueInt, Type::getInt8Ty(m_JITModule->getContext()));
+				jit.builder->CreateStore(byte, bytePtr);
+
+				primitiveResult = arrayObject; // valueObejct;
+			} else {
+				Value* byte = jit.builder->CreateLoad(bytePtr);
+				Value* expandedByte = jit.builder->CreateZExt(byte, Type::getInt32Ty(m_JITModule->getContext()));
+				Function* newInt = m_TypeModule->getFunction("newInteger()");
+				primitiveResult = jit.builder->CreateCall(newInt, expandedByte);
+			}
+		} break;
+
+
         case SmalltalkVM::smallIntAdd:        // 10
         case SmalltalkVM::smallIntDiv:        // 11
         case SmalltalkVM::smallIntMod:        // 12
@@ -1058,7 +1114,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         } break;
 
         default:
-            outs() << "JIT: Unknown primitive code " << opcode;
+            outs() << "JIT: Unknown primitive code " << opcode << "\n";
     }
 
     BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);

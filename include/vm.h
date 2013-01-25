@@ -125,18 +125,18 @@ public:
         smallIntBitAnd = 37,
         smallIntBitShift = 39
     };
+
+	enum {
+		stringAt        = 21,
+		stringAtPut     = 22,
+		arrayAt         = 24,
+		arrayAtPut      = 5
+	};
 private:
 
     enum {
         ioGetChar = 9,
         ioPutChar = 3
-    };
-
-    enum {
-        stringAt        = 21,
-        stringAtPut     = 22,
-        arrayAt         = 24,
-        arrayAtPut      = 5
     };
 
     enum IntegerOpcode {
