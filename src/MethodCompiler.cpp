@@ -421,10 +421,16 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 
     uint8_t index = jit.instruction.low;
 
-    Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
+	outs() << "pushing instance variable "  << (uint32_t)index << " from " << *jit.selfFields;
+
+	//std::string variableName = jit.method->klass->variables->getField(index)->toString();
+
+	//outs() << variableName << "\n";
+
+    Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt8(index));
     Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
-    std::string variableName = jit.method->klass->variables->getField(index)->toString();
-    instanceVariable->setName(variableName);
+
+    //instanceVariable->setName(variableName);
 
     jit.pushValue(instanceVariable);
 }
