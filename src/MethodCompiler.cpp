@@ -529,9 +529,12 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.bytePointer = jit.bytePointer;
 
     // Creating block function named Class>>method@offset
+	const uint16_t blockOffset = jit.bytePointer;
     std::ostringstream ss;
-    ss << jit.function->getName().str() << "@" << jit.bytePointer; //currentOffset;
+    ss << jit.function->getName().str() << "@" << blockOffset; //currentOffset;
     std::string blockFunctionName = ss.str();
+
+	outs() << "Creating block function "  << blockFunctionName << "\n";
 
     std::vector<Type*> blockParams;
     blockParams.push_back(ot.block->getPointerTo()); // block object with context information
@@ -564,7 +567,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     Value* args[] = {
         jit.context,                               // creatingContext
         jit.builder->getInt8(jit.instruction.low), // arg offset
-        jit.builder->getInt16(jit.bytePointer)     // bytePointer
+        jit.builder->getInt16(blockOffset)         // bytePointer
     };
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
     blockObject = jit.builder->CreateBitCast(blockObject, ot.object->getPointerTo());
@@ -972,7 +975,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             break;
 
         case SmalltalkVM::blockInvoke: {
-            Value* block  = jit.popValue();
+			Value* object = jit.popValue();
+			Value* block  = jit.builder->CreateBitCast(object, ot.block->getPointerTo());
 
             int32_t argCount = jit.instruction.low - 1;
 
@@ -998,7 +1002,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 jit.builder->CreateStore(argument, fieldPtr);
             }
 
-            Value* args[] = { jit.context, block };
+            Value* args[] = { block, jit.context };
             Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
 
 			primitiveResult = result;

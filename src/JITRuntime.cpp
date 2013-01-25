@@ -143,8 +143,9 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
     // TODO Fast 1-way lookup cache
+    const uint16_t blockOffset = getIntegerValue(block->bytePointer);
     std::ostringstream ss;
-    ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << block->bytePointer;
+    ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
     llvm::Function* blockFunction = m_JITModule->getFunction(blockFunctionName);
