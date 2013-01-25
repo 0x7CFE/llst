@@ -983,15 +983,25 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
             Value*    fields    = jit.builder->CreateCall(getFields, blockTempsObject);
 
+            Function* getSize   = m_TypeModule->getFunction("TObject::getSize()");
+            Value*    tempsSize = jit.builder->CreateCall(getSize, blockTempsObject);
+
             Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
             Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
-            Value* argumentLocationAsInt = jit.builder->CreatePtrToInt(argumentLocation, Type::getInt32Ty(m_TypeModule->getContext()));
 
+            BasicBlock* tempsCheched = BasicBlock::Create(m_JITModule->getContext(), "tempsCheched.", jit.function);
+
+            //Checking the passed temps size TODO unroll stack
+            Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
+            Value* tempSizeOk = jit.builder->CreateICmpSLE(blockAcceptsArgCount, jit.builder->getInt32(argCount));
+            jit.builder->CreateCondBr(tempSizeOk, tempsCheched, primitiveFailed);
+            jit.builder->SetInsertPoint(tempsCheched);
+            
             // Storing values in the block's wrapping context
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
             {
                 // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
-                Value* fieldIndex = jit.builder->CreateAdd(argumentLocationAsInt, jit.builder->getInt32(index));
+                Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
                 Value* fieldPtr   = jit.builder->CreateGEP(fields, fieldIndex);
                 Value* argument   = jit.popValue();
                 jit.builder->CreateStore(argument, fieldPtr);
@@ -1083,19 +1093,23 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case SmalltalkVM::smallIntBitOr:      // 36
         case SmalltalkVM::smallIntBitAnd:     // 37
         case SmalltalkVM::smallIntBitShift: { // 39
-            Value* rightOperand = jit.popValue();
-            Value* leftOperand  = jit.popValue();
+            Value* rightObject = jit.popValue();
+            Value* leftObject  = jit.popValue();
 
             Function* isSmallInt  = m_TypeModule->getFunction("isSmallInteger()");
             Function* newInteger  = m_TypeModule->getFunction("newInteger()");
+            Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
 
-            Value*    conjunction = jit.builder->CreateAnd(leftOperand, rightOperand);
-            Value*    value       = jit.builder->CreateCall(isSmallInt, conjunction);
+            Value*    rightIsInt  = jit.builder->CreateCall(isSmallInt, rightObject);
+            Value*    leftIsInt   = jit.builder->CreateCall(isSmallInt, leftObject);
+            Value*    isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
 
             BasicBlock* areInts  = BasicBlock::Create(m_JITModule->getContext(), "areInts.", jit.function);
-            jit.builder->CreateCondBr(value, areInts, primitiveFailed);
+            jit.builder->CreateCondBr(isSmallInts, areInts, primitiveFailed);
 
             jit.builder->SetInsertPoint(areInts);
+            Value* rightOperand = jit.builder->CreateCall(getIntValue, rightObject);
+            Value* leftOperand  = jit.builder->CreateCall(getIntValue, leftObject);
 
             switch(opcode) { //FIXME move to function
                 case SmalltalkVM::smallIntAdd: {
