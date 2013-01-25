@@ -1029,27 +1029,41 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
         case SmalltalkVM::stringAt:
         case SmalltalkVM::stringAtPut: {
-            Value* indexObject = jit.popValue();
-            Value* arrayObject = jit.popValue();
-            Value* valueObejct = 0;
+            Value* indexObject  = jit.popValue();
+            Value* stringObject = jit.popValue();
+            Value* valueObejct  = 0;
+
+            BasicBlock* indexCheched    = BasicBlock::Create(m_JITModule->getContext(), "indexCheched.", jit.function);
+
+            //Checking index is Smallint
+            Function* isSmallInt      = m_TypeModule->getFunction("isSmallInteger()");
+            Value*    indexIsSmallInt = jit.builder->CreateCall(isSmallInt, indexObject, "indexIsSmallInt.");
 
             Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
             Value*    index    = jit.builder->CreateCall(getValue, indexObject, "index.");
+            Value* actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1), "actualIndex.");
+            
+            //Checking boundaries
+            Function* getSize    = m_TypeModule->getFunction("TObject::getSize()");
+            Value*    stringSize = jit.builder->CreateCall(getSize, stringObject, "stringSize.");
+            Value*    boundaryOk = jit.builder->CreateICmpSLT(actualIndex, stringSize, "boundaryOk.");
+
+            Value* indexOk = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk, "indexOk.");
+            jit.builder->CreateCondBr(indexOk, indexCheched, primitiveFailed);
+            jit.builder->SetInsertPoint(indexCheched);
 
             Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
-            Value*    fields    = jit.builder->CreateCall(getFields, arrayObject);
+            Value*    fields    = jit.builder->CreateCall(getFields, stringObject);
             Value*    bytes     = jit.builder->CreateBitCast(fields, Type::getInt8Ty(m_JITModule->getContext())->getPointerTo());
-            Value*    bytePtr   = jit.builder->CreateGEP(bytes, index);
+            Value*    bytePtr   = jit.builder->CreateGEP(bytes, actualIndex);
 
-            // TODO Check boundaries and small ints
-
-            if (opcode == SmalltalkVM::arrayAtPut) {
+            if (opcode == SmalltalkVM::stringAtPut) {
                 valueObejct = jit.popValue();
-                Value* valueInt = jit.builder->CreatePtrToInt(valueObejct, Type::getInt32Ty(m_JITModule->getContext()));
+                Value* valueInt = jit.builder->CreateCall(getValue, valueObejct);
                 Value* byte = jit.builder->CreateTrunc(valueInt, Type::getInt8Ty(m_JITModule->getContext()));
                 jit.builder->CreateStore(byte, bytePtr);
 
-                primitiveResult = arrayObject; // valueObejct;
+                primitiveResult = stringObject; // valueObejct;
             } else {
                 Value* byte = jit.builder->CreateLoad(bytePtr);
                 Value* expandedByte = jit.builder->CreateZExt(byte, Type::getInt32Ty(m_JITModule->getContext()));
