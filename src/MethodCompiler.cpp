@@ -295,9 +295,9 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             if (iInst != jit.builder->GetInsertBlock()->begin())
                 --iInst;
 
-            outs() << "Prev is: " << *newBlock << "\n";
+//             outs() << "Prev is: " << *newBlock << "\n";
             if (! iInst->isTerminator())
-                outs() << *jit.builder->CreateBr(newBlock) << "\n"; // Linking current block to a new one
+                jit.builder->CreateBr(newBlock); // Linking current block to a new one
 
             jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
@@ -1065,7 +1065,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             
             Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
             Value*    fields    = jit.builder->CreateCall(getFields, arrayObject);
-            Value*    fieldPtr  = jit.builder->CreateGEP(fields, index);
+            Value*    fieldPtr  = jit.builder->CreateGEP(fields, actualIndex);
 
             if (opcode == SmalltalkVM::arrayAtPut) {
                 valueObejct = jit.popValue();
