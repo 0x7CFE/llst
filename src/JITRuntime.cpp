@@ -154,7 +154,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
         // If function was not found then the whole method needs compilation.
 
         // Compiling function and storing it to the table for further use
-        llvm::Function* methodFunction = m_methodCompiler->compileMethod(block->method);
+        llvm::Function* methodFunction = m_methodCompiler->compileMethod(block->method, callingContext);
         blockFunction = m_JITModule->getFunction(blockFunctionName);
         if (!methodFunction || !blockFunction) {
             // Something is really wrong!
@@ -198,7 +198,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 
     if (!methodFunction) {
         // Compiling function and storing it to the table for further use
-        methodFunction = m_methodCompiler->compileMethod(method);
+        methodFunction = m_methodCompiler->compileMethod(method, callingContext);
 
         //llvm::Function* asNumberBlock = m_JITModule->getFunction("String>>asNumber@4");
         //outs() << *asNumberBlock;

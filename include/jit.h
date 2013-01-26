@@ -138,6 +138,7 @@ private:
     // used during the compilation process.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
+        TContext*           callingContext;
         uint32_t            bytePointer;
         uint32_t            byteCount;
 
@@ -182,7 +183,7 @@ private:
             return value;
         }
 
-        TJITContext(TMethod* method) : method(method),
+        TJITContext(TMethod* method, TContext* context) : method(method), callingContext(context),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
             exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false)
@@ -231,7 +232,7 @@ private:
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
 public:
-    llvm::Function* compileMethod(TMethod* method);
+    llvm::Function* compileMethod(TMethod* method, TContext* callingContext);
 
     MethodCompiler(
         llvm::Module* JITModule,

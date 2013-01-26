@@ -217,9 +217,9 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     return arrayObject;
 }
 
-Function* MethodCompiler::compileMethod(TMethod* method)
+Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext)
 {
-    TJITContext  jit(method);
+    TJITContext  jit(method, callingContext);
 
     // Creating the function named as "Class>>method"
     jit.function = createFunction(method);
@@ -423,8 +423,12 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 
     Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
     Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
-    std::string variableName = jit.method->klass->variables->getField(index)->toString();
-    instanceVariable->setName(variableName);
+
+//     TObjectArray* arguments = jit.callingContext->arguments;
+//     TObject* self = arguments->getField(0);
+//     
+//     std::string variableName = self->getClass()->variables->getField(index)->toString();
+//     instanceVariable->setName(variableName);
 
     jit.pushValue(instanceVariable);
 }
@@ -525,7 +529,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
     jit.bytePointer += 2;
 
-    TJITContext blockContext(jit.method);
+    TJITContext blockContext(jit.method, jit.callingContext);
     blockContext.bytePointer = jit.bytePointer;
 
     // Creating block function named Class>>method@offset
@@ -923,15 +927,15 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* object           = jit.popValue();
             Value* objectIsSmallInt = jit.builder->CreateCall(isSmallInt, object, "isSmallInt");
             
-            BasicBlock* whenSmallInt = BasicBlock::Create(m_JITModule->getContext(), "whenSmallInt", jit.function);
-            BasicBlock* whenObject   = BasicBlock::Create(m_JITModule->getContext(), "whenObject", jit.function);
-            jit.builder->CreateCondBr(objectIsSmallInt, whenSmallInt, whenObject);
+            BasicBlock* asSmallInt = BasicBlock::Create(m_JITModule->getContext(), "asSmallInt", jit.function);
+            BasicBlock* asObject   = BasicBlock::Create(m_JITModule->getContext(), "asObject", jit.function);
+            jit.builder->CreateCondBr(objectIsSmallInt, asSmallInt, asObject);
             
-            jit.builder->SetInsertPoint(whenSmallInt);
+            jit.builder->SetInsertPoint(asSmallInt);
             Value* result = jit.builder->CreateCall(newInteger, jit.builder->getInt32(0));
             jit.builder->CreateRet(result);
             
-            jit.builder->SetInsertPoint(whenObject);
+            jit.builder->SetInsertPoint(asObject);
             Value* size       = jit.builder->CreateCall(getSize, object, "size");
             Value* sizeObject = jit.builder->CreateCall(newInteger, size);
             primitiveResult = sizeObject;
