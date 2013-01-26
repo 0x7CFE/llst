@@ -509,7 +509,6 @@ assertEq: arg withComment: comment
 
                    method text printNl.
                  ]
-
 !
 
 METHOD Block
@@ -779,7 +778,6 @@ plus
     [ 'fox' + 'baz' + 'bar' ] assertEq: 'foxbazbar' withComment: '7'.
     [ 'fox' + 'baz' + 'bar' + 'bam' ] assertEq: 'foxbazbarbam' withComment: '8'.
     [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '9'.
-
 !
 
 METHOD StringTest
@@ -845,7 +843,6 @@ init
     1 to: 257 do: [:idx|
         arrOfChars at: idx put: (Char basicNew: idx-1)
     ].
-
 !
 
 METHOD ArrayTest
@@ -1168,6 +1165,11 @@ testBlockReturn
 !
 
 METHOD LLVMTest
+testPrint
+    LLVM sendMessage: #printNl withArguments: (Array with: '123').
+!
+
+METHOD LLVMTest
 testNil
     LLVM sendMessage: #returnNil withArguments: (Array with: self).
 !
@@ -1194,8 +1196,10 @@ main    | command x |
         "x <- LLVMTest new test3.
         x printNl."
 
-        "LLVMTest new testNil."
-        LLVMTest new testBlockReturn.
+        "LLVMTest new testNil.
+        LLVMTest new testBlockReturn."
+        
+        LLVMTest new testPrint.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
