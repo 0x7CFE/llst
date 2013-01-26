@@ -916,9 +916,21 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveResult = klass;
             primitiveShouldNeverFail = true;
         } break;
+        
+        // TODO ioGetchar
+        case SmalltalkVM::ioPutChar: {
+            Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
+            Value*    intObject   = jit.popValue();
+            Value*    intValue    = jit.builder->CreateCall(getIntValue, intObject);
+            Value*    charValue   = jit.builder->CreateTrunc(intValue, jit.builder->getInt8Ty());
 
-        // TODO ioGetchar ioPutChar
-
+            Function* putcharFunc = cast<Function>(m_JITModule->getOrInsertFunction("putchar", jit.builder->getInt32Ty(), jit.builder->getInt8Ty(), NULL));
+            jit.builder->CreateCall(putcharFunc, charValue);
+            
+            primitiveResult = m_globals.nilObject;
+            primitiveShouldNeverFail = true;
+        } break;
+        
         case SmalltalkVM::getSize: {
             Function* isSmallInt = m_TypeModule->getFunction("isSmallInteger()");
             Function* getSize    = m_TypeModule->getFunction("TObject::getSize()");
