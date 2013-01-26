@@ -916,10 +916,24 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         // TODO ioGetchar ioPutChar
 
         case SmalltalkVM::getSize: {
-            Value*    object  = jit.popValue();
-            Function* getSize = m_TypeModule->getFunction("TObject::getSize()");
-            Value*    size    = jit.builder->CreateCall(getSize, object, "size");
-            Value*    sizeObject = jit.builder->CreateIntToPtr(size, ot.object->getPointerTo());
+            Function* isSmallInt = m_TypeModule->getFunction("isSmallInteger()");
+            Function* getSize    = m_TypeModule->getFunction("TObject::getSize()");
+            Function* newInteger = m_TypeModule->getFunction("newInteger()");
+            
+            Value* object           = jit.popValue();
+            Value* objectIsSmallInt = jit.builder->CreateCall(isSmallInt, object, "isSmallInt");
+            
+            BasicBlock* whenSmallInt = BasicBlock::Create(m_JITModule->getContext(), "whenSmallInt", jit.function);
+            BasicBlock* whenObject   = BasicBlock::Create(m_JITModule->getContext(), "whenObject", jit.function);
+            jit.builder->CreateCondBr(objectIsSmallInt, whenSmallInt, whenObject);
+            
+            jit.builder->SetInsertPoint(whenSmallInt);
+            Value* result = jit.builder->CreateCall(newInteger, jit.builder->getInt32(0));
+            jit.builder->CreateRet(result);
+            
+            jit.builder->SetInsertPoint(whenObject);
+            Value* size       = jit.builder->CreateCall(getSize, object, "size");
+            Value* sizeObject = jit.builder->CreateCall(newInteger, size);
             primitiveResult = sizeObject;
             primitiveShouldNeverFail = true;
         } break;
