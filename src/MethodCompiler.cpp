@@ -908,14 +908,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveResult = boolValue;
             primitiveShouldNeverFail = true;
         } break;
-
-        case SmalltalkVM::getClass: { // TODO isSmallInteger
-            Value*    object   = jit.popValue();
-            Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
-            Value*    klass    = jit.builder->CreateCall(getClass, object, "class");
-            primitiveResult = klass;
-            primitiveShouldNeverFail = true;
-        } break;
         
         // TODO ioGetchar
         case SmalltalkVM::ioPutChar: {
@@ -931,10 +923,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
         
+        case SmalltalkVM::getClass:
         case SmalltalkVM::getSize: {
             Function* isSmallInt = m_TypeModule->getFunction("isSmallInteger()");
             Function* getSize    = m_TypeModule->getFunction("TObject::getSize()");
             Function* newInteger = m_TypeModule->getFunction("newInteger()");
+            Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
             
             Value* object           = jit.popValue();
             Value* objectIsSmallInt = jit.builder->CreateCall(isSmallInt, object, "isSmallInt");
@@ -944,13 +938,22 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->CreateCondBr(objectIsSmallInt, asSmallInt, asObject);
             
             jit.builder->SetInsertPoint(asSmallInt);
-            Value* result = jit.builder->CreateCall(newInteger, jit.builder->getInt32(0));
+            Value* result = 0;
+            if (opcode == SmalltalkVM::getSize) {
+                result = jit.builder->CreateCall(newInteger, jit.builder->getInt32(0));
+            } else {
+                result = jit.builder->CreateBitCast(m_globals.smallIntClass, ot.object->getPointerTo());
+            }
             jit.builder->CreateRet(result);
             
             jit.builder->SetInsertPoint(asObject);
-            Value* size       = jit.builder->CreateCall(getSize, object, "size");
-            Value* sizeObject = jit.builder->CreateCall(newInteger, size);
-            primitiveResult = sizeObject;
+            if (opcode == SmalltalkVM::getSize) {
+                Value* size     = jit.builder->CreateCall(getSize, object, "size");
+                primitiveResult = jit.builder->CreateCall(newInteger, size);
+            } else {
+                primitiveResult = jit.builder->CreateCall(getClass, object, "class");
+            }
+            
             primitiveShouldNeverFail = true;
         } break;
 
