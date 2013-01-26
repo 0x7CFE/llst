@@ -1010,13 +1010,13 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
             Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
 
-            BasicBlock* tempsCheched = BasicBlock::Create(m_JITModule->getContext(), "tempsCheched.", jit.function);
+            BasicBlock* tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
 
             //Checking the passed temps size TODO unroll stack
             Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
             Value* tempSizeOk = jit.builder->CreateICmpSLE(blockAcceptsArgCount, jit.builder->getInt32(argCount));
-            jit.builder->CreateCondBr(tempSizeOk, tempsCheched, primitiveFailed);
-            jit.builder->SetInsertPoint(tempsCheched);
+            jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailed);
+            jit.builder->SetInsertPoint(tempsChecked);
             
             // Storing values in the block's wrapping context
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
@@ -1064,38 +1064,47 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* stringObject = jit.popValue();
             Value* valueObejct  = 0;
 
-            BasicBlock* indexCheched    = BasicBlock::Create(m_JITModule->getContext(), "indexCheched.", jit.function);
+            BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
-            //Checking index is Smallint
+            //Checking whether index is Smallint
             Function* isSmallInt      = m_TypeModule->getFunction("isSmallInteger()");
             Value*    indexIsSmallInt = jit.builder->CreateCall(isSmallInt, indexObject, "indexIsSmallInt.");
 
+            // Acquiring integer value of the index (from the smalltalk's TInteger)
             Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
             Value*    index    = jit.builder->CreateCall(getValue, indexObject, "index.");
             Value* actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1), "actualIndex.");
             
-            //Checking boundaries
+            //Checking boundaries TODO > 0
             Function* getSize    = m_TypeModule->getFunction("TObject::getSize()");
             Value*    stringSize = jit.builder->CreateCall(getSize, stringObject, "stringSize.");
             Value*    boundaryOk = jit.builder->CreateICmpSLT(actualIndex, stringSize, "boundaryOk.");
 
             Value* indexOk = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk, "indexOk.");
-            jit.builder->CreateCondBr(indexOk, indexCheched, primitiveFailed);
-            jit.builder->SetInsertPoint(indexCheched);
+            jit.builder->CreateCondBr(indexOk, indexChecked, primitiveFailed);
+            jit.builder->SetInsertPoint(indexChecked);
 
+            // Getting access to the actual indexed byte location
             Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
             Value*    fields    = jit.builder->CreateCall(getFields, stringObject);
             Value*    bytes     = jit.builder->CreateBitCast(fields, Type::getInt8Ty(m_JITModule->getContext())->getPointerTo());
             Value*    bytePtr   = jit.builder->CreateGEP(bytes, actualIndex);
 
             if (opcode == SmalltalkVM::stringAtPut) {
-                valueObejct = jit.popValue();
+                // Popping new value from the stack, getting actual integral value from the TInteger
+                // then shrinking it to the 1 byte representation and inserting into the pointed location
+                
+                valueObejct = jit.popValue(); 
                 Value* valueInt = jit.builder->CreateCall(getValue, valueObejct);
                 Value* byte = jit.builder->CreateTrunc(valueInt, Type::getInt8Ty(m_JITModule->getContext()));
-                jit.builder->CreateStore(byte, bytePtr);
+                jit.builder->CreateStore(byte, bytePtr); 
 
-                primitiveResult = stringObject; // valueObejct;
+                primitiveResult = stringObject;
             } else {
+                // Loading string byte pointed by the pointer,
+                // expanding it to the 4 byte integer and returning
+                // as TInteger value
+                
                 Value* byte = jit.builder->CreateLoad(bytePtr);
                 Value* expandedByte = jit.builder->CreateZExt(byte, Type::getInt32Ty(m_JITModule->getContext()));
                 Function* newInt = m_TypeModule->getFunction("newInteger()");
@@ -1209,7 +1218,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             outs() << "JIT: Unknown primitive code " << opcode << "\n";
     }
 
-    if(primitiveShouldNeverFail) {
+    if (primitiveShouldNeverFail) {
         BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded.", jit.function);
         
         jit.builder->CreateCondBr(jit.builder->getTrue(), primitiveSucceeded, primitiveFailed);
