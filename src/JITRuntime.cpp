@@ -419,7 +419,18 @@ TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
 
 TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
 {
-    printf("sendMessage(%p, #%s, %p)\n", callingContext, message->toString().c_str(), arguments);
+    printf("sendMessage(%p, #%s, %p)\n",
+           callingContext,
+           message->toString().c_str(),
+           arguments);
+
+    TObject* self = arguments->getField(0);
+    printf("\tself = %p\n", self);
+    
+    TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
+    printf("\tself class = %p\n", klass);
+    printf("\tself class name = '%s'\n", klass->name->toString().c_str());
+    
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
 }
 

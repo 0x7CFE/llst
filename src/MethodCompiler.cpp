@@ -909,7 +909,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
 
-        case SmalltalkVM::getClass: {
+        case SmalltalkVM::getClass: { // TODO isSmallInteger
             Value*    object   = jit.popValue();
             Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
             Value*    klass    = jit.builder->CreateCall(getClass, object, "class");
@@ -1044,14 +1044,28 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* arrayObject = jit.popValue();
             Value* valueObejct = 0;
 
+            BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
+
+            //Checking whether index is Smallint
+            Function* isSmallInt      = m_TypeModule->getFunction("isSmallInteger()");
+            Value*    indexIsSmallInt = jit.builder->CreateCall(isSmallInt, indexObject, "indexIsSmallInt.");
+            
             Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
             Value*    index    = jit.builder->CreateCall(getValue, indexObject, "index.");
+            Value*    actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1), "actualIndex.");
 
+            //Checking boundaries TODO > 0
+            Function* getSize    = m_TypeModule->getFunction("TObject::getSize()");
+            Value*    arraySize = jit.builder->CreateCall(getSize, arrayObject, "stringSize.");
+            Value*    boundaryOk = jit.builder->CreateICmpSLT(actualIndex, arraySize, "boundaryOk.");
+
+            Value* indexOk = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk, "indexOk.");
+            jit.builder->CreateCondBr(indexOk, indexChecked, primitiveFailed);
+            jit.builder->SetInsertPoint(indexChecked);
+            
             Function* getFields = m_TypeModule->getFunction("TObject::getFields()");
             Value*    fields    = jit.builder->CreateCall(getFields, arrayObject);
             Value*    fieldPtr  = jit.builder->CreateGEP(fields, index);
-
-            // TODO Check boundaries and small ints
 
             if (opcode == SmalltalkVM::arrayAtPut) {
                 valueObejct = jit.popValue();
