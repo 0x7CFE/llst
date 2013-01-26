@@ -891,6 +891,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
     Value* primitiveResult = 0;
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
+    bool primitiveShouldNeverFail = false;
 
     switch (opcode) {
         case SmalltalkVM::objectsAreEqual: {
@@ -899,8 +900,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value* result    = jit.builder->CreateICmpEQ(object1, object2);
             Value* boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
-            //jit.builder->CreateRet(boolValue);
+
             primitiveResult = boolValue;
+            primitiveShouldNeverFail = true;
         } break;
 
         case SmalltalkVM::getClass: {
@@ -908,7 +910,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Function* getClass = m_TypeModule->getFunction("TObject::getClass()");
             Value*    klass    = jit.builder->CreateCall(getClass, object, "class");
             primitiveResult = klass;
-            //jit.builder->CreateRet(klass);
+            primitiveShouldNeverFail = true;
         } break;
 
         // TODO ioGetchar ioPutChar
@@ -919,6 +921,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    size    = jit.builder->CreateCall(getSize, object, "size");
             Value*    sizeObject = jit.builder->CreateIntToPtr(size, ot.object->getPointerTo());
             primitiveResult = sizeObject;
+            primitiveShouldNeverFail = true;
         } break;
 
         // TODO new process
@@ -937,6 +940,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
 
             primitiveResult = newInstance;
+            primitiveShouldNeverFail = true;
         } break;
 
         case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
@@ -950,6 +954,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
             primitiveResult = newInstance;
+            primitiveShouldNeverFail = true;
         } break;
 
         case SmalltalkVM::cloneByteObject: { // FIXME pointer safety
@@ -963,10 +968,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
 
             primitiveResult = clone;
+            primitiveShouldNeverFail = true;
         } break;
 
         case SmalltalkVM::integerNew:
             primitiveResult = jit.popValue(); // TODO long integers
+            primitiveShouldNeverFail = true;
             break;
 
         case SmalltalkVM::blockInvoke: {
@@ -1188,7 +1195,15 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             outs() << "JIT: Unknown primitive code " << opcode << "\n";
     }
 
+    if(primitiveShouldNeverFail) {
+        BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded.", jit.function);
+        
+        jit.builder->CreateCondBr(jit.builder->getTrue(), primitiveSucceeded, primitiveFailed);
+        jit.builder->SetInsertPoint(primitiveSucceeded);
+    }
+
     jit.builder->CreateRet(primitiveResult);
     jit.builder->SetInsertPoint(primitiveFailed);
+
     jit.pushValue(m_globals.nilObject);
 }
