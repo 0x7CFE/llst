@@ -1,3 +1,41 @@
+METHOD MetaChar
+basicNew: value
+    " create and initialize a new char "
+    ^ self in: self new at: 1 put: value
+!
+METHOD MetaChar
+new: value
+    " return unique Char for ASCII value (or EOF) "
+    (value < 257) ifTrue: [ ^ chars at: value+1 ].
+
+    " otherwise build a custom Char "
+    ^ self basicNew: value
+!
+
+0000 PushArgument 1
+0001 PushLiteral 0
+0002 SendBinary <
+0003 DoSpecial branchIfFalse 16
+0006 PushInstance 6
+0007 PushArgument 1
+0008 PushConstant 1
+0009 SendBinary +
+0010 MarkArguments 2
+0011 SendMessage at:
+0012 DoSpecial stackReturn
+0013 DoSpecial branch 17
+0016 PushConstant nil
+0017 DoSpecial popTop
+0018 PushArgument 0
+0019 PushArgument 1
+0020 MarkArguments 2
+0021 SendMessage basicNew:
+0022 DoSpecial stackReturn
+0023 DoSpecial popTop
+0024 DoSpecial selfReturn
+
+
+
 METHOD String
 asNumber | val |
     " parse a base-10 ASCII number, return nil on failure "
