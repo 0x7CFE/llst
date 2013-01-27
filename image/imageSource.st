@@ -481,7 +481,6 @@ notNil
 	^ false
 !
 
-
 METHOD Block
 assertEq: arg withComment: comment
     |result header headerTab|
@@ -1149,12 +1148,14 @@ test3
 !
 
 METHOD LLVMTest
-test4 |arr|
-   arr <- Array new: 1.
-   arr at: 1 put: [^42].
+invokeBlock: aBlock withArg: anArg
+    ^ aBlock value: anArg
+!
 
-   arr at: 1; value.
-   ^0.
+METHOD LLVMTest
+testBlockReturn | block |
+    block <- [:arg | ^arg].
+    ^ self invokeBlock: block withArg: 42
 !
 
 METHOD LLVMTest
@@ -1163,8 +1164,9 @@ test42Lt: arg
 !
 
 METHOD LLVMTest
-testBlockReturn
-    LLVM sendMessage: #asNumber withArguments: (Array with: '123').
+runTestBlockReturn
+    LLVM sendMessage: #testBlockReturn withArguments: (Array with: self).
+    "LLVM sendMessage: #asNumber withArguments: (Array with: '123')."
 !
 
 METHOD LLVMTest
@@ -1195,7 +1197,7 @@ main    | command x |
         x printNl."
 
         "LLVMTest new testNil."
-        LLVMTest new testBlockReturn.
+        LLVMTest new runTestBlockReturn.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
