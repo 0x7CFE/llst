@@ -1175,6 +1175,67 @@ testNil
 !
 
 METHOD Undefined
+testBranches: x
+     (x = 1) ifTrue: [ ^x ].
+     (x = 2)
+        ifTrue:  [ ^x ]
+        ifFalse: [ (x = 3) ifTrue: [ ^x ]. ].
+!
+
+METHOD Undefined
+testBlockReturn: x |block|
+     block <- [
+        (x = 4) ifTrue: [ ^x ].
+        (x = 5) ifTrue: [ ^x ].
+     ].
+     
+     [true] ifTrue: [ ^block value ].
+!
+
+METHOD Undefined
+testResume: blockSurelyThrows |blockThatCanThrow|
+     blockThatCanThrow <- [ ^123 ].
+     
+     blockSurelyThrows value.
+     
+     ^nil.
+!
+
+METHOD Undefined
+return42FromBlockReturn
+     nil testResume: [ ^42 ].
+!
+
+CLASS LLVMTestStatements Test
+METHOD LLVMTestStatements
+branch |x|
+    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 1).
+    [ x ] assertEq: 1 withComment: '1'.
+    
+    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 2).
+    [ x ] assertEq: 2 withComment: '2'.
+    
+    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 3).
+    [ x ] assertEq: 3 withComment: '3'.
+!
+
+METHOD LLVMTestStatements
+blockReturn |x|
+    x <- LLVM sendMessage: ('testBlockReturn:' asSymbol) withArguments: (Array with: nil with: 4).
+    [ x ] assertEq: 4 withComment: '1'.
+    
+    x <- LLVM sendMessage: ('testBlockReturn:' asSymbol) withArguments: (Array with: nil with: 5).
+    [ x ] assertEq: 5 withComment: '2'.
+!
+
+METHOD LLVMTestStatements
+resume |x|
+    x <- LLVM sendMessage: #return42FromBlockReturn withArguments: (Array with: nil).
+    [ x ] assertEq: 42.
+!
+
+
+METHOD Undefined
 main    | command x |
         " initialize classes "
 
@@ -1197,9 +1258,10 @@ main    | command x |
         x printNl."
 
         "LLVMTest new testNil.
-        LLVMTest new testBlockReturn."
+        LLVMTest new testBlockReturn.
+        LLVMTest new testPrint."
         
-        LLVMTest new testPrint.
+        LLVMTestStatements new runAll.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
