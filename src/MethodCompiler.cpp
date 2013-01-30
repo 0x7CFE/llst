@@ -963,7 +963,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 Value* size     = jit.builder->CreateCall(getSize, object, "size");
                 primitiveResult = jit.builder->CreateCall(newInteger, size);
             } else {
-                primitiveResult = jit.builder->CreateCall(getClass, object, "class");
+                Value* klass = jit.builder->CreateCall(getClass, object, "class");
+                primitiveResult = jit.builder->CreateBitCast(klass, ot.object->getPointerTo());
             }
             
             primitiveShouldNeverFail = true;
