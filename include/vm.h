@@ -97,21 +97,21 @@ public:
         falseConst
     };
 
-	enum {
-		objectsAreEqual   = 1,
-		getClass          = 2,
-		getSize           = 4,
-		inAtPut           = 5,
-		startNewProcess   = 6,
-		allocateObject    = 7,
-		blockInvoke       = 8,
-		throwError        = 19,
-		allocateByteArray = 20,
-		cloneByteObject   = 23,
-		integerNew        = 32,
-		flushCache        = 34,
-		bulkReplace       = 38
-	};
+    enum {
+        objectsAreEqual   = 1,
+        getClass          = 2,
+        getSize           = 4,
+        inAtPut           = 5,
+        startNewProcess   = 6,
+        allocateObject    = 7,
+        blockInvoke       = 8,
+        throwError        = 19,
+        allocateByteArray = 20,
+        cloneByteObject   = 23,
+        integerNew        = 32,
+        flushCache        = 34,
+        bulkReplace       = 38
+    };
 
     enum SmallIntOpcode {
         smallIntAdd = 10,
@@ -126,19 +126,18 @@ public:
         smallIntBitShift = 39
     };
 
-	enum {
-		stringAt        = 21,
-		stringAtPut     = 22,
-		arrayAt         = 24,
-		arrayAtPut      = 5
-	};
-private:
-
+    enum {
+        stringAt        = 21,
+        stringAtPut     = 22,
+        arrayAt         = 24,
+        arrayAtPut      = 5
+    };
+    
     enum {
         ioGetChar = 9,
         ioPutChar = 3
     };
-
+private:
     enum IntegerOpcode {
         integerDiv = 25,
         integerMod,

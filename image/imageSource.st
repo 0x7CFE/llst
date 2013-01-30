@@ -508,7 +508,6 @@ assertEq: arg withComment: comment
 
                    method text printNl.
                  ]
-
 !
 
 METHOD Block
@@ -778,7 +777,6 @@ plus
     [ 'fox' + 'baz' + 'bar' ] assertEq: 'foxbazbar' withComment: '7'.
     [ 'fox' + 'baz' + 'bar' + 'bam' ] assertEq: 'foxbazbarbam' withComment: '8'.
     [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '9'.
-
 !
 
 METHOD StringTest
@@ -844,7 +842,6 @@ init
     1 to: 257 do: [:idx|
         arrOfChars at: idx put: (Char basicNew: idx-1)
     ].
-
 !
 
 METHOD ArrayTest
@@ -1170,9 +1167,75 @@ runTestBlockReturn
 !
 
 METHOD LLVMTest
+testPrint
+    LLVM sendMessage: #printNl withArguments: (Array with: '123').
+!
+
+METHOD LLVMTest
 testNil
     LLVM sendMessage: #returnNil withArguments: (Array with: self).
 !
+
+METHOD Undefined
+testBranches: x
+     (x = 1) ifTrue: [ ^x ].
+     (x = 2)
+        ifTrue:  [ ^x ]
+        ifFalse: [ (x = 3) ifTrue: [ ^x ]. ].
+!
+
+METHOD Undefined
+testBlockReturn: x |block|
+     block <- [
+        (x = 4) ifTrue: [ ^x ].
+        (x = 5) ifTrue: [ ^x ].
+     ].
+     
+     [true] ifTrue: [ ^block value ].
+!
+
+METHOD Undefined
+testResume: blockSurelyThrows |blockThatCanThrow|
+     blockThatCanThrow <- [ ^123 ].
+     
+     blockSurelyThrows value.
+     
+     ^nil.
+!
+
+METHOD Undefined
+return42FromBlockReturn
+     nil testResume: [ ^42 ].
+!
+
+CLASS LLVMTestStatements Test
+METHOD LLVMTestStatements
+branch |x|
+    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 1).
+    [ x ] assertEq: 1 withComment: '1'.
+    
+    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 2).
+    [ x ] assertEq: 2 withComment: '2'.
+    
+    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 3).
+    [ x ] assertEq: 3 withComment: '3'.
+!
+
+METHOD LLVMTestStatements
+blockReturn |x|
+    x <- LLVM sendMessage: ('testBlockReturn:' asSymbol) withArguments: (Array with: nil with: 4).
+    [ x ] assertEq: 4 withComment: '1'.
+    
+    x <- LLVM sendMessage: ('testBlockReturn:' asSymbol) withArguments: (Array with: nil with: 5).
+    [ x ] assertEq: 5 withComment: '2'.
+!
+
+METHOD LLVMTestStatements
+resume |x|
+    x <- LLVM sendMessage: #return42FromBlockReturn withArguments: (Array with: nil).
+    [ x ] assertEq: 42.
+!
+
 
 METHOD Undefined
 main    | command x |
@@ -1196,8 +1259,11 @@ main    | command x |
         "x <- LLVMTest new test3.
         x printNl."
 
-        "LLVMTest new testNil."
+        "LLVMTest new testNil.
         LLVMTest new runTestBlockReturn.
+        LLVMTest new testPrint."
+        
+        LLVMTestStatements new runAll.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
