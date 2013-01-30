@@ -1,3 +1,42 @@
+METHOD Undefined
+testBranches: x
+     (x = 1) ifTrue: [ ^x ].
+     (x = 2)
+        ifTrue:  [ ^x ]
+        ifFalse: [ (x = 3) ifTrue: [ ^x ]. ].
+!
+
+0000 PushArgument 1
+0001 PushConstant 1
+0002 MarkArguments 2
+0003 SendMessage =
+0004 DoSpecial branchIfFalse 12                  A
+0007 PushArgument 1
+0008 DoSpecial stackReturn
+0009 DoSpecial branch 13                            B
+0012 PushConstant nil                            A
+0013 DoSpecial popTop                               B
+0014 PushArgument 1
+0015 PushConstant 2
+0016 MarkArguments 2
+0017 SendMessage =
+0018 DoSpecial branchIfFalse 26                        C
+0021 PushArgument 1
+0022 DoSpecial stackReturn
+0023 DoSpecial branch 39                                   D1
+0026 PushArgument 1                                    C
+0027 PushConstant 3
+0028 MarkArguments 2
+0029 SendMessage =
+0030 DoSpecial branchIfFalse 38                                 E
+0033 PushArgument 1
+0034 DoSpecial stackReturn
+0035 DoSpecial branch 39                                   D2
+0038 PushConstant nil                                           E
+0039 DoSpecial popTop                                      D
+0040 DoSpecial selfReturn
+
+
 METHOD MetaChar
 basicNew: value
     " create and initialize a new char "

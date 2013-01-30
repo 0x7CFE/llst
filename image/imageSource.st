@@ -1263,7 +1263,7 @@ main    | command x |
         LLVMTest new runTestBlockReturn.
         LLVMTest new testPrint."
         
-        LLVMTestStatements new runAll.
+        "LLVMTestStatements new runAll."
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
