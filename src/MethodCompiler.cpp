@@ -1196,7 +1196,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 case SmalltalkVM::smallIntDiv: {
                     Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
                     BasicBlock* divBB  = BasicBlock::Create(m_JITModule->getContext(), "div.", jit.function);
-                    jit.builder->CreateCondBr(isZero, divBB, primitiveFailed);
+                    jit.builder->CreateCondBr(isZero, primitiveFailed, divBB);
                     
                     jit.builder->SetInsertPoint(divBB);
                     Value* intResult = jit.builder->CreateExactSDiv(leftOperand, rightOperand);
@@ -1205,7 +1205,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 case SmalltalkVM::smallIntMod: {
                     Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
                     BasicBlock* modBB  = BasicBlock::Create(m_JITModule->getContext(), "mod.", jit.function);
-                    jit.builder->CreateCondBr(isZero, modBB, primitiveFailed);
+                    jit.builder->CreateCondBr(isZero, primitiveFailed, modBB);
                     
                     jit.builder->SetInsertPoint(modBB);
                     Value* intResult = jit.builder->CreateSRem(leftOperand, rightOperand);

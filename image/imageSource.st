@@ -1236,6 +1236,12 @@ resume |x|
     [ x ] assertEq: 42.
 !
 
+METHOD LLVMTestStatements
+rem |x|
+    x <- LLVM sendMessage: ('rem:' asSymbol) withArguments: (Array with: 10 with: 3).
+    [ x ] assertEq: 1.
+!
+
 
 METHOD Undefined
 main    | command x |
