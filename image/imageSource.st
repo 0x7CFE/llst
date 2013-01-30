@@ -1242,6 +1242,18 @@ rem |x|
     [ x ] assertEq: 1.
 !
 
+METHOD String
+customSize |size|
+    size <- 0.
+    self do: [:ignore| size <- size + 1 ].
+    ^size.
+!
+
+METHOD LLVMTestStatements
+closure |x|
+    x <- LLVM sendMessage: ('customSize' asSymbol) withArguments: (Array with: '1234').
+    [ x ] assertEq: 4.
+!
 
 METHOD Undefined
 main    | command x |
@@ -1266,10 +1278,10 @@ main    | command x |
         x printNl."
 
         "LLVMTest new testNil.
-        LLVMTest new runTestBlockReturn."
-        LLVMTest new testPrint.
+        LLVMTest new runTestBlockReturn.
+        LLVMTest new testPrint."
         
-        "LLVMTestStatements new runAll."
+        LLVMTestStatements new runAll.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
