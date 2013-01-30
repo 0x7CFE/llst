@@ -95,8 +95,8 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
-        //uint32_t currentOffset = jit.bytePointer;
-        //printf("scanForBlockReturn: Processing offset %d / %d \n", currentOffset, stopPointer);
+//         uint32_t currentOffset = jit.bytePointer;
+//         printf("scanForBlockReturn: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
         TInstruction instruction;
@@ -120,6 +120,11 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
             // Skipping block's bytecodes
             jit.bytePointer = newBytePointer;
+        }
+
+        if (instruction.high == SmalltalkVM::opDoPrimitive) {
+            jit.bytePointer++; // skipping primitive number
+            continue;
         }
 
         // We're now looking only for branch bytecodes
@@ -162,7 +167,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
-        // uint32_t currentOffset = jit.bytePointer;
+        uint32_t currentOffset = jit.bytePointer;
         // printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
@@ -181,6 +186,11 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
             continue;
         }
 
+        if (instruction.high == SmalltalkVM::opDoPrimitive) {
+            jit.bytePointer++; // skipping primitive number
+            continue;
+        }
+        
         // We're now looking only for branch bytecodes
         if (instruction.high != SmalltalkVM::opDoSpecial)
             continue;
@@ -193,12 +203,14 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
                 jit.bytePointer += 2; // skipping the branch offset data
 
-                // Creating the referred basic block and inserting it into the function
-                // Later it will be filled with instructions and linked to other blocks
-                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
-                m_targetToBlockMap[targetOffset] = targetBasicBlock;
+                if (m_targetToBlockMap.find(targetOffset) == m_targetToBlockMap.end()) {
+                    // Creating the referred basic block and inserting it into the function
+                    // Later it will be filled with instructions and linked to other blocks
+                    BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
+                    m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
-                // outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
+                }
+                outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << m_targetToBlockMap[targetOffset]->getName() << ")\n";
             } break;
         }
     }
@@ -951,7 +963,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 Value* size     = jit.builder->CreateCall(getSize, object, "size");
                 primitiveResult = jit.builder->CreateCall(newInteger, size);
             } else {
-                primitiveResult = jit.builder->CreateCall(getClass, object, "class");
+                Value* klass = jit.builder->CreateCall(getClass, object, "class");
+                primitiveResult = jit.builder->CreateBitCast(klass, ot.object->getPointerTo());
             }
             
             primitiveShouldNeverFail = true;

@@ -1,3 +1,212 @@
+METHOD SmallInt
+rem: arg
+    <12 self arg>.
+    (arg isMemberOf: SmallInt) ifFalse: [^self rem: arg asSmallInt].
+    (0 = arg) ifTrue: [^ self error: 'division by zero'].
+    self primitiveFailed
+!
+
+0000 PushArgument 0
+0001 PushArgument 1
+0002 DoPrimitive SmallInt %
+0004 DoSpecial popTop
+0005 PushArgument 1
+0006 PushLiteral 0
+0007 MarkArguments 2
+0008 SendMessage isMemberOf:
+0009 DoSpecial branchIfTrue 22
+0012 PushArgument 0
+0013 PushArgument 1
+0014 MarkArguments 1
+0015 SendMessage asSmallInt
+0016 MarkArguments 2
+0017 SendMessage rem:
+0018 DoSpecial stackReturn
+0019 DoSpecial branch 23
+0022 PushConstant nil
+0023 DoSpecial popTop
+0024 PushConstant 0
+0025 PushArgument 1
+0026 MarkArguments 2
+0027 SendMessage =
+0028 DoSpecial branchIfFalse 39
+0031 PushArgument 0
+0032 PushLiteral 5
+0033 MarkArguments 2
+0034 SendMessage error:
+0035 DoSpecial stackReturn
+0036 DoSpecial branch 40
+0039 PushConstant nil
+0040 DoSpecial popTop
+0041 PushArgument 0
+0042 MarkArguments 1
+0043 SendMessage primitiveFailed
+0044 DoSpecial popTop
+0045 DoSpecial selfReturn
+
+
+
+METHOD Number
+printWidth: width base: base | res n dig wasNeg wide |
+    res <- ''.
+    (self negative) ifTrue: [
+        wasNeg <- true.
+        wide <- width-1.
+        n <- self negated
+    ] ifFalse: [
+        wasNeg <- false.
+        wide <- width.
+        n <- self
+    ].
+    [true] whileTrue: [
+        res <- ((n rem: base) asDigit) + res.
+        n <- n quo: base.
+        (n = 0) ifTrue: [
+            ((res size)+1) to: wide do: [:ignore|
+                res <- '0' + res
+            ].
+            wasNeg ifTrue: [ res <- '-' + res ].
+            ^res
+        ]
+    ]
+!
+
+0000 PushLiteral 0
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushArgument 0
+0004 MarkArguments 1
+0005 SendMessage negative
+0006 DoSpecial branchIfFalse 25
+0009 PushConstant true
+0010 AssignTemporary 3
+0011 DoSpecial popTop
+0012 PushArgument 1
+0013 PushConstant 1
+0014 MarkArguments 2
+0015 SendMessage -
+0016 AssignTemporary 4
+0017 DoSpecial popTop
+0018 PushArgument 0
+0019 MarkArguments 1
+0020 SendMessage negated
+0021 AssignTemporary 1
+0022 DoSpecial branch 33
+0025 PushConstant false
+0026 AssignTemporary 3
+0027 DoSpecial popTop
+0028 PushArgument 1
+0029 AssignTemporary 4
+0030 DoSpecial popTop
+0031 PushArgument 0
+0032 AssignTemporary 1
+0033 DoSpecial popTop
+0034 PushBlock
+0037     PushConstant true
+0038     DoSpecial stackReturn
+0039 PushConstant true
+0040 DoSpecial branchIfFalse 106
+0043 PushTemporary 1
+0044 PushArgument 2
+0045 MarkArguments 2
+0046 SendMessage rem:
+0047 MarkArguments 1
+0048 SendMessage asDigit
+0049 PushTemporary 0
+0050 SendBinary +
+0051 AssignTemporary 0
+0052 DoSpecial popTop
+0053 PushTemporary 1
+0054 PushArgument 2
+0055 MarkArguments 2
+0056 SendMessage quo:
+0057 AssignTemporary 1
+0058 DoSpecial popTop
+0059 PushTemporary 1
+0060 PushConstant 0
+0061 MarkArguments 2
+0062 SendMessage =
+0063 DoSpecial branchIfFalse 101
+0066 PushTemporary 0
+0067 MarkArguments 1
+0068 SendMessage size
+0069 PushConstant 1
+0070 SendBinary +
+0071 PushTemporary 4
+0072 PushBlock
+0075     PushLiteral 9
+0076     PushTemporary 0
+0077     SendBinary +
+0078     AssignTemporary 0
+0079     DoSpecial stackReturn
+0080 MarkArguments 3
+0081 SendMessage to:do:
+0082 DoSpecial popTop
+0083 PushTemporary 3
+0084 DoSpecial branchIfFalse 94
+0087 PushLiteral 11
+0088 PushTemporary 0
+0089 SendBinary +
+0090 AssignTemporary 0
+0091 DoSpecial branch 95
+0094 PushConstant nil
+0095 DoSpecial popTop
+0096 PushTemporary 0
+0097 DoSpecial stackReturn
+0098 DoSpecial branch 102
+0101 PushConstant nil
+0102 DoSpecial popTop
+0103 DoSpecial branch 39
+0106 PushConstant 0
+0107 DoSpecial popTop
+0108 DoSpecial selfReturn
+
+
+METHOD Undefined
+testBranches: x
+     (x = 1) ifTrue: [ ^x ].
+     (x = 2)
+        ifTrue:  [ ^x ]
+        ifFalse: [ (x = 3) ifTrue: [ ^x ]. ].
+!
+
+0000 PushArgument 1
+0001 PushConstant 1
+0002 MarkArguments 2
+0003 SendMessage =
+0004 DoSpecial branchIfFalse 12                  A
+0007 PushArgument 1
+0008 DoSpecial stackReturn
+0009 DoSpecial branch 13                            B
+0012 PushConstant nil                            A
+0013 DoSpecial popTop                               B
+0014 PushArgument 1
+0015 PushConstant 2
+0016 MarkArguments 2
+0017 SendMessage =
+0018 DoSpecial branchIfFalse 26                        C
+0021 PushArgument 1
+0022 DoSpecial stackReturn
+0023 DoSpecial branch 39                                   D1
+0026 PushArgument 1                                    C
+0027 PushConstant 3
+0028 MarkArguments 2
+0029 SendMessage =
+0030 DoSpecial branchIfFalse 38                                 E
+0033 PushArgument 1
+0034 DoSpecial stackReturn
+0035 DoSpecial branch 39                                   D2
+0038 PushConstant nil                                           E
+0039 DoSpecial popTop                                      D
+0040 DoSpecial selfReturn
+
+Branch site: 4 -> 12 (branch.)
+Branch site: 9 -> 13 (branch.1)
+Branch site: 18 -> 26 (branch.2)
+Branch site: 23 -> 39 (branch.3)
+Branch site: 30 -> 38 (branch.4)
+Branch site: 35 -> 39 (branch.5)
+
 METHOD MetaChar
 basicNew: value
     " create and initialize a new char "
