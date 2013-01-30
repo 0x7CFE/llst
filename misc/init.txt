@@ -36,6 +36,12 @@ testBranches: x
 0039 DoSpecial popTop                                      D
 0040 DoSpecial selfReturn
 
+Branch site: 4 -> 12 (branch.)
+Branch site: 9 -> 13 (branch.1)
+Branch site: 18 -> 26 (branch.2)
+Branch site: 23 -> 39 (branch.3)
+Branch site: 30 -> 38 (branch.4)
+Branch site: 35 -> 39 (branch.5)
 
 METHOD MetaChar
 basicNew: value

@@ -162,7 +162,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
-        // uint32_t currentOffset = jit.bytePointer;
+        uint32_t currentOffset = jit.bytePointer;
         // printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
@@ -193,12 +193,14 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                 uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
                 jit.bytePointer += 2; // skipping the branch offset data
 
-                // Creating the referred basic block and inserting it into the function
-                // Later it will be filled with instructions and linked to other blocks
-                BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
-                m_targetToBlockMap[targetOffset] = targetBasicBlock;
+                if (m_targetToBlockMap.find(targetOffset) == m_targetToBlockMap.end()) {
+                    // Creating the referred basic block and inserting it into the function
+                    // Later it will be filled with instructions and linked to other blocks
+                    BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
+                    m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
-                // outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
+                    outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << targetBasicBlock->getName() << ")\n";
+                }
             } break;
         }
     }
