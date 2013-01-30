@@ -974,7 +974,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
         case SmalltalkVM::allocateObject: { // FIXME pointer safety
             Value* sizeObject  = jit.popValue();
-            Value* klass       = jit.popValue();
+            Value* klassObject = jit.popValue();
+            Value* klass       = jit.builder->CreateBitCast(klassObject, ot.klass->getPointerTo());
 
             Function* getValue = m_TypeModule->getFunction("getIntegerValue()");
             Value*    size     = jit.builder->CreateCall(getValue, sizeObject, "size.");
@@ -991,7 +992,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
         case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
             Value*    sizeObject  = jit.popValue();
-            Value*    klass       = jit.popValue();
+            Value*    klassObject = jit.popValue();
+            Value*    klass       = jit.builder->CreateBitCast(klassObject, ot.klass->getPointerTo());
 
             Function* getValue    = m_TypeModule->getFunction("getIntegerValue()");
             Value*    dataSize    = jit.builder->CreateCall(getValue, sizeObject, "dataSize.");
@@ -999,7 +1001,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, dataSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
-            primitiveResult = newInstance;
+            primitiveResult = jit.builder->CreateBitCast(newInstance, ot.object->getPointerTo() );
             primitiveShouldNeverFail = true;
         } break;
 
