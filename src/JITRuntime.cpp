@@ -162,11 +162,13 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             exit(1);
         }
 
+        outs() << *blockFunction;
+        
         verifyModule(*m_JITModule);
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
     }
-
+    
     block->previousContext = callingContext->previousContext;
 
     TBlockFunction compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));

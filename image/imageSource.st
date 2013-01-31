@@ -1256,6 +1256,22 @@ closure |x|
 !
 
 METHOD Undefined
+blockParam | block a b |
+    block <- [ :x :y | a <- x.  b <- y * 2. ].
+    block value: 1 value: 2.
+
+    ((a = 1) and: [ b = 4 ])
+        ifTrue:  [ ^ 42]
+        ifFalse: [ ^ 666]
+!
+
+METHOD LLVMTestStatements
+blockParam |x|
+    x <- LLVM sendMessage: #blockParam withArguments: (Array with: nil).
+    [ x ] assertEq: 42.
+!
+
+METHOD Undefined
 main    | command x |
         " initialize classes "
 
@@ -1278,10 +1294,11 @@ main    | command x |
         x printNl."
 
         "LLVMTest new testNil.
-        LLVMTest new runTestBlockReturn.
-        LLVMTest new testPrint."
+        LLVMTest new runTestBlockReturn."
+        "LLVMTest new testPrint."
         
-        LLVMTestStatements new runAll.
+        "LLVMTestStatements new closure."
+        LLVMTestStatements new blockParam.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
