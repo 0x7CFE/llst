@@ -1255,8 +1255,8 @@ closure |x|
     [ x ] assertEq: 4.
 !
 
-METHOD Undefined
-blockParam | block a b |
+METHOD LLVMTestStatements
+testblockParam | block a b |
     block <- [ :x :y | a <- x.  b <- y * 2. ].
     block value: 1 value: 2.
 
@@ -1267,7 +1267,7 @@ blockParam | block a b |
 
 METHOD LLVMTestStatements
 blockParam |x|
-    x <- LLVM sendMessage: #blockParam withArguments: (Array with: nil).
+    x <- LLVM sendMessage: #testblockParam withArguments: (Array with: self).
     [ x ] assertEq: 42.
 !
 

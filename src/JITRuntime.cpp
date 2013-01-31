@@ -193,6 +193,11 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
     // TODO #doesNotUnderstand:
 
+    if (! method.rawptr()) {
+        outs() << "Method not found!";
+        exit(1);
+    }
+    
     // Searching for the jit compiled function
     // TODO Fast 1-way lookup cache
     std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
