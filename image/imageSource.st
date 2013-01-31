@@ -1232,7 +1232,7 @@ blockReturn |x|
 
 METHOD LLVMTestStatements
 resume |x|
-    x <- LLVM sendMessage: #return42FromBlockReturn withArguments: (Array with: nil).
+    x <- LLVM sendMessage: ('return42FromBlockReturn' asSymbol) withArguments: (Array with: nil).
     [ x ] assertEq: 42.
 !
 
@@ -1251,7 +1251,7 @@ customSize |size|
 
 METHOD LLVMTestStatements
 closure |x|
-    x <- LLVM sendMessage: ('customSize' asSymbol) withArguments: (Array with: '1234').
+    x <- LLVM sendMessage: #customSize withArguments: (Array with: '1234').
     [ x ] assertEq: 4.
 !
 

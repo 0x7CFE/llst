@@ -369,33 +369,33 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
 
     Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
-
+    
     LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
     caughtResult->addClause(m_exceptionAPI.blockReturnType);
-
+    
     Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
     Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
     Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, ot.blockReturn->getPointerTo());
-
+    
     Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
     Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);
-
+    
     Value* targetContextPtr = jit.builder->CreateStructGEP(blockResult, 1);
     Value* targetContext    = jit.builder->CreateLoad(targetContextPtr);
-
-    jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
-
+    
     BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
     BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
-
+    
     Value* compareTargets = jit.builder->CreateICmpEQ(jit.context, targetContext);
     jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
-
+    
     jit.builder->SetInsertPoint(returnBlock);
+    jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
     jit.builder->CreateRet(returnValue);
-
+    
     jit.builder->SetInsertPoint(rethrowBlock);
-    jit.builder->CreateResume(caughtResult);
+    jit.builder->CreateCall(m_exceptionAPI.cxa_rethrow);
+    jit.builder->CreateUnreachable();
 }
 
 void MethodCompiler::printOpcode(TInstruction instruction)
