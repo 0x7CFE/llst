@@ -72,6 +72,7 @@ struct TExceptionAPI {
     llvm::Function*    gxx_personality;
     llvm::Function*    cxa_begin_catch;
     llvm::Function*    cxa_end_catch;
+    llvm::Function*    cxa_rethrow;
     llvm::GlobalValue* blockReturnType;
 };
 
