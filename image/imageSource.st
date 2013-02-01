@@ -1163,13 +1163,13 @@ test42Lt: arg
 METHOD LLVMTest
 runTestBlockReturn
     LLVM sendMessage: #testBlockReturn withArguments: (Array with: self).
-    "LLVM sendMessage: #asNumber withArguments: (Array with: '123')."
 !
 
 METHOD LLVMTest
 testPrint | result |
-    result <- LLVM sendMessage: #printNl withArguments: (Array with: '123').
-    result printNl.
+    result <- LLVM sendMessage: #printString withArguments: (Array with: 123).
+    "result <- LLVM sendMessage: #asNumber withArguments: (Array with: '123')."
+    result class print. ' "' print. result print. $" printNl.
 !
 
 METHOD LLVMTest
@@ -1296,10 +1296,10 @@ main    | command x |
 
         "LLVMTest new testNil.
         LLVMTest new runTestBlockReturn."
-        LLVMTest new testPrint.
+        "LLVMTest new testPrint."
         
         "LLVMTestStatements new closure."
-        "LLVMTestStatements new blockParam."
+        LLVMTestStatements new blockParam.
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
