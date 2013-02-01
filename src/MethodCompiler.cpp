@@ -76,7 +76,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
     jit.literals               = jit.builder->CreateCall(objectGetFields, literalsObject, "literals");
 
-    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.context, 4, "tempsObjectPtr");
+    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.context, 3, "tempsObjectPtr");
     Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
     Value* tempsObject         = jit.builder->CreateBitCast(tempsObjectArray, ot.object->getPointerTo(), "tempsObject");
     jit.temporaries            = jit.builder->CreateCall(objectGetFields, tempsObject, "temporaries");
@@ -1039,10 +1039,13 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    fields    = jit.builder->CreateCall(getFields, blockTempsObject);
 
             Function* getSize   = m_TypeModule->getFunction("TObject::getSize()");
-            Value*    tempsSize = jit.builder->CreateCall(getSize, blockTempsObject);
+            Value*    tempsSize = jit.builder->CreateCall(getSize, blockTempsObject, "tempsSize.");
 
-            Value* argumentLocationPtr = jit.builder->CreateStructGEP(block, 1);
-            Value* argumentLocation    = jit.builder->CreateLoad(argumentLocationPtr);
+            Function* getIntValue = m_TypeModule->getFunction("getIntegerValue()");
+            Value* argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
+            Value* argumentLocationField  = jit.builder->CreateLoad(argumentLocationPtr);
+            Value* argumentLocationObject = jit.builder->CreateIntToPtr(argumentLocationField, ot.object->getPointerTo());
+            Value* argumentLocation       = jit.builder->CreateCall(getIntValue, argumentLocationObject, "argLocation.");
 
             BasicBlock* tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
 

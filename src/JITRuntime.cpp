@@ -86,7 +86,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
                             .setErrorStr(&error)
                             .setTargetOptions(Opts)
                             .create();
-    if(!m_executionEngine) {
+                            
+    if (!m_executionEngine) {
         errs() << error;
         exit(1);
     }
@@ -162,12 +163,12 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             exit(1);
         }
 
-        outs() << *blockFunction;
-        
         verifyModule(*m_JITModule);
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
     }
+    
+    outs() << *blockFunction;
     
     block->previousContext = callingContext->previousContext;
 

@@ -1167,8 +1167,9 @@ runTestBlockReturn
 !
 
 METHOD LLVMTest
-testPrint
-    LLVM sendMessage: #printNl withArguments: (Array with: '123').
+testPrint | result |
+    result <- LLVM sendMessage: #printNl withArguments: (Array with: '123').
+    result printNl.
 !
 
 METHOD LLVMTest
@@ -1257,10 +1258,10 @@ closure |x|
 
 METHOD LLVMTestStatements
 testblockParam | block a b |
-    block <- [ :x :y | a <- x.  b <- y * 2. ].
+    block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
     block value: 1 value: 2.
 
-    ((a = 1) and: [ b = 4 ])
+    ((a = 2) and: [ b = 4 ])
         ifTrue:  [ ^ 42]
         ifFalse: [ ^ 666]
 !
@@ -1295,10 +1296,10 @@ main    | command x |
 
         "LLVMTest new testNil.
         LLVMTest new runTestBlockReturn."
-        "LLVMTest new testPrint."
+        LLVMTest new testPrint.
         
         "LLVMTestStatements new closure."
-        LLVMTestStatements new blockParam.
+        "LLVMTestStatements new blockParam."
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
