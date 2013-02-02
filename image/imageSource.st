@@ -1261,7 +1261,7 @@ testblockParam | block a b |
     block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
     block value: 1 value: 2.
 
-    ((a = 2) and: [ b = 4 ])
+    (((a = 2) and: [ b = 4 ]) and: [ a < b ])
         ifTrue:  [ ^ 42]
         ifFalse: [ ^ 666]
 !

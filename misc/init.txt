@@ -1,3 +1,54 @@
+METHOD LLVMTestStatements
+testblockParam | block a b |
+    block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
+    block value: 1 value: 2.
+
+    ((a = 2) and: [ b = 4 ])
+        ifTrue:  [ ^ 42]
+        ifFalse: [ ^ 666]
+!
+
+0000 PushBlock
+0003     PushTemporary 3
+0004     PushConstant 1
+0005     SendBinary +
+0006     AssignTemporary 1
+0007     DoSpecial popTop
+0008     PushTemporary 4
+0009     PushConstant 2
+0010     MarkArguments 2
+0011     SendMessage *
+0012     AssignTemporary 2
+0013     DoSpecial stackReturn
+0014 AssignTemporary 0
+0015 DoSpecial popTop
+0016 PushTemporary 0
+0017 PushConstant 1
+0018 PushConstant 2
+0019 MarkArguments 3
+0020 SendMessage value:value:
+0021 DoSpecial popTop
+0022 PushTemporary 1
+0023 PushConstant 2
+0024 MarkArguments 2
+0025 SendMessage =
+0026 DoSpecial branchIfFalse 36      A
+0029 PushTemporary 2
+0030 PushConstant 4
+0031 MarkArguments 2
+0032 SendMessage =
+0033 DoSpecial branch 37                   B
+0036 PushConstant false              A
+0037 DoSpecial branchIfFalse 45            B
+0040 PushLiteral 4
+0041 DoSpecial stackReturn
+0042 DoSpecial branch 47                        C
+0045 PushLiteral 5
+0046 DoSpecial stackReturn
+0047 DoSpecial popTop                           C
+0048 DoSpecial selfReturn
+
+
 METHOD SmallInt
 rem: arg
     <12 self arg>.
@@ -467,17 +518,17 @@ sort: criteria | left right mediane |
     0034     PushTemporary 2
     0035     MarkArguments 3
     0036     SendMessage value:value:
-    0037     DoSpecial branchIfFalse 47
+    0037     DoSpecial branchIfFalse 47   *
     0040     PushTemporary 0
     0041     PushTemporary 3
     0042     MarkArguments 2
     0043     SendMessage add:
-    0044     DoSpecial branch 51
-    0047     PushTemporary 1
+    0044     DoSpecial branch 51              #
+    0047     PushTemporary 1              *
     0048     PushTemporary 3
     0049     MarkArguments 2
     0050     SendMessage add:
-    0051     DoSpecial stackReturn
+    0051     DoSpecial stackReturn            #
     0052 MarkArguments 2
     0053 SendMessage do:
     0054 DoSpecial popTop
@@ -618,7 +669,7 @@ Dictionary at: index put: value
     0030 PushArgument 2
     0031 MarkArguments 3
     0032 SendMessage at:put:
-    0033 DoSpecial branch 49
+ @  0033 DoSpecial branch 49
  #  0036 PushInstance 0
     0037 PushArgument 1
     0038 PushTemporary 0
@@ -632,7 +683,7 @@ Dictionary at: index put: value
     0046 MarkArguments 3
     0047 SendMessage insert:at:
     0048 AssignInstance 1
-    0049 DoSpecial popTop
+ @  0049 DoSpecial popTop
     0050 PushArgument 2
     0051 DoSpecial stackReturn
     0052 DoSpecial popTop

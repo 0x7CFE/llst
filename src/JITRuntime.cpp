@@ -167,6 +167,8 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
         // Running the optimization passes on a function
         //m_functionPassManager->run(*function);
     }
+
+    outs() << *blockFunction;
     
     outs() << *blockFunction;
     
