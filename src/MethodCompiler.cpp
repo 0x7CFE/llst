@@ -65,6 +65,23 @@ Value* MethodCompiler::TJITContext::lastValue()
     return value;
 }
 
+bool MethodCompiler::TJITContext::hasValue()
+{
+    TBasicBlockContext& blockContext = basicBlockContexts[builder->GetInsertBlock()];
+
+    // If local stack is not empty, then we definitly have some value
+    if (! blockContext.valueStack.empty())
+        return true;
+
+    // If not, checking the possible referers
+    if (blockContext.referers.size() == 0)
+        return false; // no referers == no value
+
+    // Every referer should have equal number of values on the stack
+    // so we may check any referer's stack to see if it has value
+    return basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
+}
+
 Value* MethodCompiler::TJITContext::popValue()
 {
     TBasicBlockContext& blockContext = basicBlockContexts[builder->GetInsertBlock()];

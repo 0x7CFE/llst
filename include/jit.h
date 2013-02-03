@@ -187,7 +187,7 @@ private:
         // will be linked together with effect of instanceVariables[2] = temporaries[1]
 
         MethodCompiler* compiler; // link to outer class for variable access
-        bool hasValue() { return true; } // FIXME !valueStack.empty(); }
+        bool hasValue(); // { return true; } // FIXME !valueStack.empty(); }
         void pushValue(llvm::Value* value); // { valueStack.push_back(value); }
         llvm::Value* lastValue(); // { return valueStack.back(); }
         llvm::Value* popValue();
