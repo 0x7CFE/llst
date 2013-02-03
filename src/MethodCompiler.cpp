@@ -87,7 +87,10 @@ Value* MethodCompiler::TJITContext::popValue()
         } else {
             // Storing current insert position for further use
             BasicBlock::iterator insertPoint = builder->GetInsertPoint();
-            builder->SetInsertPoint(builder->GetInsertBlock()->getFirstInsertionPt());
+            BasicBlock::iterator firstInsertionPoint = builder->GetInsertBlock()->getFirstInsertionPt();
+
+            if (firstInsertionPoint != builder->GetInsertBlock()->end())
+                builder->SetInsertPoint(firstInsertionPoint);
             
             // Creating a phi function at the beginning of the  block
             const uint32_t numReferers = blockContext.referers.size();
@@ -108,7 +111,8 @@ Value* MethodCompiler::TJITContext::popValue()
                 phi->addIncoming(value, *iReferer);
             }
             
-            builder->SetInsertPoint(insertPoint);
+            if (firstInsertionPoint != builder->GetInsertBlock()->end())
+                builder->SetInsertPoint(insertPoint);
             return phi;
         }
     }
@@ -398,7 +402,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                 // Inserting current block as a referer to the newly created one
                 // Popping the value may result in popping the referer's stack
                 // or even generation of phi function if there are several referers  
-                jit.basicBlockContexts[newBlock].referers.insert(iBlock->second);
+                jit.basicBlockContexts[newBlock].referers.insert(jit.builder->GetInsertBlock());
             }
 
             jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
