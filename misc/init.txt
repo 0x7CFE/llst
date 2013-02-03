@@ -367,10 +367,10 @@ loopTest | i sum |
 0010     PushLiteral 0
 0011     SendBinary <
 0012     DoSpecial stackReturn
-0013 PushTemporary 0
+0013 PushTemporary 0                   A
 0014 PushLiteral 1
 0015 SendBinary <
-0016 DoSpecial branchIfFalse 27
+0016 DoSpecial branchIfFalse 27                                B
 0019 PushTemporary 1
 0020 PushTemporary 0
 0021 SendBinary +
@@ -381,8 +381,8 @@ loopTest | i sum |
      SendBinary +
      AssignTemporary 0
      DoSpecial popTop
-0024 DoSpecial branch 13
-0027 PushConstant 0         ; these two are thrown out
+0024 DoSpecial branch 13               A^
+0027 PushConstant 0         ; these two are thrown out         B
 0028 DoSpecial popTop       ; at the compilation time
 0029 PushTemporary 1
 0030 DoSpecial stackReturn

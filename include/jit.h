@@ -39,6 +39,7 @@
 
 #include <map>
 #include <list>
+#include <set>
 #include <stdio.h>
 
 #include <llvm/Function.h>
@@ -135,6 +136,23 @@ private:
     llvm::Module* m_JITModule;
     llvm::Module* m_TypeModule;
 
+    // Some useful type aliases
+    typedef std::list<llvm::Value*> TValueStack;
+    typedef std::set<llvm::BasicBlock*> TRefererSet;
+    typedef std::set<llvm::BasicBlock*>::iterator TRefererSetIterator;
+
+    // Block context is a logic encapsulation
+    // of Smalltalk's CFG and value transitions
+    struct TBasicBlockContext {
+        // Compile time stack of values that are
+        // produced as a result of opcode processing
+        TValueStack valueStack;
+        
+        // Blocks that are referencing
+        // current block by branching to it
+        TRefererSet referers;
+    };
+    
     // This structure contains working data which is
     // used during the compilation process.
     struct TJITContext {
@@ -157,8 +175,9 @@ private:
         llvm::Value*        blockContext;
 
         llvm::BasicBlock*   exceptionLandingPad;
-        //llvm::Value*        blockReturnTypeInfo;
         bool                methodHasBlockReturn;
+
+        std::map<llvm::BasicBlock*, TBasicBlockContext> basicBlockContexts;
 
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -167,44 +186,34 @@ private:
         // two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
         // will be linked together with effect of instanceVariables[2] = temporaries[1]
 
-        bool hasValue() { return !valueStack.empty(); }
-        void pushValue(llvm::Value* value) { valueStack.push_back(value); }
-        llvm::Value* lastValue() { return valueStack.back(); }
-        llvm::Value* popValue() {
-            if (valueStack.empty()) {
-                // Stack underflow due to continiuoslypopping the values,
-                // like in blockReturn stackReturn
-                // FIXME Do this in a more clever way
-                //return m_globals.nilObject;
-                printf("JIT: Value stack underflow!\n");
-            }
+        MethodCompiler* compiler; // link to outer class for variable access
+        bool hasValue() { return true; } // FIXME !valueStack.empty(); }
+        void pushValue(llvm::Value* value); // { valueStack.push_back(value); }
+        llvm::Value* lastValue(); // { return valueStack.back(); }
+        llvm::Value* popValue();
 
-            llvm::Value* value = valueStack.back();
-            valueStack.pop_back();
-            return value;
-        }
-
-        TJITContext(TMethod* method, TContext* context) : method(method), callingContext(context),
+        TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
+            : method(method), callingContext(context),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
-            exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false)
+            exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false), compiler(compiler)
         {
             byteCount = method->byteCodes->getSize();
-            valueStack.reserve(method->stackSize);
+            //valueStack.reserve(method->stackSize);
         };
 
         ~TJITContext() { if (builder) delete builder; }
     private:
-        std::vector<llvm::Value*> valueStack;
+        //TValueStack valueStack;
     };
-
+    
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
     bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
 
-    TObjectTypes ot;
+    TObjectTypes   ot;
     TJITGlobals    m_globals;
     TRuntimeAPI    m_runtimeAPI;
     TExceptionAPI  m_exceptionAPI;
