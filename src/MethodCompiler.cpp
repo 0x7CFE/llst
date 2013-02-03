@@ -77,6 +77,7 @@ bool MethodCompiler::TJITContext::hasValue()
     if (blockContext.referers.size() == 0)
         return false; // no referers == no value
 
+    // FIXME This is not correct in a case of dummy transitive block with an only simple branch
     // Every referer should have equal number of values on the stack
     // so we may check any referer's stack to see if it has value
     return basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
@@ -118,10 +119,13 @@ Value* MethodCompiler::TJITContext::popValue()
             for (; iReferer != blockContext.referers.end(); ++iReferer) {
                 TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
                 TValueStack& predcessorStack = refererContext.valueStack;
+
+                // FIXME 1 If predcessor block has an empty value list
+                //         continue with it's referrers (recursive phi?)
                 
-                // FIXME non filled block will not yet have the value
-                //       we need to store them to a special post processing list
-                //       and update the current phi function when value will be available
+                // FIXME 2 non filled block will not yet have the value
+                //         we need to store them to a special post processing list
+                //         and update the current phi function when value will be available
                 Value* value = predcessorStack.back();
                 predcessorStack.pop_back();
                 
