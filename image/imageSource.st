@@ -1038,8 +1038,9 @@ METHOD Undefined
 benchmark: size | list ms |
     list <- List new.
     1 to: size do: [ :x | list add: 1000 atRandom ].
-    ms <- Timer millisecondsToRun: [ list <- list sort ].
-    'Sorted in ms: ' print. ms printNl.
+    "ms <- Timer millisecondsToRun: [" list <- list sort. "].
+    'Sorted in ms: ' print. ms printNl."
+    list printNl.
 !
 
 METHOD Undefined
@@ -1278,10 +1279,24 @@ blockParam |x|
 !
 
 
+METHOD Undefined
+sortTest |x|
+    "x <- '#(2 7 4 5 2 0 9 1 4 7 3)' doIt.
+    ^x sort."
+    nil benchmark: 10
+!
+
 METHOD LLVMTestStatements
 testCat |x|
     x <- LLVM sendMessage: #strCat withArguments: (Array with: nil).
     [ x ] assertEq: 'hello world'.
+!
+
+METHOD LLVMTestStatements
+testSort |x|
+    x <- LLVM sendMessage: #sortTest withArguments: (Array with: nil).
+    "[ x ] assertEq: 'hello world'."
+    x printNl.
 !
 
 METHOD MetaLLVMTest
@@ -1322,7 +1337,10 @@ main    | command x |
         "LLVMTestStatements new testCat."
         "LLVMTestStatements new runAll."
 
-        LLVMTest runAllFrom: StringTest.
+        "LLVMTest runAllFrom: StringTest."
+
+        LLVMTestStatements new testSort.
+
         
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
