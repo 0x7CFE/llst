@@ -1220,7 +1220,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case SmalltalkVM::arrayAtPut: {
             Value* indexObject = jit.popValue();
             Value* arrayObject = jit.popValue();
-            Value* valueObejct = 0;
+            Value* valueObejct = (opcode == SmalltalkVM::arrayAtPut) ? jit.popValue() : 0;
 
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
@@ -1246,7 +1246,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    fieldPtr  = jit.builder->CreateGEP(fields, actualIndex);
 
             if (opcode == SmalltalkVM::arrayAtPut) {
-                valueObejct = jit.popValue();
                 jit.builder->CreateStore(valueObejct, fieldPtr);
                 primitiveResult = arrayObject; // valueObejct;
             } else {
@@ -1258,7 +1257,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case SmalltalkVM::stringAtPut: {
             Value* indexObject  = jit.popValue();
             Value* stringObject = jit.popValue();
-            Value* valueObejct  = 0;
+            Value* valueObejct  = (opcode == SmalltalkVM::stringAtPut) ? jit.popValue() : 0;
 
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
@@ -1289,8 +1288,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             if (opcode == SmalltalkVM::stringAtPut) {
                 // Popping new value from the stack, getting actual integral value from the TInteger
                 // then shrinking it to the 1 byte representation and inserting into the pointed location
-                
-                valueObejct = jit.popValue(); 
                 Value* valueInt = jit.builder->CreateCall(getValue, valueObejct);
                 Value* byte = jit.builder->CreateTrunc(valueInt, Type::getInt8Ty(m_JITModule->getContext()));
                 jit.builder->CreateStore(byte, bytePtr); 
