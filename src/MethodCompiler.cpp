@@ -1417,7 +1417,14 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* destinationStopOffset  = jit.popValue();
             Value* destinationStartOffset = jit.popValue();
 
-            Value* arguments[]  = { destination, sourceStartOffset, source, destinationStopOffset, destinationStartOffset };
+            Value* arguments[]  = {
+                destination,
+                destinationStartOffset,
+                destinationStopOffset,
+                source,
+                sourceStartOffset
+            };
+            
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
 
             BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);

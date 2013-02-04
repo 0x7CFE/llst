@@ -1182,7 +1182,10 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     if ( ! isSmallInteger(sourceStartOffset) ||
          ! isSmallInteger(destinationStartOffset) ||
          ! isSmallInteger(destinationStopOffset) )
+    {
+        printf("(0) : %p %p %p\n", sourceStartOffset, destinationStartOffset, destinationStopOffset);
         return false;
+    }
 
     // Smalltalk indexes are counted starting from 1.
     // We need to decrement all values to get the zero based index:
@@ -1195,11 +1198,17 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
          iDestinationStartOffset < 0 ||
          iDestinationStopOffset  < 0 ||
          iCount < 1 )
+    {
+        printf("(1) %d %d %d\n", iSourceStartOffset, iDestinationStartOffset, iDestinationStopOffset);
         return false;
+    }
 
     if (destination->getSize() < (uint32_t) iDestinationStopOffset ||
         source->getSize() < (uint32_t) (iSourceStartOffset + iCount) )
+    {
+        printf("(2)\n");
         return false;
+    }
 
     if ( source->isBinary() && destination->isBinary() ) {
         // Interpreting pointer array as raw byte sequence
@@ -1216,7 +1225,10 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     // If we're moving objects between static and dynamic memory,
     // let the VM hadle it because pointer checking is required. See checkRoot()
     if (m_memoryManager->isInStaticHeap(source) != m_memoryManager->isInStaticHeap(destination))
+    {
+        printf("(3)\n");
         return false;
+    }
 
     if ( ! source->isBinary() && ! destination->isBinary() ) {
         TObject** sourceFields      = source->getFields();
@@ -1229,6 +1241,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return true;
     }
 
+    printf("(4)\n");
     return false;
 }
 
