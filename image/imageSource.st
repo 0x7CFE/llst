@@ -1209,6 +1209,11 @@ return42FromBlockReturn
      nil testResume: [ ^42 ].
 !
 
+METHOD Undefined
+strCat
+     ^ 'hello ' + 'world'
+!
+
 CLASS LLVMTestStatements Test
 METHOD LLVMTestStatements
 branch |x|
@@ -1272,6 +1277,13 @@ blockParam |x|
     [ x ] assertEq: 42.
 !
 
+
+METHOD LLVMTestStatements
+testCat |x|
+    x <- LLVM sendMessage: #strCat withArguments: (Array with: nil).
+    [ x ] assertEq: 'hello world'.
+!
+
 METHOD Undefined
 main    | command x |
         " initialize classes "
@@ -1301,6 +1313,8 @@ main    | command x |
         "LLVMTestStatements new closure."
         "LLVMTestStatements new blockParam."
 
+        LLVMTestStatements new testCat.
+        
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
