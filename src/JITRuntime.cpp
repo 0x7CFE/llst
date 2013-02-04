@@ -170,8 +170,6 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 
     outs() << *blockFunction;
     
-    outs() << *blockFunction;
-    
     block->previousContext = callingContext->previousContext;
 
     TBlockFunction compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));

@@ -88,59 +88,73 @@ Value* MethodCompiler::TJITContext::popValue()
     TBasicBlockContext& blockContext = basicBlockContexts[builder->GetInsertBlock()];
     TValueStack& valueStack = blockContext.valueStack;
     
-    if (valueStack.empty()) {
+    if (!valueStack.empty()) {
+        // If local stack is not empty
+        // then we simply pop the value from it
+        Value* value = valueStack.back();
+        valueStack.pop_back();
+        
+        return value;
+    } else {
         // If value stack is empty then it means that we're dealing with
         // a value pushed in the predcessor block (or a stack underflow)
         
         // If there is a single predcessor, then we simply pop that value
         // If there are several predcessors we need to create a phi function
-        if (blockContext.referers.size() == 1) {
-            BasicBlock* referer = *blockContext.referers.begin();
-            TBasicBlockContext& refererContext = basicBlockContexts[referer];
-            TValueStack& predcessorStack = refererContext.valueStack;
-            
-            Value* value = predcessorStack.back();
-            predcessorStack.pop_back();
-            return value;
-        } else {
-            // Storing current insert position for further use
-            BasicBlock::iterator insertPoint = builder->GetInsertPoint();
-            BasicBlock::iterator firstInsertionPoint = builder->GetInsertBlock()->getFirstInsertionPt();
-
-            if (firstInsertionPoint != builder->GetInsertBlock()->end())
-                builder->SetInsertPoint(firstInsertionPoint);
-            
-            // Creating a phi function at the beginning of the  block
-            const uint32_t numReferers = blockContext.referers.size();
-            PHINode* phi = builder->CreatePHI(compiler->ot.object->getPointerTo(), numReferers);
-            
-            // Filling incoming nodes with values from the referer stacks
-            TRefererSetIterator iReferer = blockContext.referers.begin();
-            for (; iReferer != blockContext.referers.end(); ++iReferer) {
-                TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
-                TValueStack& predcessorStack = refererContext.valueStack;
-
-                // FIXME 1 If predcessor block has an empty value list
-                //         continue with it's referrers (recursive phi?)
+        switch (blockContext.referers.size()) {
+            case 0: 
+                /* TODO no referers, empty local stack and pop operation = error */ 
+                outs() << "Value stack underflow\n";
+                exit(1);
+                return compiler->m_globals.nilObject;
                 
-                // FIXME 2 non filled block will not yet have the value
-                //         we need to store them to a special post processing list
-                //         and update the current phi function when value will be available
+            case 1: {
+                BasicBlock* referer = *blockContext.referers.begin();
+                TBasicBlockContext& refererContext = basicBlockContexts[referer];
+                TValueStack& predcessorStack = refererContext.valueStack;
+                
                 Value* value = predcessorStack.back();
                 predcessorStack.pop_back();
-                
-                phi->addIncoming(value, *iReferer);
-            }
+                return value;
+            } break;
             
-            if (firstInsertionPoint != builder->GetInsertBlock()->end())
-                builder->SetInsertPoint(insertPoint);
-            return phi;
+            default: {
+                // Storing current insert position for further use
+                BasicBlock::iterator insertPoint = builder->GetInsertPoint();
+                BasicBlock::iterator firstInsertionPoint = builder->GetInsertBlock()->getFirstInsertionPt();
+                
+                if (firstInsertionPoint != builder->GetInsertBlock()->end())
+                    builder->SetInsertPoint(firstInsertionPoint);
+                
+                // Creating a phi function at the beginning of the  block
+                const uint32_t numReferers = blockContext.referers.size();
+                PHINode* phi = builder->CreatePHI(compiler->ot.object->getPointerTo(), numReferers);
+                    
+                // Filling incoming nodes with values from the referer stacks
+                TRefererSetIterator iReferer = blockContext.referers.begin();
+                for (; iReferer != blockContext.referers.end(); ++iReferer) {
+                    TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
+                    TValueStack& predcessorStack = refererContext.valueStack;
+                    
+                    // FIXME 1 If predcessor block has an empty value list
+                    //         continue with it's referrers (recursive phi?)
+                    
+                    // FIXME 2 non filled block will not yet have the value
+                    //         we need to store them to a special post processing list
+                    //         and update the current phi function when value will be available
+                    Value* value = predcessorStack.back();
+                    predcessorStack.pop_back();
+                    
+                    phi->addIncoming(value, *iReferer);
+                }
+                
+                if (firstInsertionPoint != builder->GetInsertBlock()->end())
+                    builder->SetInsertPoint(insertPoint);
+                
+                return phi;
+            }
         }
     }
-    
-    Value* value = valueStack.back();
-    valueStack.pop_back();
-    return value;
 }
 
 Function* MethodCompiler::createFunction(TMethod* method)
@@ -1182,6 +1196,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
             Value* tempSizeOk = jit.builder->CreateICmpSLE(blockAcceptsArgCount, jit.builder->getInt32(argCount));
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailed);
+            
+            jit.basicBlockContexts[tempsChecked].referers.insert(jit.builder->GetInsertBlock());
             jit.builder->SetInsertPoint(tempsChecked);
             
             // Storing values in the block's wrapping context

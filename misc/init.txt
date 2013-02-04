@@ -1,3 +1,22 @@
+METHOD Block
+value: a value: b
+    " start block execution "
+    <8 a b self>.
+    (self argCount)
+!
+
+0000 PushArgument 1
+0001 PushArgument 2
+0002 PushArgument 0
+0003 DoPrimitive block invoke
+0005 DoSpecial popTop
+0006 PushArgument 0
+0007 MarkArguments 1
+0008 SendMessage argCount
+0009 DoSpecial popTop
+0010 DoSpecial selfReturn
+
+
 METHOD LLVMTestStatements
 testblockParam | block a b |
     block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
