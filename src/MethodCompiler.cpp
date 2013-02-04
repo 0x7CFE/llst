@@ -162,8 +162,8 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
 //                    phi->addIncoming(value, *iReferer);
                 }
                 
-                if (overrideBlock && firstInsertionPoint != insertBlock->end())
-                    builder->SetInsertPoint(currentInsertPoint);
+                if (overrideBlock || firstInsertionPoint != insertBlock->end())
+                    builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
                 
                 return phi;
             }
