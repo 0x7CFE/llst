@@ -1151,7 +1151,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
 
-        case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
+        case SmalltalkVM::allocateByteArray: { // 20      // FIXME pointer safety
             Value*    sizeObject  = jit.popValue();
             Value*    klassObject = jit.popValue();
             Value*    klass       = jit.builder->CreateBitCast(klassObject, ot.klass->getPointerTo());
@@ -1166,17 +1166,19 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
 
-        case SmalltalkVM::cloneByteObject: { // FIXME pointer safety
-            Value*    klass    = jit.popValue();
-            Value*    original = jit.popValue();
-
+        case SmalltalkVM::cloneByteObject: { // 23      // FIXME pointer safety
+            Value*    klassObject = jit.popValue();
+            Value*    original    = jit.popValue();
+            Value*    klass       = jit.builder->CreateBitCast(klassObject, ot.klass->getPointerTo());
+            
             Function* getSize  = m_TypeModule->getFunction("TObject::getSize()");
             Value*    dataSize = jit.builder->CreateCall(getSize, original, "dataSize.");
 
             Value*    args[]   = { klass, dataSize };
             Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
+            Value*    resultObject = jit.builder->CreateBitCast(clone, ot.object->getPointerTo());
 
-            primitiveResult = clone;
+            primitiveResult = resultObject;
             primitiveShouldNeverFail = true;
         } break;
 
@@ -1185,7 +1187,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
             break;
 
-        case SmalltalkVM::blockInvoke: {
+        case SmalltalkVM::blockInvoke: { // 8
             Value* object = jit.popValue();
             Value* block  = jit.builder->CreateBitCast(object, ot.block->getPointerTo());
 
@@ -1234,8 +1236,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveResult = result;
         } break;
 
-        case SmalltalkVM::arrayAt:
-        case SmalltalkVM::arrayAtPut: {
+        case SmalltalkVM::arrayAt:       // 24
+        case SmalltalkVM::arrayAtPut: {  // 5
             Value* indexObject = jit.popValue();
             Value* arrayObject = jit.popValue();
             Value* valueObejct = (opcode == SmalltalkVM::arrayAtPut) ? jit.popValue() : 0;
@@ -1271,8 +1273,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             }
         } break;
 
-        case SmalltalkVM::stringAt:
-        case SmalltalkVM::stringAtPut: {
+        case SmalltalkVM::stringAt:       // 21
+        case SmalltalkVM::stringAtPut: {  // 22
             Value* indexObject  = jit.popValue();
             Value* stringObject = jit.popValue();
             Value* valueObejct  = (opcode == SmalltalkVM::stringAtPut) ? jit.popValue() : 0;

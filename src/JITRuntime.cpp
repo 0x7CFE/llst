@@ -323,7 +323,8 @@ void JITRuntime::initializeRuntimeAPI() {
     PointerType* byteObjectType = ot.byteObject->getPointerTo();
     PointerType* contextType    = ot.context->getPointerTo();
     PointerType* blockType      = ot.block->getPointerTo();
-
+    PointerType* objectSlotType = ot.object->getPointerTo()->getPointerTo(); // TObject**
+    
     Type* params[] = {
         classType,                    // klass
         Type::getInt32Ty(llvmContext) // size
@@ -359,6 +360,12 @@ void JITRuntime::initializeRuntimeAPI() {
     };
     FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
 
+    Type* checkRootParams[] = {
+        objectType,     // value
+        objectSlotType  // slot
+    };
+    FunctionType* checkRootType = FunctionType::get(Type::getVoidTy(llvmContext), checkRootParams, false);
+    
     Type* bulkReplaceParams[] = {
         objectType, // destination
         objectType, // sourceStartOffset
@@ -384,7 +391,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.createBlock        = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
     m_runtimeAPI.invokeBlock        = Function::Create(invokeBlockType, Function::ExternalLinkage, "invokeBlock", m_JITModule);
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
-    m_runtimeAPI.checkRoot          = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "checkRoot", m_JITModule );
+    m_runtimeAPI.checkRoot          = Function::Create(checkRootType, Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
     m_runtimeAPI.performSmallInt    = Function::Create(performSmallIntType, Function::ExternalLinkage, "performSmallInt", m_JITModule);
 

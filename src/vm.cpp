@@ -1199,7 +1199,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
          iDestinationStopOffset  < 0 ||
          iCount < 1 )
     {
-        printf("(1) %d %d %d\n", iSourceStartOffset, iDestinationStartOffset, iDestinationStopOffset);
+        printf("(1) %d %d %d %d\n", iSourceStartOffset, iDestinationStartOffset, iDestinationStopOffset, iCount);
         return false;
     }
 

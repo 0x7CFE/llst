@@ -1167,8 +1167,8 @@ runTestBlockReturn
 
 METHOD LLVMTest
 testPrint | result |
-    result <- LLVM sendMessage: #printString withArguments: (Array with: 123).
-    "result <- LLVM sendMessage: #asNumber withArguments: (Array with: '123')."
+    "result <- LLVM sendMessage: #printString withArguments: (Array with: 123)."
+    result <- LLVM sendMessage: #asNumber withArguments: (Array with: '123').
     result class print. ' "' print. result print. $" printNl.
 !
 
@@ -1261,7 +1261,7 @@ closure |x|
     [ x ] assertEq: 4.
 !
 
-METHOD LLVMTestStatements
+METHOD Undefined
 testblockParam | block a b |
     block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
     block value: 1 value: 2.
@@ -1273,7 +1273,7 @@ testblockParam | block a b |
 
 METHOD LLVMTestStatements
 blockParam |x|
-    x <- LLVM sendMessage: #testblockParam withArguments: (Array with: self).
+    x <- LLVM sendMessage: #testblockParam withArguments: (Array with: nil).
     [ x ] assertEq: 42.
 !
 
@@ -1282,6 +1282,12 @@ METHOD LLVMTestStatements
 testCat |x|
     x <- LLVM sendMessage: #strCat withArguments: (Array with: nil).
     [ x ] assertEq: 'hello world'.
+!
+
+METHOD MetaLLVMTest
+runAllFrom: testSuite | suite |
+    suite <- testSuite new.
+    LLVM sendMessage: #runAll withArguments: (Array with: suite).
 !
 
 METHOD Undefined
@@ -1313,7 +1319,10 @@ main    | command x |
         "LLVMTestStatements new closure."
         "LLVMTestStatements new blockParam."
 
-        LLVMTestStatements new testCat.
+        "LLVMTestStatements new testCat."
+        "LLVMTestStatements new runAll."
+
+        LLVMTest runAllFrom: StringTest.
         
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
