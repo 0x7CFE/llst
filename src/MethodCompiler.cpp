@@ -78,14 +78,14 @@ bool MethodCompiler::TJITContext::hasValue()
         return false; // no referers == no value
 
     // FIXME This is not correct in a case of dummy transitive block with an only simple branch
-    // Every referer should have equal number of values on the stack
-    // so we may check any referer's stack to see if it has value
-    return basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
+    //       Every referer should have equal number of values on the stack
+    //       so we may check any referer's stack to see if it has value
+    return ! basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
 }
 
-Value* MethodCompiler::TJITContext::popValue()
+Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
 {
-    TBasicBlockContext& blockContext = basicBlockContexts[builder->GetInsertBlock()];
+    TBasicBlockContext& blockContext = basicBlockContexts[overrideBlock ? overrideBlock : builder->GetInsertBlock()];
     TValueStack& valueStack = blockContext.valueStack;
     
     if (!valueStack.empty()) {
@@ -109,47 +109,61 @@ Value* MethodCompiler::TJITContext::popValue()
                 return compiler->m_globals.nilObject;
                 
             case 1: {
+                // Recursively processing referer's block
                 BasicBlock* referer = *blockContext.referers.begin();
-                TBasicBlockContext& refererContext = basicBlockContexts[referer];
-                TValueStack& predcessorStack = refererContext.valueStack;
-                
-                Value* value = predcessorStack.back();
-                predcessorStack.pop_back();
+                Value* value = popValue(referer);
                 return value;
+                
+//                 TBasicBlockContext& refererContext = basicBlockContexts[referer];
+//                 TValueStack& refererStack = refererContext.valueStack;
+//                 
+//                 Value* value = refererStack.back();
+//                 refererStack.pop_back();
+//                 return value;
             } break;
             
             default: {
                 // Storing current insert position for further use
-                BasicBlock::iterator insertPoint = builder->GetInsertPoint();
-                BasicBlock::iterator firstInsertionPoint = builder->GetInsertBlock()->getFirstInsertionPt();
+                BasicBlock* currentBasicBlock = builder->GetInsertBlock();
+                BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
                 
-                if (firstInsertionPoint != builder->GetInsertBlock()->end())
-                    builder->SetInsertPoint(firstInsertionPoint);
+                BasicBlock* insertBlock = overrideBlock ? overrideBlock : currentBasicBlock;  
+                BasicBlock::iterator firstInsertionPoint = insertBlock->getFirstInsertionPt();
                 
-                // Creating a phi function at the beginning of the  block
+                if (overrideBlock) {
+                    builder->SetInsertPoint(overrideBlock, firstInsertionPoint);
+                } else {
+                    if (firstInsertionPoint != insertBlock->end())
+                        builder->SetInsertPoint(currentBasicBlock, firstInsertionPoint);
+                }
+                
+                // Creating a phi function at the beginning of the block
                 const uint32_t numReferers = blockContext.referers.size();
-                PHINode* phi = builder->CreatePHI(compiler->ot.object->getPointerTo(), numReferers);
+                PHINode* phi = builder->CreatePHI(compiler->ot.object->getPointerTo(), numReferers, "phi.");
                     
                 // Filling incoming nodes with values from the referer stacks
                 TRefererSetIterator iReferer = blockContext.referers.begin();
                 for (; iReferer != blockContext.referers.end(); ++iReferer) {
-                    TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
-                    TValueStack& predcessorStack = refererContext.valueStack;
-                    
-                    // FIXME 1 If predcessor block has an empty value list
-                    //         continue with it's referrers (recursive phi?)
-                    
-                    // FIXME 2 non filled block will not yet have the value
-                    //         we need to store them to a special post processing list
-                    //         and update the current phi function when value will be available
-                    Value* value = predcessorStack.back();
-                    predcessorStack.pop_back();
-                    
+                    Value* value = popValue(*iReferer);
                     phi->addIncoming(value, *iReferer);
+                    
+//                     TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
+//                     TValueStack& predcessorStack = refererContext.valueStack;
+//                     
+//                     // FIXME 1 If predcessor block has an empty value list
+//                     //         continue with it's referrers (recursive phi?)
+//                     
+//                     // FIXME 2 non filled block will not yet have the value
+//                     //         we need to store them to a special post processing list
+//                     //         and update the current phi function when value will be available
+//                     Value* value = predcessorStack.back();
+//                     predcessorStack.pop_back();
+                    
+//                    phi->addIncoming(value, *iReferer);
                 }
                 
-                if (firstInsertionPoint != builder->GetInsertBlock()->end())
-                    builder->SetInsertPoint(insertPoint);
+                if (overrideBlock && firstInsertionPoint != insertBlock->end())
+                    builder->SetInsertPoint(currentInsertPoint);
                 
                 return phi;
             }
@@ -886,7 +900,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // We do not know now which way the program will be executed,
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
-    PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2);
+    PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2, "phi.");
     phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
@@ -1050,6 +1064,10 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
     Value* primitiveResult = 0;
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
+    
+    // Linking pop chain
+    jit.basicBlockContexts[primitiveFailed].referers.insert(jit.builder->GetInsertBlock());
+    
     bool primitiveShouldNeverFail = false;
 
     switch (opcode) {
@@ -1413,6 +1431,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
     if (primitiveShouldNeverFail) {
         BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded.", jit.function);
+        
+        // Linking pop chain
+        jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
         
         jit.builder->CreateCondBr(jit.builder->getTrue(), primitiveSucceeded, primitiveFailed);
         jit.builder->SetInsertPoint(primitiveSucceeded);

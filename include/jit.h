@@ -190,7 +190,7 @@ private:
         bool hasValue(); // { return true; } // FIXME !valueStack.empty(); }
         void pushValue(llvm::Value* value); // { valueStack.push_back(value); }
         llvm::Value* lastValue(); // { return valueStack.back(); }
-        llvm::Value* popValue();
+        llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0);
 
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
@@ -247,11 +247,11 @@ public:
     MethodCompiler(
         llvm::Module* JITModule,
         llvm::Module* TypeModule,
-        TRuntimeAPI   api,
+        TRuntimeAPI   runtimeApi,
         TExceptionAPI exceptionApi
     )
         : m_JITModule(JITModule), m_TypeModule(TypeModule),
-        m_runtimeAPI(api), m_exceptionAPI(exceptionApi)
+        m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
         std::string linkerErrorMessages;

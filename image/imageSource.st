@@ -1294,12 +1294,12 @@ main    | command x |
         "x <- LLVMTest new test3.
         x printNl."
 
-        "LLVMTest new testNil.
-        LLVMTest new runTestBlockReturn."
+        "LLVMTest new testNil."
+        "LLVMTest new runTestBlockReturn."
         "LLVMTest new testPrint."
         
         "LLVMTestStatements new closure."
-        LLVMTestStatements new blockParam.
+        "LLVMTestStatements new blockParam."
 
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
