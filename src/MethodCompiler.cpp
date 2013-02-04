@@ -1419,10 +1419,15 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value* arguments[]  = { destination, sourceStartOffset, source, destinationStopOffset, destinationStartOffset };
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
-            //FIXME remove CreateSelect
-            Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
 
-            primitiveResult = resultObject;
+            BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
+            jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
+            
+            jit.builder->CreateCondBr(isSucceeded, primitiveSucceeded, primitiveFailed);
+            //Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
+            jit.builder->SetInsertPoint(primitiveSucceeded);
+
+            primitiveResult = destination;
         } break;
 
         default:
@@ -1430,7 +1435,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     }
 
     if (primitiveShouldNeverFail) {
-        BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded.", jit.function);
+        BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
         
         // Linking pop chain
         jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
