@@ -1038,8 +1038,8 @@ METHOD Undefined
 benchmark: size | list ms |
     list <- List new.
     1 to: size do: [ :x | list add: 1000 atRandom ].
-    "ms <- Timer millisecondsToRun: [" list <- list sort. "].
-    'Sorted in ms: ' print. ms printNl."
+    ms <- Timer millisecondsToRun: [ list <- list sort. ].
+    'Sorted in ms: ' print. ms printNl.
     list printNl.
 !
 

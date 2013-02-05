@@ -148,7 +148,7 @@ JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TSymbol* selector,
     uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    if (entry.methodName    == selector && entry.receiverClass == klass) {
+    if (entry.methodName == selector && entry.receiverClass == klass) {
         m_cacheHits++;
         return entry.function;
     } else {
@@ -191,6 +191,7 @@ JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TSymbol* contai
     
     entry.containerMethodName  = containerMethodName;
     entry.containerMethodClass = containerMethodClass;
+    entry.blockOffset = blockOffset;
     entry.function = function;
 }
 
