@@ -1038,8 +1038,9 @@ METHOD Undefined
 benchmark: size | list ms |
     list <- List new.
     1 to: size do: [ :x | list add: 1000 atRandom ].
-    ms <- Timer millisecondsToRun: [ list <- list sort ].
+    ms <- Timer millisecondsToRun: [ list <- list sort. ].
     'Sorted in ms: ' print. ms printNl.
+    list printNl.
 !
 
 METHOD Undefined
@@ -1167,8 +1168,8 @@ runTestBlockReturn
 
 METHOD LLVMTest
 testPrint | result |
-    result <- LLVM sendMessage: #printString withArguments: (Array with: 123).
-    "result <- LLVM sendMessage: #asNumber withArguments: (Array with: '123')."
+    "result <- LLVM sendMessage: #printString withArguments: (Array with: 123)."
+    result <- LLVM sendMessage: #asNumber withArguments: (Array with: '123').
     result class print. ' "' print. result print. $" printNl.
 !
 
@@ -1207,6 +1208,11 @@ testResume: blockSurelyThrows |blockThatCanThrow|
 METHOD Undefined
 return42FromBlockReturn
      nil testResume: [ ^42 ].
+!
+
+METHOD Undefined
+strCat
+     ^ 'hello ' + 'world'
 !
 
 CLASS LLVMTestStatements Test
@@ -1256,7 +1262,7 @@ closure |x|
     [ x ] assertEq: 4.
 !
 
-METHOD LLVMTestStatements
+METHOD Undefined
 testblockParam | block a b |
     block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
     block value: 1 value: 2.
@@ -1268,12 +1274,52 @@ testblockParam | block a b |
 
 METHOD LLVMTestStatements
 blockParam |x|
-    x <- LLVM sendMessage: #testblockParam withArguments: (Array with: self).
+    x <- LLVM sendMessage: #testblockParam withArguments: (Array with: nil).
     [ x ] assertEq: 42.
 !
 
+
 METHOD Undefined
-main    | command x |
+sortTest | list |
+    list <- List new.
+    1 to: 100 do: [ :x | list add: 1000 atRandom ].
+    list <- list sort. 
+    ^list
+
+    "x <- '#(2 7 4 5 2 0 9 1 4 7 3)' doIt.
+    ^x sort."
+!
+
+METHOD Undefined
+sortTest2: aList
+    ^ aList sort
+!
+
+METHOD LLVMTestStatements
+testCat |x|
+    x <- LLVM sendMessage: #strCat withArguments: (Array with: nil).
+    [ x ] assertEq: 'hello world'.
+!
+
+METHOD LLVMTestStatements
+testSort |x|
+    x <- LLVM sendMessage: #sortTest withArguments: (Array with: nil).
+    ^x
+!
+
+METHOD LLVMTestStatements
+testSort2: aList
+    ^ LLVM sendMessage: #sortTest withArguments: (Array with: nil with: aList).
+!
+
+METHOD MetaLLVMTest
+runAllFrom: testSuite | suite |
+    suite <- testSuite new.
+    LLVM sendMessage: #runAll withArguments: (Array with: suite).
+!
+
+METHOD Undefined
+main    | command x1 x2 list ms1 ms2 |
         " initialize classes "
 
         Char initialize.
@@ -1294,13 +1340,26 @@ main    | command x |
         "x <- LLVMTest new test3.
         x printNl."
 
-        "LLVMTest new testNil.
-        LLVMTest new runTestBlockReturn."
+        "LLVMTest new testNil."
+        "LLVMTest new runTestBlockReturn."
         "LLVMTest new testPrint."
         
         "LLVMTestStatements new closure."
-        LLVMTestStatements new blockParam.
+        "LLVMTestStatements new blockParam."
 
+        "LLVMTestStatements new testCat."
+        "LLVMTestStatements new runAll."
+
+        "LLVMTest runAllFrom: StringTest."
+
+        list <- List new.
+        1 to: 800 do: [ :x | list add: 1000 atRandom ].
+        ms1 <- Timer millisecondsToRun: [ x1 <- LLVMTestStatements new testSort2: list ].
+        ms2 <- Timer millisecondsToRun: [ x2 <- LLVMTestStatements new testSort2: list ].
+        x2 printNl.
+        '1 Sorted in ms: ' print. ms1 printNl.
+        '2 Sorted in ms: ' print. ms2 printNl.
+        
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty

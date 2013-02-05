@@ -1,3 +1,106 @@
+METHOD Array
++ aValue    | size1 size2 newValue |
+    " catenate two strings together "
+    size1 <- self size.
+    size2 <- aValue size.
+    newValue <- self class new: (size1 + size2).
+    newValue replaceFrom: 1 to: size1 with: self.
+    newValue replaceFrom: size1+1 to: size1+size2 with: aValue.
+    ^ newValue
+!
+
+0000 PushArgument 0
+0001 MarkArguments 1
+0002 SendMessage size
+0003 AssignTemporary 0
+0004 DoSpecial popTop
+0005 PushArgument 1
+0006 MarkArguments 1
+0007 SendMessage size
+0008 AssignTemporary 1
+0009 DoSpecial popTop
+0010 PushArgument 0
+0011 MarkArguments 1
+0012 SendMessage class
+0013 PushTemporary 0
+0014 PushTemporary 1
+0015 SendBinary +
+0016 MarkArguments 2
+0017 SendMessage new:
+0018 AssignTemporary 2
+0019 DoSpecial popTop
+0020 PushTemporary 2
+0021 PushConstant 1
+0022 PushTemporary 0
+0023 PushArgument 0
+0024 MarkArguments 4
+0025 SendMessage replaceFrom:to:with:
+0026 DoSpecial popTop
+0027 PushTemporary 2
+0028 PushTemporary 0
+0029 PushConstant 1
+0030 SendBinary +
+0031 PushTemporary 0
+0032 PushTemporary 1
+0033 SendBinary +
+0034 PushArgument 1
+0035 MarkArguments 4
+0036 SendMessage replaceFrom:to:with:
+0037 DoSpecial popTop
+0038 PushTemporary 2
+0039 DoSpecial stackReturn
+0040 DoSpecial popTop
+0041 DoSpecial selfReturn
+
+
+METHOD String
+basicAt: index put: value
+    <22 value self index>.
+    ^nil
+!
+0000 PushArgument 2
+0001 PushArgument 0
+0002 PushArgument 1
+0003 DoPrimitive String at:put:
+0005 DoSpecial popTop
+0006 PushConstant nil
+0007 DoSpecial stackReturn
+0008 DoSpecial popTop
+0009 DoSpecial selfReturn
+
+
+METHOD Number
+negative
+    ^self < 0
+!
+
+0000 PushArgument 0
+0001 PushConstant 0
+0002 SendBinary <
+0003 DoSpecial stackReturn
+0004 DoSpecial popTop
+0005 DoSpecial selfReturn
+
+
+METHOD Block
+value: a value: b
+    " start block execution "
+    <8 a b self>.
+    (self argCount)
+!
+
+0000 PushArgument 1
+0001 PushArgument 2
+0002 PushArgument 0
+0003 DoPrimitive block invoke
+0005 DoSpecial popTop
+0006 PushArgument 0
+0007 MarkArguments 1
+0008 SendMessage argCount
+0009 DoSpecial popTop
+0010 DoSpecial selfReturn
+
+
 METHOD LLVMTestStatements
 testblockParam | block a b |
     block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
@@ -367,10 +470,10 @@ loopTest | i sum |
 0010     PushLiteral 0
 0011     SendBinary <
 0012     DoSpecial stackReturn
-0013 PushTemporary 0
+0013 PushTemporary 0                   A
 0014 PushLiteral 1
 0015 SendBinary <
-0016 DoSpecial branchIfFalse 27
+0016 DoSpecial branchIfFalse 27                                B
 0019 PushTemporary 1
 0020 PushTemporary 0
 0021 SendBinary +
@@ -381,8 +484,8 @@ loopTest | i sum |
      SendBinary +
      AssignTemporary 0
      DoSpecial popTop
-0024 DoSpecial branch 13
-0027 PushConstant 0         ; these two are thrown out
+0024 DoSpecial branch 13               A^
+0027 PushConstant 0         ; these two are thrown out         B
 0028 DoSpecial popTop       ; at the compilation time
 0029 PushTemporary 1
 0030 DoSpecial stackReturn

@@ -36,10 +36,140 @@
 #include <jit.h>
 #include <vm.h>
 #include <stdarg.h>
+#include <llvm/Support/CFG.h>
 #include <iostream>
 #include <sstream>
 
 using namespace llvm;
+
+void MethodCompiler::TJITContext::pushValue(llvm::Value* value)
+{
+    // Values are always pushed to the local stack
+    basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(value);
+}
+
+Value* MethodCompiler::TJITContext::lastValue()
+{
+    TValueStack& valueStack = basicBlockContexts[builder->GetInsertBlock()].valueStack;
+    if (! valueStack.empty())
+        return valueStack.back();
+
+    // Popping value from the referer's block
+    // and creating phi function if necessary
+    Value* value = popValue();
+
+    // Pushing the value locally (may be phi)
+    valueStack.push_back(value);
+
+    // Returning it as a last value
+    return value;
+}
+
+bool MethodCompiler::TJITContext::hasValue()
+{
+    TBasicBlockContext& blockContext = basicBlockContexts[builder->GetInsertBlock()];
+
+    // If local stack is not empty, then we definitly have some value
+    if (! blockContext.valueStack.empty())
+        return true;
+
+    // If not, checking the possible referers
+    if (blockContext.referers.size() == 0)
+        return false; // no referers == no value
+
+    // FIXME This is not correct in a case of dummy transitive block with an only simple branch
+    //       Every referer should have equal number of values on the stack
+    //       so we may check any referer's stack to see if it has value
+    return ! basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
+}
+
+Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
+{
+    TBasicBlockContext& blockContext = basicBlockContexts[overrideBlock ? overrideBlock : builder->GetInsertBlock()];
+    TValueStack& valueStack = blockContext.valueStack;
+    
+    if (!valueStack.empty()) {
+        // If local stack is not empty
+        // then we simply pop the value from it
+        Value* value = valueStack.back();
+        valueStack.pop_back();
+        
+        return value;
+    } else {
+        // If value stack is empty then it means that we're dealing with
+        // a value pushed in the predcessor block (or a stack underflow)
+        
+        // If there is a single predcessor, then we simply pop that value
+        // If there are several predcessors we need to create a phi function
+        switch (blockContext.referers.size()) {
+            case 0: 
+                /* TODO no referers, empty local stack and pop operation = error */ 
+                outs() << "Value stack underflow\n";
+                exit(1);
+                return compiler->m_globals.nilObject;
+                
+            case 1: {
+                // Recursively processing referer's block
+                BasicBlock* referer = *blockContext.referers.begin();
+                Value* value = popValue(referer);
+                return value;
+                
+//                 TBasicBlockContext& refererContext = basicBlockContexts[referer];
+//                 TValueStack& refererStack = refererContext.valueStack;
+//                 
+//                 Value* value = refererStack.back();
+//                 refererStack.pop_back();
+//                 return value;
+            } break;
+            
+            default: {
+                // Storing current insert position for further use
+                BasicBlock* currentBasicBlock = builder->GetInsertBlock();
+                BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
+                
+                BasicBlock* insertBlock = overrideBlock ? overrideBlock : currentBasicBlock;  
+                BasicBlock::iterator firstInsertionPoint = insertBlock->getFirstInsertionPt();
+                
+                if (overrideBlock) {
+                    builder->SetInsertPoint(overrideBlock, firstInsertionPoint);
+                } else {
+                    if (firstInsertionPoint != insertBlock->end())
+                        builder->SetInsertPoint(currentBasicBlock, firstInsertionPoint);
+                }
+                
+                // Creating a phi function at the beginning of the block
+                const uint32_t numReferers = blockContext.referers.size();
+                PHINode* phi = builder->CreatePHI(compiler->ot.object->getPointerTo(), numReferers, "phi.");
+                    
+                // Filling incoming nodes with values from the referer stacks
+                TRefererSetIterator iReferer = blockContext.referers.begin();
+                for (; iReferer != blockContext.referers.end(); ++iReferer) {
+                    Value* value = popValue(*iReferer);
+                    phi->addIncoming(value, *iReferer);
+                    
+//                     TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
+//                     TValueStack& predcessorStack = refererContext.valueStack;
+//                     
+//                     // FIXME 1 If predcessor block has an empty value list
+//                     //         continue with it's referrers (recursive phi?)
+//                     
+//                     // FIXME 2 non filled block will not yet have the value
+//                     //         we need to store them to a special post processing list
+//                     //         and update the current phi function when value will be available
+//                     Value* value = predcessorStack.back();
+//                     predcessorStack.pop_back();
+                    
+//                    phi->addIncoming(value, *iReferer);
+                }
+                
+                if (overrideBlock || firstInsertionPoint != insertBlock->end())
+                    builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
+                
+                return phi;
+            }
+        }
+    }
+}
 
 Function* MethodCompiler::createFunction(TMethod* method)
 {
@@ -210,7 +340,13 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
                     m_targetToBlockMap[targetOffset] = targetBasicBlock;
 
                 }
-                outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << m_targetToBlockMap[targetOffset]->getName() << ")\n";
+
+                // Updating reference information
+//                 BasicBlock* targetBasicBlock = m_targetToBlockMap[targetOffset];
+//                 TBlockContext& blockContext = jit.blockContexts[targetBasicBlock];
+//                 blockContext.referers.insert(?);
+                
+                //outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << m_targetToBlockMap[targetOffset]->getName() << ")\n";
             } break;
         }
     }
@@ -231,7 +367,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 
 Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext)
 {
-    TJITContext  jit(method, callingContext);
+    TJITContext  jit(this, method, callingContext);
 
     // Creating the function named as "Class>>method"
     jit.function = createFunction(method);
@@ -308,8 +444,15 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                 --iInst;
 
 //             outs() << "Prev is: " << *newBlock << "\n";
-            if (! iInst->isTerminator())
+            if (! iInst->isTerminator()) {
                 jit.builder->CreateBr(newBlock); // Linking current block to a new one
+                // Updating the block referers
+
+                // Inserting current block as a referer to the newly created one
+                // Popping the value may result in popping the referer's stack
+                // or even generation of phi function if there are several referers  
+                jit.basicBlockContexts[newBlock].referers.insert(jit.builder->GetInsertBlock());
+            }
 
             jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
@@ -322,7 +465,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        printOpcode(jit.instruction);
+//         printOpcode(jit.instruction);
 
 //         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
@@ -362,7 +505,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 void MethodCompiler::writeLandingPad(TJITContext& jit)
 {
-    outs() << "Writing landing pad\n";
+    // outs() << "Writing landing pad\n";
 
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
@@ -524,9 +667,9 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             constantValue->setName(ss.str());
         } break;
 
-        case SmalltalkVM::nilConst:   outs() << "nil ";   constantValue = m_globals.nilObject;   break;
-        case SmalltalkVM::trueConst:  outs() << "true ";  constantValue = m_globals.trueObject;  break;
-        case SmalltalkVM::falseConst: outs() << "false "; constantValue = m_globals.falseObject; break;
+        case SmalltalkVM::nilConst:   /*outs() << "nil "; */  constantValue = m_globals.nilObject;   break;
+        case SmalltalkVM::trueConst:  /*outs() << "true ";*/  constantValue = m_globals.trueObject;  break;
+        case SmalltalkVM::falseConst: /*outs() << "false ";*/ constantValue = m_globals.falseObject; break;
 
         default:
             fprintf(stderr, "JIT: unknown push constant %d\n", constant);
@@ -541,7 +684,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
     jit.bytePointer += 2;
 
-    TJITContext blockContext(jit.method, jit.callingContext);
+    TJITContext blockContext(this, jit.method, jit.callingContext);
     blockContext.bytePointer = jit.bytePointer;
 
     // Creating block function named Class>>method@offset
@@ -550,7 +693,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     ss << jit.function->getName().str() << "@" << blockOffset; //currentOffset;
     std::string blockFunctionName = ss.str();
 
-    outs() << "Creating block function "  << blockFunctionName << "\n";
+    // outs() << "Creating block function "  << blockFunctionName << "\n";
 
     std::vector<Type*> blockParams;
     blockParams.push_back(ot.block->getPointerTo()); // block object with context information
@@ -672,6 +815,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
     BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
 
+    // Linking pop-chain within the current logical block
+    jit.basicBlockContexts[resultBlock].referers.insert(jit.builder->GetInsertBlock());
+
     // Dpending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
     jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
@@ -739,6 +885,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* sendMessageResult = 0;
     if (jit.methodHasBlockReturn) {
         sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, resultBlock, jit.exceptionLandingPad, sendMessageArgs);
+        
     } else {
         sendMessageResult = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
 
@@ -749,11 +896,11 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     // Now the value aggregator block
     jit.builder->SetInsertPoint(resultBlock);
-
+    
     // We do not know now which way the program will be executed,
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
-    PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2);
+    PHINode* phi = jit.builder->CreatePHI(ot.object->getPointerTo(), 2, "phi.");
     phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
@@ -793,6 +940,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         // Creating basic block that will be branched to on normal invoke
         BasicBlock* nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
 
+        // Linking pop-chain within the current logical block
+        jit.basicBlockContexts[nextBlock].referers.insert(jit.builder->GetInsertBlock());
+        
         // Performing a function invoke
         result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.exceptionLandingPad, sendMessageArgs);
 
@@ -862,6 +1012,9 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 // from the previously stored basic blocks
                 BasicBlock* target = m_targetToBlockMap[targetOffset];
                 jit.builder->CreateBr(target);
+
+                // Updating block referers
+                jit.basicBlockContexts[target].referers.insert(jit.builder->GetInsertBlock());
             }
         } break;
 
@@ -886,6 +1039,10 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
                 jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
+                // Updating referers
+                jit.basicBlockContexts[targetBlock].referers.insert(jit.builder->GetInsertBlock());
+                jit.basicBlockContexts[skipBlock].referers.insert(jit.builder->GetInsertBlock());
+                
                 // Switching to a newly created block
                 jit.builder->SetInsertPoint(skipBlock);
             }
@@ -903,10 +1060,14 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
     uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
-    outs() << "Primitive opcode = " << opcode << "\n";
+    //outs() << "Primitive opcode = " << opcode << "\n";
 
     Value* primitiveResult = 0;
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
+    
+    // Linking pop chain
+    jit.basicBlockContexts[primitiveFailed].referers.insert(jit.builder->GetInsertBlock());
+    
     bool primitiveShouldNeverFail = false;
 
     switch (opcode) {
@@ -990,7 +1151,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
 
-        case SmalltalkVM::allocateByteArray: { // FIXME pointer safety
+        case SmalltalkVM::allocateByteArray: { // 20      // FIXME pointer safety
             Value*    sizeObject  = jit.popValue();
             Value*    klassObject = jit.popValue();
             Value*    klass       = jit.builder->CreateBitCast(klassObject, ot.klass->getPointerTo());
@@ -1005,17 +1166,19 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
 
-        case SmalltalkVM::cloneByteObject: { // FIXME pointer safety
-            Value*    klass    = jit.popValue();
-            Value*    original = jit.popValue();
-
+        case SmalltalkVM::cloneByteObject: { // 23      // FIXME pointer safety
+            Value*    klassObject = jit.popValue();
+            Value*    original    = jit.popValue();
+            Value*    klass       = jit.builder->CreateBitCast(klassObject, ot.klass->getPointerTo());
+            
             Function* getSize  = m_TypeModule->getFunction("TObject::getSize()");
             Value*    dataSize = jit.builder->CreateCall(getSize, original, "dataSize.");
 
             Value*    args[]   = { klass, dataSize };
             Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
+            Value*    resultObject = jit.builder->CreateBitCast(clone, ot.object->getPointerTo());
 
-            primitiveResult = clone;
+            primitiveResult = resultObject;
             primitiveShouldNeverFail = true;
         } break;
 
@@ -1024,7 +1187,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
             break;
 
-        case SmalltalkVM::blockInvoke: {
+        case SmalltalkVM::blockInvoke: { // 8
             Value* object = jit.popValue();
             Value* block  = jit.builder->CreateBitCast(object, ot.block->getPointerTo());
 
@@ -1053,6 +1216,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
             Value* tempSizeOk = jit.builder->CreateICmpSLE(blockAcceptsArgCount, jit.builder->getInt32(argCount));
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailed);
+            
+            jit.basicBlockContexts[tempsChecked].referers.insert(jit.builder->GetInsertBlock());
             jit.builder->SetInsertPoint(tempsChecked);
             
             // Storing values in the block's wrapping context
@@ -1071,11 +1236,11 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveResult = result;
         } break;
 
-        case SmalltalkVM::arrayAt:
-        case SmalltalkVM::arrayAtPut: {
+        case SmalltalkVM::arrayAt:       // 24
+        case SmalltalkVM::arrayAtPut: {  // 5
             Value* indexObject = jit.popValue();
             Value* arrayObject = jit.popValue();
-            Value* valueObejct = 0;
+            Value* valueObejct = (opcode == SmalltalkVM::arrayAtPut) ? jit.popValue() : 0;
 
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
@@ -1101,7 +1266,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    fieldPtr  = jit.builder->CreateGEP(fields, actualIndex);
 
             if (opcode == SmalltalkVM::arrayAtPut) {
-                valueObejct = jit.popValue();
                 jit.builder->CreateStore(valueObejct, fieldPtr);
                 primitiveResult = arrayObject; // valueObejct;
             } else {
@@ -1109,11 +1273,11 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             }
         } break;
 
-        case SmalltalkVM::stringAt:
-        case SmalltalkVM::stringAtPut: {
+        case SmalltalkVM::stringAt:       // 21
+        case SmalltalkVM::stringAtPut: {  // 22
             Value* indexObject  = jit.popValue();
             Value* stringObject = jit.popValue();
-            Value* valueObejct  = 0;
+            Value* valueObejct  = (opcode == SmalltalkVM::stringAtPut) ? jit.popValue() : 0;
 
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
@@ -1144,8 +1308,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             if (opcode == SmalltalkVM::stringAtPut) {
                 // Popping new value from the stack, getting actual integral value from the TInteger
                 // then shrinking it to the 1 byte representation and inserting into the pointed location
-                
-                valueObejct = jit.popValue(); 
                 Value* valueInt = jit.builder->CreateCall(getValue, valueObejct);
                 Value* byte = jit.builder->CreateTrunc(valueInt, Type::getInt8Ty(m_JITModule->getContext()));
                 jit.builder->CreateStore(byte, bytePtr); 
@@ -1257,12 +1419,24 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* destinationStopOffset  = jit.popValue();
             Value* destinationStartOffset = jit.popValue();
 
-            Value* arguments[]  = { destination, sourceStartOffset, source, destinationStopOffset, destinationStartOffset };
+            Value* arguments[]  = {
+                destination,
+                destinationStartOffset,
+                destinationStopOffset,
+                source,
+                sourceStartOffset
+            };
+            
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
-            //FIXME remove CreateSelect
-            Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
 
-            primitiveResult = resultObject;
+            BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
+            jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
+            
+            jit.builder->CreateCondBr(isSucceeded, primitiveSucceeded, primitiveFailed);
+            //Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
+            jit.builder->SetInsertPoint(primitiveSucceeded);
+
+            primitiveResult = destination;
         } break;
 
         default:
@@ -1270,7 +1444,10 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     }
 
     if (primitiveShouldNeverFail) {
-        BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded.", jit.function);
+        BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
+        
+        // Linking pop chain
+        jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
         
         jit.builder->CreateCondBr(jit.builder->getTrue(), primitiveSucceeded, primitiveFailed);
         jit.builder->SetInsertPoint(primitiveSucceeded);
