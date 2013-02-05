@@ -117,6 +117,8 @@ JITRuntime::~JITRuntime() {
     // Finalize stuff and dispose memory
     if (m_functionPassManager)
         delete m_functionPassManager;
+    if (m_modulePassManager)
+        delete m_modulePassManager;
 }
 
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
@@ -273,6 +275,8 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 
             verifyModule(*m_JITModule);
             // Running the optimization passes on a function
+            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+                                                      //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
             
             outs() << *methodFunction;
@@ -345,7 +349,7 @@ void JITRuntime::initializeGlobals() {
 
 void JITRuntime::initializePassManager() {
     m_functionPassManager = new FunctionPassManager(m_JITModule);
-    
+    m_modulePassManager   = new PassManager();
     // Set up the optimizer pipeline.
     // Start with registering info about how the
     // target lays out data structures.
@@ -373,7 +377,8 @@ void JITRuntime::initializePassManager() {
     // Simplify the control flow graph (deleting unreachable
     // blocks, etc).
     m_functionPassManager->add(llvm::createCFGSimplificationPass());
-
+    
+    m_modulePassManager->add(llvm::createFunctionInliningPass());
 //     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
 //     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
 //     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());

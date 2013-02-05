@@ -292,7 +292,8 @@ public:
     
 private:
     llvm::FunctionPassManager* m_functionPassManager;
-
+    llvm::PassManager*         m_modulePassManager;
+    
     SmalltalkVM* m_softVM;
     llvm::ExecutionEngine* m_executionEngine;
     MethodCompiler* m_methodCompiler;
