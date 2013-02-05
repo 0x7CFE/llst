@@ -346,7 +346,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 //                 TBlockContext& blockContext = jit.blockContexts[targetBasicBlock];
 //                 blockContext.referers.insert(?);
                 
-                outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << m_targetToBlockMap[targetOffset]->getName() << ")\n";
+                //outs() << "Branch site: " << currentOffset << " -> " << targetOffset << " (" << m_targetToBlockMap[targetOffset]->getName() << ")\n";
             } break;
         }
     }
@@ -465,7 +465,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        printOpcode(jit.instruction);
+//         printOpcode(jit.instruction);
 
 //         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
@@ -505,7 +505,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
 void MethodCompiler::writeLandingPad(TJITContext& jit)
 {
-    outs() << "Writing landing pad\n";
+    // outs() << "Writing landing pad\n";
 
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
@@ -667,9 +667,9 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             constantValue->setName(ss.str());
         } break;
 
-        case SmalltalkVM::nilConst:   outs() << "nil ";   constantValue = m_globals.nilObject;   break;
-        case SmalltalkVM::trueConst:  outs() << "true ";  constantValue = m_globals.trueObject;  break;
-        case SmalltalkVM::falseConst: outs() << "false "; constantValue = m_globals.falseObject; break;
+        case SmalltalkVM::nilConst:   /*outs() << "nil "; */  constantValue = m_globals.nilObject;   break;
+        case SmalltalkVM::trueConst:  /*outs() << "true ";*/  constantValue = m_globals.trueObject;  break;
+        case SmalltalkVM::falseConst: /*outs() << "false ";*/ constantValue = m_globals.falseObject; break;
 
         default:
             fprintf(stderr, "JIT: unknown push constant %d\n", constant);
@@ -693,7 +693,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     ss << jit.function->getName().str() << "@" << blockOffset; //currentOffset;
     std::string blockFunctionName = ss.str();
 
-    outs() << "Creating block function "  << blockFunctionName << "\n";
+    // outs() << "Creating block function "  << blockFunctionName << "\n";
 
     std::vector<Type*> blockParams;
     blockParams.push_back(ot.block->getPointerTo()); // block object with context information
@@ -1060,7 +1060,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
     uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
-    outs() << "Primitive opcode = " << opcode << "\n";
+    //outs() << "Primitive opcode = " << opcode << "\n";
 
     Value* primitiveResult = 0;
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);

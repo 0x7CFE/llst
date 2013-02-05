@@ -286,6 +286,10 @@ extern "C" {
 }
 
 class JITRuntime {
+public:
+    typedef TObject* (*TMethodFunction)(TContext*);
+    typedef TObject* (*TBlockFunction)(TBlock*);
+    
 private:
     llvm::FunctionPassManager* m_functionPassManager;
 
@@ -318,6 +322,35 @@ private:
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
 
+    struct TFunctionCacheEntry
+    {
+        TObject* methodName;
+        TClass*  receiverClass;
+        
+        TMethodFunction function;
+    };
+
+    struct TBlockFunctionCacheEntry
+    {
+        TObject* containerMethodName;
+        TClass*  containerMethodClass;
+        uint32_t blockOffset;
+        
+        TBlockFunction function;
+    };
+    
+    static const unsigned int LOOKUP_CACHE_SIZE = 1024;
+    TFunctionCacheEntry      m_functionLookupCache[LOOKUP_CACHE_SIZE];
+    TBlockFunctionCacheEntry m_blockFunctionLookupCache[LOOKUP_CACHE_SIZE];
+    
+    uint32_t m_cacheHits;
+    uint32_t m_cacheMisses;
+    
+    TMethodFunction lookupFunctionInCache(TSymbol* selector, TClass* klass);
+    TBlockFunction  lookupBlockFunctionInCache(TSymbol* containerMethodName, TClass* containerMethodClass, uint32_t blockOffset);
+    TMethodFunction updateFunctionCache(TSymbol* selector, TClass* klass, TMethodFunction function);
+    TMethodFunction updateBlockFunctionCache(TSymbol* containerMethodName, TClass* containerMethodClass, uint32_t blockOffset, TBlockFunction function);
+    
     void initializeGlobals();
     void initializePassManager();
 
@@ -327,9 +360,6 @@ private:
 
 public:
     static JITRuntime* Instance() { return s_instance; }
-
-    typedef TObject* (*TMethodFunction)(TContext*);
-    typedef TObject* (*TBlockFunction)(TBlock*);
 
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }
