@@ -219,7 +219,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             
             verifyModule(*m_JITModule);
             // Running the optimization passes on a function
-            //m_functionPassManager->run(*function);
+            m_functionPassManager->run(*blockFunction);
         }
         
         // outs() << *blockFunction;
@@ -270,11 +270,12 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 
             //llvm::Function* asNumberBlock = m_JITModule->getFunction("String>>asNumber@4");
             //outs() << *asNumberBlock;
-            //outs() << *methodFunction;
 
             verifyModule(*m_JITModule);
             // Running the optimization passes on a function
-            //m_functionPassManager->run(*function);
+            m_functionPassManager->run(*methodFunction);
+            
+            outs() << *methodFunction;
         }
 
         //outs() << *m_JITModule;
@@ -344,15 +345,15 @@ void JITRuntime::initializeGlobals() {
 
 void JITRuntime::initializePassManager() {
     m_functionPassManager = new FunctionPassManager(m_JITModule);
-
+    
     // Set up the optimizer pipeline.
     // Start with registering info about how the
     // target lays out data structures.
-    /*m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
-
+    m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
+    
     // Basic AliasAnslysis support for GVN.
     m_functionPassManager->add(llvm::createBasicAliasAnalysisPass());
-
+    
     // Promote allocas to registers.
     m_functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
 
@@ -365,9 +366,13 @@ void JITRuntime::initializePassManager() {
     // Eliminate Common SubExpressions.
     m_functionPassManager->add(llvm::createGVNPass());
 
+    m_functionPassManager->add(llvm::createAggressiveDCEPass());
+    
+    m_functionPassManager->add(llvm::createTailCallEliminationPass());
+    
     // Simplify the control flow graph (deleting unreachable
     // blocks, etc).
-    m_functionPassManager->add(llvm::createCFGSimplificationPass()); */
+    m_functionPassManager->add(llvm::createCFGSimplificationPass());
 
 //     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
 //     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
