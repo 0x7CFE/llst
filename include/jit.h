@@ -324,16 +324,13 @@ private:
 
     struct TFunctionCacheEntry
     {
-        TObject* methodName;
-        TClass*  receiverClass;
-        
+        TMethod* method;
         TMethodFunction function;
     };
 
     struct TBlockFunctionCacheEntry
     {
-        TObject* containerMethodName;
-        TClass*  containerMethodClass;
+        TMethod* containerMethod;
         uint32_t blockOffset;
         
         TBlockFunction function;
@@ -346,10 +343,10 @@ private:
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
     
-    TMethodFunction lookupFunctionInCache(TSymbol* selector, TClass* klass);
-    TBlockFunction  lookupBlockFunctionInCache(TSymbol* containerMethodName, TClass* containerMethodClass, uint32_t blockOffset);
-    TMethodFunction updateFunctionCache(TSymbol* selector, TClass* klass, TMethodFunction function);
-    TMethodFunction updateBlockFunctionCache(TSymbol* containerMethodName, TClass* containerMethodClass, uint32_t blockOffset, TBlockFunction function);
+    TMethodFunction lookupFunctionInCache(TMethod* method);
+    TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
+    TMethodFunction updateFunctionCache(TMethod* method, TMethodFunction function);
+    TMethodFunction updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
     
     void initializeGlobals();
     void initializePassManager();

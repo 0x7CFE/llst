@@ -143,12 +143,12 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     return newBlock;
 }
 
-JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TSymbol* selector, TClass* klass)
+JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
+    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    if (entry.methodName == selector && entry.receiverClass == klass) {
+    if (entry.method == method) {
         m_cacheHits++;
         return entry.function;
     } else {
@@ -157,14 +157,12 @@ JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TSymbol* selector,
     }
 }
 
-JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TSymbol* containerMethodName, TClass* containerMethodClass, uint32_t blockOffset)
+JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(containerMethodName) ^ reinterpret_cast<uint32_t>(containerMethodClass) ^ blockOffset;
+    uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
     TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    if (entry.containerMethodName  == containerMethodName  && 
-        entry.containerMethodClass == containerMethodClass && 
-        entry.blockOffset == blockOffset) 
+    if (entry.containerMethod  == containerMethod && entry.blockOffset == blockOffset) 
     {
         m_cacheHits++;
         return entry.function;
@@ -174,23 +172,21 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TSymbol* conta
     }
 }
 
-JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TSymbol* selector, TClass* klass, TMethodFunction function)
+JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
+    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    entry.methodName = selector;
-    entry.receiverClass = klass;
+    entry.method   = method;
     entry.function = function;
 }
 
-JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TSymbol* containerMethodName, TClass* containerMethodClass, uint32_t blockOffset, TBlockFunction function)
+JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(containerMethodName) ^ reinterpret_cast<uint32_t>(containerMethodClass) ^ blockOffset;
+    uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
     TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    entry.containerMethodName  = containerMethodName;
-    entry.containerMethodClass = containerMethodClass;
+    entry.containerMethod = containerMethod;
     entry.blockOffset = blockOffset;
     entry.function = function;
 }
@@ -201,7 +197,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     // TODO Fast 1-way lookup cache
     const uint16_t blockOffset = getIntegerValue(block->bytePointer);
     
-    TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method->name, block->method->klass, blockOffset);
+    TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
     
     if (! compiledBlockFunction) {
         std::ostringstream ss;
@@ -229,7 +225,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
         
         // outs() << *blockFunction;
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
-        updateBlockFunctionCache(block->method->name, block->method->klass, blockOffset, compiledBlockFunction);
+        updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
     }
     
     block->previousContext = callingContext->previousContext;
@@ -262,7 +258,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     // Searching for the jit compiled function
     // TODO Fast 1-way lookup cache
     
-    TMethodFunction compiledMethodFunction = lookupFunctionInCache(message, receiverClass); 
+    TMethodFunction compiledMethodFunction = lookupFunctionInCache(method); 
     
     if (! compiledMethodFunction) {
         // If function was not found in the cache looking it in the LLVM directly
@@ -286,7 +282,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         // Calling the method and returning the result
         //outs() << "Acquiring function address for " << functionName << " ...\n";
         compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
-        updateFunctionCache(message, receiverClass, compiledMethodFunction);
+        updateFunctionCache(method, compiledMethodFunction);
     }
     
     // Preparing the context objects. Because we do not call the software
