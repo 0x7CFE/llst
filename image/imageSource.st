@@ -1353,7 +1353,7 @@ main    | command x1 x2 list ms1 ms2 |
         "LLVMTest runAllFrom: StringTest."
 
         list <- List new.
-        1 to: 100 do: [ :x | list add: 1000 atRandom ].
+        1 to: 800 do: [ :x | list add: 1000 atRandom ].
         ms1 <- Timer millisecondsToRun: [ x1 <- LLVMTestStatements new testSort2: list ].
         ms2 <- Timer millisecondsToRun: [ x2 <- LLVMTestStatements new testSort2: list ].
         x2 printNl.

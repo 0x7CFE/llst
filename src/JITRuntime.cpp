@@ -145,7 +145,7 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
 
 JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ 0xDEADBEEF;
+    uint32_t hash = reinterpret_cast<uint32_t>(method); // ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
     if (entry.method == method) {
@@ -162,8 +162,7 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
     uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
     TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
-    if (entry.containerMethod  == containerMethod && entry.blockOffset == blockOffset) 
-    {
+    if (entry.containerMethod == containerMethod && entry.blockOffset == blockOffset) {
         m_cacheHits++;
         return entry.function;
     } else {
@@ -174,7 +173,7 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
 
 JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ 0xDEADBEEF;
+    uint32_t hash = reinterpret_cast<uint32_t>(method); // ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
     entry.method   = method;
