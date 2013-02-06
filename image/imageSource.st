@@ -1279,10 +1279,18 @@ testCat |x|
     [ x ] assertEq: 'hello world'.
 !
 
+METHOD Class "TODO for tests only"
+name
+    ^name.
+!
+
 METHOD LLVMTestStatements
 classAsString |x|
+    x <- LLVM sendMessage: #name withArguments: (Array with: SmallInt).
+    [ x printString ] assertEq: 'SmallInt' withComment: '1'.
+    
     x <- LLVM sendMessage: #asString withArguments: (Array with: SmallInt).
-    [ x ] assertEq: 'SmallInt'.
+    [ x ] assertEq: 'SmallInt' withComment: '2'.
 !
 
 METHOD MetaLLVMTest
