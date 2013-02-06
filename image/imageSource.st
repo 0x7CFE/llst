@@ -1286,8 +1286,8 @@ name
 
 METHOD LLVMTestStatements
 classAsString |x|
-    x <- LLVM sendMessage: #name withArguments: (Array with: SmallInt).
-    [ x printString ] assertEq: 'SmallInt' withComment: '1'.
+    "x <- LLVM sendMessage: #name withArguments: (Array with: SmallInt).
+    [ x printString ] assertEq: 'SmallInt' withComment: '1'."
     
     x <- LLVM sendMessage: #asString withArguments: (Array with: SmallInt).
     [ x ] assertEq: 'SmallInt' withComment: '2'.
@@ -1330,7 +1330,8 @@ main    | command x1 x2 list ms1 ms2 |
         ContextTest      new runAll.
         PrimitiveTest    new runAll."
         
-        LLVMTestStatements new runAll.
+        "LLVMTestStatements new runAll."
+        LLVMTestStatements new classAsString.
         
         "StringTest new runAllInLLVM.     "
         "   both are almost equal. runAllFrom uses newProcessStart primitive  "

@@ -165,6 +165,8 @@ define %struct.TSymbol* @"TSymbolArray::getField(int)"(%struct.TSymbolArray* %th
     ret %struct.TSymbol* %result
 }
 
+declare void @llvm.memcpy.p0i8.p0i8.i32(i8* %dest, i8* %src, i32 %size, i32 %align, i1 %volatile)
+
 ; define void @"MethodCompilerExample"(%struct.TContext* %context) {
 ; entry:
 ;     %argObjectPtr    = getelementptr inbounds %struct.TContext* %context, i32 0, i32 2

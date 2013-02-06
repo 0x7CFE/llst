@@ -1191,9 +1191,30 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value*    args[]   = { klass, dataSize };
             Value*    clone    = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
-            Value*    resultObject = jit.builder->CreateBitCast(clone, ot.object->getPointerTo());
+            
+            Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
+            Value*    originalObject = jit.builder->CreateBitCast(original, ot.object->getPointerTo());
+            Value*    cloneObject    = jit.builder->CreateBitCast(clone, ot.object->getPointerTo());
+            Value*    sourceFields = jit.builder->CreateCall(objectGetFields, originalObject);
+            Value*    destFields   = jit.builder->CreateCall(objectGetFields, cloneObject);
+            
+            Value*    source       = jit.builder->CreateBitCast(sourceFields, Type::getInt8PtrTy(m_JITModule->getContext()));
+            Value*    destination  = jit.builder->CreateBitCast(destFields, Type::getInt8PtrTy(m_JITModule->getContext()));
+            
+            // Copying the data
+            Value* copyArgs[] = {
+                destination, 
+                source,
+                dataSize,
+                jit.builder->getInt32(0), // no alignment
+                jit.builder->getInt1(0)  // not volatile
+            };
+            Function* memcpyIntrinsic = m_JITModule->getFunction("llvm.memcpy.p0i8.p0i8.i32");
+            jit.builder->CreateCall(memcpyIntrinsic, copyArgs);
+            
+            //Value*    resultObject = jit.builder->CreateBitCast( clone, ot.object->getPointerTo());
 
-            primitiveResult = resultObject;
+            primitiveResult = cloneObject;
             primitiveShouldNeverFail = true;
         } break;
 

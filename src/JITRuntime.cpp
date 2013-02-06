@@ -221,10 +221,11 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             
             verifyModule(*m_JITModule);
             // Running the optimization passes on a function
-            m_functionPassManager->run(*blockFunction);
+            //m_functionPassManager->run(*blockFunction);
+            
+            outs() << *blockFunction;
         }
         
-        // outs() << *blockFunction;
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
         updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
     }
@@ -285,9 +286,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Running the optimization passes on a function
             //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
-            m_functionPassManager->run(*methodFunction);
+            //m_functionPassManager->run(*methodFunction);
             
-            //outs() << *methodFunction;
+            outs() << *methodFunction;
         }
 
         //outs() << *m_JITModule;
@@ -515,7 +516,7 @@ TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
 
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
 {
-//     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
+    printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
