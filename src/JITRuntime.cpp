@@ -223,7 +223,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             // Running the optimization passes on a function
             //m_functionPassManager->run(*blockFunction);
             
-            outs() << *blockFunction;
+//             outs() << *blockFunction;
         }
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
@@ -244,24 +244,31 @@ TObject* JITRuntime::runProcess(TProcess* process, TContext* callingContext)
 {
     TSymbol* message        = process->context->method->name;
     TObjectArray* arguments = process->context->arguments;
-    TObject* result         = sendMessage(callingContext, message, arguments);
+    TObject* result         = sendMessage(callingContext, message, arguments, 0);
     return result;
 }
 
-TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
+TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
 {
     // First of all we need to find the actual method object
-    TObject* receiver = arguments->getField(0);
-    TClass*  receiverClass = globals.smallIntClass;
-    if (! isSmallInteger(receiver))
-        receiverClass = receiver->getClass();
+    TClass*  klass = 0;
+
+//     if (receiverClass) {
+//        outs() << "receiverClass = " << receiverClass << "\n";
+//         outs() << "name = " << receiverClass->name->toString() << "\n";
+//         klass = receiverClass;
+//     } else {
+        TObject* receiver = arguments->getField(0);
+        klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+//     }
 
     // Searching for the actual method to be called
-    hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
+    hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, klass));
     // TODO #doesNotUnderstand:
 
     if (! method.rawptr()) {
-        outs() << "Method not found!";
+        //std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+        outs() << "Method not found: " << message->toString() << "\n";
         exit(1);
     }
     
@@ -288,7 +295,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                                                       //we may get rid of TObject::getFields on our own.
             //m_functionPassManager->run(*methodFunction);
             
-            outs() << *methodFunction;
+//             outs() << *methodFunction;
         }
 
         //outs() << *m_JITModule;
@@ -416,7 +423,8 @@ void JITRuntime::initializeRuntimeAPI() {
     Type* sendParams[] = {
         contextType,                    // callingContext
         ot.symbol->getPointerTo(),      // message selector
-        ot.objectArray->getPointerTo()  // arguments
+        ot.objectArray->getPointerTo(), // arguments
+        classType                       // receiverClass
     };
     FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
 
@@ -516,11 +524,11 @@ TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
 
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
 {
-    printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
+//     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
+TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
 {
 //     printf("sendMessage(%p, #%s, %p)\n",
 //            callingContext,
@@ -534,7 +542,7 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
 //     printf("\tself class = %p\n", klass);
 //     printf("\tself class name = '%s'\n", klass->name->toString().c_str());
     
-    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments);
+    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
 }
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)

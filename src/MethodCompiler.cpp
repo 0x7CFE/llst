@@ -878,7 +878,10 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* sendMessageArgs[] = {
         jit.context, // calling context
         m_globals.binarySelectors[jit.instruction.low],
-        argumentsArray
+        argumentsArray,
+
+        // default receiver class
+        jit.builder->CreateIntToPtr(jit.builder->getInt32(0), ot.klass->getPointerTo())
     };
 
     // Now performing a message call
@@ -932,7 +935,10 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* sendMessageArgs[] = {
         jit.context,     // calling context
         messageSelector, // selector
-        arguments        // message arguments
+        arguments,        // message arguments
+
+        // default receiver class
+        jit.builder->CreateIntToPtr(jit.builder->getInt32(0), ot.klass->getPointerTo())
     };
 
     Value* result = 0;
@@ -1048,6 +1054,10 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             }
         } break;
 
+//         case SmalltalkVM::sendToSuper: {
+//             
+//         } break;
+        
         case SmalltalkVM::breakpoint:
             // TODO
             break;

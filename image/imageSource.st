@@ -1330,10 +1330,20 @@ main    | command x1 x2 list ms1 ms2 |
         ContextTest      new runAll.
         PrimitiveTest    new runAll."
         
-        "LLVMTestStatements new runAll."
-        LLVMTestStatements new classAsString.
+        "LLVMTestStatements new runAll.
+        LLVMTestStatements new classAsString."
+
+        StringTest new runAllInLLVM.
+
+        "list <- List new.
+        1 to: 800 do: [ :x | list add: 1000 atRandom ].
+        ms1 <- Timer millisecondsToRun: [ LLVMTestStatements testSort2: list ].
+        ms2 <- Timer millisecondsToRun: [ LLVMTestStatements testSort2: list ].
+        x2 printNl.
+        '1 Sorted in ms: ' print. ms1 printNl.
+        '2 Sorted in ms: ' print. ms2 printNl."
         
-        "StringTest new runAllInLLVM.     "
+        
         "   both are almost equal. runAllFrom uses newProcessStart primitive  "
         "LLVM runAllFrom: StringTest.     "
         

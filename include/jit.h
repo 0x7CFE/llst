@@ -271,7 +271,7 @@ public:
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject*     invokeBlock(TBlock* block, TContext* callingContext);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
@@ -316,14 +316,14 @@ private:
 
     static JITRuntime* s_instance;
 
-    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject* invokeBlock(TBlock* block, TContext* callingContext);
     TObject* runProcess(TProcess* process, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
+    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
     friend TObject*     runProcess(TProcess* process, TContext* callingContext);
