@@ -1138,13 +1138,14 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* process       = jit.builder->CreateBitCast(processObject, ot.process->getPointerTo());
             Value* args[] = { process, jit.context };
             /*Value* result = */ jit.builder->CreateCall(m_runtimeAPI.runProcess, args);
-            
             Function* newInt = m_TypeModule->getFunction("newInteger()");
             primitiveResult = jit.builder->CreateCall(newInt, jit.builder->getInt32( (int)SmalltalkVM::returnReturned)); //FIXME
             primitiveShouldNeverFail = true;
-            //TExecuteResult result = this->execute(newProcess, ticks);
-
-            //return reinterpret_cast<TObject*>(newInteger(result));
+            //TODO stub:
+            //we should create a new function representing process
+            //in that function we create invoke to process->method
+            //if method did not fail we return reinterpret_cast<TObject*>(newInteger(returnReturned))
+            //otherwise we catch error and return returnError
         } break;
 
         case SmalltalkVM::allocateObject: { // FIXME pointer safety
