@@ -1293,6 +1293,18 @@ classAsString |x|
     [ x ] assertEq: 'SmallInt' withComment: '2'.
 !
 
+METHOD LLVMTestStatements
+isKindOf |kindOf|
+    kindOf <- [:child :parent | LLVM sendMessage: ('isKindOf:' asSymbol) withArguments: (Array with: child with: parent). ]. 
+    [ kindOf value: 1 value: Object ] assertWithComment: '1'.
+    [ kindOf value: Class value: Object ] assertWithComment: '2'.
+    [ kindOf value: Object value: Class ] assertWithComment: '3'.
+    [ kindOf value: 1 value: Magnitude ] assertWithComment: '4'.
+    [ kindOf value: 'hello' value: Magnitude ] assertWithComment: '5'.
+    [ kindOf value: 'hello' value: Collection ] assertWithComment: '6'.
+    [ kindOf value: 'hello' value: Array ] assertWithComment: '7'.
+!
+
 METHOD MetaLLVMTest
 runAllFrom: testSuite | suite |
     suite <- testSuite new.
