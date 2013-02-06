@@ -488,8 +488,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             case SmalltalkVM::opSendBinary:        doSendBinary(jit);      break;
             case SmalltalkVM::opSendMessage:       doSendMessage(jit);     break;
 
-            case SmalltalkVM::opDoSpecial:         doSpecial(jit); break;
-            case SmalltalkVM::opDoPrimitive: 		doPrimitive(jit); break;
+            case SmalltalkVM::opDoSpecial:         doSpecial(jit);         break;
+            case SmalltalkVM::opDoPrimitive:       doPrimitive(jit);       break;
 
             default:
                 fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
@@ -713,7 +713,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     // Creating the basic block and inserting it into the function
     BasicBlock* blockPreamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
     blockContext.builder = new IRBuilder<>(blockPreamble);
-    writePreamble(blockContext, true);
+    writePreamble(blockContext, /*isBlock*/ true);
     scanForBranches(blockContext, newBytePointer - jit.bytePointer);
 
     BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
@@ -1131,7 +1131,22 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveShouldNeverFail = true;
         } break;
 
-        // TODO new process
+        case SmalltalkVM::startNewProcess: { // 6
+            Value* ticksUnused   = jit.popValue();
+            Value* processObject = jit.popValue();
+            //TODO pushProcess ?
+            Value* process       = jit.builder->CreateBitCast(processObject, ot.process->getPointerTo());
+            Value* args[] = { process, jit.context };
+            /*Value* result = */ jit.builder->CreateCall(m_runtimeAPI.runProcess, args);
+            Function* newInt = m_TypeModule->getFunction("newInteger()");
+            primitiveResult = jit.builder->CreateCall(newInt, jit.builder->getInt32( (int)SmalltalkVM::returnReturned)); //FIXME
+            primitiveShouldNeverFail = true;
+            //TODO stub:
+            //we should create a new function representing process
+            //in that function we create invoke to process->method
+            //if method did not fail we return reinterpret_cast<TObject*>(newInteger(returnReturned))
+            //otherwise we catch error and return returnError
+        } break;
 
         case SmalltalkVM::allocateObject: { // FIXME pointer safety
             Value* sizeObject  = jit.popValue();

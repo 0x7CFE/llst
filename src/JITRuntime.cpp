@@ -117,6 +117,8 @@ JITRuntime::~JITRuntime() {
     // Finalize stuff and dispose memory
     if (m_functionPassManager)
         delete m_functionPassManager;
+    if (m_modulePassManager)
+        delete m_modulePassManager;
 }
 
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
@@ -237,6 +239,14 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     return result;
 }
 
+TObject* JITRuntime::runProcess(TProcess* process, TContext* callingContext)
+{
+    TSymbol* message        = process->context->method->name;
+    TObjectArray* arguments = process->context->arguments;
+    TObject* result         = sendMessage(callingContext, message, arguments);
+    return result;
+}
+
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments)
 {
     // First of all we need to find the actual method object
@@ -273,9 +283,11 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 
             verifyModule(*m_JITModule);
             // Running the optimization passes on a function
+            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+                                                      //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
             
-            outs() << *methodFunction;
+            //outs() << *methodFunction;
         }
 
         //outs() << *m_JITModule;
@@ -345,7 +357,7 @@ void JITRuntime::initializeGlobals() {
 
 void JITRuntime::initializePassManager() {
     m_functionPassManager = new FunctionPassManager(m_JITModule);
-    
+    m_modulePassManager   = new PassManager();
     // Set up the optimizer pipeline.
     // Start with registering info about how the
     // target lays out data structures.
@@ -373,7 +385,8 @@ void JITRuntime::initializePassManager() {
     // Simplify the control flow graph (deleting unreachable
     // blocks, etc).
     m_functionPassManager->add(llvm::createCFGSimplificationPass());
-
+    
+    m_modulePassManager->add(llvm::createFunctionInliningPass());
 //     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
 //     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
 //     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
@@ -448,6 +461,11 @@ void JITRuntime::initializeRuntimeAPI() {
     };
     FunctionType* performSmallIntType = FunctionType::get(objectType, performSmallIntParams, false);
 
+    Type* runProcessParams[] = {
+        ot.process->getPointerTo(),
+        contextType // callingContext
+    };
+    FunctionType* runProcessType = FunctionType::get(objectType, runProcessParams, false);
 
 
     // Creating function references
@@ -460,6 +478,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.checkRoot          = Function::Create(checkRootType, Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
     m_runtimeAPI.performSmallInt    = Function::Create(performSmallIntType, Function::ExternalLinkage, "performSmallInt", m_JITModule);
+    m_runtimeAPI.runProcess         = Function::Create(runProcessType, Function::ExternalLinkage, "runProcess", m_JITModule);
 
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -471,6 +490,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.performSmallInt, reinterpret_cast<void*>(& ::performSmallInt));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.runProcess, reinterpret_cast<void*>(& ::runProcess));
 }
 
 void JITRuntime::initializeExceptionAPI() {
@@ -564,6 +584,11 @@ TObject* performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObje
     int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
     int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
     return JITRuntime::Instance()->getVM()->doSmallInt((SmalltalkVM::SmallIntOpcode) opcode, leftOperand, rightOperand);
+}
+
+TObject* runProcess(TProcess* process, TContext* callingContext)
+{
+    return JITRuntime::Instance()->runProcess(process, callingContext);
 }
 
 }

@@ -117,6 +117,10 @@ COMMENT ---------------------------------------------------
 COMMENT --- Package: GUI
 RAWCLASS MetaGuiPrimitives Class MetaObject theInstance
 RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
+
+CLASS LLVM Object
+CLASS LLVMTest Object field1
+
 COMMENT ---------- method bodies ------------
 COMMENT -----------Object-------------------
 METHOD MetaObject
@@ -594,6 +598,21 @@ runAll |reservedNames|
                         ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
+METHOD Test
+runAllInLLVM |reservedNames|
+    self init.
+    reservedNames <- Array with: #init.
+
+    Char newline print.
+    'Running ' print. self class printNl.
+
+    self class methods
+            do: [:m |
+                    ( reservedNames includes: (m name) )
+                        ifFalse: [ LLVM sendMessage: (m name) withArguments: (Array with: self) ]
+                ]
+!
+
 METHOD Test
 init
     ^nil
@@ -1085,9 +1104,6 @@ primes: n | cand count |
         Char newline print
 !
 
-CLASS LLVM Object
-CLASS LLVMTest Object field1
-
 METHOD MetaLLVM
 sendMessage: aSelector withArguments: anArguments
     "calling context will be taken from VM"
@@ -1103,47 +1119,6 @@ test1: arg1  | temp1 |
     ^self
 !
 
-METHOD LLVMTest
-test2: arg1  | temp1 |
-    temp1 <- 42.
-    ^arg1 + temp1
-!
-
-METHOD LLVMTest
-returnFourtyTwo
-    ^42
-!
-
-METHOD LLVMTest
-returnNil
-    ^nil
-!
-
-METHOD LLVMTest
-toDoTest |x|
-    x <- 0.
-    1 to: 11 do: [ x <- x + 1 ].
-    ^x
-!
-
-METHOD LLVMTest
-loopTest | i sum |
-    i   <- 1.
-    sum <- 0.
-
-    [ i < 1001 ] whileTrue:
-        [ sum <- sum + i. i <- i + 1 ].
-
-    ^sum
-!
-
-METHOD LLVMTest
-test3
-    "^ LLVM sendMessage: ('test42Lt:' asSymbol) withArguments: (Array with: self with: 40)."
-    ^ LLVM sendMessage: #loopTest withArguments: (Array with: self).
-    "^ LLVM sendMessage: #returnFourtyTwo withArguments: (Array with: self)."
-    "^ LLVM sendMessage: ('test2:' asSymbol) withArguments: (Array with: self with: 1)."
-!
 
 METHOD LLVMTest
 invokeBlock: aBlock withArg: anArg
@@ -1168,9 +1143,7 @@ runTestBlockReturn
 
 METHOD LLVMTest
 testPrint | result |
-    "result <- LLVM sendMessage: #printString withArguments: (Array with: 123)."
-    result <- LLVM sendMessage: #asNumber withArguments: (Array with: '123').
-    result class print. ' "' print. result print. $" printNl.
+    LLVM sendMessage: #printNl withArguments: (Array with: '123').
 !
 
 METHOD LLVMTest
@@ -1208,11 +1181,6 @@ testResume: blockSurelyThrows |blockThatCanThrow|
 METHOD Undefined
 return42FromBlockReturn
      nil testResume: [ ^42 ].
-!
-
-METHOD Undefined
-strCat
-     ^ 'hello ' + 'world'
 !
 
 CLASS LLVMTestStatements Test
@@ -1278,6 +1246,16 @@ blockParam |x|
     [ x ] assertEq: 42.
 !
 
+METHOD LLVMTestStatements
+getClass |x metaClass|
+    x <- LLVM sendMessage: #class withArguments: (Array with: 42).
+    [ x ] assertEq: SmallInt withComment: '1'.
+    
+    metaClass <- Object class.
+    x <- LLVM sendMessage: #class withArguments: (Array with: metaClass).
+    [ x ] assertEq: Class withComment: '2'.
+!
+
 
 METHOD Undefined
 sortTest | list |
@@ -1297,19 +1275,34 @@ sortTest2: aList
 
 METHOD LLVMTestStatements
 testCat |x|
-    x <- LLVM sendMessage: #strCat withArguments: (Array with: nil).
+    x <- LLVM sendMessage: ('+' asSymbol) withArguments: (Array with: 'hello ' with: 'world').
     [ x ] assertEq: 'hello world'.
 !
 
-METHOD LLVMTestStatements
-testSort |x|
-    x <- LLVM sendMessage: #sortTest withArguments: (Array with: nil).
-    ^x
+METHOD Class "TODO for tests only"
+name
+    ^name.
 !
 
 METHOD LLVMTestStatements
-testSort2: aList
-    ^ LLVM sendMessage: #sortTest withArguments: (Array with: nil with: aList).
+classAsString |x|
+    x <- LLVM sendMessage: #name withArguments: (Array with: SmallInt).
+    [ x printString ] assertEq: 'SmallInt' withComment: '1'.
+    
+    x <- LLVM sendMessage: #asString withArguments: (Array with: SmallInt).
+    [ x ] assertEq: 'SmallInt' withComment: '2'.
+!
+
+METHOD LLVMTestStatements
+isKindOf |kindOf|
+    kindOf <- [:child :parent | LLVM sendMessage: ('isKindOf:' asSymbol) withArguments: (Array with: child with: parent). ]. 
+    [ kindOf value: 1 value: Object ] assertWithComment: '1'.
+    [ kindOf value: Class value: Object ] assertWithComment: '2'.
+    [ kindOf value: Object value: Class ] assertWithComment: '3'.
+    [ kindOf value: 1 value: Magnitude ] assertWithComment: '4'.
+    [ kindOf value: 'hello' value: Magnitude ] assertWithComment: '5'.
+    [ kindOf value: 'hello' value: Collection ] assertWithComment: '6'.
+    [ kindOf value: 'hello' value: Array ] assertWithComment: '7'.
 !
 
 METHOD MetaLLVMTest
@@ -1336,29 +1329,12 @@ main    | command x1 x2 list ms1 ms2 |
         GCTest           new runAll.
         ContextTest      new runAll.
         PrimitiveTest    new runAll."
-
-        "x <- LLVMTest new test3.
-        x printNl."
-
-        "LLVMTest new testNil."
-        "LLVMTest new runTestBlockReturn."
-        "LLVMTest new testPrint."
         
-        "LLVMTestStatements new closure."
-        "LLVMTestStatements new blockParam."
-
-        "LLVMTestStatements new testCat."
-        "LLVMTestStatements new runAll."
-
-        "LLVMTest runAllFrom: StringTest."
-
-        list <- List new.
-        1 to: 800 do: [ :x | list add: 1000 atRandom ].
-        ms1 <- Timer millisecondsToRun: [ x1 <- LLVMTestStatements new testSort2: list ].
-        ms2 <- Timer millisecondsToRun: [ x2 <- LLVMTestStatements new testSort2: list ].
-        x2 printNl.
-        '1 Sorted in ms: ' print. ms1 printNl.
-        '2 Sorted in ms: ' print. ms2 printNl.
+        LLVMTestStatements new runAll.
+        
+        "StringTest new runAllInLLVM.     "
+        "   both are almost equal. runAllFrom uses newProcessStart primitive  "
+        "LLVM runAllFrom: StringTest.     "
         
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
