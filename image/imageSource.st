@@ -117,6 +117,10 @@ COMMENT ---------------------------------------------------
 COMMENT --- Package: GUI
 RAWCLASS MetaGuiPrimitives Class MetaObject theInstance
 RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
+
+CLASS LLVM Object
+CLASS LLVMTest Object field1
+
 COMMENT ---------- method bodies ------------
 COMMENT -----------Object-------------------
 METHOD MetaObject
@@ -594,6 +598,21 @@ runAll |reservedNames|
                         ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
+METHOD Test
+runAllInLLVM |reservedNames|
+    self init.
+    reservedNames <- Array with: #init.
+
+    Char newline print.
+    'Running ' print. self class printNl.
+
+    self class methods
+            do: [:m |
+                    ( reservedNames includes: (m name) )
+                        ifFalse: [ LLVM sendMessage: (m name) withArguments: (Array with: self) ]
+                ]
+!
+
 METHOD Test
 init
     ^nil
@@ -1085,9 +1104,6 @@ primes: n | cand count |
         Char newline print
 !
 
-CLASS LLVM Object
-CLASS LLVMTest Object field1
-
 METHOD MetaLLVM
 sendMessage: aSelector withArguments: anArguments
     "calling context will be taken from VM"
@@ -1230,6 +1246,16 @@ blockParam |x|
     [ x ] assertEq: 42.
 !
 
+METHOD LLVMTestStatements
+getClass |x metaClass|
+    x <- LLVM sendMessage: #class withArguments: (Array with: 42).
+    [ x ] assertEq: SmallInt withComment: '1'.
+    
+    metaClass <- Object class.
+    x <- LLVM sendMessage: #class withArguments: (Array with: metaClass).
+    [ x ] assertEq: Class withComment: '2'.
+!
+
 
 METHOD Undefined
 sortTest | list |
@@ -1251,6 +1277,12 @@ METHOD LLVMTestStatements
 testCat |x|
     x <- LLVM sendMessage: ('+' asSymbol) withArguments: (Array with: 'hello ' with: 'world').
     [ x ] assertEq: 'hello world'.
+!
+
+METHOD LLVMTestStatements
+classAsString |x|
+    x <- LLVM sendMessage: #asString withArguments: (Array with: SmallInt).
+    [ x ] assertEq: 'SmallInt'.
 !
 
 METHOD MetaLLVMTest
@@ -1278,8 +1310,11 @@ main    | command x1 x2 list ms1 ms2 |
         ContextTest      new runAll.
         PrimitiveTest    new runAll."
         
-        "LLVMTestStatements new runAll. All OK"
-        LLVM runAllFrom: StringTest.
+        LLVMTestStatements new runAll.
+        
+        "StringTest new runAllInLLVM.     "
+        "   both are almost equal. runAllFrom uses newProcessStart primitive  "
+        "LLVM runAllFrom: StringTest.     "
         
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
