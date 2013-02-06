@@ -64,6 +64,7 @@ struct TRuntimeAPI {
     llvm::Function* invokeBlock;
     llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
+    llvm::Function* runProcess;
 
     llvm::Function* bulkReplace;
     llvm::Function* performSmallInt;
@@ -89,8 +90,8 @@ struct TObjectTypes {
     llvm::StructType* symbolArray;
     llvm::StructType* globals;
     llvm::StructType* byteObject;
-
     llvm::StructType* blockReturn;
+    llvm::StructType* process;
 
 
     void initializeFromModule(llvm::Module* module) {
@@ -106,6 +107,7 @@ struct TObjectTypes {
         globals     = module->getTypeByName("struct.TGlobals");
         byteObject  = module->getTypeByName("struct.TByteObject");
         blockReturn = module->getTypeByName("struct.TBlockReturn");
+        process     = module->getTypeByName("struct.TProcess");
     }
 };
 
@@ -283,6 +285,7 @@ extern "C" {
                             TObject* sourceStartOffset);
 
     TObject*     performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject);
+    TObject*     runProcess(TProcess* process, TContext* callingContext);
 }
 
 class JITRuntime {
@@ -316,13 +319,15 @@ private:
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject* invokeBlock(TBlock* block, TContext* callingContext);
+    TObject* runProcess(TProcess* process, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
-
+    friend TObject*     runProcess(TProcess* process, TContext* callingContext);
+    
     struct TFunctionCacheEntry
     {
         TMethod* method;
