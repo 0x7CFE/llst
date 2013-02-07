@@ -765,7 +765,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
 }
 
 // TODO Refactor code to make this clean
-extern "C" { TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments); }
+extern "C" { TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass); }
 
 TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed) {
     TObjectArray& stack = *ec.currentContext->stack;
@@ -790,7 +790,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case 252: {
             TObjectArray* args = (TObjectArray*) stack[--ec.stackTop];
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
-            return sendMessage(ec.currentContext, selector, args);
+            return sendMessage(ec.currentContext, selector, args, 0);
         } break;
 
         case objectsAreEqual: { // 1

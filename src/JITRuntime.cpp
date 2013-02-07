@@ -253,14 +253,14 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     // First of all we need to find the actual method object
     TClass*  klass = 0;
 
-//     if (receiverClass) {
-//        outs() << "receiverClass = " << receiverClass << "\n";
-//         outs() << "name = " << receiverClass->name->toString() << "\n";
-//         klass = receiverClass;
-//     } else {
+     if (receiverClass) {
+        outs() << "receiverClass = " << receiverClass << "\n";
+        outs() << "name = " << receiverClass->name->toString() << "\n";
+        klass = receiverClass;
+     } else {
         TObject* receiver = arguments->getField(0);
         klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
-//     }
+     }
 
     // Searching for the actual method to be called
     hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, klass));
@@ -541,7 +541,6 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
 //     TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
 //     printf("\tself class = %p\n", klass);
 //     printf("\tself class name = '%s'\n", klass->name->toString().c_str());
-    
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
 }
 

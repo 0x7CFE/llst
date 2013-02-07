@@ -181,7 +181,9 @@ Function* MethodCompiler::createFunction(TMethod* method)
     );
 
     std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-    return cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType) );
+    Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
+    function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
+    return function;
 }
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
@@ -881,7 +883,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         argumentsArray,
 
         // default receiver class
-        ConstantPointerNull::get(ot.klass->getPointerTo())
+        ConstantPointerNull::get(ot.klass->getPointerTo()) //inttoptr 0 works fine too
     };
 
     // Now performing a message call
