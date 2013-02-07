@@ -881,7 +881,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         argumentsArray,
 
         // default receiver class
-        jit.builder->CreateIntToPtr(jit.builder->getInt32(0), ot.klass->getPointerTo())
+        ConstantPointerNull::get(ot.klass->getPointerTo())
     };
 
     // Now performing a message call
@@ -938,7 +938,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         arguments,        // message arguments
 
         // default receiver class
-        jit.builder->CreateIntToPtr(jit.builder->getInt32(0), ot.klass->getPointerTo())
+        ConstantPointerNull::get(ot.klass->getPointerTo())
     };
 
     Value* result = 0;
