@@ -1056,14 +1056,36 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             }
         } break;
 
-//         case SmalltalkVM::sendToSuper: {
-//             
-//         } break;
+        case SmalltalkVM::sendToSuper: {
+            Value* argsObject         = jit.popValue();
+            Value* arguments          = jit.builder->CreateBitCast(argsObject, ot.objectArray->getPointerTo());
+            
+            uint32_t literalIndex     = byteCodes[jit.bytePointer++];
+            Value* messageSelectorPtr = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(literalIndex));
+            Value* messageObject      = jit.builder->CreateLoad(messageSelectorPtr);
+            Value* messageSelector    = jit.builder->CreateBitCast(messageObject, ot.symbol->getPointerTo());
+            
+            Value* methodObject       = jit.builder->CreateLoad(jit.methodPtr);
+            Value* currentClassPtr    = jit.builder->CreateStructGEP(methodObject, 6);
+            Value* currentClass       = jit.builder->CreateLoad(currentClassPtr);
+            Value* parentClassPtr     = jit.builder->CreateStructGEP(currentClass, 2);
+            Value* parentClass        = jit.builder->CreateLoad(parentClassPtr);
+            
+            Value* sendMessageArgs[] = {
+                jit.context,     // calling context
+                messageSelector, // selector
+                arguments,       // message arguments
+                parentClass      // receiver class
+            };
+            
+            Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
+            jit.pushValue(result);
+        } break;
         
-        case SmalltalkVM::breakpoint:
-            // TODO
-            break;
-
+        //case SmalltalkVM::breakpoint:
+        // TODO
+        //break;
+        
         default:
             printf("JIT: unknown special opcode %d\n", opcode);
     }
@@ -1144,7 +1166,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         } break;
 
         case SmalltalkVM::startNewProcess: { // 6
-            Value* ticksUnused   = jit.popValue();
+            /* ticks. unused */    jit.popValue();
             Value* processObject = jit.popValue();
             //TODO pushProcess ?
             Value* process       = jit.builder->CreateBitCast(processObject, ot.process->getPointerTo());
