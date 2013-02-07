@@ -252,24 +252,48 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 {
     // First of all we need to find the actual method object
     TClass*  klass = 0;
-
-     if (receiverClass) {
+    
+    if (receiverClass) {
         outs() << "receiverClass = " << receiverClass << "\n";
         outs() << "name = " << receiverClass->name->toString() << "\n";
         klass = receiverClass;
-     } else {
+    } else {
         TObject* receiver = arguments->getField(0);
         klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
-     }
-
+    }
+    
     // Searching for the actual method to be called
     hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, klass));
-    // TODO #doesNotUnderstand:
-
-    if (! method.rawptr()) {
-        //std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-        outs() << "Method not found: " << message->toString() << "\n";
-        exit(1);
+    
+    // Checking whether we found a method
+    if (method == 0) {
+        // Oops. Method was not found. In this case we should
+        // send #doesNotUnderstand: message to the receiver
+        
+        // Looking up the #doesNotUnderstand: method:
+        method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, klass));
+        if (method == 0) {
+            // Something goes really wrong.
+            // We could not continue the execution
+            errs() << "\nCould not locate #doesNotUnderstand:\n";
+            exit(1);
+        }
+        
+        // Protecting the selector pointer because it may be invalidated later
+        hptr<TSymbol> failedSelector = m_softVM->newPointer(message);
+        
+        // We're replacing the original call arguments with custom one
+        hptr<TObjectArray> errorArguments = m_softVM->newObject<TObjectArray>(2);
+        
+        // Filling in the failed call context information
+        errorArguments[0] = arguments->getField(0); // receiver object
+        errorArguments[1] = failedSelector;      // message selector that failed
+        
+        // Replacing the arguments with newly created one
+        arguments = errorArguments; //TODO is it okay? I think its not.
+        
+        // Continuing the execution just as if #doesNotUnderstand:
+        // was the actual selector that we wanted to call
     }
     
     // Searching for the jit compiled function
@@ -285,17 +309,12 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         if (! methodFunction) {
             // Compiling function and storing it to the table for further use
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
-
-            //llvm::Function* asNumberBlock = m_JITModule->getFunction("String>>asNumber@4");
-            //outs() << *asNumberBlock;
-
+            
             verifyModule(*m_JITModule);
             // Running the optimization passes on a function
             //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
             //m_functionPassManager->run(*methodFunction);
-            
-//             outs() << *methodFunction;
         }
 
         //outs() << *m_JITModule;
