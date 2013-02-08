@@ -342,7 +342,7 @@ private:
         TBlockFunction function;
     };
     
-    static const unsigned int LOOKUP_CACHE_SIZE = 1024;
+    static const unsigned int LOOKUP_CACHE_SIZE = 512;
     TFunctionCacheEntry      m_functionLookupCache[LOOKUP_CACHE_SIZE];
     TBlockFunctionCacheEntry m_blockFunctionLookupCache[LOOKUP_CACHE_SIZE];
     

@@ -170,7 +170,7 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
 
 JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method); // ^ 0xDEADBEEF;
+    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
     if (entry.method == method) {
@@ -198,7 +198,7 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
 
 JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method); // ^ 0xDEADBEEF;
+    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
     entry.method   = method;
@@ -242,9 +242,15 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 exit(1);
             }
             
-            verifyModule(*m_JITModule);
+            if (verifyModule(*m_JITModule)) {
+                outs() << "Module verification failed.\n";
+                //exit(1);
+            }
+            
+            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            
             // Running the optimization passes on a function
-            //m_functionPassManager->run(*blockFunction);
+            m_functionPassManager->run(*blockFunction);
             
 //             outs() << *blockFunction;
         }
@@ -333,11 +339,15 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Compiling function and storing it to the table for further use
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
             
-            verifyModule(*m_JITModule);
+            if (verifyModule(*m_JITModule)) {
+                outs() << "Module verification failed.\n";
+                exit(1);
+            }
+            
             // Running the optimization passes on a function
-            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
-            //m_functionPassManager->run(*methodFunction);
+            m_functionPassManager->run(*methodFunction);
         }
 
         //outs() << *m_JITModule;
