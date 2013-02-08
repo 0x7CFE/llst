@@ -50,6 +50,28 @@ using namespace llvm;
 
 JITRuntime* JITRuntime::s_instance = 0;
 
+void JITRuntime::printStat()
+{
+    float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    float blockHitRatio = (float) 100 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
+    
+    printf(
+        "JIT Runtime stat:\n"
+        "\tMessages dispatched: %12d\n"
+        "\tObjects  allocated:  %12d\n"
+        "\tBlocks   invoked:    %12d\n"
+        "\tBlock    cache hits: %12d  misses %10d ratio %6.2f %%\n"
+        "\tMessage  cache hits: %12d  misses %10d ratio %6.2f %%\n",
+            
+        m_messagesDispatched,
+        m_objectsAllocated,
+        m_blocksInvoked,
+        m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
+        m_cacheHits, m_cacheMisses, hitRatio
+    );
+}
+
+
 void JITRuntime::initialize(SmalltalkVM* softVM)
 {
     s_instance = this;
@@ -102,15 +124,16 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_runtimeAPI, m_exceptionAPI);
 
-    // Initializing stack
+    // Initializing caches
     memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
     memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
-}
-
-void JITRuntime::dumpJIT()
-{
-    verifyModule(*m_JITModule);
-    m_JITModule->dump();
+    m_blockCacheHits = 0;
+    m_blockCacheMisses = 0;
+    m_cacheHits = 0;
+    m_cacheMisses = 0;
+    m_messagesDispatched = 0;
+    m_blocksInvoked = 0;
+    m_objectsAllocated = 0;
 }
 
 JITRuntime::~JITRuntime() {
@@ -165,10 +188,10 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
     TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
     
     if (entry.containerMethod == containerMethod && entry.blockOffset == blockOffset) {
-        m_cacheHits++;
+        m_blockCacheHits++;
         return entry.function;
     } else {
-        m_cacheMisses++;
+        m_blockCacheMisses++;
         return 0;
     }
 }
@@ -538,12 +561,14 @@ extern "C" {
 TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
 {
 //     printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
+    JITRuntime::Instance()->m_objectsAllocated++;
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
 {
 //     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
+    JITRuntime::Instance()->m_objectsAllocated++;
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
@@ -560,6 +585,7 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
 //     TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
 //     printf("\tself class = %p\n", klass);
 //     printf("\tself class name = '%s'\n", klass->name->toString().c_str());
+    JITRuntime::Instance()->m_messagesDispatched++;
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
 }
 
@@ -576,6 +602,7 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
 TObject* invokeBlock(TBlock* block, TContext* callingContext)
 {
 //     printf("invokeBlock %p, %p\n", block, callingContext);
+    JITRuntime::Instance()->m_blocksInvoked++;
     return JITRuntime::Instance()->invokeBlock(block, callingContext);
 }
 
