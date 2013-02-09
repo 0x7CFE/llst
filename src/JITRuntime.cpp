@@ -1,7 +1,7 @@
 /*
-*    main.cpp
+*    JITRuntime.cpp
 *
-*    Program entry point
+*    LLST Runtime environment
 *
 *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
 *
@@ -43,6 +43,9 @@
 #include <llvm/Target/TargetData.h>
 #include <llvm/LinkAllPasses.h>
 
+#include <llvm/CodeGen/GCs.h>
+
+
 #include <iostream>
 #include <sstream>
 
@@ -79,7 +82,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     // Initializing LLVM subsystem
     InitializeNativeTarget();
-
+    llvm::linkShadowStackGC();
+    
     LLVMContext& llvmContext = getGlobalContext();
 
     // Initializing types module
@@ -101,7 +105,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     TargetOptions Opts;
     Opts.JITExceptionHandling = true;
-
+    Opts.JITEmitDebugInfo = true;
+    
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule)
                             .setEngineKind(EngineKind::JIT)
@@ -218,7 +223,6 @@ JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TMethod* contai
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
-    // TODO Fast 1-way lookup cache
     const uint16_t blockOffset = getIntegerValue(block->bytePointer);
     
     TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
@@ -247,12 +251,12 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 //exit(1);
             }
             
-            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
             
             // Running the optimization passes on a function
-            m_functionPassManager->run(*blockFunction);
+            //m_functionPassManager->run(*blockFunction);
             
-//             outs() << *blockFunction;
+            outs() << *blockFunction;
         }
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
@@ -326,8 +330,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
     
     // Searching for the jit compiled function
-    // TODO Fast 1-way lookup cache
-    
     TMethodFunction compiledMethodFunction = lookupFunctionInCache(method); 
     
     if (! compiledMethodFunction) {
@@ -343,16 +345,16 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 outs() << "Module verification failed.\n";
                 exit(1);
             }
+
+            outs() << *methodFunction;
             
             // Running the optimization passes on a function
-            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
-            m_functionPassManager->run(*methodFunction);
+            //m_functionPassManager->run(*methodFunction);
         }
 
-        //outs() << *m_JITModule;
         // Calling the method and returning the result
-        //outs() << "Acquiring function address for " << functionName << " ...\n";
         compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
         updateFunctionCache(method, compiledMethodFunction);
     }
@@ -376,7 +378,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     newContext->method            = method;
     newContext->previousContext   = previousContext;
 
-	//outs() << "Calling compiled method " << functionName << " ...\n";
 	TObject* result = compiledMethodFunction(newContext);
 
 //     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);

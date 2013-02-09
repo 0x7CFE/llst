@@ -166,45 +166,7 @@ define %struct.TSymbol* @"TSymbolArray::getField(int)"(%struct.TSymbolArray* %th
 }
 
 declare void @llvm.memcpy.p0i8.p0i8.i32(i8* %dest, i8* %src, i32 %size, i32 %align, i1 %volatile)
-
-; define void @"MethodCompilerExample"(%struct.TContext* %context) {
-; entry:
-;     %argObjectPtr    = getelementptr inbounds %struct.TContext* %context, i32 0, i32 2
-;     %argsObjectArray = load %struct.TObjectArray** %argObjectPtr, align 4
-;     %argsObject      = bitcast %struct.TObjectArray* %argsObjectArray to %struct.TObject*
-;     %args            = call %struct.TObject** @"TObject::getFields()"(%struct.TObject* %argsObject)
-;
-;     %temps = getelementptr %struct.TContext* %context, i32 3, i32 0, i32 2, i32 0
-;
-;     %selfObjectPtr = getelementptr %struct.TObject** %args, i32 0
-;     %selfObject    = load %struct.TObject** %selfObjectPtr
-;     %self          = call %struct.TObject** @"TObject::getFields()"(%struct.TObject* %selfObject)
-;
-;     ; push argument 3
-;     %ptr.0  = getelementptr %struct.TObject** %args, i32 3
-;     %load.0 = load %struct.TObject** %ptr.0
-;     ; we remember stack[0] = instruction %load.0
-;
-;     ; assign instance 5
-;     %ptr.1 = getelementptr %struct.TObject** %self, i32 5 ; FIXME bad gep
-;     ; and now we take the top instruction from our stack (stack[0] = load.0)
-;     store %struct.TObject* %load.0, %struct.TObject** %ptr.1
-;
-;     ;push instance 4
-;     %ptr.2   = getelementptr %struct.TObject** %self, i32 4 ; FIXME
-;     %load.2 = load %struct.TObject** %ptr.2
-;     ; we remember stack[1] = instruction %load.2
-;
-;     ; assign temporary 3
-;     %ptr.3 = getelementptr %struct.TObject** %temps, i32 3
-;     store %struct.TObject* %load.2, %struct.TObject** %ptr.3
-;
-;     ret void
-; }
-
-;define i32 @main() { ; FIXME remove from release
-;    ret i32 0
-;}
+declare void @llvm.gcroot(i8** %ptrloc, i8* %metadata)
 
 ; memory management functions
 ;declare %struct.TObject*     @newOrdinaryFunction(%struct.TClass, i32)

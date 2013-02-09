@@ -174,8 +174,9 @@ private:
         TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
         llvm::Value*        context;
-        llvm::Value*        blockContext;
+        //llvm::Value*        blockContext;
 
+        llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
 
@@ -189,16 +190,16 @@ private:
         // will be linked together with effect of instanceVariables[2] = temporaries[1]
 
         MethodCompiler* compiler; // link to outer class for variable access
-        bool hasValue(); // { return true; } // FIXME !valueStack.empty(); }
-        void pushValue(llvm::Value* value); // { valueStack.push_back(value); }
-        llvm::Value* lastValue(); // { return valueStack.back(); }
+        bool hasValue();
+        void pushValue(llvm::Value* value); 
+        llvm::Value* lastValue(); 
         llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0);
 
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
             bytePointer(0), function(0), methodPtr(0), arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
-            exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false), compiler(compiler)
+            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler)
         {
             byteCount = method->byteCodes->getSize();
             //valueStack.reserve(method->stackSize);
@@ -220,6 +221,7 @@ private:
     TRuntimeAPI    m_runtimeAPI;
     TExceptionAPI  m_exceptionAPI;
 
+    llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);

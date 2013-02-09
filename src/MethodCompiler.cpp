@@ -113,13 +113,6 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
                 BasicBlock* referer = *blockContext.referers.begin();
                 Value* value = popValue(referer);
                 return value;
-                
-//                 TBasicBlockContext& refererContext = basicBlockContexts[referer];
-//                 TValueStack& refererStack = refererContext.valueStack;
-//                 
-//                 Value* value = refererStack.back();
-//                 refererStack.pop_back();
-//                 return value;
             } break;
             
             default: {
@@ -149,9 +142,6 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
                     
 //                     TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
 //                     TValueStack& predcessorStack = refererContext.valueStack;
-//                     
-//                     // FIXME 1 If predcessor block has an empty value list
-//                     //         continue with it's referrers (recursive phi?)
 //                     
 //                     // FIXME 2 non filled block will not yet have the value
 //                     //         we need to store them to a special post processing list
@@ -183,14 +173,60 @@ Function* MethodCompiler::createFunction(TMethod* method)
     std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
     Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
+    function->setGC("shadow-stack");
     return function;
+}
+
+Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
+{
+    // Storing current edit location
+    BasicBlock* insertBlock = jit.builder->GetInsertBlock();
+    BasicBlock::iterator insertPoint = jit.builder->GetInsertPoint();
+
+    // Switching to the preamble
+    jit.builder->SetInsertPoint(jit.preamble, jit.preamble->begin());
+
+    // Allocating the object holder
+    Value* holder = jit.builder->CreateAlloca(type, 0, "holder.");
+
+    // Registering holder as a GC root
+    Value* stackRoot = jit.builder->CreateBitCast(holder, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
+    Function* gcRootFunction = m_TypeModule->getFunction("llvm.gcroot");
+    jit.builder->CreateCall2(gcRootFunction, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
+
+    // Returning to the original edit location
+    jit.builder->SetInsertPoint(insertBlock, insertPoint);
+
+    return holder;
 }
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 {
-    if (isBlock)
-        jit.context = jit.builder->CreateBitCast(jit.blockContext, ot.context->getPointerTo());
+    Value* context = 0;
+    
+    if (isBlock) {
+        // This is a block function
+        context = (Value*) (jit.function->arg_begin());
+        context->setName("context");
+    } else {
+        // This is a regular function
+        Value* blockContext = (Value*) (jit.function->arg_begin());
+        blockContext->setName("blockContext");
 
+        context = jit.builder->CreateBitCast(blockContext, ot.context->getPointerTo());
+    }
+    context->setName("contextParameter");
+    
+    // Allocating context holder
+    Value* contextHolder = allocateRoot(jit, ot.context->getPointerTo());
+    
+    // Storing value to the holder to protect the pointer
+    jit.builder->CreateStore(context, contextHolder);
+
+    // Loading it back as a value which will then be used 
+    jit.context = jit.builder->CreateLoad(contextHolder);
+    jit.context->setName("context");
+    
     jit.methodPtr = jit.builder->CreateStructGEP(jit.context, 1, "method");
 
     Function* objectGetFields = m_TypeModule->getFunction("TObject::getFields()");
@@ -375,15 +411,15 @@ Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContex
     jit.function = createFunction(method);
 
     // First argument of every function is a pointer to TContext object
-    jit.context = (Value*) (jit.function->arg_begin());
-    jit.context->setName("context");
+    //jit.context = (Value*) (jit.function->arg_begin());
+    //jit.context->setName("context");
 
     // Creating the preamble basic block and inserting it into the function
     // It will contain basic initialization code (args, temps and so on)
-    BasicBlock* preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
+    jit.preamble = BasicBlock::Create(m_JITModule->getContext(), "preamble", jit.function);
 
     // Creating the instruction builder
-    jit.builder = new IRBuilder<>(preamble);
+    jit.builder = new IRBuilder<>(jit.preamble);
 
     // Checking whether method contains inline blocks that has blockReturn instruction.
     // If this is true we need to put an exception handler into the method and treat
@@ -401,7 +437,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContex
 
     // Switching builder context to the body's basic block from the preamble
     BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
-    jit.builder->SetInsertPoint(preamble);
+    jit.builder->SetInsertPoint(jit.preamble);
     jit.builder->CreateBr(body);
 
     // Resetting the builder to the body
@@ -709,12 +745,12 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     m_blockFunctions[blockFunctionName] = blockContext.function;
 
     // First argument of every block function is a pointer to TBlock object
-    blockContext.blockContext = (Value*) (blockContext.function->arg_begin());
-    blockContext.blockContext->setName("blockContext");
+    //blockContext.blockContext = (Value*) (blockContext.function->arg_begin());
+    //blockContext.blockContext->setName("blockContext");
 
     // Creating the basic block and inserting it into the function
-    BasicBlock* blockPreamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
-    blockContext.builder = new IRBuilder<>(blockPreamble);
+    blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
+    blockContext.builder = new IRBuilder<>(blockContext.preamble);
     writePreamble(blockContext, /*isBlock*/ true);
     scanForBranches(blockContext, newBytePointer - jit.bytePointer);
 
@@ -990,7 +1026,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* value = jit.popValue();
 
                 // Loading the target context information
-                Value* creatingContextPtr = jit.builder->CreateStructGEP(jit.blockContext, 2);
+                Value* blockContext = jit.builder->CreateBitCast(jit.context, ot.block->getPointerTo());
+                Value* creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception
