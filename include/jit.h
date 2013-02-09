@@ -342,12 +342,17 @@ private:
         TBlockFunction function;
     };
     
-    static const unsigned int LOOKUP_CACHE_SIZE = 1024;
+    static const unsigned int LOOKUP_CACHE_SIZE = 512;
     TFunctionCacheEntry      m_functionLookupCache[LOOKUP_CACHE_SIZE];
     TBlockFunctionCacheEntry m_blockFunctionLookupCache[LOOKUP_CACHE_SIZE];
     
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
+    uint32_t m_blockCacheHits;
+    uint32_t m_blockCacheMisses;
+    uint32_t m_messagesDispatched;
+    uint32_t m_blocksInvoked;
+    uint32_t m_objectsAllocated;
     
     TMethodFunction lookupFunctionInCache(TMethod* method);
     TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
@@ -368,8 +373,8 @@ public:
     SmalltalkVM* getVM() { return m_softVM; }
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
 
-    void dumpJIT();
-
+    void printStat();
+    
     void initialize(SmalltalkVM* softVM);
     ~JITRuntime();
 };

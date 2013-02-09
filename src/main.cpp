@@ -139,6 +139,7 @@ int main(int argc, char **argv) {
            info.collectionsCount, averageAllocs, (uint32_t) info.totalCollectionDelay);
     
     vm.printVMStat();
+    runtime.printStat();
 
     return 0;
 }
