@@ -204,12 +204,12 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 {
     Value* context = 0;
     
-    if (isBlock) {
-        // This is a block function
+    if (! isBlock) {
+        // This is a regular function
         context = (Value*) (jit.function->arg_begin());
         context->setName("context");
     } else {
-        // This is a regular function
+        // This is a block function
         Value* blockContext = (Value*) (jit.function->arg_begin());
         blockContext->setName("blockContext");
 
@@ -503,7 +503,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-//         printOpcode(jit.instruction);
+         printOpcode(jit.instruction);
 
 //         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
