@@ -1292,7 +1292,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             primitiveResult = result;
         } break;
         
-        case SmalltalkVM::throwError: {
+        case SmalltalkVM::throwError: { //19
+            //19 primitive is very special. It raises exception, no code is reachable
+            //after calling cxa_throw. But! Someone may add Smalltalk code after <19>
+            //Thats why we have to create unconditional br to 'primitiveFailed'
+            //to catch any generated code into that BB
+            
             int errCode = 0; //TODO we may extend it in the future
             
             Value* slotI8Ptr  = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, jit.builder->getInt32(4));
@@ -1306,10 +1311,10 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 jit.builder->CreateBitCast(typeId, jit.builder->getInt8PtrTy()),
                 ConstantPointerNull::get(jit.builder->getInt8PtrTy())
             };
-            jit.builder->CreateCall(m_exceptionAPI.cxa_throw, throwArgs);
-            jit.builder->CreateUnreachable();
             
-            primitiveFailed->eraseFromParent();
+            jit.builder->CreateCall(m_exceptionAPI.cxa_throw, throwArgs);
+            jit.builder->CreateBr(primitiveFailed);
+            jit.builder->SetInsertPoint(primitiveFailed);
             return;
         } break;
         
