@@ -1491,12 +1491,31 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                     Value* intResult = jit.builder->CreateAnd(leftOperand, rightOperand);
                     primitiveResult  = jit.builder->CreateCall(newInteger, intResult);
                 } break;
-                //case SmalltalkVM::smallIntBitShift: { //TODO
-                //} break;
-                default: {
-                    Value* arguments[] = { jit.builder->getInt8(opcode), leftOperand, rightOperand };
-                    primitiveResult    = jit.builder->CreateCall(m_runtimeAPI.performSmallInt, arguments, "result.");
-                }
+                case SmalltalkVM::smallIntBitShift: {
+                    BasicBlock* shiftRightBB  = BasicBlock::Create(m_JITModule->getContext(), ">>", jit.function);
+                    BasicBlock* shiftLeftBB   = BasicBlock::Create(m_JITModule->getContext(), "<<", jit.function);
+                    BasicBlock* shiftResultBB = BasicBlock::Create(m_JITModule->getContext(), "shiftResult", jit.function);
+                    
+                    Value* rightIsNeg = jit.builder->CreateICmpSLT(rightOperand, jit.builder->getInt32(0));
+                    jit.builder->CreateCondBr(rightIsNeg, shiftRightBB, shiftLeftBB);
+                    
+                    jit.builder->SetInsertPoint(shiftRightBB);
+                    Value* rightOperandNeg  = jit.builder->CreateNeg(rightOperand);
+                    Value* shiftRightResult = jit.builder->CreateAShr(leftOperand, rightOperandNeg);
+                    jit.builder->CreateBr(shiftResultBB);
+                    
+                    jit.builder->SetInsertPoint(shiftLeftBB);
+                    Value* shiftLeftResult = jit.builder->CreateShl(leftOperand, rightOperand);
+                    Value* shiftLeftFailed = jit.builder->CreateICmpSGT(leftOperand, shiftLeftResult);
+                    jit.builder->CreateCondBr(shiftLeftFailed, primitiveFailed, shiftResultBB);
+                    
+                    jit.builder->SetInsertPoint(shiftResultBB);
+                    PHINode* phi = jit.builder->CreatePHI(jit.builder->getInt32Ty(), 2);
+                    phi->addIncoming(shiftRightResult, shiftRightBB);
+                    phi->addIncoming(shiftLeftResult, shiftLeftBB);
+                    
+                    primitiveResult = jit.builder->CreateCall(newInteger, phi);
+                } break;
             }
         } break;
 

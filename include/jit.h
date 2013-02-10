@@ -66,7 +66,6 @@ struct TRuntimeAPI {
     llvm::Function* checkRoot;
 
     llvm::Function* bulkReplace;
-    llvm::Function* performSmallInt;
 };
 
 struct TExceptionAPI {
@@ -282,8 +281,6 @@ extern "C" {
                             TObject* destinationStopOffset,
                             TObject* source,
                             TObject* sourceStartOffset);
-
-    TObject*     performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject);
 }
 
 class JITRuntime {
