@@ -790,7 +790,11 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case 252: {
             TObjectArray* args = (TObjectArray*) stack[--ec.stackTop];
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
-            return sendMessage(ec.currentContext, selector, args, 0);
+            try {
+                return sendMessage(ec.currentContext, selector, args, 0);
+            } catch(...) { //TODO ........
+                failed = true;
+            }
         } break;
 
         case objectsAreEqual: { // 1

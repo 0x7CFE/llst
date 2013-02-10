@@ -598,20 +598,6 @@ runAll |reservedNames|
                         ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
-METHOD Test
-runAllInLLVM |reservedNames|
-    self init.
-    reservedNames <- Array with: #init.
-
-    Char newline print.
-    'Running ' print. self class printNl.
-
-    self class methods
-            do: [:m |
-                    ( reservedNames includes: (m name) )
-                        ifFalse: [ LLVM sendMessage: (m name) withArguments: (Array with: self) ]
-                ]
-!
 
 METHOD Test
 init
@@ -1345,9 +1331,7 @@ main    | command x1 x2 list ms1 ms2 selector args |
         '1 Sorted in ms: ' print. ms1 printNl.
         '2 Sorted in ms: ' print. ms2 printNl.
         
-        
-        "   both are almost equal. runAllFrom uses newProcessStart primitive  "
-        "LLVM runAllFrom: StringTest.     "
+        "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
         
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]

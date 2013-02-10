@@ -64,7 +64,6 @@ struct TRuntimeAPI {
     llvm::Function* invokeBlock;
     llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
-    llvm::Function* runProcess;
 
     llvm::Function* bulkReplace;
     llvm::Function* performSmallInt;
@@ -75,6 +74,8 @@ struct TExceptionAPI {
     llvm::Function*    cxa_begin_catch;
     llvm::Function*    cxa_end_catch;
     llvm::Function*    cxa_rethrow;
+    llvm::Function*    cxa_allocate_exception;
+    llvm::Function*    cxa_throw;
     llvm::GlobalValue* blockReturnType;
 };
 
@@ -136,7 +137,6 @@ struct TJITGlobals {
 class MethodCompiler {
 private:
     llvm::Module* m_JITModule;
-    llvm::Module* m_TypeModule;
 
     // Some useful type aliases
     typedef std::list<llvm::Value*> TValueStack;
@@ -248,11 +248,10 @@ public:
 
     MethodCompiler(
         llvm::Module* JITModule,
-        llvm::Module* TypeModule,
         TRuntimeAPI   runtimeApi,
         TExceptionAPI exceptionApi
     )
-        : m_JITModule(JITModule), m_TypeModule(TypeModule),
+        : m_JITModule(JITModule),
         m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi)
     {
         /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
@@ -263,7 +262,7 @@ public:
             exit(1);
         }
         */
-        ot.initializeFromModule(m_TypeModule);
+        ot.initializeFromModule(JITModule);
         m_globals.initializeFromModule(m_JITModule);
     }
 };
@@ -285,7 +284,6 @@ extern "C" {
                             TObject* sourceStartOffset);
 
     TObject*     performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject);
-    TObject*     runProcess(TProcess* process, TContext* callingContext);
 }
 
 class JITRuntime {
@@ -302,7 +300,6 @@ private:
     MethodCompiler* m_methodCompiler;
 
     llvm::Module* m_JITModule;
-    llvm::Module* m_TypeModule;
 
     //typedef std::map<std::string, llvm::Function*> TFunctionMap;
     //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
@@ -319,14 +316,12 @@ private:
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject* invokeBlock(TBlock* block, TContext* callingContext);
-    TObject* runProcess(TProcess* process, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
-    friend TObject*     runProcess(TProcess* process, TContext* callingContext);
     
     struct TFunctionCacheEntry
     {
@@ -365,6 +360,7 @@ private:
     //uses ot types. dont forget to init it before calling this method
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
+    void createExecuteProcessFunction();
 
 public:
     static JITRuntime* Instance() { return s_instance; }
