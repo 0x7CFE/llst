@@ -224,7 +224,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.builder->CreateStore(context, contextHolder);
 
     // Loading it back as a value which will then be used 
-    jit.context = jit.builder->CreateLoad(contextHolder);
+    jit.context = jit.builder->CreateLoad(contextHolder, true);
     jit.context->setName("context");
     
     jit.methodPtr = jit.builder->CreateStructGEP(jit.context, 1, "method");

@@ -112,6 +112,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
                             .setEngineKind(EngineKind::JIT)
                             .setErrorStr(&error)
                             .setTargetOptions(Opts)
+                            .setOptLevel(CodeGenOpt::Aggressive)
                             .create();
                             
     if (!m_executionEngine) {
@@ -246,21 +247,21 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 exit(1);
             }
             
-            if (verifyModule(*m_JITModule)) {
-                outs() << "Module verification failed.\n";
-                //exit(1);
-            }
+//             if (verifyModule(*m_JITModule)) {
+//                 outs() << "Module verification failed.\n";
+//                 //exit(1);
+//             }
             
-            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
             
             // Running the optimization passes on a function
-            //m_functionPassManager->run(*blockFunction);
+            m_functionPassManager->run(*blockFunction);
             
-            outs() << *blockFunction;
         }
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
         updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
+        outs() << *blockFunction;
     }
     
     block->previousContext = callingContext->previousContext;
@@ -341,17 +342,17 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Compiling function and storing it to the table for further use
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
             
-            if (verifyModule(*m_JITModule)) {
-                outs() << "Module verification failed.\n";
-                exit(1);
-            }
+//             if (verifyModule(*m_JITModule)) {
+//                 outs() << "Module verification failed.\n";
+//                 exit(1);
+//             }
 
-            outs() << *methodFunction;
             
             // Running the optimization passes on a function
-            //m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
-            //m_functionPassManager->run(*methodFunction);
+            m_functionPassManager->run(*methodFunction);
+            outs() << *methodFunction;
         }
 
         // Calling the method and returning the result
