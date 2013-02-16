@@ -86,18 +86,14 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     LLVMContext& llvmContext = getGlobalContext();
 
-    // Initializing types module
+    // Initializing JIT module.
+    // All JIT functions will be created here
     SMDiagnostic Err;
-    m_TypeModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
-    if (!m_TypeModule) {
+    m_JITModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
+    if (!m_JITModule) {
         Err.print("JITRuntime.cpp", errs());
         exit(1);
     }
-
-    // Initializing JIT module.
-    // All JIT functions will be created here
-    // m_JITModule = new Module("jit", llvmContext);
-    m_JITModule = m_TypeModule;
 
     // Providing the memory management interface to the JIT module
     // FIXME Think about interfacing the MemoryManager directly
@@ -120,15 +116,16 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         exit(1);
     }
 
-    ot.initializeFromModule(m_TypeModule);
+    ot.initializeFromModule(m_JITModule);
 
     initializeGlobals();
     initializePassManager();
     initializeRuntimeAPI();
     initializeExceptionAPI();
+    createExecuteProcessFunction();
 
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler(m_JITModule, m_TypeModule, m_runtimeAPI, m_exceptionAPI);
+    m_methodCompiler = new MethodCompiler(m_JITModule, m_runtimeAPI, m_exceptionAPI);
 
     // Initializing caches
     memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
@@ -271,14 +268,6 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     //     printf("Block function result: %p\n", result);
     //     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
     
-    return result;
-}
-
-TObject* JITRuntime::runProcess(TProcess* process, TContext* callingContext)
-{
-    TSymbol* message        = process->context->method->name;
-    TObjectArray* arguments = process->context->arguments;
-    TObject* result         = sendMessage(callingContext, message, arguments, 0);
     return result;
 }
 
@@ -517,20 +506,6 @@ void JITRuntime::initializeRuntimeAPI() {
     };
     FunctionType* bulkReplaceType = FunctionType::get(Type::getInt1Ty(llvmContext), bulkReplaceParams, false);
 
-    Type* performSmallIntParams[] = {
-        Type::getInt8Ty(llvmContext), // opcode
-        objectType,        // leftOperand
-        objectType,        // rightOperand
-    };
-    FunctionType* performSmallIntType = FunctionType::get(objectType, performSmallIntParams, false);
-
-    Type* runProcessParams[] = {
-        ot.process->getPointerTo(),
-        contextType // callingContext
-    };
-    FunctionType* runProcessType = FunctionType::get(objectType, runProcessParams, false);
-
-
     // Creating function references
     m_runtimeAPI.newOrdinaryObject  = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
@@ -540,8 +515,6 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     m_runtimeAPI.checkRoot          = Function::Create(checkRootType, Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
-    m_runtimeAPI.performSmallInt    = Function::Create(performSmallIntType, Function::ExternalLinkage, "performSmallInt", m_JITModule);
-    m_runtimeAPI.runProcess         = Function::Create(runProcessType, Function::ExternalLinkage, "runProcess", m_JITModule);
 
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -552,20 +525,73 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
-    m_executionEngine->addGlobalMapping(m_runtimeAPI.performSmallInt, reinterpret_cast<void*>(& ::performSmallInt));
-    m_executionEngine->addGlobalMapping(m_runtimeAPI.runProcess, reinterpret_cast<void*>(& ::runProcess));
 }
 
 void JITRuntime::initializeExceptionAPI() {
-    LLVMContext& llvmContext = getGlobalContext();
-
-    m_exceptionAPI.gxx_personality = Function::Create(FunctionType::get(Type::getInt32Ty(llvmContext), true), Function::ExternalLinkage, "__gxx_personality_v0", m_JITModule);
-    m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Type::getInt8PtrTy(llvmContext), Type::getInt8PtrTy(llvmContext), false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
-    m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
-    m_exceptionAPI.cxa_rethrow     = Function::Create(FunctionType::get(Type::getVoidTy(llvmContext), false), Function::ExternalLinkage, "__cxa_rethrow", m_JITModule);
+    LLVMContext& Context = getGlobalContext();
+    Type* Int32Ty        = Type::getInt32Ty(Context);
+    Type* Int8PtrTy      = Type::getInt8PtrTy(Context);
+    Type* VoidTy         = Type::getVoidTy(Context);
+    Type* throwParams[] = { Int8PtrTy, Int8PtrTy, Int8PtrTy };
     
-    m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Type::getInt8Ty(llvmContext)));
+    m_exceptionAPI.gxx_personality = Function::Create(FunctionType::get(Int32Ty, true), Function::ExternalLinkage, "__gxx_personality_v0", m_JITModule);
+    m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Int8PtrTy, Int8PtrTy, false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
+    m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
+    m_exceptionAPI.cxa_rethrow     = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_rethrow", m_JITModule);
+    m_exceptionAPI.cxa_allocate_exception = Function::Create(FunctionType::get(Int8PtrTy, Int32Ty, false), Function::ExternalLinkage, "__cxa_allocate_exception", m_JITModule);
+    m_exceptionAPI.cxa_throw       = Function::Create(FunctionType::get(VoidTy, throwParams, false), Function::ExternalLinkage, "__cxa_throw", m_JITModule);
+    
+    m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Int8PtrTy));
     m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, reinterpret_cast<void*>( TBlockReturn::getBlockReturnType() ));
+}
+
+void JITRuntime::createExecuteProcessFunction() {
+    Type* executeProcessParams[] = {
+        ot.process->getPointerTo()
+    };
+    FunctionType* executeProcessType = FunctionType::get(Type::getInt32Ty(m_JITModule->getContext()), executeProcessParams, false);
+    
+    Function* executeProcess = cast<Function>( m_JITModule->getOrInsertFunction("executeProcess", executeProcessType));
+    BasicBlock* entry = BasicBlock::Create(m_JITModule->getContext(), "", executeProcess);
+    
+    IRBuilder<> builder(entry);
+    
+    Value* process     = (Value*) (executeProcess->arg_begin());
+    Value* contextPtr  = builder.CreateStructGEP(process, 1);
+    Value* context     = builder.CreateLoad(contextPtr);
+    Value* argsPtr     = builder.CreateStructGEP(context, 2);
+    Value* args        = builder.CreateLoad(argsPtr);
+    Value* methodPtr   = builder.CreateStructGEP(context, 1);
+    Value* method      = builder.CreateLoad(methodPtr);
+    Value* selectorPtr = builder.CreateStructGEP(method, 1);
+    Value* selector    = builder.CreateLoad(selectorPtr);
+    
+    BasicBlock* OK   = BasicBlock::Create(m_JITModule->getContext(), "OK", executeProcess);
+    BasicBlock* Fail = BasicBlock::Create(m_JITModule->getContext(), "FAIL", executeProcess);
+    
+    Value* sendMessageArgs[] = {
+        context,
+        selector,
+        args,
+        ConstantPointerNull::get(ot.klass->getPointerTo()) 
+    };
+    
+    builder.CreateInvoke(m_runtimeAPI.sendMessage, OK, Fail, sendMessageArgs);
+    
+    builder.SetInsertPoint(OK);
+    builder.CreateRet( builder.getInt32(SmalltalkVM::returnReturned) );
+    
+    builder.SetInsertPoint(Fail);
+    Value* gxx_personality_i8 = builder.CreateBitCast(m_exceptionAPI.gxx_personality, builder.getInt8PtrTy());
+    Type* caughtType = StructType::get(builder.getInt8PtrTy(), builder.getInt32Ty(), NULL);
+    
+    LandingPadInst* caughtResult = builder.CreateLandingPad(caughtType, gxx_personality_i8, 1);
+    caughtResult->addClause(ConstantPointerNull::get(builder.getInt8PtrTy()));
+    
+    Value* thrownException  = builder.CreateExtractValue(caughtResult, 0);
+    builder.CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
+    builder.CreateCall(m_exceptionAPI.cxa_end_catch);
+    builder.CreateRet( builder.getInt32(SmalltalkVM::returnError) );
 }
 
 extern "C" {
@@ -641,20 +667,6 @@ bool bulkReplace(TObject* destination,
                                                         destinationStopOffset,
                                                         source,
                                                         sourceStartOffset);
-}
-
-TObject* performSmallInt(uint8_t opcode, TObject* leftObject, TObject* rightObject)
-{
-//     printf("performSmallInt %d, %p, %p\n", (uint32_t) opcode, leftObject, rightObject);
-
-    int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
-    int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
-    return JITRuntime::Instance()->getVM()->doSmallInt((SmalltalkVM::SmallIntOpcode) opcode, leftOperand, rightOperand);
-}
-
-TObject* runProcess(TProcess* process, TContext* callingContext)
-{
-    return JITRuntime::Instance()->runProcess(process, callingContext);
 }
 
 }
