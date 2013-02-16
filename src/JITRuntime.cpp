@@ -261,7 +261,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
         updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
-        outs() << *blockFunction;
+//         outs() << *blockFunction;
     }
     
     block->previousContext = callingContext->previousContext;
@@ -352,7 +352,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
-            outs() << *methodFunction;
+            //outs() << *methodFunction;
         }
 
         // Calling the method and returning the result
