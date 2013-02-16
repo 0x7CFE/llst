@@ -191,7 +191,7 @@ Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
 
     // Registering holder as a GC root
     Value* stackRoot = jit.builder->CreateBitCast(holder, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
-    Function* gcRootFunction = m_TypeModule->getFunction("llvm.gcroot");
+    Function* gcRootFunction = m_JITModule->getFunction("llvm.gcroot");
     jit.builder->CreateCall2(gcRootFunction, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
 
     // Returning to the original edit location
