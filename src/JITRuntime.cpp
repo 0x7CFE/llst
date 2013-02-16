@@ -258,7 +258,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
         updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
-//         outs() << *blockFunction;
+        outs() << *blockFunction;
     }
     
     block->previousContext = callingContext->previousContext;
@@ -341,7 +341,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
-            //outs() << *methodFunction;
+            outs() << *methodFunction;
         }
 
         // Calling the method and returning the result
@@ -525,6 +525,12 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
+                                                             
+    //Type*  rootChainType = m_JITModule->getTypeByName("gc_stackentry")->getPointerTo();
+    //GlobalValue* gRootChain    = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("llvm_gc_root_chain", rootChainType) );
+    GlobalValue* gRootChain = m_JITModule->getGlobalVariable("llvm_gc_root_chain");
+    m_executionEngine->addGlobalMapping(gRootChain, reinterpret_cast<void*>(&llvm_gc_root_chain));
+    
 }
 
 void JITRuntime::initializeExceptionAPI() {

@@ -40,7 +40,7 @@
 #include <jit.h>
 
 int main(int argc, char **argv) {
-    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
+    std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
     memoryManager->initializeHeap(65536 * 128);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));

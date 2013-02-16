@@ -742,6 +742,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
         false                      // we're not dealing with vararg
     );
     blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
+    blockContext.function->setGC("shadow-stack");
     m_blockFunctions[blockFunctionName] = blockContext.function;
 
     // First argument of every block function is a pointer to TBlock object
