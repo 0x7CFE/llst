@@ -692,7 +692,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     // Creating block function named Class>>method@offset
     const uint16_t blockOffset = jit.bytePointer;
     std::ostringstream ss;
-    ss << jit.function->getName().str() << "@" << blockOffset; //currentOffset;
+    ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << blockOffset; //currentOffset;
     std::string blockFunctionName = ss.str();
 
     // outs() << "Creating block function "  << blockFunctionName << "\n";
