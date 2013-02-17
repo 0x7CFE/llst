@@ -53,7 +53,9 @@ void LLVMMemoryManager::moveObjects()
         // Iterating through the roots in the current stack frame
         for (int32_t index = 0, count = entry->map->numRoots; index < count; index++) {
             TMovableObject** objectSlot = (TMovableObject**) entry->roots[index];
-            *objectSlot = moveObject(*objectSlot);
+
+            if (objectSlot != 0)
+                *objectSlot = moveObject(*objectSlot);
         }
     }
 }

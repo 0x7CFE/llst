@@ -1320,7 +1320,8 @@ main    | command x1 x2 list ms1 ms2 selector args block |
         LLVMTestStatements new classAsString."
 
         "StringTest new runAllInLLVM."
-
+        "LLVMTestStatements new testCat. ^nil."
+        
         list <- List new.
         1 to: 500 do: [ :x | list add: 1000 atRandom ].
         selector <- ('sortTest2:' asSymbol).
@@ -1328,6 +1329,7 @@ main    | command x1 x2 list ms1 ms2 selector args block |
         block <- [ LLVM sendMessage: selector withArguments: args ].
         ms1 <- Timer millisecondsToRun: block.
         ms2 <- Timer millisecondsToRun: block.
+
         "x2 printNl."
         '1 Sorted in ms: ' print. ms1 printNl.
         '2 Sorted in ms: ' print. ms2 printNl.

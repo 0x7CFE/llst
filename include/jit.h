@@ -163,7 +163,8 @@ private:
         uint32_t            byteCount;
 
         llvm::Function*     function;     // LLVM function that is created based on method
-        llvm::Value*        methodPtr;    // LLVM representation for Smalltalk's method object
+        //llvm::Value*        methodPtr;    
+        llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
         llvm::Value*        arguments;    // LLVM representation for method arguments array
         llvm::Value*        temporaries;  // LLVM representation for method temporaries array
         llvm::Value*        literals;     // LLVM representation for method literals array
@@ -196,7 +197,7 @@ private:
 
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
-            bytePointer(0), function(0), methodPtr(0), arguments(0),
+            bytePointer(0), function(0), /*methodPtr(0),*/ arguments(0),
             temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler)
         {
@@ -221,6 +222,8 @@ private:
     TExceptionAPI  m_exceptionAPI;
 
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
+    llvm::Value* protectValue(TJITContext& jit, llvm::Value* value);
+    
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);

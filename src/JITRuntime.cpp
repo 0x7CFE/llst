@@ -341,11 +341,12 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
-            outs() << *methodFunction;
         }
 
         // Calling the method and returning the result
         compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
+        outs() << *methodFunction;
+        
         updateFunctionCache(method, compiledMethodFunction);
     }
     
