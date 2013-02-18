@@ -787,9 +787,9 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
     Value* value     = jit.popValue();
     Value* condition = 0;
 
-    switch ((opcode::UnaryMessageOpcode) jit.instruction.low) {
-        case opcode::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
-        case opcode::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
+    switch ((unaryMessage::Opcode) jit.instruction.low) {
+        case unaryMessage::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
+        case unaryMessage::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
 
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
@@ -832,10 +832,10 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     Value* intResult       = 0;  // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
-    switch (opcode) {
-        case 0: intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break; // operator <
-        case 1: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break; // operator <=
-        case 2: intResult = jit.builder->CreateAdd(leftInt, rightInt);     break; // operator +
+    switch ((binaryMessage::Opcode) opcode) {
+        case binaryMessage::smallIntLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break; // operator <
+        case binaryMessage::smallIntLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break; // operator <=
+        case binaryMessage::smallIntAdd     : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break; // operator +
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
     }

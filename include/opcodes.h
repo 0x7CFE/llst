@@ -17,9 +17,20 @@ enum Opcode {
     doPrimitive,
     doSpecial = 15
 };
-enum UnaryMessageOpcode {
+};
+
+namespace unaryMessage {
+enum Opcode {
     isNil  = 0,
     notNil = 1
+};
+};
+
+namespace binaryMessage {
+enum Opcode {
+    smallIntLess  = 0,
+    smallIntLessOrEq,
+    smallIntAdd
 };
 };
 

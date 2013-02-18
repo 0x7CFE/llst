@@ -54,8 +54,6 @@ public:
 
         returnNoReturn = 255
     };
-    //FIXME move enums away from SmalltalkVM class
-
 private:
     struct TVMExecutionContext {
     private:
@@ -120,16 +118,18 @@ private:
     void doPushConstant(TVMExecutionContext& ec);
     void doPushBlock(TVMExecutionContext& ec);
     void doMarkArguments(TVMExecutionContext& ec);
-    void doSendMessage(TVMExecutionContext& ec);
-    void doSendMessage(TVMExecutionContext& ec,
-                       TSymbol* selector, TObjectArray* arguments,
-                       TClass* receiverClass = 0);
+    //Takes selector, arguments from context and sends message
+    //The class is taken from the first argument
+    void doSendMessage(TVMExecutionContext& ec); 
+    //This method is used to send message to the first argument
+    //If receiverClass != 0 then the class is not taken from the first argument (implementation of sendToSuper)
+    void doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments, TClass* receiverClass = 0);
     void doSendUnary(TVMExecutionContext& ec);
     void doSendBinary(TVMExecutionContext& ec);
 
     TObject* performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed);
     TExecuteResult doPrimitive(hptr<TProcess>& process, TVMExecutionContext& ec);
-    TExecuteResult doSpecial         (hptr<TProcess>& process, TVMExecutionContext& ec);
+    TExecuteResult doSpecial  (hptr<TProcess>& process, TVMExecutionContext& ec);
 
 
     Image*          m_image;
@@ -181,6 +181,7 @@ template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool r
     TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
     if (!klass)
         return hptr<T>((T*) globals.nilObject, m_memoryManager);
+    
 
     if (T::InstancesAreBinary()) {
         return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, registerPointer);
