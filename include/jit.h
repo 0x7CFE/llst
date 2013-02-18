@@ -133,6 +133,26 @@ struct TJITGlobals {
     }
 };
 
+struct TBaseFunctions {
+    llvm::Function* isSmallInteger;
+    llvm::Function* getIntegerValue;
+    llvm::Function* newInteger;
+    llvm::Function* TObject__getSize;
+    llvm::Function* TObject__getClass;
+    llvm::Function* TObject__getFields;
+    llvm::Function* getSlotSize;
+
+    void initializeFromModule(llvm::Module* module) {
+        isSmallInteger     = module->getFunction("isSmallInteger()");
+        getIntegerValue    = module->getFunction("getIntegerValue()");
+        newInteger         = module->getFunction("newInteger()");
+        TObject__getSize   = module->getFunction("TObject::getSize()");
+        TObject__getClass  = module->getFunction("TObject::getClass()");
+        TObject__getFields = module->getFunction("TObject::getFields()");
+        getSlotSize        = module->getFunction("getSlotSize()");
+    }
+};
+
 class MethodCompiler {
 private:
     llvm::Module* m_JITModule;
@@ -218,6 +238,7 @@ private:
     TJITGlobals    m_globals;
     TRuntimeAPI    m_runtimeAPI;
     TExceptionAPI  m_exceptionAPI;
+    TBaseFunctions m_baseFunctions;
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
@@ -262,7 +283,8 @@ public:
         }
         */
         m_baseTypes.initializeFromModule(JITModule);
-        m_globals.initializeFromModule(m_JITModule);
+        m_globals.initializeFromModule(JITModule);
+        m_baseFunctions.initializeFromModule(JITModule);
     }
 };
 
