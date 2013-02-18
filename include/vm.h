@@ -40,7 +40,7 @@
 #include <types.h>
 #include <memory.h>
 #include <stdlib.h>
-
+#include "opcodes.h"
 #include <stdio.h>
 
 class SmalltalkVM {
@@ -55,99 +55,8 @@ public:
         returnNoReturn = 255
     };
     //FIXME move enums away from SmalltalkVM class
-    enum Opcode {
-        opExtended = 0,
-        opPushInstance,
-        opPushArgument,
-        opPushTemporary,
-        opPushLiteral,
-        opPushConstant,
-        opAssignInstance,
-        opAssignTemporary,
-        opMarkArguments,
-        opSendMessage,
-        opSendUnary,
-        opSendBinary,
-        opPushBlock,
-        opDoPrimitive,
-        opDoSpecial = 15
-    };
 
-    enum Special {
-        selfReturn = 1,
-        stackReturn,
-        blockReturn,
-        duplicate,
-        popTop,
-        branch,
-        branchIfTrue,
-        branchIfFalse,
-        sendToSuper = 11,
-        breakpoint = 12
-    };
-
-    enum UnaryOpcode {
-        isNil  = 0,
-        notNil = 1
-    };
-
-    enum {
-        nilConst = 10,
-        trueConst,
-        falseConst
-    };
-
-    enum {
-        objectsAreEqual   = 1,
-        getClass          = 2,
-        getSize           = 4,
-        inAtPut           = 5,
-        startNewProcess   = 6,
-        allocateObject    = 7,
-        blockInvoke       = 8,
-        throwError        = 19,
-        allocateByteArray = 20,
-        cloneByteObject   = 23,
-        integerNew        = 32,
-        flushCache        = 34,
-        bulkReplace       = 38
-    };
-
-    enum SmallIntOpcode {
-        smallIntAdd = 10,
-        smallIntDiv,
-        smallIntMod,
-        smallIntLess,
-        smallIntEqual,
-        smallIntMul,
-        smallIntSub,
-        smallIntBitOr = 36,
-        smallIntBitAnd = 37,
-        smallIntBitShift = 39
-    };
-
-    enum {
-        stringAt        = 21,
-        stringAtPut     = 22,
-        arrayAt         = 24,
-        arrayAtPut      = 5
-    };
-    
-    enum {
-        ioGetChar = 9,
-        ioPutChar = 3
-    };
 private:
-    enum IntegerOpcode {
-        integerDiv = 25,
-        integerMod,
-        integerAdd,
-        integerMul,
-        integerSub,
-        integerLess,
-        integerEqual,
-    };
-
     struct TVMExecutionContext {
     private:
         // TODO Think about proper memory organization
@@ -233,7 +142,7 @@ private:
 public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
+    TObject* doSmallInt(primitive::SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
 
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
