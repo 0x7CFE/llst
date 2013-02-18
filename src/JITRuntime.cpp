@@ -331,10 +331,12 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Compiling function and storing it to the table for further use
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
             
-//             if (verifyModule(*m_JITModule)) {
-//                 outs() << "Module verification failed.\n";
-//                 exit(1);
-//             }
+            outs() << *methodFunction;
+            
+            if (verifyModule(*m_JITModule)) {
+                outs() << "Module verification failed.\n";
+                exit(1);
+            }
 
             
             // Running the optimization passes on a function

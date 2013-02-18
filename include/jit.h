@@ -133,12 +133,62 @@ struct TJITGlobals {
     }
 };
 
-class MethodCompiler {
-private:
-    llvm::Module* m_JITModule;
+class TStackValue {
+public:
+    virtual llvm::Value* get() = 0;
+};
 
+class TPlainValue : public TStackValue {
+private:
+    llvm::Value* m_value;
+public:
+    TPlainValue(llvm::Value* value) : m_value(value) {}
+    virtual ~TPlainValue() { }
+    
+    virtual llvm::Value* get() { return m_value; }
+};
+
+class TDeferredValue : public TStackValue {
+public:
+    enum TOperationType {
+        loadInstance,
+        loadArgument,
+        loadTemporary,
+        loadLiteral,
+        
+        // result of message sent 
+        // or pushed block 
+        loadHolder
+    };
+
+    class TJITContext;
+    typedef struct TDeferredParameters {
+        TOperationType operation;
+        uint32_t       index;
+        llvm::Value*   argument;
+        MethodCompiler::TJITContext* jit;
+    };
+private:
+    TDeferredParameters m_parameters;
+public:
+    TDeferredValue(TOperationType operation, uint32_t index) {
+        m_parameters.operation = operation;
+        m_parameters.index = index;
+    }
+    
+    TDeferredValue(TOperationType operation, llvm::Value* argument) {
+        m_parameters.operation = operation;
+        m_parameters.argument = argument;
+    }
+    
+    virtual ~TDeferredValue();
+    virtual llvm::Value* get();
+};
+
+class MethodCompiler {
+public:
     // Some useful type aliases
-    typedef std::list<llvm::Value*> TValueStack;
+    typedef std::list<TStackValue> TValueStack;
     typedef std::set<llvm::BasicBlock*> TRefererSet;
     typedef std::set<llvm::BasicBlock*>::iterator TRefererSetIterator;
 
@@ -173,7 +223,7 @@ private:
 
         TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
-        llvm::Value*        context;
+        //llvm::Value*        context;
         //llvm::Value*        blockContext;
 
         llvm::BasicBlock*   preamble;
@@ -195,11 +245,22 @@ private:
         llvm::Value* lastValue(); 
         llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0);
 
+        llvm::Value* contextHolder;
+        //llvm::Value* argumentsHolder;
+        llvm::Value* selfHolder;
+        
+        llvm::Value* getCurrentContext();
+        llvm::Value* getSelf();
+        llvm::Value* getSelfFields();
+        
+        void pushValue(const TStackValue& value);
+        
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
             bytePointer(0), function(0), /*methodPtr(0),*/ arguments(0),
-            temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
-            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler)
+            temporaries(0), literals(0), self(0), selfFields(0), builder(0), /*context(0),*/
+            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
+            contextHolder(0), selfHolder(0)
         {
             byteCount = method->byteCodes->getSize();
             //valueStack.reserve(method->stackSize);
@@ -210,6 +271,8 @@ private:
         //TValueStack valueStack;
     };
     
+private:
+    llvm::Module* m_JITModule;
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
     bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
@@ -222,7 +285,7 @@ private:
     TExceptionAPI  m_exceptionAPI;
 
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
-    llvm::Value* protectValue(TJITContext& jit, llvm::Value* value);
+    llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
     
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);

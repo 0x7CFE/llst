@@ -42,24 +42,59 @@
 
 using namespace llvm;
 
-void MethodCompiler::TJITContext::pushValue(llvm::Value* value)
+Value* TDeferredValue::get()
+{
+    IRBuilder<>& builder = m_parameters.jit->builder;
+    
+    switch (m_parameters.operation) {
+        // Passed argument is a handler value
+        case TOperationType::loadHolder: return builder.CreateLoad(m_parameters.argument);
+        
+        case TOperationType::loadArgument: {
+            Value* context = m_parameters.jit->getCurrentContext();
+            
+            Value* indices[] = {
+                builder.getInt32(0), // * context
+                builder.getInt32(2), //   arguments *
+                builder.getInt32(0), // * arguments
+                builder.getInt32(m_parameters.index) // argument[index] *
+            };
+            Value* valuePointer = builder.CreateGEP(context, indices);
+            Value* argument     = builder.CreateLoad(valuePointer);
+            
+            std::ostringstream ss;
+            ss << "arg" << (uint32_t)index << ".";
+            argument->setName(ss.str());
+            
+            return argument;
+        } break;
+    }
+}    
+
+void MethodCompiler::TJITContext::pushValue(const TStackValue& value)
 {
     // Values are always pushed to the local stack
     basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(value);
+}
+
+void MethodCompiler::TJITContext::pushValue(llvm::Value* value)
+{
+    // Values are always pushed to the local stack
+    basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(TPlainValue(value));
 }
 
 Value* MethodCompiler::TJITContext::lastValue()
 {
     TValueStack& valueStack = basicBlockContexts[builder->GetInsertBlock()].valueStack;
     if (! valueStack.empty())
-        return valueStack.back();
+        return valueStack.back().get();
 
     // Popping value from the referer's block
     // and creating phi function if necessary
     Value* value = popValue();
 
     // Pushing the value locally (may be phi)
-    valueStack.push_back(value);
+    valueStack.push_back(TPlainValue(value));
 
     // Returning it as a last value
     return value;
@@ -88,10 +123,10 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
     TBasicBlockContext& blockContext = basicBlockContexts[overrideBlock ? overrideBlock : builder->GetInsertBlock()];
     TValueStack& valueStack = blockContext.valueStack;
     
-    if (!valueStack.empty()) {
+    if (! valueStack.empty()) {
         // If local stack is not empty
         // then we simply pop the value from it
-        Value* value = valueStack.back();
+        Value* value = valueStack.back().get();
         valueStack.pop_back();
         
         return value;
@@ -200,7 +235,7 @@ Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
     return holder;
 }
 
-Value* MethodCompiler::protectValue(TJITContext& jit, Value* value)
+Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
 {
     // Allocating holder
     Value* holder = allocateRoot(jit, value->getType());
@@ -210,7 +245,7 @@ Value* MethodCompiler::protectValue(TJITContext& jit, Value* value)
     
     // Loading it back as a value which will then be used
     //return jit.builder->CreateLoad(holder, true);
-    return value;
+    return value;           
 }
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
@@ -231,20 +266,20 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     context->setName("contextParameter");
     
     // Protecting the context holder
-    jit.context = protectValue(jit, context);
-    jit.context->setName("context");
+    jit.contextHolder = protectPointer(jit, context);
+    jit.contextHolder->setName("pContext");
     
-    Value* methodPtr = jit.builder->CreateStructGEP(jit.context, 1);
+    Value* methodPtr = jit.builder->CreateStructGEP(jit.getCurrentContext(), 1);
     Value* methodObject = jit.builder->CreateLoad(methodPtr);
-    jit.methodObject = protectValue(jit, methodObject);
+    jit.methodObject = protectPointer(jit, methodObject);
     jit.methodObject->setName("method");
     
     Function* objectGetFields = m_JITModule->getFunction("TObject::getFields()");
 
-    Value* argsObjectPtr       = jit.builder->CreateStructGEP(jit.context, 2, "argObjectPtr");
+    Value* argsObjectPtr       = jit.builder->CreateStructGEP(jit.getCurrentContext(), 2, "argObjectPtr");
     Value* argsObjectArray     = jit.builder->CreateLoad(argsObjectPtr, "argsObjectArray");
     Value* argsObject          = jit.builder->CreateBitCast(argsObjectArray, ot.object->getPointerTo(), "argsObject");
-    Value* argsObject_         = protectValue(jit, argsObject);
+    Value* argsObject_         = protectPointer(jit, argsObject);
     
     jit.arguments = jit.builder->CreateCall(objectGetFields, argsObject_);
     jit.arguments->setName("arguments");
@@ -254,29 +289,48 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* literalsObjectPtr   = jit.builder->CreateStructGEP(methodObject, 3, "literalsObjectPtr");
     Value* literalsObjectArray = jit.builder->CreateLoad(literalsObjectPtr, "literalsObjectArray");
     Value* literalsObject      = jit.builder->CreateBitCast(literalsObjectArray, ot.object->getPointerTo(), "literalsObject");
-    Value* literalsObject_     = protectValue(jit, literalsObject);
+    Value* literalsObject_     = protectPointer(jit, literalsObject);
     
     jit.literals = jit.builder->CreateCall(objectGetFields, literalsObject_);
     jit.literals->setName("literals");
     
 
 
-    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.context, 3, "tempsObjectPtr");
+    Value* tempsObjectPtr      = jit.builder->CreateStructGEP(jit.getCurrentContext(), 3, "tempsObjectPtr");
     Value* tempsObjectArray    = jit.builder->CreateLoad(tempsObjectPtr, "tempsObjectArray");
     Value* tempsObject         = jit.builder->CreateBitCast(tempsObjectArray, ot.object->getPointerTo(), "tempsObject");
-    Value* tempsObject_        = protectValue(jit, tempsObject);
+    Value* tempsObject_        = protectPointer(jit, tempsObject);
     
     jit.temporaries = jit.builder->CreateCall(objectGetFields, tempsObject_);
     jit.temporaries->setName("temporaries");
     
     Value* selfObjectPtr       = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(0), "selfObjectPtr");
     Value* self                = jit.builder->CreateLoad(selfObjectPtr);
-    jit.self = protectValue(jit, self);
+    jit.self = protectPointer(jit, self);
     jit.self->setName("self");
     
     jit.selfFields          = jit.builder->CreateCall(objectGetFields, jit.self);
     //jit.selfFields = protectValue(jit, selfFields);
     jit.selfFields->setName("selfFields");
+}
+
+Value* MethodCompiler::TJITContext::getCurrentContext()
+{
+    return builder->CreateLoad(contextHolder);
+}
+    
+Value* MethodCompiler::TJITContext::getSelf()
+{
+    Value* context = builder->CreateLoad(contextHolder);
+    
+    Value* indices[] = {
+        builder->getInt32(0), // * context
+        builder->getInt32(2), //   arguments *
+        builder->getInt32(0), // * arguments
+        builder->getInt32(0)  //   self *
+    };
+    Value* selfPtr = builder->CreateGEP(context, indices, "self.");
+    return builder->CreateLoad(selfPtr);
 }
 
 bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
@@ -424,7 +478,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     uint32_t slotSize = sizeof(TObject) + elementsCount * sizeof(TObject*);
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(slotSize) };
     Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
-    return protectValue(jit, arrayObject);
+    return protectPointer(jit, arrayObject);
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext)
@@ -591,7 +645,7 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
     BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
     
-    Value* compareTargets = jit.builder->CreateICmpEQ(jit.context, targetContext);
+    Value* compareTargets = jit.builder->CreateICmpEQ(jit.getCurrentContext(), targetContext);
     jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
     
     jit.builder->SetInsertPoint(returnBlock);
@@ -637,9 +691,10 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.instruction.low;
-
-    Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
-    Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadInstance, index));
+    
+//    Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
+//    Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
 
 //     TObjectArray* arguments = jit.callingContext->arguments;
 //     TObject* self = arguments->getField(0);
@@ -647,62 +702,66 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 //     std::string variableName = self->getClass()->variables->getField(index)->toString();
 //     instanceVariable->setName(variableName);
 
-    jit.pushValue(instanceVariable);
+//    jit.pushValue(instanceVariable);
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-
-    if (index == 0) {
-        jit.pushValue(jit.self);
-    } else {
-        Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
-        Value* argument     = jit.builder->CreateLoad(valuePointer);
-
-        std::ostringstream ss;
-        ss << "arg" << (uint32_t)index << ".";
-        argument->setName(ss.str());
-
-        jit.pushValue(argument);
-    }
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadArgument, index));
+    
+//     if (index == 0) {
+//         jit.pushValue(jit.self);
+//     } else {
+//         Value* valuePointer = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(index));
+//         Value* argument     = jit.builder->CreateLoad(valuePointer);
+// 
+//         std::ostringstream ss;
+//         ss << "arg" << (uint32_t)index << ".";
+//         argument->setName(ss.str());
+// 
+//         jit.pushValue(argument);
+//     }
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-
-    Value* valuePointer = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
-    Value* temporary    = jit.builder->CreateLoad(valuePointer);
-
-    std::ostringstream ss;
-    ss << "temp" << (uint32_t)index << ".";
-    temporary->setName(ss.str());
-
-    jit.pushValue(temporary);
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadTemporary, index));
+    
+//     Value* valuePointer = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
+//     Value* temporary    = jit.builder->CreateLoad(valuePointer);
+// 
+//     std::ostringstream ss;
+//     ss << "temp" << (uint32_t)index << ".";
+//     temporary->setName(ss.str());
+// 
+//     jit.pushValue(temporary);
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    Value* literal = 0; // here will be the value
-
-    // Checking whether requested literal is a small integer value.
-    // If this is true just pushing the immediate constant value instead
-    TObject* literalObject = jit.method->literals->getField(index);
-    if (isSmallInteger(literalObject)) {
-        Value* constant = jit.builder->getInt32(reinterpret_cast<uint32_t>(literalObject));
-        literal = jit.builder->CreateIntToPtr(constant, ot.object->getPointerTo());
-    } else {
-        Value* valuePointer = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(index));
-        literal = jit.builder->CreateLoad(valuePointer);
-    }
-
-    std::ostringstream ss;
-    ss << "lit" << (uint32_t)index << ".";
-    literal->setName(ss.str());
-
-    jit.pushValue(literal);
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadLiteral, index));
+    
+//     Value* literal = 0; // here will be the value
+// 
+//     // Checking whether requested literal is a small integer value.
+//     // If this is true just pushing the immediate constant value instead
+//     TObject* literalObject = jit.method->literals->getField(index);
+//     if (isSmallInteger(literalObject)) {
+//         Value* constant = jit.builder->getInt32(reinterpret_cast<uint32_t>(literalObject));
+//         literal = jit.builder->CreateIntToPtr(constant, ot.object->getPointerTo());
+//     } else {
+//         Value* valuePointer = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(index));
+//         literal = jit.builder->CreateLoad(valuePointer);
+//     }
+// 
+//     std::ostringstream ss;
+//     ss << "lit" << (uint32_t)index << ".";
+//     literal->setName(ss.str());
+// 
+//     jit.pushValue(literal);
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -787,22 +846,27 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
 
     // Create block object and fill it with context information
     Value* args[] = {
-        jit.context,                               // creatingContext
+        jit.getCurrentContext(),                   // creatingContext
         jit.builder->getInt8(jit.instruction.low), // arg offset
         jit.builder->getInt16(blockOffset)         // bytePointer
     };
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
     blockObject = jit.builder->CreateBitCast(blockObject, ot.object->getPointerTo());
     blockObject->setName("block.");
-    jit.pushValue(blockObject);
-
     jit.bytePointer = newBytePointer;
+    
+    Value* blockHolder = allocateRoot(jit, ot.block->getPointerTo());
+    jit.builder->CreateStore(blockObject, blockHolder);
+    
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadHolder, blockHolder));
+    
+    //jit.pushValue(blockObject);
 }
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    Value* value  = jit.lastValue();
+    Value*  value = jit.lastValue();
 
     Value* temporaryAddress = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
     jit.builder->CreateStore(value, temporaryAddress);
@@ -811,7 +875,7 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    Value* value  = jit.lastValue();
+    Value*  value = jit.lastValue();
 
     Value* instanceVariableAddress = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
     jit.builder->CreateStore(value, instanceVariableAddress);
@@ -939,7 +1003,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     Value* argumentsArray    = jit.builder->CreateBitCast(argumentsObject, ot.objectArray->getPointerTo());
     Value* sendMessageArgs[] = {
-        jit.context, // calling context
+        jit.getCurrentContext(), // calling context
         m_globals.binarySelectors[jit.instruction.low],
         argumentsArray,
 
@@ -971,7 +1035,11 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
     // Result of sendBinary will be the value of phi function
-    jit.pushValue(phi);
+    //jit.pushValue(phi);
+    
+    Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
+    jit.builder->CreateStore(phi, resultHolder);
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSendMessage(TJITContext& jit)
@@ -996,7 +1064,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     // Forming a message parameters
     Value* sendMessageArgs[] = {
-        jit.context,     // calling context
+        jit.getCurrentContext(),     // calling context
         messageSelector, // selector
         arguments,        // message arguments
 
@@ -1022,7 +1090,10 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
 
-    jit.pushValue(result);
+    Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
+    jit.builder->CreateStore(result, resultHolder);
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadHolder, resultHolder));
+    //jit.pushValue(result);
 }
 
 void MethodCompiler::doSpecial(TJITContext& jit)
@@ -1051,7 +1122,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* value = jit.popValue();
 
                 // Loading the target context information
-                Value* blockContext = jit.builder->CreateBitCast(jit.context, ot.block->getPointerTo());
+                Value* blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), ot.block->getPointerTo());
                 Value* creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
@@ -1134,7 +1205,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             Value* parentClass        = jit.builder->CreateLoad(parentClassPtr);
             
             Value* sendMessageArgs[] = {
-                jit.context,     // calling context
+                jit.getCurrentContext(),     // calling context
                 messageSelector, // selector
                 arguments,       // message arguments
                 parentClass      // receiver class
@@ -1231,7 +1302,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    processResult  = jit.builder->CreateCall(executeProcess, process);
             
             Function* newInt = m_JITModule->getFunction("newInteger()");
-            primitiveResult = jit.builder->CreateCall(newInt, processResult);
+            primitiveResult  = jit.builder->CreateCall(newInt, processResult);
         } break;
 
         case SmalltalkVM::allocateObject: { // FIXME pointer safety
@@ -1248,7 +1319,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, slotSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
 
-            primitiveResult = protectValue(jit, newInstance);
+            primitiveResult = protectPointer(jit, newInstance);
         } break;
 
         case SmalltalkVM::allocateByteArray: { // 20      // FIXME pointer safety
@@ -1262,7 +1333,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, dataSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
-            primitiveResult = jit.builder->CreateBitCast(protectValue(jit, newInstance), ot.object->getPointerTo() );
+            primitiveResult = jit.builder->CreateBitCast(protectPointer(jit, newInstance), ot.object->getPointerTo() );
         } break;
 
         case SmalltalkVM::cloneByteObject: { // 23      // FIXME pointer safety
@@ -1275,7 +1346,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value*    args[]   = { klass, dataSize };
             Value*    _clone   = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
-            Value*    clone = protectValue(jit, _clone);
+            Value*    clone = protectPointer(jit, _clone);
             
             Function* objectGetFields = m_JITModule->getFunction("TObject::getFields()");
             Value*    originalObject = jit.builder->CreateBitCast(original, ot.object->getPointerTo());
@@ -1349,7 +1420,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 jit.builder->CreateStore(argument, fieldPtr);
             }
 
-            Value* args[] = { block, jit.context };
+            Value* args[] = { block, jit.getCurrentContext() };
             Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
 
             primitiveResult = result;
