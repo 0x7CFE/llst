@@ -214,7 +214,7 @@ private:
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
 
-    TObjectTypes   ot;
+    TObjectTypes   m_baseTypes;
     TJITGlobals    m_globals;
     TRuntimeAPI    m_runtimeAPI;
     TExceptionAPI  m_exceptionAPI;
@@ -261,7 +261,7 @@ public:
             exit(1);
         }
         */
-        ot.initializeFromModule(JITModule);
+        m_baseTypes.initializeFromModule(JITModule);
         m_globals.initializeFromModule(m_JITModule);
     }
 };
@@ -354,7 +354,7 @@ private:
     void initializeGlobals();
     void initializePassManager();
 
-    //uses ot types. dont forget to init it before calling this method
+    //uses m_baseTypes. dont forget to init it before calling this method
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
     void createExecuteProcessFunction();
