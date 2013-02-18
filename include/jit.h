@@ -161,24 +161,22 @@ public:
         loadHolder
     };
 
-    class TJITContext;
-    typedef struct TDeferredParameters {
-        TOperationType operation;
-        uint32_t       index;
-        llvm::Value*   argument;
-        MethodCompiler::TJITContext* jit;
-    };
 private:
-    TDeferredParameters m_parameters;
+    TOperationType m_operation;
+    uint32_t       m_index;
+    llvm::Value*   m_argument;
+
+    class TJITContext;
+    MethodCompiler::TJITContext* m_jit;
 public:
     TDeferredValue(TOperationType operation, uint32_t index) {
-        m_parameters.operation = operation;
-        m_parameters.index = index;
+        m_operation = operation;
+        m_index = index;
     }
     
     TDeferredValue(TOperationType operation, llvm::Value* argument) {
-        m_parameters.operation = operation;
-        m_parameters.argument = argument;
+        m_operation = operation;
+        m_argument = argument;
     }
     
     virtual ~TDeferredValue();

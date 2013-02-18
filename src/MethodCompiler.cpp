@@ -44,20 +44,21 @@ using namespace llvm;
 
 Value* TDeferredValue::get()
 {
-    IRBuilder<>& builder = m_parameters.jit->builder;
+    IRBuilder<>& builder = m_jit->builder;
     
-    switch (m_parameters.operation) {
+    switch (m_operation) {
         // Passed argument is a handler value
-        case TOperationType::loadHolder: return builder.CreateLoad(m_parameters.argument);
+        case TOperationType::loadHolder:
+            return builder.CreateLoad(m_argument);
         
         case TOperationType::loadArgument: {
-            Value* context = m_parameters.jit->getCurrentContext();
+            Value* context = m_jit->getCurrentContext();
             
             Value* indices[] = {
                 builder.getInt32(0), // * context
                 builder.getInt32(2), //   arguments *
                 builder.getInt32(0), // * arguments
-                builder.getInt32(m_parameters.index) // argument[index] *
+                builder.getInt32(m_index) // argument[index] *
             };
             Value* valuePointer = builder.CreateGEP(context, indices);
             Value* argument     = builder.CreateLoad(valuePointer);
