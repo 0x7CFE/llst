@@ -1088,6 +1088,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     //outs() << "Primitive opcode = " << opcode << "\n";
     
     Value* primitiveResult = 0;
+    BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
     
     // Linking pop chain
@@ -1493,22 +1494,14 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             };
             
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
-            
-            BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
-            jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
-            
             jit.builder->CreateCondBr(isSucceeded, primitiveSucceeded, primitiveFailed);
-            //Value* resultObject = jit.builder->CreateSelect(isSucceeded, destination, m_globals.nilObject);
             jit.builder->SetInsertPoint(primitiveSucceeded);
-            
             primitiveResult = destination;
         } break;
         
         default:
             outs() << "JIT: Unknown primitive code " << opcode << "\n";
     }
-    
-    BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
     
     // Linking pop chain
     jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
