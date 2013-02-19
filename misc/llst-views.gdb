@@ -13,7 +13,7 @@ end
 
 document tsymbol
     Prints TSymbol information.
-    Syntax: tsymbol <TSymbol>
+    Syntax: tsymbol <TSymbol*>
     Example:
     tsymbol globals.badMethodSymbol
 end
@@ -27,17 +27,17 @@ define tmethod
         help tmethod
     else
         set $class = (TClass*) $arg0->getClass()
-        set $className  = $class->name->toString()
-        set $methodName = $arg0->name->toString()
-        printf "Method name: \"%s\" \n", (char*) $methodName
-        printf "Method class: \"%s\", ", (char*) $className
+        set $className  = (char*) $class->name->toString()
+        set $methodName = (char*) $arg0->name->toString()
+        printf "Method name: \"%s\" \n", $methodName
+        printf "Method class: \"%s\", ", $className
         p $class
     end
 end
 
 document tmethod
     Prints TMethod information.
-    Syntax: tmethod <TMethod>
+    Syntax: tmethod <TMethod*>
     Example:
     tmethod globals.initialMethod
 end
@@ -54,8 +54,8 @@ define tclass
         set $parentName  = (char*) $arg0->parentClass->name->toString()
         set $methodSize  = $arg0->methods->keys->getSize()
         
-        printf "Class name: \"%s\"\n", $className
-        printf "Instance size: %d\n", $arg0->instanceSize
+        printf "Class name: \"%s\"\n  ", $className
+        printf "Instance size: %d\n   ", getIntegerValue($arg0->instanceSize)
         printf "Parent class: \"%s\", ", $parentName
         p $arg0->parentClass
         printf "Got %d methods: \n", $methodSize
@@ -74,7 +74,7 @@ end
 
 document tclass
     Prints TClass information.
-    Syntax: tclass <TClass>
+    Syntax: tclass <TClass*>
     Example:
     tclass globals.smallIntClass
 end
