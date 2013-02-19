@@ -48,10 +48,10 @@ Value* TDeferredValue::get()
     
     switch (m_operation) {
         // Passed argument is a handler value
-        case TOperationType::loadHolder:
+        case TOperation::loadHolder:
             return builder.CreateLoad(m_argument);
         
-        case TOperationType::loadArgument: {
+        case TOperation::loadArgument: {
             Value* context = m_jit->getCurrentContext();
             
             Value* indices[] = {
@@ -127,6 +127,8 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
     if (! valueStack.empty()) {
         // If local stack is not empty
         // then we simply pop the value from it
+        
+        // NOTE May perform code injection
         Value* value = valueStack.back().get();
         valueStack.pop_back();
         
@@ -173,19 +175,12 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
                 // Filling incoming nodes with values from the referer stacks
                 TRefererSetIterator iReferer = blockContext.referers.begin();
                 for (; iReferer != blockContext.referers.end(); ++iReferer) {
+                    // FIXME non filled block will not yet have the value
+                    //       we need to store them to a special post processing list
+                    //       and update the current phi function when value will be available
+                    
                     Value* value = popValue(*iReferer);
                     phi->addIncoming(value, *iReferer);
-                    
-//                     TBasicBlockContext& refererContext = basicBlockContexts[*iReferer];
-//                     TValueStack& predcessorStack = refererContext.valueStack;
-//                     
-//                     // FIXME 2 non filled block will not yet have the value
-//                     //         we need to store them to a special post processing list
-//                     //         and update the current phi function when value will be available
-//                     Value* value = predcessorStack.back();
-//                     predcessorStack.pop_back();
-                    
-//                    phi->addIncoming(value, *iReferer);
                 }
                 
                 if (overrideBlock || firstInsertionPoint != insertBlock->end())
@@ -692,7 +687,7 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadInstance, index));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadInstance, index));
     
 //    Value* valuePointer      = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
 //    Value* instanceVariable  = jit.builder->CreateLoad(valuePointer);
@@ -709,7 +704,7 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadArgument, index));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadArgument, index));
     
 //     if (index == 0) {
 //         jit.pushValue(jit.self);
@@ -728,7 +723,7 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadTemporary, index));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadTemporary, index));
     
 //     Value* valuePointer = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
 //     Value* temporary    = jit.builder->CreateLoad(valuePointer);
@@ -743,7 +738,7 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadLiteral, index));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadLiteral, index));
     
 //     Value* literal = 0; // here will be the value
 // 
@@ -859,7 +854,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     Value* blockHolder = allocateRoot(jit, ot.block->getPointerTo());
     jit.builder->CreateStore(blockObject, blockHolder);
     
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadHolder, blockHolder));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadHolder, blockHolder));
     
     //jit.pushValue(blockObject);
 }
@@ -1040,7 +1035,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
     jit.builder->CreateStore(phi, resultHolder);
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadHolder, resultHolder));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSendMessage(TJITContext& jit)
@@ -1048,16 +1043,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* arguments = jit.popValue();
 
     // First of all we need to get the actual message selector
-    //Function* getFieldFunction = m_JITModule->getFunction("TObjectArray::getField(int)");
-
-    //Value* literalArray    = jit.builder->CreateBitCast(jit.literals, ot.objectArray->getPointerTo());
-    //Value* getFieldArgs[]  = { literalArray, jit.builder->getInt32(jit.instruction.low) };
-    //Value* messageSelector = jit.builder->CreateCall(getFieldFunction, getFieldArgs);
     Value* messageSelectorPtr    = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(jit.instruction.low));
     Value* messageSelectorObject = jit.builder->CreateLoad(messageSelectorPtr);
     Value* messageSelector       = jit.builder->CreateBitCast(messageSelectorObject, ot.symbol->getPointerTo());
-
-    //messageSelector = jit.builder->CreateBitCast(messageSelector, ot.symbol->getPointerTo());
 
     std::ostringstream ss;
     ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
@@ -1065,9 +1053,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     // Forming a message parameters
     Value* sendMessageArgs[] = {
-        jit.getCurrentContext(),     // calling context
-        messageSelector, // selector
-        arguments,        // message arguments
+        jit.getCurrentContext(), // calling context
+        messageSelector,         // selector
+        arguments,               // message arguments
 
         // default receiver class
         ConstantPointerNull::get(ot.klass->getPointerTo())
@@ -1093,7 +1081,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
     jit.builder->CreateStore(result, resultHolder);
-    jit.pushValue(TDeferredValue(TDeferredValue::TOperationType::loadHolder, resultHolder));
+    jit.pushValue(TDeferredValue(TDeferredValue::TOperation::loadHolder, resultHolder));
     //jit.pushValue(result);
 }
 

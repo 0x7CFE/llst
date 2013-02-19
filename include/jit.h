@@ -150,7 +150,7 @@ public:
 
 class TDeferredValue : public TStackValue {
 public:
-    enum TOperationType {
+    enum TOperation {
         loadInstance,
         loadArgument,
         loadTemporary,
@@ -162,19 +162,20 @@ public:
     };
 
 private:
-    TOperationType m_operation;
-    uint32_t       m_index;
-    llvm::Value*   m_argument;
+    TOperation   m_operation;
+    uint32_t     m_index;
+    llvm::Value* m_argument;
 
     class TJITContext;
     MethodCompiler::TJITContext* m_jit;
+    llvm::BasicBlock* origin;
 public:
-    TDeferredValue(TOperationType operation, uint32_t index) {
+    TDeferredValue(TOperation operation, uint32_t index) : m_argument(0) {
         m_operation = operation;
         m_index = index;
     }
     
-    TDeferredValue(TOperationType operation, llvm::Value* argument) {
+    TDeferredValue(TOperation operation, llvm::Value* argument) : m_index(0) {
         m_operation = operation;
         m_argument = argument;
     }
