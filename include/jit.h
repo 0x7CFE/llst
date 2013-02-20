@@ -177,12 +177,12 @@ public:
 
         llvm::Function*     function;     // LLVM function that is created based on method
         //llvm::Value*        methodPtr;    
-        llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
-        llvm::Value*        arguments;    // LLVM representation for method arguments array
-        llvm::Value*        temporaries;  // LLVM representation for method temporaries array
-        llvm::Value*        literals;     // LLVM representation for method literals array
-        llvm::Value*        self;         // LLVM representation for current object
-        llvm::Value*        selfFields;   // LLVM representation for current object's fields
+        //llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
+        //llvm::Value*        arguments;    // LLVM representation for method arguments array
+        //llvm::Value*        temporaries;  // LLVM representation for method temporaries array
+        //llvm::Value*        literals;     // LLVM representation for method literals array
+        //llvm::Value*        self;         // LLVM representation for current object
+        //llvm::Value*        selfFields;   // LLVM representation for current object's fields
 
         TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
@@ -209,19 +209,21 @@ public:
         llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0);
 
         llvm::Value* contextHolder;
-        //llvm::Value* argumentsHolder;
         llvm::Value* selfHolder;
         
         llvm::Value* getCurrentContext();
         llvm::Value* getSelf();
-        llvm::Value* getSelfFields();
+        llvm::Value* getMethodClass();
+        llvm::Value* getLiteral(uint32_t index);
         
         void pushValue(const TStackValue& value);
         
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
-            bytePointer(0), function(0), /*methodPtr(0),*/ arguments(0),
-            temporaries(0), literals(0), self(0), selfFields(0), builder(0), /*context(0),*/
+            bytePointer(0), function(0), /*methodPtr(0),*/ 
+            //arguments(0),
+            //temporaries(0), literals(0), self(0), selfFields(0), 
+            builder(0), /*context(0),*/
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
