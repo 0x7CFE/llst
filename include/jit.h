@@ -135,7 +135,7 @@ struct TJITGlobals {
 
 class TStackValue {
 public:
-    virtual llvm::Value* get() = 0;
+    virtual llvm::Value* get() { return 0; }
 };
 
 class TPlainValue : public TStackValue {
@@ -146,42 +146,6 @@ public:
     virtual ~TPlainValue() { }
     
     virtual llvm::Value* get() { return m_value; }
-};
-
-class TDeferredValue : public TStackValue {
-public:
-    enum TOperation {
-        loadInstance,
-        loadArgument,
-        loadTemporary,
-        loadLiteral,
-        
-        // result of message sent 
-        // or pushed block 
-        loadHolder
-    };
-
-private:
-    TOperation   m_operation;
-    uint32_t     m_index;
-    llvm::Value* m_argument;
-
-    class TJITContext;
-    MethodCompiler::TJITContext* m_jit;
-    llvm::BasicBlock* origin;
-public:
-    TDeferredValue(TOperation operation, uint32_t index) : m_argument(0) {
-        m_operation = operation;
-        m_index = index;
-    }
-    
-    TDeferredValue(TOperation operation, llvm::Value* argument) : m_index(0) {
-        m_operation = operation;
-        m_argument = argument;
-    }
-    
-    virtual ~TDeferredValue();
-    virtual llvm::Value* get();
 };
 
 class MethodCompiler {
@@ -332,6 +296,42 @@ public:
         m_globals.initializeFromModule(m_JITModule);
     }
 };
+
+class TDeferredValue : public TStackValue {
+public:
+    enum TOperation {
+        loadInstance,
+        loadArgument,
+        loadTemporary,
+        loadLiteral,
+        
+        // result of message sent 
+        // or pushed block 
+        loadHolder
+    };
+    
+private:
+    TOperation   m_operation;
+    uint32_t     m_index;
+    llvm::Value* m_argument;
+    
+    MethodCompiler::TJITContext* m_jit;
+    llvm::BasicBlock* origin;
+public:
+    TDeferredValue(TOperation operation, uint32_t index) : m_argument(0) {
+        m_operation = operation;
+        m_index = index;
+    }
+    
+    TDeferredValue(TOperation operation, llvm::Value* argument) : m_index(0) {
+        m_operation = operation;
+        m_argument = argument;
+    }
+    
+    virtual ~TDeferredValue() { }
+    virtual llvm::Value* get();
+};
+
 
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
