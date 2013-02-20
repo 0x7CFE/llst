@@ -378,9 +378,9 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.self = protectPointer(jit, self);
     jit.self->setName("self");
     
-    jit.selfFields          = jit.builder->CreateCall(objectGetFields, jit.self);
+    //jit.selfFields          = jit.builder->CreateCall(objectGetFields, jit.self);
     //jit.selfFields = protectValue(jit, selfFields);
-    jit.selfFields->setName("selfFields");
+    //jit.selfFields->setName("selfFields");
 }
 
 Value* MethodCompiler::TJITContext::getCurrentContext()
@@ -936,19 +936,47 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
     Value*  value = jit.lastValue();
-
-    Value* temporaryAddress = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
-    jit.builder->CreateStore(value, temporaryAddress);
+    IRBuilder<>& builder = * jit.builder;
+    
+    Value* context = jit.getCurrentContext();
+    
+    //Value* temporaryAddress = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
+    Value* indices[] = {
+        builder.getInt32(0),       // * context
+        builder.getInt32(3),       //   temporaries *
+        builder.getInt32(0),       // * temporaries
+        builder.getInt32(0),       // * ->object
+        builder.getInt32(2),       //   temporaries[]
+        builder.getInt32(index),   //   temporaries[index]
+    };
+    
+    Value* temporaryPointer = builder.CreateGEP(context, indices);
+    builder.CreateStore(value, temporaryPointer);
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
     Value*  value = jit.lastValue();
-
-    Value* instanceVariableAddress = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
-    jit.builder->CreateStore(value, instanceVariableAddress);
-    jit.builder->CreateCall2(m_runtimeAPI.checkRoot, value, instanceVariableAddress);
+    IRBuilder<>& builder = * jit.builder;
+    
+    //Value* instanceVariableAddress = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
+    Value* context = jit.getCurrentContext();
+    
+    Value* indices[] = {
+        builder.getInt32(0),       // * context
+        builder.getInt32(2),       //   arguments *
+        builder.getInt32(0),       // * arguments
+        builder.getInt32(0),       //   self *
+        builder.getInt32(0),       // * self
+        builder.getInt32(0),       // * ->object
+        builder.getInt32(2),       //   fields[]
+        builder.getInt32(index),   //   fields[index]
+    };
+    Value* fieldPointer = builder.CreateGEP(context, indices);
+    
+    builder.CreateStore(value, fieldPointer);
+    builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
 }
 
 void MethodCompiler::doMarkArguments(TJITContext& jit)
@@ -1170,7 +1198,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     switch (opcode) {
         case SmalltalkVM::selfReturn:
             if (! iPreviousInst->isTerminator())
-                jit.builder->CreateRet(jit.self);
+                jit.builder->CreateRet(jit.getSelf());
             break;
 
         case SmalltalkVM::stackReturn:
