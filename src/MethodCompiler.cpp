@@ -198,9 +198,21 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
         // If local stack is not empty
         // then we simply pop the value from it
         
+        BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
+        if (overrideBlock) {
+            Instruction* terminator = overrideBlock->getTerminator();
+            if (terminator)
+                builder->SetInsertPoint(terminator);
+            else 
+                builder->SetInsertPoint(overrideBlock);
+        }
+        
         // NOTE May perform code injection
         Value* value = valueStack.back().get();
         valueStack.pop_back();
+        
+        if (overrideBlock)
+            builder->SetInsertPoint(currentInsertPoint);
         
         return value;
     } else {
