@@ -369,10 +369,12 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.contextHolder->setName("pContext");
     
     Value* indices[] = {
-        jit.builder->getInt32(0), // * context
-        jit.builder->getInt32(2), //   arguments *
-        jit.builder->getInt32(0), // * arguments
-        jit.builder->getInt32(0)  //   self *
+        jit.builder->getInt32(0),      // * context
+        jit.builder->getInt32(2),      //   arguments *
+        jit.builder->getInt32(0),      // * arguments
+        jit.builder->getInt32(0),      // * ->object
+        jit.builder->getInt32(2),      //   arguments[]
+        jit.builder->getInt32(0)       //   argument[0] *
     };
     Value* selfPtr = jit.builder->CreateGEP(context, indices, "self.");
     Value* self    = jit.builder->CreateLoad(selfPtr);
