@@ -74,18 +74,15 @@ Value* TDeferredValue::get()
         
         case loadInstance: {
             Value* context = m_jit->getCurrentContext();
+            Value* self    = m_jit->getSelf();
             
             Value* indices[] = {
-                builder.getInt32(0),       // * context
-                builder.getInt32(2),       //   arguments *
-                builder.getInt32(0),       // * arguments
-                builder.getInt32(0),       //   self *
                 builder.getInt32(0),       // * self
                 builder.getInt32(0),       // * ->object
                 builder.getInt32(2),       //   fields[]
                 builder.getInt32(m_index), //   fields[index]
             };
-            Value* fieldPointer = builder.CreateGEP(context, indices);
+            Value* fieldPointer = builder.CreateGEP(self, indices);
             Value* field        = builder.CreateLoad(fieldPointer);
             
             std::ostringstream ss;
@@ -375,6 +372,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     
     Value* selfObjectPtr       = jit.builder->CreateGEP(jit.arguments, jit.builder->getInt32(0), "selfObjectPtr");
     Value* self                = jit.builder->CreateLoad(selfObjectPtr);
+    
     jit.self = protectPointer(jit, self);
     jit.self->setName("self");
     
@@ -385,21 +383,12 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 
 Value* MethodCompiler::TJITContext::getCurrentContext()
 {
-    return builder->CreateLoad(contextHolder);
+    return builder->CreateLoad(contextHolder, "context.");
 }
     
 Value* MethodCompiler::TJITContext::getSelf()
 {
-    Value* context = builder->CreateLoad(contextHolder);
-    
-    Value* indices[] = {
-        builder->getInt32(0), // * context
-        builder->getInt32(2), //   arguments *
-        builder->getInt32(0), // * arguments
-        builder->getInt32(0)  //   self *
-    };
-    Value* selfPtr = builder->CreateGEP(context, indices, "self.");
-    return builder->CreateLoad(selfPtr);
+    return builder->CreateLoad(self, "self.");
 }
 
 bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
