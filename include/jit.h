@@ -417,8 +417,8 @@ private:
     
     TMethodFunction lookupFunctionInCache(TMethod* method);
     TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
-    TMethodFunction updateFunctionCache(TMethod* method, TMethodFunction function);
-    TMethodFunction updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
+    void updateFunctionCache(TMethod* method, TMethodFunction function);
+    void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
     
     void initializeGlobals();
     void initializePassManager();

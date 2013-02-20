@@ -199,7 +199,7 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
     }
 }
 
-JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
+void JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
@@ -208,7 +208,7 @@ JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMe
     entry.function = function;
 }
 
-JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
+void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
     TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];

@@ -73,7 +73,6 @@ Value* TDeferredValue::get()
         } break;
         
         case loadInstance: {
-            Value* context = m_jit->getCurrentContext();
             Value* self    = m_jit->getSelf();
             
             Value* indices[] = {
@@ -119,6 +118,7 @@ Value* TDeferredValue::get()
         
         default:
             outs() << "Unknown deferred operation: " << m_operation << "\n";
+            return 0;
     }
 }    
 
@@ -472,7 +472,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     // Processing the method's bytecodes
     while (jit.bytePointer < stopPointer) {
-        uint32_t currentOffset = jit.bytePointer;
+//         uint32_t currentOffset = jit.bytePointer;
         // printf("scanForBranches: Processing offset %d / %d \n", currentOffset, stopPointer);
 
         // Decoding the pending instruction (TODO move to a function)
