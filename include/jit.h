@@ -95,19 +95,19 @@ struct TObjectTypes {
 
 
     void initializeFromModule(llvm::Module* module) {
-        object      = module->getTypeByName("struct.TObject");
-        klass       = module->getTypeByName("struct.TClass");
-        context     = module->getTypeByName("struct.TContext");
-        block       = module->getTypeByName("struct.TBlock");
-        dictionary  = module->getTypeByName("struct.TDictionary");
-        method      = module->getTypeByName("struct.TMethod");
-        symbol      = module->getTypeByName("struct.TSymbol");
-        objectArray = module->getTypeByName("struct.TObjectArray");
-        symbolArray = module->getTypeByName("struct.TSymbolArray");
-        globals     = module->getTypeByName("struct.TGlobals");
-        byteObject  = module->getTypeByName("struct.TByteObject");
-        blockReturn = module->getTypeByName("struct.TBlockReturn");
-        process     = module->getTypeByName("struct.TProcess");
+        object      = module->getTypeByName("TObject");
+        klass       = module->getTypeByName("TClass");
+        context     = module->getTypeByName("TContext");
+        block       = module->getTypeByName("TBlock");
+        dictionary  = module->getTypeByName("TDictionary");
+        method      = module->getTypeByName("TMethod");
+        symbol      = module->getTypeByName("TSymbol");
+        objectArray = module->getTypeByName("TObjectArray");
+        symbolArray = module->getTypeByName("TSymbolArray");
+        globals     = module->getTypeByName("TGlobals");
+        byteObject  = module->getTypeByName("TByteObject");
+        blockReturn = module->getTypeByName("TBlockReturn");
+        process     = module->getTypeByName("TProcess");
     }
 };
 

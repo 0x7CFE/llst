@@ -47,7 +47,7 @@ Value* TDeferredValue::get()
     IRBuilder<>& builder = * m_jit->builder;
     Module* jitModule = JITRuntime::Instance()->getModule();
     Function* getObjectField = jitModule->getFunction("getObjectField");
-    Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
+    Type* objectPtrType = jitModule->getTypeByName("TObject")->getPointerTo();
     
     switch (m_operation) {
         case loadHolder:
@@ -106,7 +106,7 @@ Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
     Module* jitModule = JITRuntime::Instance()->getModule();
     Function* getObjectField = jitModule->getFunction("getObjectField");
-    Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
+    Type* objectPtrType = jitModule->getTypeByName("TObject")->getPointerTo();
     
     Value* context   = getCurrentContext();
     Value* pmethod   = builder->CreateStructGEP(context, 1); // method*
