@@ -130,7 +130,7 @@ Value* MethodCompiler::TJITContext::getMethodClass()
     Value* context   = getCurrentContext();
     Value* pmethod   = builder->CreateStructGEP(context, 1); // method*
     Value* method    = builder->CreateLoad(pmethod);
-    Value* pklass    = builder->CreateStructGEP(context, 6); // class*
+    Value* pklass    = builder->CreateStructGEP(method, 6); // class*
     Value* klass     = builder->CreateLoad(pklass);
     
     klass->setName("class.");
@@ -251,7 +251,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
                 PHINode* phi = builder->CreatePHI(compiler->ot.object->getPointerTo(), numReferers, "phi.");
                     
                 // Filling incoming nodes with values from the referer stacks
-                TRefererSetIterator iReferer = blockContext.referers.begin();
+                TRefererSet::iterator iReferer = blockContext.referers.begin();
                 for (; iReferer != blockContext.referers.end(); ++iReferer) {
                     // FIXME non filled block will not yet have the value
                     //       we need to store them to a special post processing list
@@ -611,7 +611,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
          // printOpcode(jit.instruction);
 
-//         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
+        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
         // Then writing the code
         switch (jit.instruction.high) {
@@ -640,9 +640,10 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
         }
 
-//         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
+         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 
-//            if (instCountAfter > instCountBefore)
+         if (instCountAfter > instCountBefore)
+            outs() << * --jit.builder->GetInsertPoint() << "\n";         
 //                outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }

@@ -136,7 +136,7 @@ struct TJITGlobals {
 class TStackValue {
 public:
     virtual ~TStackValue() { }
-    virtual llvm::Value* get() { return 0; }
+    virtual llvm::Value* get() = 0;
 };
 
 class TPlainValue : public TStackValue {
@@ -154,7 +154,6 @@ public:
     // Some useful type aliases
     typedef std::list<TStackValue*> TValueStack;
     typedef std::set<llvm::BasicBlock*> TRefererSet;
-    typedef std::set<llvm::BasicBlock*>::iterator TRefererSetIterator;
 
     // Block context is a logic encapsulation
     // of Smalltalk's CFG and value transitions
@@ -194,7 +193,8 @@ public:
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
 
-        std::map<llvm::BasicBlock*, TBasicBlockContext> basicBlockContexts;
+        typedef std::map<llvm::BasicBlock*, TBasicBlockContext> TBlockContextMap;
+        TBlockContextMap basicBlockContexts;
 
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -232,7 +232,27 @@ public:
             //valueStack.reserve(method->stackSize);
         };
 
-        ~TJITContext() { if (builder) delete builder; }
+        ~TJITContext() {
+            if (! basicBlockContexts.empty()) {
+                TBlockContextMap::iterator iContext = basicBlockContexts.begin();
+                while (iContext != basicBlockContexts.end()) {
+                    TValueStack& valueStack = iContext->second.valueStack;
+                    if (! valueStack.empty()) {
+                        TValueStack::iterator iStackValue = valueStack.begin();
+                        while (iStackValue != valueStack.end()) {
+                            delete *iStackValue;
+                            ++iStackValue;
+                        }
+                        valueStack.clear();
+                    }
+                    ++iContext;
+                }
+                basicBlockContexts.clear();
+            }
+            
+            if (builder) 
+                delete builder; 
+        }
     private:
         //TValueStack valueStack;
     };
