@@ -45,6 +45,9 @@ using namespace llvm;
 Value* TDeferredValue::get()
 {
     IRBuilder<>& builder = * m_jit->builder;
+    Module* jitModule = JITRuntime::Instance()->getModule();
+    Function* getObjectField = jitModule->getFunction("TObject::getField(int)");
+    Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
     
     switch (m_operation) {
         // Passed argument is a handler value
@@ -52,18 +55,11 @@ Value* TDeferredValue::get()
             return builder.CreateLoad(m_argument);
         
         case loadArgument: {
-            Value* context = m_jit->getCurrentContext();
-            
-            Value* indices[] = {
-                builder.getInt32(0),      // * context
-                builder.getInt32(2),      //   arguments *
-                builder.getInt32(0),      // * arguments
-                builder.getInt32(0),      // * ->object
-                builder.getInt32(2),      //   arguments[]
-                builder.getInt32(m_index) //   argument[index] *
-            };
-            Value* valuePointer = builder.CreateGEP(context, indices);
-            Value* argument     = builder.CreateLoad(valuePointer);
+            Value* context   = m_jit->getCurrentContext();
+            Value* pargs     = builder.CreateStructGEP(context, 2); // args
+            Value* arguments = builder.CreateLoad(pargs);
+            Value* pobject   = builder.CreateBitCast(arguments, objectPtrType);
+            Value* argument  = builder.CreateCall2(getObjectField, pobject, builder.getInt32(m_index));
             
             std::ostringstream ss;
             ss << "arg" << (uint32_t) m_index << ".";
@@ -74,15 +70,7 @@ Value* TDeferredValue::get()
         
         case loadInstance: {
             Value* self    = m_jit->getSelf();
-            
-            Value* indices[] = {
-                builder.getInt32(0),       // * self
-                builder.getInt32(0),       // * ->object
-                builder.getInt32(2),       //   fields[]
-                builder.getInt32(m_index), //   fields[index]
-            };
-            Value* fieldPointer = builder.CreateGEP(self, indices);
-            Value* field        = builder.CreateLoad(fieldPointer);
+            Value* field = builder.CreateCall2(getObjectField, self, builder.getInt32(m_index));
             
             std::ostringstream ss;
             ss << "field" << (uint32_t) m_index << ".";
@@ -92,18 +80,11 @@ Value* TDeferredValue::get()
         } break;
         
         case loadTemporary: {
-            Value* context = m_jit->getCurrentContext();
-            
-            Value* indices[] = {
-                builder.getInt32(0),       // * context
-                builder.getInt32(3),       //   temporaries *
-                builder.getInt32(0),       // * temporaries
-                builder.getInt32(0),       // * ->object
-                builder.getInt32(2),       //   temporaries[]
-                builder.getInt32(m_index), //   temporaries[index]
-            };
-            Value* temporaryPointer = builder.CreateGEP(context, indices);
-            Value* temporary        = builder.CreateLoad(temporaryPointer);
+            Value* context   = m_jit->getCurrentContext();
+            Value* ptemps    = builder.CreateStructGEP(context, 3); // temporaries
+            Value* temps     = builder.CreateLoad(ptemps);
+            Value* pobject   = builder.CreateBitCast(temps, objectPtrType);
+            Value* temporary = builder.CreateCall2(getObjectField, pobject, builder.getInt32(m_index));
             
             std::ostringstream ss;
             ss << "temp" << (uint32_t) m_index << ".";
@@ -124,24 +105,22 @@ Value* TDeferredValue::get()
 
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
-    Value* context = getCurrentContext();
+    Module* jitModule = JITRuntime::Instance()->getModule();
+    Function* getObjectField = jitModule->getFunction("TObject::getField(int)");
+    Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
     
-    Value* indices[] = {
-        builder->getInt32(0),       // * context
-        builder->getInt32(3),       //   method *
-        builder->getInt32(0),       // * method
-        builder->getInt32(3),       //   literals *
-        builder->getInt32(0),       // * literals
-        builder->getInt32(0),       // * ->object
-        builder->getInt32(2),       //   literals[]
-        builder->getInt32(index),   //   literals[index]
-    };
+    Value* context   = getCurrentContext();
+    Value* pmethod   = builder->CreateStructGEP(context, 1); // method*
+    Value* method    = builder->CreateLoad(pmethod);
     
-    Value* literalPointer = builder->CreateGEP(context, indices);
-    Value* literal        = builder->CreateLoad(literalPointer);
+    Value* pliterals = builder->CreateStructGEP(method, 3); // literals*
+    Value* literals  = builder->CreateLoad(pliterals);
+    
+    Value* pobject   = builder->CreateBitCast(literals, objectPtrType);
+    Value* literal   = builder->CreateCall2(getObjectField, pobject, builder->getInt32(index));
     
     std::ostringstream ss;
-    ss << "temp" << (uint32_t) index << ".";
+    ss << "lit" << (uint32_t) index << ".";
     literal->setName(ss.str());
     
     return literal;
@@ -149,23 +128,17 @@ Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 
 Value* MethodCompiler::TJITContext::getMethodClass()
 {
-    Value* context = getCurrentContext();
-
-    Value* indices[] = {
-        builder->getInt32(0),       // * context
-        builder->getInt32(3),       //   method *
-        builder->getInt32(0),       // * method
-        builder->getInt32(6)        //   class *
-    };
-
-    Value* klassPointer = builder->CreateGEP(context, indices);
-    Value* klass        = builder->CreateLoad(klassPointer);
+    Value* context   = getCurrentContext();
+    Value* pmethod   = builder->CreateStructGEP(context, 1); // method*
+    Value* method    = builder->CreateLoad(pmethod);
+    Value* pklass    = builder->CreateStructGEP(context, 6); // class*
+    Value* klass     = builder->CreateLoad(pklass);
+    
     klass->setName("class.");
-
     return klass;
 }
 
-void MethodCompiler::TJITContext::pushValue(const TStackValue& value)
+void MethodCompiler::TJITContext::pushValue(TStackValue* value)
 {
     // Values are always pushed to the local stack
     basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(value);
@@ -174,21 +147,21 @@ void MethodCompiler::TJITContext::pushValue(const TStackValue& value)
 void MethodCompiler::TJITContext::pushValue(llvm::Value* value)
 {
     // Values are always pushed to the local stack
-    basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(TPlainValue(value));
+    basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(new TPlainValue(value));
 }
 
 Value* MethodCompiler::TJITContext::lastValue()
 {
     TValueStack& valueStack = basicBlockContexts[builder->GetInsertBlock()].valueStack;
     if (! valueStack.empty())
-        return valueStack.back().get();
+        return valueStack.back()->get();
 
     // Popping value from the referer's block
     // and creating phi function if necessary
     Value* value = popValue();
 
     // Pushing the value locally (may be phi)
-    valueStack.push_back(TPlainValue(value));
+    valueStack.push_back(new TPlainValue(value));
 
     // Returning it as a last value
     return value;
@@ -230,8 +203,9 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
                 builder->SetInsertPoint(overrideBlock);
         }
         
-        // NOTE May perform code injection
-        Value* value = valueStack.back().get();
+        TStackValue* stackValue = valueStack.back();
+        Value* value = stackValue->get(); // NOTE May perform code injection
+        delete stackValue;
         valueStack.pop_back();
         
         if (overrideBlock)
@@ -367,18 +341,13 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     // Protecting the context holder
     jit.contextHolder = protectPointer(jit, context);
     jit.contextHolder->setName("pContext");
-    
-    Value* indices[] = {
-        jit.builder->getInt32(0),      // * context
-        jit.builder->getInt32(2),      //   arguments *
-        jit.builder->getInt32(0),      // * arguments
-        jit.builder->getInt32(0),      // * ->object
-        jit.builder->getInt32(2),      //   arguments[]
-        jit.builder->getInt32(0)       //   argument[0] *
-    };
-    Value* selfPtr = jit.builder->CreateGEP(context, indices, "self.");
-    Value* self    = jit.builder->CreateLoad(selfPtr);
-    
+
+    // Storing self pointer
+    Function* getObjectField = m_JITModule->getFunction("TObject::getField(int)");
+    Value* pargs     = jit.builder->CreateStructGEP(context, 2);
+    Value* pobject   = jit.builder->CreateBitCast(pargs, ot.object->getPointerTo());
+    Value* arguments = jit.builder->CreateLoad(pobject);
+    Value* self      = jit.builder->CreateCall2(getObjectField, arguments, 0);
     jit.selfHolder = protectPointer(jit, self);
     jit.selfHolder->setName("pSelf");
 }
@@ -751,25 +720,25 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::loadInstance, index));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::loadArgument, index));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::loadTemporary, index));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(TDeferredValue(TDeferredValue::loadLiteral, index));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -862,7 +831,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     Value* blockHolder = allocateRoot(jit, ot.block->getPointerTo());
     jit.builder->CreateStore(blockObject, blockHolder);
     
-    jit.pushValue(TDeferredValue(TDeferredValue::loadHolder, blockHolder));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
 }
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
@@ -1069,7 +1038,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
     jit.builder->CreateStore(phi, resultHolder);
-    jit.pushValue(TDeferredValue(TDeferredValue::loadHolder, resultHolder));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSendMessage(TJITContext& jit)
@@ -1117,7 +1086,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
     jit.builder->CreateStore(result, resultHolder);
-    jit.pushValue(TDeferredValue(TDeferredValue::loadHolder, resultHolder));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
     //jit.pushValue(result);
 }
 
@@ -1160,6 +1129,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
 
         case SmalltalkVM::duplicate:
+            // FIXME Duplicate the TStackValue, not the result
             jit.pushValue(jit.lastValue());
             break;
 

@@ -135,6 +135,7 @@ struct TJITGlobals {
 
 class TStackValue {
 public:
+    virtual ~TStackValue() { }
     virtual llvm::Value* get() { return 0; }
 };
 
@@ -151,7 +152,7 @@ public:
 class MethodCompiler {
 public:
     // Some useful type aliases
-    typedef std::list<TStackValue> TValueStack;
+    typedef std::list<TStackValue*> TValueStack;
     typedef std::set<llvm::BasicBlock*> TRefererSet;
     typedef std::set<llvm::BasicBlock*>::iterator TRefererSetIterator;
 
@@ -216,7 +217,7 @@ public:
         llvm::Value* getMethodClass();
         llvm::Value* getLiteral(uint32_t index);
         
-        void pushValue(const TStackValue& value);
+        void pushValue(TStackValue* value);
         
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
@@ -318,16 +319,19 @@ private:
     llvm::Value* m_argument;
     
     MethodCompiler::TJITContext* m_jit;
-    llvm::BasicBlock* origin;
 public:
-    TDeferredValue(TOperation operation, uint32_t index) : m_argument(0) {
+    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index) {
+        m_argument = 0;
         m_operation = operation;
         m_index = index;
+        m_jit = jit;
     }
     
-    TDeferredValue(TOperation operation, llvm::Value* argument) : m_index(0) {
+    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument) {
         m_operation = operation;
         m_argument = argument;
+        m_index = 0;
+        m_jit = jit;
     }
     
     virtual ~TDeferredValue() { }
@@ -434,6 +438,7 @@ public:
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
+    llvm::Module* getModule() { return m_JITModule; }
 
     void printStat();
     
