@@ -344,10 +344,10 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     // Storing self pointer
     Function* getObjectField = m_JITModule->getFunction("TObject::getField(int)");
     Value* pargs     = jit.builder->CreateStructGEP(context, 2);
-    Value* pobject   = jit.builder->CreateBitCast(pargs, ot.object->getPointerTo());
-    Value* arguments = jit.builder->CreateLoad(pobject);
-    Value* self      = jit.builder->CreateCall2(getObjectField, arguments, 0);
-    jit.selfHolder = protectPointer(jit, self);
+    Value* arguments = jit.builder->CreateLoad(pargs);
+    Value* pobject   = jit.builder->CreateBitCast(arguments, ot.object->getPointerTo());
+    Value* self      = jit.builder->CreateCall2(getObjectField, pobject, jit.builder->getInt32(0));
+    jit.selfHolder   = protectPointer(jit, self);
     jit.selfHolder->setName("pSelf");
 }
 

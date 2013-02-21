@@ -331,13 +331,13 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Compiling function and storing it to the table for further use
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
             
+            outs() << *methodFunction;
             
             if (verifyModule(*m_JITModule)) {
                 outs() << "Module verification failed.\n";
                 exit(1);
             }
 
-            outs() << *methodFunction;
             
             // Running the optimization passes on a function
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
