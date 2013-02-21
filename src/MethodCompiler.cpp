@@ -50,7 +50,6 @@ Value* TDeferredValue::get()
     Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
     
     switch (m_operation) {
-        // Passed argument is a handler value
         case loadHolder:
             return builder.CreateLoad(m_argument);
         
@@ -318,7 +317,7 @@ Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
     // Storing value to the holder to protect the pointer
     jit.builder->CreateStore(value, holder);
     
-    return value;           
+    return holder;           
 }
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
@@ -507,7 +506,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     uint32_t slotSize = sizeof(TObject) + elementsCount * sizeof(TObject*);
     Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(slotSize) };
     Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
-    return protectPointer(jit, arrayObject);
+    return arrayObject; //protectPointer(jit, arrayObject);
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext)
@@ -1319,7 +1318,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, slotSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
 
-            primitiveResult = protectPointer(jit, newInstance);
+            primitiveResult = newInstance; //protectPointer(jit, newInstance);
         } break;
 
         case SmalltalkVM::allocateByteArray: { // 20      // FIXME pointer safety
@@ -1333,7 +1332,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value*    args[]      = { klass, dataSize };
             Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
-            primitiveResult = jit.builder->CreateBitCast(protectPointer(jit, newInstance), ot.object->getPointerTo() );
+            primitiveResult = jit.builder->CreateBitCast(newInstance/*protectPointer(jit, newInstance)*/, ot.object->getPointerTo() );
         } break;
 
         case SmalltalkVM::cloneByteObject: { // 23      // FIXME pointer safety
@@ -1346,7 +1345,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
             Value*    args[]   = { klass, dataSize };
             Value*    _clone   = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
-            Value*    clone = protectPointer(jit, _clone);
+            Value*    clone = _clone; //protectPointer(jit, _clone);
             
             Function* objectGetFields = m_JITModule->getFunction("TObject::getFields()");
             Value*    originalObject = jit.builder->CreateBitCast(original, ot.object->getPointerTo());
