@@ -828,9 +828,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockObject->setName("block.");
     jit.bytePointer = newBytePointer;
     
-    Value* blockHolder = allocateRoot(jit, ot.block->getPointerTo());
-    jit.builder->CreateStore(blockObject, blockHolder);
-    
+    Value* blockHolder = protectPointer(jit, blockObject);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
 }
 
@@ -1033,11 +1031,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
-    // Result of sendBinary will be the value of phi function
-    //jit.pushValue(phi);
-    
-    Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
-    jit.builder->CreateStore(phi, resultHolder);
+    Value* resultHolder = protectPointer(jit, phi);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
@@ -1084,10 +1078,8 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
 
-    Value* resultHolder = allocateRoot(jit, ot.object->getPointerTo());
-    jit.builder->CreateStore(result, resultHolder);
+    Value* resultHolder = protectPointer(jit, result);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
-    //jit.pushValue(result);
 }
 
 void MethodCompiler::doSpecial(TJITContext& jit)
