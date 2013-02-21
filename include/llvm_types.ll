@@ -145,7 +145,7 @@ define %struct.TObject** @"TObject::getFields()"(%struct.TObject* %this) {
 
 ; FIXME demangle TObject ::getField() properly
 
-define %struct.TObject* @"TObject::getField(int)"(%struct.TObject* %this, i32 %index) {
+define %struct.TObject* @getObjectField(%struct.TObject* %this, i32 %index) {
     %fields    = getelementptr inbounds %struct.TObject* %this, i32 0, i32 2
     %resultPtr = getelementptr inbounds [0 x %struct.TObject*]* %fields, i32 0, i32 %index
     %result    = load %struct.TObject** %resultPtr

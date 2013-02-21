@@ -46,7 +46,7 @@ Value* TDeferredValue::get()
 {
     IRBuilder<>& builder = * m_jit->builder;
     Module* jitModule = JITRuntime::Instance()->getModule();
-    Function* getObjectField = jitModule->getFunction("TObject::getField(int)");
+    Function* getObjectField = jitModule->getFunction("getObjectField");
     Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
     
     switch (m_operation) {
@@ -105,7 +105,7 @@ Value* TDeferredValue::get()
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
     Module* jitModule = JITRuntime::Instance()->getModule();
-    Function* getObjectField = jitModule->getFunction("TObject::getField(int)");
+    Function* getObjectField = jitModule->getFunction("getObjectField");
     Type* objectPtrType = jitModule->getTypeByName("struct.TObject")->getPointerTo();
     
     Value* context   = getCurrentContext();
@@ -342,7 +342,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.contextHolder->setName("pContext");
 
     // Storing self pointer
-    Function* getObjectField = m_JITModule->getFunction("TObject::getField(int)");
+    Function* getObjectField = m_JITModule->getFunction("getObjectField");
     Value* pargs     = jit.builder->CreateStructGEP(context, 2);
     Value* arguments = jit.builder->CreateLoad(pargs);
     Value* pobject   = jit.builder->CreateBitCast(arguments, ot.object->getPointerTo());
