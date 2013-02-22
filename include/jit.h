@@ -128,8 +128,6 @@ struct TJITGlobals {
         binarySelectors[0] = module->getGlobalVariable("globals.<");
         binarySelectors[1] = module->getGlobalVariable("globals.<=");
         binarySelectors[2] = module->getGlobalVariable("globals.+");
-
-    //badMethodSymbol =
     }
 };
 
@@ -176,18 +174,8 @@ public:
         uint32_t            byteCount;
 
         llvm::Function*     function;     // LLVM function that is created based on method
-        //llvm::Value*        methodPtr;    
-        //llvm::Value*        methodObject; // LLVM representation for Smalltalk's method object
-        //llvm::Value*        arguments;    // LLVM representation for method arguments array
-        //llvm::Value*        temporaries;  // LLVM representation for method temporaries array
-        //llvm::Value*        literals;     // LLVM representation for method literals array
-        //llvm::Value*        self;         // LLVM representation for current object
-        //llvm::Value*        selfFields;   // LLVM representation for current object's fields
-
         TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
-        //llvm::Value*        context;
-        //llvm::Value*        blockContext;
 
         llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
@@ -221,15 +209,11 @@ public:
         
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
-            bytePointer(0), function(0), /*methodPtr(0),*/ 
-            //arguments(0),
-            //temporaries(0), literals(0), self(0), selfFields(0), 
-            builder(0), /*context(0),*/
+            bytePointer(0), function(0), builder(0), 
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
             byteCount = method->byteCodes->getSize();
-            //valueStack.reserve(method->stackSize);
         };
 
         ~TJITContext() {
@@ -253,8 +237,6 @@ public:
             if (builder) 
                 delete builder; 
         }
-    private:
-        //TValueStack valueStack;
     };
     
 private:
@@ -307,14 +289,6 @@ public:
         : m_JITModule(JITModule),
         m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi)
     {
-        /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
-        std::string linkerErrorMessages;
-        bool linkerFailed = llvm::Linker::LinkModules(m_JITModule, TypeModule, llvm::Linker::PreserveSource, &linkerErrorMessages);
-        if (linkerFailed) {
-            printf("%s\n", linkerErrorMessages.c_str());
-            exit(1);
-        }
-        */
         ot.initializeFromModule(JITModule);
         m_globals.initializeFromModule(m_JITModule);
     }
@@ -390,10 +364,6 @@ private:
     MethodCompiler* m_methodCompiler;
 
     llvm::Module* m_JITModule;
-
-    //typedef std::map<std::string, llvm::Function*> TFunctionMap;
-    //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
-    //TFunctionMap m_compiledFunctions; //TODO useless var?
 
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
