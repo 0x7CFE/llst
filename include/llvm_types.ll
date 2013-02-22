@@ -145,11 +145,18 @@ define %TObject** @"TObject::getFields()"(%TObject* %this) {
 
 ; FIXME demangle TObject ::getField() properly
 
-define %TObject* @getObjectField(%TObject* %this, i32 %index) {
-    %fields    = getelementptr inbounds %TObject* %this, i32 0, i32 2
-    %resultPtr = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
-    %result    = load %TObject** %resultPtr
+define %TObject* @getObjectField(%TObject* %object, i32 %index) {
+    %fields    = getelementptr inbounds %TObject* %object, i32 0, i32 2
+    %fieldPtr  = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
+    %result    = load %TObject** %fieldPtr
     ret %TObject* %result
+}
+
+define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) {
+    %fields   = getelementptr inbounds %TObject* %object, i32 0, i32 2
+    %fieldPtr = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
+    store %TObject* %value, %TObject** %fieldPtr
+    ret %TObject** %fieldPtr
 }
 
 declare void @llvm.memcpy.p0i8.p0i8.i32(i8* %dest, i8* %src, i32 %size, i32 %align, i1 %volatile)

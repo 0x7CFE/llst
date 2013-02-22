@@ -193,6 +193,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
         // If local stack is not empty
         // then we simply pop the value from it
         
+        BasicBlock* currentBasicBlock = builder->GetInsertBlock();
         BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
         if (overrideBlock) {
             Instruction* terminator = overrideBlock->getTerminator();
@@ -208,7 +209,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
         valueStack.pop_back();
         
         if (overrideBlock)
-            builder->SetInsertPoint(currentInsertPoint);
+            builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
         
         return value;
     } else {
@@ -609,9 +610,9 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-         // printOpcode(jit.instruction);
+        printOpcode(jit.instruction);
 
-        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
+//         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
         // Then writing the code
         switch (jit.instruction.high) {
@@ -640,10 +641,10 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
         }
 
-         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
-
-         if (instCountAfter > instCountBefore)
-            outs() << * --jit.builder->GetInsertPoint() << "\n";         
+//          uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
+// 
+//          if (instCountAfter > instCountBefore)
+//             outs() << * --jit.builder->GetInsertPoint() << "\n";         
 //                outs() << "[" << currentOffset << "] " << (jit.function->getName()) << ":" << (jit.builder->GetInsertBlock()->getName()) << ": " << *(--jit.builder->GetInsertPoint()) << "\n";
     }
 }
@@ -839,19 +840,12 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
     IRBuilder<>& builder = * jit.builder;
     
     Value* context = jit.getCurrentContext();
+    Function* getObjectField = m_JITModule->getFunction("setObjectField");
     
-    //Value* temporaryAddress = jit.builder->CreateGEP(jit.temporaries, jit.builder->getInt32(index));
-    Value* indices[] = {
-        builder.getInt32(0),       // * context
-        builder.getInt32(3),       //   temporaries *
-        builder.getInt32(0),       // * temporaries
-        builder.getInt32(0),       // * ->object
-        builder.getInt32(2),       //   temporaries[]
-        builder.getInt32(index),   //   temporaries[index]
-    };
-    
-    Value* temporaryPointer = builder.CreateGEP(context, indices);
-    builder.CreateStore(value, temporaryPointer);
+    Value* ptemps    = builder.CreateStructGEP(context, 3); // temporaries
+    Value* temps     = builder.CreateLoad(ptemps);
+    Value* pobject   = builder.CreateBitCast(temps, ot.object->getPointerTo());
+    builder.CreateCall3(getObjectField, pobject, builder.getInt32(index), value);
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
@@ -860,22 +854,12 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
     Value*  value = jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
     
-    //Value* instanceVariableAddress = jit.builder->CreateGEP(jit.selfFields, jit.builder->getInt32(index));
     Value* context = jit.getCurrentContext();
+    Function* getObjectField = m_JITModule->getFunction("setObjectField");
+
+    Value* self  = jit.getSelf();
+    Value* fieldPointer = builder.CreateCall3(getObjectField, self, builder.getInt32(index), value);
     
-    Value* indices[] = {
-        builder.getInt32(0),       // * context
-        builder.getInt32(2),       //   arguments *
-        builder.getInt32(0),       // * arguments
-        builder.getInt32(0),       //   self *
-        builder.getInt32(0),       // * self
-        builder.getInt32(0),       // * ->object
-        builder.getInt32(2),       //   fields[]
-        builder.getInt32(index),   //   fields[index]
-    };
-    Value* fieldPointer = builder.CreateGEP(context, indices);
-    
-    builder.CreateStore(value, fieldPointer);
     builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
 }
 
