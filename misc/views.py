@@ -1,12 +1,21 @@
 import gdb
 
-#python execfile("../misc/views.py")
+#add lines to ~/.gdbinit
+#python
+#  import sys
+#  sys.path.insert(0, '/LLSTPATH/misc/')
+#  from views import register_printers
+#  register_printers ()
+#end
 
+def g_nil():
+    return gdb.parse_and_eval("globals.nilObject")
+def g_true():
+    return gdb.parse_and_eval("globals.trueObject")
+def g_false(): 
+    return gdb.parse_and_eval("globals.falseObject")
 
 char_ptr_ty = gdb.lookup_type("char").pointer()
-g_nil   = gdb.parse_and_eval("globals.nilObject")
-g_true  = gdb.parse_and_eval("globals.trueObject")
-g_false = gdb.parse_and_eval("globals.falseObject")
 
 class TSymbolPrinter:
     def __init__(self, val):
@@ -40,31 +49,13 @@ class TStringPrinter:
     
     def display_hint (self):
         return 'string'
-        
-class TObjectArrayPrinter:
-    def __init__(self, val):
-        self.val = val
-    
-    def to_string (self):
-        size = gdb.parse_and_eval("((TObjectArray*) %d)->getSize()" % self.val)
-        return "Array got %d elements" % size
-    
-    def children(self):
-        size = gdb.parse_and_eval("((TObjectArray*) %d)->getSize()" % self.val)
-        for i in range(size):
-            elem = gdb.parse_and_eval("((TObjectArray*) %d)->getField((uint32_t) %d)" % (self.val, i)).cast( gdb.lookup_type("TObject").pointer() )
-            yield ("[%s]" % str(i), elem)
-        #FIXME Why gdb.error is raised?
-    
-    def display_hint (self):
-        return 'array'
 
 #class TClassPrinter:
 #    def __init__(self, val):
 #        self.val = val
 #    
 #    def to_string (self):
-#        if self.val == g_nil:
+#        if self.val == g_nil():
 #            return "nil"
 #        
 #        class_name = gdb.parse_and_eval("((TClass*) %d)->name->toString()" % self.val).cast(char_ptr_ty).string()
@@ -85,15 +76,14 @@ class TObjectPrinter:
         self.val = val
     
     def to_string (self):
-        if self.val == g_nil:
+        if self.val == g_nil():
             return "nil"
         
-        if self.val == g_true:
+        if self.val == g_true():
             return "true"
         
-        if self.val == g_false:
+        if self.val == g_false():
             return "false"
-        
         
         
         #class_name = gdb.parse_and_eval("((TObject*) %d)->getClass()->name->toString()" % self.val).cast(char_ptr_ty).string()
@@ -110,14 +100,13 @@ def lookup_type (val):
         return TSmallIntPrinter(val)
     if val.type == gdb.lookup_type("TString").pointer():
         return TStringPrinter(val)
-    if val.type == gdb.lookup_type("TObjectArray").pointer():
-        return TObjectArrayPrinter(val)
     #if val.type == gdb.lookup_type("TClass").pointer():
     #    return TClassPrinter(val)
         
     
-    #if val.type == gdb.lookup_type("TObject").pointer():
-    #    return TObjectPrinter(val)
+    if val.type == gdb.lookup_type("TObject").pointer():
+        return TObjectPrinter(val)
     return None
-
-gdb.pretty_printers.append (lookup_type)
+    
+def register_printers ():
+    gdb.pretty_printers.append (lookup_type)
