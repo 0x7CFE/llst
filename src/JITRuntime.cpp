@@ -440,11 +440,11 @@ void JITRuntime::initializePassManager() {
     // blocks, etc).
     m_functionPassManager->add(llvm::createCFGSimplificationPass());
     
+    m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
+    m_functionPassManager->add(llvm::createDeadInstEliminationPass());
+    m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
+    
     m_modulePassManager->add(llvm::createFunctionInliningPass());
-//     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
-//     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
-//     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
-
     m_functionPassManager->doInitialization();
 }
 

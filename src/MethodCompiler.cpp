@@ -143,7 +143,7 @@ void MethodCompiler::TJITContext::pushValue(TStackValue* value)
     basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(value);
 }
 
-void MethodCompiler::TJITContext::pushValue(llvm::Value* value)
+void MethodCompiler::TJITContext::pushValue(Value* value)
 {
     // Values are always pushed to the local stack
     basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(new TPlainValue(value));
@@ -152,8 +152,8 @@ void MethodCompiler::TJITContext::pushValue(llvm::Value* value)
 Value* MethodCompiler::TJITContext::lastValue()
 {
     TValueStack& valueStack = basicBlockContexts[builder->GetInsertBlock()].valueStack;
-    if (! valueStack.empty())
-        return valueStack.back()->get();
+//     if (! valueStack.empty())
+//         return valueStack.back()->get();
 
     // Popping value from the referer's block
     // and creating phi function if necessary
