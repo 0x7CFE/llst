@@ -854,9 +854,7 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
     Value*  value = jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
     
-    Value* context = jit.getCurrentContext();
     Function* getObjectField = m_JITModule->getFunction("setObjectField");
-
     Value* self  = jit.getSelf();
     Value* fieldPointer = builder.CreateCall3(getObjectField, self, builder.getInt32(index), value);
     
