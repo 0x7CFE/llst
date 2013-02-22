@@ -612,7 +612,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
 
         printOpcode(jit.instruction);
 
-//         uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
+//        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
         // Then writing the code
         switch (jit.instruction.high) {
@@ -641,7 +641,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
         }
 
-//          uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
+//         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 // 
 //          if (instCountAfter > instCountBefore)
 //             outs() << * --jit.builder->GetInsertPoint() << "\n";         
