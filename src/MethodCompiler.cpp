@@ -610,7 +610,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
 
-        printOpcode(jit.instruction);
+//         printOpcode(jit.instruction);
 
 //        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
