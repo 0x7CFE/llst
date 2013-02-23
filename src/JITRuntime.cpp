@@ -266,10 +266,6 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     block->previousContext = callingContext->previousContext;
     TObject* result = compiledBlockFunction(block);
     
-    //     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
-    //     printf("Block function result: %p\n", result);
-    //     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
-    
     return result;
 }
 
@@ -279,8 +275,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     TClass*  klass = 0;
     
     if (receiverClass) {
-//         outs() << "receiverClass = " << receiverClass << "\n";
-//         outs() << "name = " << receiverClass->name->toString() << "\n";
         klass = receiverClass;
     } else {
         TObject* receiver = arguments->getField(0);
@@ -375,10 +369,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     newContext->previousContext   = previousContext;
 
 	TObject* result = compiledMethodFunction(newContext);
-
-//     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
-//     printf("Function result: %p\n", result);
-//     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
 
     return result;
 }
