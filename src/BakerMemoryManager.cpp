@@ -76,33 +76,57 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     // To initialize properly we need a heap with an even size
     heapSize = correctPadding(heapSize);
 
-    void* base = malloc(heapSize);
-    if (!base)
-        return false;
+//     void* base = malloc(heapSize);
+//     if (!base)
+//         return false;
+// 
+//     memset(base, 0, heapSize);
 
-    memset(base, 0, heapSize);
-
+    
+    uint32_t mediane = heapSize / 2;
     m_heapSize = heapSize;
     m_maxHeapSize = maxHeapSize;
 
-    uint32_t mediane = heapSize / 2;
-    m_heapOne = (uint8_t*) base;
-    m_heapTwo = (uint8_t*) base + mediane;
+    m_heapOne = (uint8_t*) malloc(mediane);
+    m_heapTwo = (uint8_t*) malloc(mediane);
+    // TODO check for allocation errors
 
+    memset(m_heapOne, 0, mediane);
+    memset(m_heapTwo, 0, mediane);
+    
     m_activeHeapOne = true;
     
     m_activeHeapBase = m_heapOne;
-    m_activeHeapPointer = (uint8_t*) base + mediane;
+    m_activeHeapPointer = m_heapOne + mediane;
     
-    m_inactiveHeapBase = (uint8_t*) base + mediane;
-    m_inactiveHeapPointer = (uint8_t*) base + heapSize;
+    m_inactiveHeapBase =  m_heapTwo;
+    m_inactiveHeapPointer = m_heapTwo + mediane;
 
     return true;
 }
 
 void BakerMemoryManager::growHeap()
 {
+    // Stage1. Growing inactive heap
+    m_heapSize = correctPadding(m_heapSize + m_heapSize / 2);
+    // Check whether we're still may to grow a heap
     
+    uint32_t newMediane = m_heapSize / 2;
+    uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
+    uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
+    
+    // Reallocating space and zeroing it
+    *inactiveHeapBase = (uint8_t*) realloc(*inactiveHeapBase, newMediane);
+    memset(*inactiveHeapBase, 0, newMediane);
+
+    // Stage 2. Collecting garbage so that 
+    // active objects will be moved to a new home
+    collectGarbage();
+
+    // Now pointers are swapped and previously active heap is now inactive
+    // We need to reallocate it too
+    *activeHeapBase = (uint8_t*) realloc(*activeHeapBase, newMediane);
+    memset(*activeHeapBase, 0, newMediane);
 }
 
 void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
