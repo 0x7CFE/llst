@@ -108,6 +108,7 @@ void BakerMemoryManager::growHeap()
     uint32_t newMediane = m_heapSize / 2;
     uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
     uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
+//    uint8_t** inactiveHeapPointer = &m_inactiveHeapPointer;
     
     // Reallocating space and zeroing it
     *inactiveHeapBase = (uint8_t*) realloc(*inactiveHeapBase, newMediane);

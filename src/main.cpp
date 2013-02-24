@@ -60,7 +60,9 @@ int main(int argc, char **argv) {
     hptr<TProcess> initProcess = vm.newObject<TProcess>();
     initProcess->context = initContext;
     
-    initContext->arguments = (TObjectArray*) globals.nilObject;
+    initContext->arguments = vm.newObject<TObjectArray>(1);
+    initContext->arguments->putField(0, globals.nilObject);
+    
     initContext->bytePointer = newInteger(0);
     initContext->previousContext = (TContext*) globals.nilObject;
     
