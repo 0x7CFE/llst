@@ -100,7 +100,7 @@ Value* TDeferredValue::get()
             outs() << "Unknown deferred operation: " << m_operation << "\n";
             return 0;
     }
-}    
+}
 
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
@@ -161,7 +161,7 @@ Value* MethodCompiler::TJITContext::lastValue()
     
     // Pushing the value locally (may be phi)
     valueStack.push_back(new TPlainValue(value));
-
+    
     // Returning it as a last value
     return value;
 }
@@ -333,21 +333,20 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
         // This is a block function
         Value* blockContext = (Value*) (jit.function->arg_begin());
         blockContext->setName("blockContext");
-
-        context = jit.builder->CreateBitCast(blockContext, ot.context->getPointerTo());
+        
+        context = jit.builder->CreateBitCast(blockContext, m_baseTypes.context->getPointerTo());
     }
     context->setName("contextParameter");
     
     // Protecting the context holder
     jit.contextHolder = protectPointer(jit, context);
     jit.contextHolder->setName("pContext");
-
+    
     // Storing self pointer
-    Function* getObjectField = m_JITModule->getFunction("getObjectField");
     Value* pargs     = jit.builder->CreateStructGEP(context, 2);
     Value* arguments = jit.builder->CreateLoad(pargs);
-    Value* pobject   = jit.builder->CreateBitCast(arguments, ot.object->getPointerTo());
-    Value* self      = jit.builder->CreateCall2(getObjectField, pobject, jit.builder->getInt32(0));
+    Value* pobject   = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
+    Value* self      = jit.builder->CreateCall2(m_baseFunctions.TObject__getField, pobject, jit.builder->getInt32(0));
     jit.selfHolder   = protectPointer(jit, self);
     jit.selfHolder->setName("pSelf");
 }
@@ -840,12 +839,11 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
     IRBuilder<>& builder = * jit.builder;
     
     Value* context = jit.getCurrentContext();
-    Function* getObjectField = m_JITModule->getFunction("setObjectField");
     
     Value* ptemps    = builder.CreateStructGEP(context, 3); // temporaries
     Value* temps     = builder.CreateLoad(ptemps);
-    Value* pobject   = builder.CreateBitCast(temps, ot.object->getPointerTo());
-    builder.CreateCall3(getObjectField, pobject, builder.getInt32(index), value);
+    Value* pobject   = builder.CreateBitCast(temps, m_baseTypes.object->getPointerTo());
+    builder.CreateCall3(m_baseFunctions.TObject__setField, pobject, builder.getInt32(index), value);
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
@@ -854,9 +852,8 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
     Value*  value = jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
     
-    Function* getObjectField = m_JITModule->getFunction("setObjectField");
     Value* self  = jit.getSelf();
-    Value* fieldPointer = builder.CreateCall3(getObjectField, self, builder.getInt32(index), value);
+    Value* fieldPointer = builder.CreateCall3(m_baseFunctions.TObject__setField, self, builder.getInt32(index), value);
     
     builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
 }
@@ -1019,7 +1016,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 //     Value* messageSelectorObject = jit.builder->CreateLoad(messageSelectorPtr);
     
     Value* selectorObject  = jit.getLiteral(jit.instruction.low);
-    Value* messageSelector = jit.builder->CreateBitCast(selectorObject, ot.symbol->getPointerTo());
+    Value* messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
     
     std::ostringstream ss;
     ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
@@ -1030,7 +1027,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         jit.getCurrentContext(), // calling context
         messageSelector,         // selector
         arguments,               // message arguments
-
+        
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo())
     };
@@ -1083,7 +1080,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* value = jit.popValue();
                 
                 // Loading the target context information
-                Value* blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), ot.block->getPointerTo());
+                Value* blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), m_baseTypes.block->getPointerTo());
                 Value* creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
                 Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
                 
@@ -1161,7 +1158,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             //Value* messageObject      = jit.builder->CreateLoad(messageSelectorPtr);
             
             Value* selectorObject  = jit.getLiteral(literalIndex);
-            Value* messageSelector = jit.builder->CreateBitCast(selectorObject, ot.symbol->getPointerTo());
+            Value* messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
             
             //Value* methodObject       = jit.builder->CreateLoad(jit.methodPtr);
             //Value* currentClassPtr    = jit.builder->CreateStructGEP(jit.methodObject, 6);

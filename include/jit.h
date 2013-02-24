@@ -140,6 +140,8 @@ struct TBaseFunctions {
     llvm::Function* TObject__getSize;
     llvm::Function* TObject__getClass;
     llvm::Function* TObject__getFields;
+    llvm::Function* TObject__getField;
+    llvm::Function* TObject__setField;
     llvm::Function* getSlotSize;
 
     void initializeFromModule(llvm::Module* module) {
@@ -149,6 +151,8 @@ struct TBaseFunctions {
         TObject__getSize   = module->getFunction("TObject::getSize()");
         TObject__getClass  = module->getFunction("TObject::getClass()");
         TObject__getFields = module->getFunction("TObject::getFields()");
+        TObject__getField  = module->getFunction("getObjectField");
+        TObject__setField  = module->getFunction("setObjectField");
         getSlotSize        = module->getFunction("getSlotSize()");
     }
 };
