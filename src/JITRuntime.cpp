@@ -44,7 +44,7 @@
 #include <llvm/LinkAllPasses.h>
 
 #include <llvm/CodeGen/GCs.h>
-
+#include <llstPass.h>
 
 #include <iostream>
 #include <sstream>
@@ -443,6 +443,8 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
+    
+    m_functionPassManager->add(createLLSTPass());
     
     m_modulePassManager->add(llvm::createFunctionInliningPass());
     m_functionPassManager->doInitialization();
