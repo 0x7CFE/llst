@@ -1,101 +1,101 @@
 ; ModuleID = 'types'
-%struct.TSize = type { i32 ; data
+%TSize = type { i32 ; data
                      }
-%struct.TObject = type { %struct.TSize, ; size
-                         %struct.TClass*, ; class
-                         [0 x %struct.TObject*] ; fields
+%TObject = type { %TSize, ; size
+                         %TClass*, ; class
+                         [0 x %TObject*] ; fields
                        }
-%struct.TByteObject = type { %struct.TObject }
-%struct.TSymbol = type { %struct.TByteObject }
-%struct.TString = type { %struct.TByteObject }
-%struct.TChar = type { %struct.TObject,
+%TByteObject = type { %TObject }
+%TSymbol = type { %TByteObject }
+%TString = type { %TByteObject }
+%TChar = type { %TObject,
                        i32 ; value
                      }
-%struct.TArray = type { %struct.TObject }
-%struct.TObjectArray = type { %struct.TObject }
-%struct.TSymbolArray = type { %struct.TObject }
-%struct.TContext = type { %struct.TObject,
-                          %struct.TMethod*,
-                          %struct.TObjectArray*, ; arguments
-                          %struct.TObjectArray*, ; temporaries
-                          %struct.TObjectArray*, ; stack
+%TArray = type { %TObject }
+%TObjectArray = type { %TObject }
+%TSymbolArray = type { %TObject }
+%TContext = type { %TObject,
+                          %TMethod*,
+                          %TObjectArray*, ; arguments
+                          %TObjectArray*, ; temporaries
+                          %TObjectArray*, ; stack
                           i32, ; bytePointer
                           i32, ; stackTop
-                          %struct.TContext* ; previousContext
+                          %TContext* ; previousContext
                         }
-%struct.TBlock = type { %struct.TContext,
+%TBlock = type { %TContext,
                         i32, ; argumentLocation
-                        %struct.TContext*, ; creatingContext
+                        %TContext*, ; creatingContext
                         i32  ; blockBytePointer
                       }
-%struct.TMethod = type { %struct.TObject,
-                         %struct.TSymbol*, ; name
-                         %struct.TByteObject*, ; byteCodes
-                         %struct.TSymbolArray*, ; literals
+%TMethod = type { %TObject,
+                         %TSymbol*, ; name
+                         %TByteObject*, ; byteCodes
+                         %TSymbolArray*, ; literals
                          i32, ; stackSize
                          i32, ; temporarySize
-                         %struct.TClass*, ; class
-                         %struct.TString*, ; text
-                         %struct.TObject* ; package
+                         %TClass*, ; class
+                         %TString*, ; text
+                         %TObject* ; package
                        }
-%struct.TDictionary = type { %struct.TObject,
-                             %struct.TSymbolArray*, ; keys
-                             %struct.TObjectArray* ; values
+%TDictionary = type { %TObject,
+                             %TSymbolArray*, ; keys
+                             %TObjectArray* ; values
                            }
-%struct.TClass = type { %struct.TObject,
-                        %struct.TSymbol*, ; name
-                        %struct.TClass*, ; parentClass
-                        %struct.TDictionary*, ; methods
+%TClass = type { %TObject,
+                        %TSymbol*, ; name
+                        %TClass*, ; parentClass
+                        %TDictionary*, ; methods
                         i32, ; instanceSize
-                        %struct.TSymbolArray*, ; variables
-                        %struct.TObject* ; package
+                        %TSymbolArray*, ; variables
+                        %TObject* ; package
                       }
-%struct.TProcess = type { %struct.TObject,
-                          %struct.TContext*, ; context
-                          %struct.TObject*, ; state
-                          %struct.TObject* ; result
+%TProcess = type { %TObject,
+                          %TContext*, ; context
+                          %TObject*, ; state
+                          %TObject* ; result
                         }
-%struct.TGlobals = type { %struct.TObject*, ; nilObject
-                          %struct.TObject*, ; trueObject
-                          %struct.TObject*, ; falseObject
-                          %struct.TClass*, ; smallIntClass
-                          %struct.TClass*, ; arrayClass
-                          %struct.TClass*, ; blockClass
-                          %struct.TClass*, ; contextClass
-                          %struct.TClass*, ; stringClass
-                          %struct.TDictionary*, ; globalsObject
-                          %struct.TMethod*, ; initialMethod
-                          [3 x %struct.TObject*], ; binaryMessages : [<, <=, +]
-                          %struct.TClass*, ; integerClass
-                          %struct.TSymbol* ; badMethodSymbol
+%TGlobals = type { %TObject*, ; nilObject
+                          %TObject*, ; trueObject
+                          %TObject*, ; falseObject
+                          %TClass*, ; smallIntClass
+                          %TClass*, ; arrayClass
+                          %TClass*, ; blockClass
+                          %TClass*, ; contextClass
+                          %TClass*, ; stringClass
+                          %TDictionary*, ; globalsObject
+                          %TMethod*, ; initialMethod
+                          [3 x %TObject*], ; binaryMessages : [<, <=, +]
+                          %TClass*, ; integerClass
+                          %TSymbol* ; badMethodSymbol
                         }
 
-%struct.TBlockReturn = type {
-    %struct.TObject*, ; value
-    %struct.TContext* ; targetContext
+%TBlockReturn = type {
+    %TObject*, ; value
+    %TContext* ; targetContext
 }
 
 ; We can use extern C++ function but
 ; llvm passes may optimize/inline IR code.
 
-define i1 @"isSmallInteger()"(%struct.TObject* %value) {
-    %int = ptrtoint %struct.TObject* %value to i32
+define i1 @"isSmallInteger()"(%TObject* %value) {
+    %int = ptrtoint %TObject* %value to i32
     ;%flag = and i32 %int, 1
     %result = trunc i32 %int to i1
     ret i1 %result
 }
 
-define i32 @"getIntegerValue()"(%struct.TObject* %value) {
-    %int = ptrtoint %struct.TObject* %value to i32
+define i32 @"getIntegerValue()"(%TObject* %value) {
+    %int = ptrtoint %TObject* %value to i32
     %result = ashr i32 %int, 1
     ret i32 %result
 }
 
-define %struct.TObject* @"newInteger()"(i32 %value) {
+define %TObject* @"newInteger()"(i32 %value) {
     %shled = shl i32 %value, 1
     %ored  = or  i32 %shled, 1
-    %result = inttoptr i32 %ored to %struct.TObject*
-    ret %struct.TObject* %result
+    %result = inttoptr i32 %ored to %TObject*
+    ret %TObject* %result
 }
 
 define i32 @"getSlotSize()"(i32 %fieldsCount) {
@@ -108,51 +108,67 @@ define i32 @"getSlotSize()"(i32 %fieldsCount) {
 }
 
 
-define i32 @"TObject::getSize()"(%struct.TObject* %this) {
-    %1 = getelementptr %struct.TObject* %this, i32 0, i32 0, i32 0
+define i32 @"TObject::getSize()"(%TObject* %this) {
+    %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %result = lshr i32 %data, 2
     ret i32 %result
 }
 
-define i1 @"TObject::isRelocated()"(%struct.TObject* %this) {
-    %1 = getelementptr %struct.TObject* %this, i32 0, i32 0, i32 0
+define i1 @"TObject::isRelocated()"(%TObject* %this) {
+    %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %field = and i32 %data, 1
     %result = trunc i32 %field to i1
     ret i1 %result
 }
 
-define i1 @"TObject::isBinary()"(%struct.TObject* %this) {
-    %1 = getelementptr %struct.TObject* %this, i32 0, i32 0, i32 0
+define i1 @"TObject::isBinary()"(%TObject* %this) {
+    %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %field = and i32 %data, 2
     %result = icmp ne i32 %field, 0
     ret i1 %result
 }
 
-define %struct.TClass* @"TObject::getClass()"(%struct.TObject* %this) {
-    %addr = getelementptr %struct.TObject* %this, i32 0, i32 1
-    %class = load %struct.TClass** %addr
-    ret %struct.TClass* %class
+define %TClass* @"TObject::getClass()"(%TObject* %this) {
+    %addr = getelementptr %TObject* %this, i32 0, i32 1
+    %class = load %TClass** %addr
+    ret %TClass* %class
 }
 
-define %struct.TObject** @"TObject::getFields()"(%struct.TObject* %this) {
-    %fields = getelementptr inbounds %struct.TObject* %this, i32 0, i32 2
-    %result = getelementptr inbounds [0 x %struct.TObject*]* %fields, i32 0, i32 0
-    ret %struct.TObject** %result
+define %TObject** @"TObject::getFields()"(%TObject* %this) {
+    %fields = getelementptr inbounds %TObject* %this, i32 0, i32 2
+    %result = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 0
+    ret %TObject** %result
 }
 
 ; FIXME demangle TObject ::getField() properly
 
-define %struct.TObject* @"TObject::getField(int)"(%struct.TObject* %this, i32 %index) {
-    %fields    = getelementptr inbounds %struct.TObject* %this, i32 0, i32 2
-    %resultPtr = getelementptr inbounds [0 x %struct.TObject*]* %fields, i32 0, i32 %index
-    %result    = load %struct.TObject** %resultPtr
-    ret %struct.TObject* %result
+define %TObject* @getObjectField(%TObject* %object, i32 %index) {
+    %fields    = getelementptr inbounds %TObject* %object, i32 0, i32 2
+    %fieldPtr  = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
+    %result    = load %TObject** %fieldPtr
+    ret %TObject* %result
+}
+
+define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) {
+    %fields   = getelementptr inbounds %TObject* %object, i32 0, i32 2
+    %fieldPtr = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
+    store %TObject* %value, %TObject** %fieldPtr
+    ret %TObject** %fieldPtr
 }
 
 declare void @llvm.memcpy.p0i8.p0i8.i32(i8* %dest, i8* %src, i32 %size, i32 %align, i1 %volatile)
+declare void @llvm.gcroot(i8** %ptrloc, i8* %metadata)
+
+define %TObject* @dummy() gc "shadow-stack" {
+    ; enabling shadow stack init on this module
+    ret %TObject* null
+}
+
 ; memory management functions
-;declare %struct.TObject*     @newOrdinaryFunction(%struct.TClass, i32)
-;declare %struct.TByteObject* @newBinaryFunction(%struct.TClass, i32)
+;declare %TObject*     @newOrdinaryFunction(%TClass, i32)
+;declare %TByteObject* @newBinaryFunction(%TClass, i32)
+
+

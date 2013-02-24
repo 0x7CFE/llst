@@ -95,19 +95,19 @@ struct TObjectTypes {
 
 
     void initializeFromModule(llvm::Module* module) {
-        object      = module->getTypeByName("struct.TObject");
-        klass       = module->getTypeByName("struct.TClass");
-        context     = module->getTypeByName("struct.TContext");
-        block       = module->getTypeByName("struct.TBlock");
-        dictionary  = module->getTypeByName("struct.TDictionary");
-        method      = module->getTypeByName("struct.TMethod");
-        symbol      = module->getTypeByName("struct.TSymbol");
-        objectArray = module->getTypeByName("struct.TObjectArray");
-        symbolArray = module->getTypeByName("struct.TSymbolArray");
-        globals     = module->getTypeByName("struct.TGlobals");
-        byteObject  = module->getTypeByName("struct.TByteObject");
-        blockReturn = module->getTypeByName("struct.TBlockReturn");
-        process     = module->getTypeByName("struct.TProcess");
+        object      = module->getTypeByName("TObject");
+        klass       = module->getTypeByName("TClass");
+        context     = module->getTypeByName("TContext");
+        block       = module->getTypeByName("TBlock");
+        dictionary  = module->getTypeByName("TDictionary");
+        method      = module->getTypeByName("TMethod");
+        symbol      = module->getTypeByName("TSymbol");
+        objectArray = module->getTypeByName("TObjectArray");
+        symbolArray = module->getTypeByName("TSymbolArray");
+        globals     = module->getTypeByName("TGlobals");
+        byteObject  = module->getTypeByName("TByteObject");
+        blockReturn = module->getTypeByName("TBlockReturn");
+        process     = module->getTypeByName("TProcess");
     }
 };
 
@@ -153,14 +153,27 @@ struct TBaseFunctions {
     }
 };
 
-class MethodCompiler {
-private:
-    llvm::Module* m_JITModule;
+class TStackValue {
+public:
+    virtual ~TStackValue() { }
+    virtual llvm::Value* get() = 0;
+};
 
+class TPlainValue : public TStackValue {
+private:
+    llvm::Value* m_value;
+public:
+    TPlainValue(llvm::Value* value) : m_value(value) {}
+    virtual ~TPlainValue() { }
+    
+    virtual llvm::Value* get() { return m_value; }
+};
+
+class MethodCompiler {
+public:
     // Some useful type aliases
-    typedef std::list<llvm::Value*> TValueStack;
+    typedef std::list<TStackValue*> TValueStack;
     typedef std::set<llvm::BasicBlock*> TRefererSet;
-    typedef std::set<llvm::BasicBlock*>::iterator TRefererSetIterator;
 
     // Block context is a logic encapsulation
     // of Smalltalk's CFG and value transitions
@@ -183,22 +196,15 @@ private:
         uint32_t            byteCount;
 
         llvm::Function*     function;     // LLVM function that is created based on method
-        llvm::Value*        methodPtr;    // LLVM representation for Smalltalk's method object
-        llvm::Value*        arguments;    // LLVM representation for method arguments array
-        llvm::Value*        temporaries;  // LLVM representation for method temporaries array
-        llvm::Value*        literals;     // LLVM representation for method literals array
-        llvm::Value*        self;         // LLVM representation for current object
-        llvm::Value*        selfFields;   // LLVM representation for current object's fields
-
         TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
-        llvm::Value*        context;
-        llvm::Value*        blockContext;
 
+        llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
 
-        std::map<llvm::BasicBlock*, TBasicBlockContext> basicBlockContexts;
+        typedef std::map<llvm::BasicBlock*, TBasicBlockContext> TBlockContextMap;
+        TBlockContextMap basicBlockContexts;
 
         // Value stack is used as a FIFO value holder during the compilation process.
         // Software VM uses object arrays to hold the values in dynamic.
@@ -208,26 +214,55 @@ private:
         // will be linked together with effect of instanceVariables[2] = temporaries[1]
 
         MethodCompiler* compiler; // link to outer class for variable access
-        bool hasValue(); // { return true; } // FIXME !valueStack.empty(); }
-        void pushValue(llvm::Value* value); // { valueStack.push_back(value); }
-        llvm::Value* lastValue(); // { return valueStack.back(); }
+        bool hasValue();
+        void pushValue(llvm::Value* value); 
+        llvm::Value* lastValue(); 
         llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0);
 
+        llvm::Value* contextHolder;
+        llvm::Value* selfHolder;
+        
+        llvm::Value* getCurrentContext();
+        llvm::Value* getSelf();
+        llvm::Value* getMethodClass();
+        llvm::Value* getLiteral(uint32_t index);
+        
+        void pushValue(TStackValue* value);
+        
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
             : method(method), callingContext(context),
-            bytePointer(0), function(0), methodPtr(0), arguments(0),
-            temporaries(0), literals(0), self(0), selfFields(0), builder(0), context(0),
-            exceptionLandingPad(0), /*blockReturnTypeInfo(0),*/ methodHasBlockReturn(false), compiler(compiler)
+            bytePointer(0), function(0), builder(0), 
+            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
+            contextHolder(0), selfHolder(0)
         {
             byteCount = method->byteCodes->getSize();
-            //valueStack.reserve(method->stackSize);
         };
 
-        ~TJITContext() { if (builder) delete builder; }
-    private:
-        //TValueStack valueStack;
+        ~TJITContext() {
+            if (! basicBlockContexts.empty()) {
+                TBlockContextMap::iterator iContext = basicBlockContexts.begin();
+                while (iContext != basicBlockContexts.end()) {
+                    TValueStack& valueStack = iContext->second.valueStack;
+                    if (! valueStack.empty()) {
+                        TValueStack::iterator iStackValue = valueStack.begin();
+                        while (iStackValue != valueStack.end()) {
+                            delete *iStackValue;
+                            ++iStackValue;
+                        }
+                        valueStack.clear();
+                    }
+                    ++iContext;
+                }
+                basicBlockContexts.clear();
+            }
+            
+            if (builder) 
+                delete builder; 
+        }
     };
     
+private:
+    llvm::Module* m_JITModule;
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
     bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
@@ -240,6 +275,9 @@ private:
     TExceptionAPI  m_exceptionAPI;
     TBaseFunctions m_baseFunctions;
 
+    llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
+    llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
+    
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);
@@ -274,19 +312,50 @@ public:
         : m_JITModule(JITModule),
         m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi)
     {
-        /* we can get rid of m_TypeModule by linking m_JITModule with TypeModule
-        std::string linkerErrorMessages;
-        bool linkerFailed = llvm::Linker::LinkModules(m_JITModule, TypeModule, llvm::Linker::PreserveSource, &linkerErrorMessages);
-        if (linkerFailed) {
-            printf("%s\n", linkerErrorMessages.c_str());
-            exit(1);
-        }
-        */
         m_baseTypes.initializeFromModule(JITModule);
         m_globals.initializeFromModule(JITModule);
         m_baseFunctions.initializeFromModule(JITModule);
     }
 };
+
+class TDeferredValue : public TStackValue {
+public:
+    enum TOperation {
+        loadInstance,
+        loadArgument,
+        loadTemporary,
+        loadLiteral,
+        
+        // result of message sent 
+        // or pushed block 
+        loadHolder
+    };
+    
+private:
+    TOperation   m_operation;
+    uint32_t     m_index;
+    llvm::Value* m_argument;
+    
+    MethodCompiler::TJITContext* m_jit;
+public:
+    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index) {
+        m_argument = 0;
+        m_operation = operation;
+        m_index = index;
+        m_jit = jit;
+    }
+    
+    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument) {
+        m_operation = operation;
+        m_argument = argument;
+        m_index = 0;
+        m_jit = jit;
+    }
+    
+    virtual ~TDeferredValue() { }
+    virtual llvm::Value* get();
+};
+
 
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
@@ -319,10 +388,6 @@ private:
     MethodCompiler* m_methodCompiler;
 
     llvm::Module* m_JITModule;
-
-    //typedef std::map<std::string, llvm::Function*> TFunctionMap;
-    //typedef std::map<std::string, llvm::Function*>::iterator TFunctionMapIterator;
-    //TFunctionMap m_compiledFunctions; //TODO useless var?
 
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
@@ -370,8 +435,8 @@ private:
     
     TMethodFunction lookupFunctionInCache(TMethod* method);
     TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
-    TMethodFunction updateFunctionCache(TMethod* method, TMethodFunction function);
-    TMethodFunction updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
+    void updateFunctionCache(TMethod* method, TMethodFunction function);
+    void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
     
     void initializeGlobals();
     void initializePassManager();
@@ -387,6 +452,7 @@ public:
     MethodCompiler* getCompiler() { return m_methodCompiler; }
     SmalltalkVM* getVM() { return m_softVM; }
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
+    llvm::Module* getModule() { return m_JITModule; }
 
     void printStat();
     

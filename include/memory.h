@@ -282,6 +282,9 @@ public:
     virtual ~LLVMMemoryManager();
 };
 
+extern "C" { extern LLVMMemoryManager::TStackEntry* llvm_gc_root_chain; }
+
+
 class Image {
 private:
     int      m_imageFileFD;

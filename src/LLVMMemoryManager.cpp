@@ -42,19 +42,28 @@ extern "C" { LLVMMemoryManager::TStackEntry* llvm_gc_root_chain = 0; }
 void LLVMMemoryManager::moveObjects()
 {
     // First of all doing our usual job
+    printf("LLVMMemoryManager::moveObjects() collecting heap objects\n");
     BakerMemoryManager::moveObjects();
 
-    printf("LLVMMemoryManager::moveObjects()\n");
+    printf("LLVMMemoryManager::moveObjects() processing llvm_gc_root_chain\n");
     // Then, traversing the call stack pointers
     for (TStackEntry* entry = llvm_gc_root_chain; entry != 0; entry = entry->next) {
         // NOTE We do not using the meta info
 
         // Iterating through the roots in the current stack frame
         for (int32_t index = 0, count = entry->map->numRoots; index < count; index++) {
-            TMovableObject** objectSlot = (TMovableObject**) entry->roots[index];
-            *objectSlot = moveObject(*objectSlot);
+            TMovableObject* object = (TMovableObject*) entry->roots[index];
+
+            if (object != 0)
+                object = moveObject(object);
+
+            entry->roots[index] = object;
         }
     }
+}
+
+LLVMMemoryManager::LLVMMemoryManager()
+{
 }
 
 LLVMMemoryManager::~LLVMMemoryManager()

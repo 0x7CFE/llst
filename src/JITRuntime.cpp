@@ -1,7 +1,7 @@
 /*
-*    main.cpp
+*    JITRuntime.cpp
 *
-*    Program entry point
+*    LLST Runtime environment
 *
 *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
 *
@@ -43,6 +43,9 @@
 #include <llvm/Target/TargetData.h>
 #include <llvm/LinkAllPasses.h>
 
+#include <llvm/CodeGen/GCs.h>
+
+
 #include <iostream>
 #include <sstream>
 
@@ -79,7 +82,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     // Initializing LLVM subsystem
     InitializeNativeTarget();
-
+    llvm::linkShadowStackGC();
+    
     LLVMContext& llvmContext = getGlobalContext();
 
     // Initializing JIT module.
@@ -97,12 +101,14 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     TargetOptions Opts;
     Opts.JITExceptionHandling = true;
-
+    Opts.JITEmitDebugInfo = true;
+    
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule)
                             .setEngineKind(EngineKind::JIT)
                             .setErrorStr(&error)
                             .setTargetOptions(Opts)
+                            .setOptLevel(CodeGenOpt::Aggressive)
                             .create();
                             
     if (!m_executionEngine) {
@@ -193,7 +199,7 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
     }
 }
 
-JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
+void JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
@@ -202,7 +208,7 @@ JITRuntime::TMethodFunction JITRuntime::updateFunctionCache(TMethod* method, TMe
     entry.function = function;
 }
 
-JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
+void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
 {
     uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
     TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
@@ -215,7 +221,6 @@ JITRuntime::TMethodFunction JITRuntime::updateBlockFunctionCache(TMethod* contai
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
-    // TODO Fast 1-way lookup cache
     const uint16_t blockOffset = getIntegerValue(block->bytePointer);
     
     TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
@@ -239,21 +244,21 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 exit(1);
             }
             
-            if (verifyModule(*m_JITModule)) {
-                outs() << "Module verification failed.\n";
-                //exit(1);
-            }
+//             if (verifyModule(*m_JITModule)) {
+//                 outs() << "Module verification failed.\n";
+//                 //exit(1);
+//             }
             
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
             
             // Running the optimization passes on a function
             m_functionPassManager->run(*blockFunction);
             
-//             outs() << *blockFunction;
         }
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
         updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
+        outs() << *blockFunction;
     }
     
     block->previousContext = callingContext->previousContext;
@@ -315,8 +320,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
     
     // Searching for the jit compiled function
-    // TODO Fast 1-way lookup cache
-    
     TMethodFunction compiledMethodFunction = lookupFunctionInCache(method); 
     
     if (! compiledMethodFunction) {
@@ -328,10 +331,13 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Compiling function and storing it to the table for further use
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
             
+            outs() << *methodFunction;
+            
             if (verifyModule(*m_JITModule)) {
                 outs() << "Module verification failed.\n";
                 exit(1);
             }
+
             
             // Running the optimization passes on a function
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
@@ -339,10 +345,10 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             m_functionPassManager->run(*methodFunction);
         }
 
-        //outs() << *m_JITModule;
         // Calling the method and returning the result
-        //outs() << "Acquiring function address for " << functionName << " ...\n";
         compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
+        outs() << *methodFunction;
+        
         updateFunctionCache(method, compiledMethodFunction);
     }
     
@@ -365,7 +371,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     newContext->method            = method;
     newContext->previousContext   = previousContext;
 
-	//outs() << "Calling compiled method " << functionName << " ...\n";
 	TObject* result = compiledMethodFunction(newContext);
 
 //     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
@@ -435,11 +440,11 @@ void JITRuntime::initializePassManager() {
     // blocks, etc).
     m_functionPassManager->add(llvm::createCFGSimplificationPass());
     
+    m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
+    m_functionPassManager->add(llvm::createDeadInstEliminationPass());
+    m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
+    
     m_modulePassManager->add(llvm::createFunctionInliningPass());
-//     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
-//     m_functionPassManager->add(llvm::createDeadInstEliminationPass());
-//     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
-
     m_functionPassManager->doInitialization();
 }
 
@@ -523,6 +528,12 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
+                                                             
+    //Type*  rootChainType = m_JITModule->getTypeByName("gc_stackentry")->getPointerTo();
+    //GlobalValue* gRootChain    = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("llvm_gc_root_chain", rootChainType) );
+    GlobalValue* gRootChain = m_JITModule->getGlobalVariable("llvm_gc_root_chain");
+    m_executionEngine->addGlobalMapping(gRootChain, reinterpret_cast<void*>(&llvm_gc_root_chain));
+    
 }
 
 void JITRuntime::initializeExceptionAPI() {
@@ -596,61 +607,61 @@ extern "C" {
 
 TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
 {
-//     printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
+    printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
     JITRuntime::Instance()->m_objectsAllocated++;
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
 {
-//     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
+    printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     JITRuntime::Instance()->m_objectsAllocated++;
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
 TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
 {
-//     printf("sendMessage(%p, #%s, %p)\n",
-//            callingContext,
-//            message->toString().c_str(),
-//            arguments);
+    printf("sendMessage(%p, #%s, %p)\n",
+           callingContext,
+           message->toString().c_str(),
+           arguments);
 
-//     TObject* self = arguments->getField(0);
-//     printf("\tself = %p\n", self);
-//     
-//     TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
-//     printf("\tself class = %p\n", klass);
-//     printf("\tself class name = '%s'\n", klass->name->toString().c_str());
+    TObject* self = arguments->getField(0);
+    printf("\tself = %p\n", self);
+    
+    TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
+    printf("\tself class = %p\n", klass);
+    printf("\tself class name = '%s'\n", klass->name->toString().c_str());
     JITRuntime::Instance()->m_messagesDispatched++;
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
 }
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
-//     printf("createBlock(%p, %d, %d)\n",
-//         callingContext,
-//         (uint32_t) argLocation,
-//         (uint32_t) bytePointer );
+    printf("createBlock(%p, %d, %d)\n",
+        callingContext,
+        (uint32_t) argLocation,
+        (uint32_t) bytePointer );
 
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
 TObject* invokeBlock(TBlock* block, TContext* callingContext)
 {
-//     printf("invokeBlock %p, %p\n", block, callingContext);
+    printf("invokeBlock %p, %p\n", block, callingContext);
     JITRuntime::Instance()->m_blocksInvoked++;
     return JITRuntime::Instance()->invokeBlock(block, callingContext);
 }
 
 void emitBlockReturn(TObject* value, TContext* targetContext)
 {
-//     printf("emitBlockReturn(%p, %p)\n", value, targetContext);
+    printf("emitBlockReturn(%p, %p)\n", value, targetContext);
     throw TBlockReturn(value, targetContext);
 }
 
 void checkRoot(TObject* value, TObject** objectSlot)
 {
-//     printf("checkRoot %p, %p\n", value, objectSlot);
+    printf("checkRoot %p, %p\n", value, objectSlot);
     JITRuntime::Instance()->getVM()->checkRoot(value, objectSlot);
 }
 

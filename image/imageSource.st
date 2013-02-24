@@ -1298,7 +1298,7 @@ runAllFrom: testSuite | suite |
 !
 
 METHOD Undefined
-main    | command x1 x2 list ms1 ms2 selector args |
+main    | command x1 x2 list ms1 ms2 selector args block |
         " initialize classes "
 
         Char initialize.
@@ -1320,13 +1320,16 @@ main    | command x1 x2 list ms1 ms2 selector args |
         LLVMTestStatements new classAsString."
 
         "StringTest new runAllInLLVM."
-
+        "LLVMTestStatements new testCat. ^nil."
+        
         list <- List new.
-        1 to: 250 do: [ :x | list add: 1000 atRandom ].
+        1 to: 500 do: [ :x | list add: 1000 atRandom ].
         selector <- ('sortTest2:' asSymbol).
         args <- Array with: nil with: list.
-        ms1 <- Timer millisecondsToRun: [ LLVM sendMessage: selector withArguments: args ].
-        ms2 <- Timer millisecondsToRun: [ LLVM sendMessage: selector withArguments: args ].
+        block <- [ LLVM sendMessage: selector withArguments: args ].
+        ms1 <- Timer millisecondsToRun: block.
+        ms2 <- Timer millisecondsToRun: block.
+
         "x2 printNl."
         '1 Sorted in ms: ' print. ms1 printNl.
         '2 Sorted in ms: ' print. ms2 printNl.
