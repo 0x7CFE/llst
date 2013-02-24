@@ -608,9 +608,9 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.high =  jit.instruction.low;
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
-
+        
         printOpcode(jit.instruction);
-
+        
 //        uint32_t instCountBefore = jit.builder->GetInsertBlock()->getInstList().size();
 
         // Then writing the code
@@ -804,7 +804,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
     blockContext.function->setGC("shadow-stack");
     m_blockFunctions[blockFunctionName] = blockContext.function;
-
+    
     // Creating the basic block and inserting it into the function
     blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
     blockContext.builder = new IRBuilder<>(blockContext.preamble);
@@ -926,7 +926,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     jit.builder->SetInsertPoint(integersBlock);
     Value*    rightInt     = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
     Value*    leftInt      = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftValue);
-
+    
     Value* intResult       = 0;  // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
     switch ((binaryMessage::Opcode) opcode) {
@@ -1049,7 +1049,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         // Just calling the function. No block switching is required
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
-
+    
     Value* resultHolder = protectPointer(jit, result);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
@@ -1213,9 +1213,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         
         // TODO ioGetchar
         case primitive::ioPutChar: {
-            Value*    intObject   = jit.popValue();
-            Value*    intValue    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, intObject);
-            Value*    charValue   = jit.builder->CreateTrunc(intValue, jit.builder->getInt8Ty());
+            Value* intObject = jit.popValue();
+            Value* intValue  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, intObject);
+            Value* charValue = jit.builder->CreateTrunc(intValue, jit.builder->getInt8Ty());
             
             Function* putcharFunc = cast<Function>(m_JITModule->getOrInsertFunction("putchar", jit.builder->getInt32Ty(), jit.builder->getInt8Ty(), NULL));
             jit.builder->CreateCall(putcharFunc, charValue);
@@ -1268,45 +1268,45 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* klassObject = jit.popValue();
             Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
             
-            Value*    size        = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "size.");
-            Value*    slotSize    = jit.builder->CreateCall(m_baseFunctions.getSlotSize, size, "slotSize.");
-            Value*    args[]      = { klass, slotSize };
-            Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
+            Value* size        = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "size.");
+            Value* slotSize    = jit.builder->CreateCall(m_baseFunctions.getSlotSize, size, "slotSize.");
+            Value* args[]      = { klass, slotSize };
+            Value* newInstance = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args, "instance.");
             
             primitiveResult = newInstance; //protectPointer(jit, newInstance);
         } break;
         
         case primitive::allocateByteArray: { // 20      // FIXME pointer safety
-            Value*    sizeObject  = jit.popValue();
-            Value*    klassObject = jit.popValue();
+            Value* sizeObject  = jit.popValue();
+            Value* klassObject = jit.popValue();
             
-            Value*    klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
-            Value*    dataSize    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "dataSize.");
+            Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
+            Value* dataSize    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "dataSize.");
             
-            Value*    args[]      = { klass, dataSize };
-            Value*    newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
+            Value* args[]      = { klass, dataSize };
+            Value* newInstance = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "instance.");
 
             primitiveResult = jit.builder->CreateBitCast(newInstance/*protectPointer(jit, newInstance)*/, m_baseTypes.object->getPointerTo() );
         } break;
         
         case primitive::cloneByteObject: { // 23      // FIXME pointer safety
-            Value*    klassObject = jit.popValue();
-            Value*    original    = jit.popValue();
-            Value*    klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
+            Value* klassObject = jit.popValue();
+            Value* original    = jit.popValue();
+            Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
             
-            Value*    dataSize = jit.builder->CreateCall(m_baseFunctions.TObject__getSize, original, "dataSize.");
+            Value* dataSize = jit.builder->CreateCall(m_baseFunctions.TObject__getSize, original, "dataSize.");
             
-            Value*    args[]   = { klass, dataSize };
-            Value*    _clone   = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
-            Value*    clone = _clone; //protectPointer(jit, _clone);
+            Value* args[]   = { klass, dataSize };
+            Value* _clone   = jit.builder->CreateCall(m_runtimeAPI.newBinaryObject, args, "clone.");
+            Value* clone    = _clone; //protectPointer(jit, _clone);
             
-            Value*    originalObject = jit.builder->CreateBitCast(original, m_baseTypes.object->getPointerTo());
-            Value*    cloneObject    = jit.builder->CreateBitCast(clone, m_baseTypes.object->getPointerTo());
-            Value*    sourceFields = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, originalObject);
-            Value*    destFields   = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, cloneObject);
+            Value* originalObject = jit.builder->CreateBitCast(original, m_baseTypes.object->getPointerTo());
+            Value* cloneObject    = jit.builder->CreateBitCast(clone, m_baseTypes.object->getPointerTo());
+            Value* sourceFields   = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, originalObject);
+            Value* destFields     = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, cloneObject);
             
-            Value*    source       = jit.builder->CreateBitCast(sourceFields, Type::getInt8PtrTy(m_JITModule->getContext()));
-            Value*    destination  = jit.builder->CreateBitCast(destFields, Type::getInt8PtrTy(m_JITModule->getContext()));
+            Value* source       = jit.builder->CreateBitCast(sourceFields, Type::getInt8PtrTy(m_JITModule->getContext()));
+            Value* destination  = jit.builder->CreateBitCast(destFields, Type::getInt8PtrTy(m_JITModule->getContext()));
             
             // Copying the data
             Value* copyArgs[] = {
@@ -1334,13 +1334,13 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             
             int32_t argCount = jit.instruction.low - 1;
             
-            Value* blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
-            Value* blockTempsPtr  = jit.builder->CreateStructGEP(blockAsContext, 3);
-            Value* blockTemps     = jit.builder->CreateLoad(blockTempsPtr);
+            Value* blockAsContext   = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
+            Value* blockTempsPtr    = jit.builder->CreateStructGEP(blockAsContext, 3);
+            Value* blockTemps       = jit.builder->CreateLoad(blockTempsPtr);
             Value* blockTempsObject = jit.builder->CreateBitCast(blockTemps, m_baseTypes.object->getPointerTo());
             
-            Value*    fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, blockTempsObject);
-            Value*    tempsSize = jit.builder->CreateCall(m_baseFunctions.TObject__getSize, blockTempsObject, "tempsSize.");
+            Value* fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, blockTempsObject);
+            Value* tempsSize = jit.builder->CreateCall(m_baseFunctions.TObject__getSize, blockTempsObject, "tempsSize.");
             
             Value* argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
             Value* argumentLocationField  = jit.builder->CreateLoad(argumentLocationPtr);
@@ -1408,10 +1408,10 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
             
             //Checking whether index is Smallint //TODO jump to primitiveFailed if not
-            Value*    indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
+            Value* indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
             
-            Value*    index    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
-            Value*    actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1));
+            Value* index       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
+            Value* actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1));
             
             //Checking boundaries
             Value* arraySize   = jit.builder->CreateCall(m_baseFunctions.TObject__getSize, arrayObject);
@@ -1423,8 +1423,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->CreateCondBr(indexOk, indexChecked, primitiveFailed);
             jit.builder->SetInsertPoint(indexChecked);
             
-            Value*    fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, arrayObject);
-            Value*    fieldPtr  = jit.builder->CreateGEP(fields, actualIndex);
+            Value* fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, arrayObject);
+            Value* fieldPtr  = jit.builder->CreateGEP(fields, actualIndex);
             
             if (opcode == primitive::arrayAtPut) {
                 jit.builder->CreateStore(valueObejct, fieldPtr);
@@ -1443,7 +1443,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
             
             //Checking whether index is Smallint //TODO jump to primitiveFailed if not
-            Value*    indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
+            Value* indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
             
             // Acquiring integer value of the index (from the smalltalk's TInteger)
             Value*    index    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
@@ -1460,9 +1460,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->SetInsertPoint(indexChecked);
             
             // Getting access to the actual indexed byte location
-            Value*    fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, stringObject);
-            Value*    bytes     = jit.builder->CreateBitCast(fields, jit.builder->getInt8PtrTy());
-            Value*    bytePtr   = jit.builder->CreateGEP(bytes, actualIndex);
+            Value* fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, stringObject);
+            Value* bytes     = jit.builder->CreateBitCast(fields, jit.builder->getInt8PtrTy());
+            Value* bytePtr   = jit.builder->CreateGEP(bytes, actualIndex);
             
             if (opcode == primitive::stringAtPut) {
                 // Popping new value from the stack, getting actual integral value from the TInteger
@@ -1497,11 +1497,11 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* rightObject = jit.popValue();
             Value* leftObject  = jit.popValue();
             
-            Value*    rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightObject);
-            Value*    leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftObject);
-            Value*    isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
+            Value* rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightObject);
+            Value* leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftObject);
+            Value* isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
             
-            BasicBlock* areInts  = BasicBlock::Create(m_JITModule->getContext(), "areInts.", jit.function);
+            BasicBlock* areInts = BasicBlock::Create(m_JITModule->getContext(), "areInts.", jit.function);
             jit.builder->CreateCondBr(isSmallInts, areInts, primitiveFailed);
             
             jit.builder->SetInsertPoint(areInts);

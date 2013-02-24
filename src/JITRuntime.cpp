@@ -79,13 +79,13 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 {
     s_instance = this;
     m_softVM = softVM;
-
+    
     // Initializing LLVM subsystem
     InitializeNativeTarget();
     llvm::linkShadowStackGC();
     
     LLVMContext& llvmContext = getGlobalContext();
-
+    
     // Initializing JIT module.
     // All JIT functions will be created here
     SMDiagnostic Err;
@@ -94,11 +94,11 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         Err.print("JITRuntime.cpp", errs());
         exit(1);
     }
-
+    
     // Providing the memory management interface to the JIT module
     // FIXME Think about interfacing the MemoryManager directly
     // These are then used as an allocator function return types
-
+    
     TargetOptions Opts;
     Opts.JITExceptionHandling = true;
     Opts.JITEmitDebugInfo = true;
@@ -110,23 +110,23 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
                             .setTargetOptions(Opts)
                             .setOptLevel(CodeGenOpt::Aggressive)
                             .create();
-                            
+    
     if (!m_executionEngine) {
         errs() << error;
         exit(1);
     }
-
+    
     ot.initializeFromModule(m_JITModule);
-
+    
     initializeGlobals();
     initializePassManager();
     initializeRuntimeAPI();
     initializeExceptionAPI();
     createExecuteProcessFunction();
-
+    
     // Initializing the method compiler
     m_methodCompiler = new MethodCompiler(m_JITModule, m_runtimeAPI, m_exceptionAPI);
-
+    
     // Initializing caches
     memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
     memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
@@ -151,7 +151,7 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
 {
     // Protecting pointer
     hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
-
+    
     // Creating new context object and inheriting context variables
     // NOTE We do not allocating stack because it's not used in LLVM
     hptr<TBlock> newBlock      = m_softVM->newObject<TBlock>();
@@ -160,14 +160,14 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     newBlock->method           = previousContext->method;
     newBlock->arguments        = previousContext->arguments;
     newBlock->temporaries      = previousContext->temporaries;
-
+    
     // Assigning creatingContext depending on the hierarchy
     // Nested blocks inherit the outer creating context
     if (previousContext->getClass() == globals.blockClass)
         newBlock->creatingContext = previousContext.cast<TBlock>()->creatingContext;
     else
         newBlock->creatingContext = previousContext;
-
+    
     return newBlock;
 }
 
@@ -337,14 +337,14 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 outs() << "Module verification failed.\n";
                 exit(1);
             }
-
+            
             
             // Running the optimization passes on a function
             m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
         }
-
+        
         // Calling the method and returning the result
         compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
         outs() << *methodFunction;
@@ -356,55 +356,55 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     // implementation here, we do not need to allocate the stack object
     // because it is not used by JIT runtime. We also may skip the proper
     // initialization of various objects such as stackTop and bytePointer.
-
+    
     // Protecting the pointers before allocation
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     hptr<TContext>     previousContext  = m_softVM->newPointer(callingContext);
-
+    
     // Creating context object and temporaries
     hptr<TContext>     newContext = m_softVM->newObject<TContext>();
     hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
-
+    
     // Initializing context variables
     newContext->temporaries       = newTemps;
     newContext->arguments         = messageArguments;
     newContext->method            = method;
     newContext->previousContext   = previousContext;
-
-	TObject* result = compiledMethodFunction(newContext);
+    
+    TObject* result = compiledMethodFunction(newContext);
 
 //     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
 //     printf("Function result: %p\n", result);
 //     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
-
+    
     return result;
 }
 
 void JITRuntime::initializeGlobals() {
     GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
-
+    
     GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", ot.object) );
     m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(globals.nilObject));
-
+    
     GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object) );
     m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(globals.trueObject));
-
+    
     GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", ot.object) );
     m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(globals.falseObject));
-
+    
     GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", ot.klass) );
     m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(globals.smallIntClass));
-
+    
     GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", ot.klass) );
     m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(globals.arrayClass));
-
+    
     GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", ot.symbol) );
     m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(globals.binaryMessages[0]));
-
+    
     GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", ot.symbol) );
     m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(globals.binaryMessages[1]));
-
+    
     GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", ot.symbol) );
     m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(globals.binaryMessages[2]));
 }
@@ -452,7 +452,7 @@ void JITRuntime::initializePassManager() {
 
 void JITRuntime::initializeRuntimeAPI() {
     LLVMContext& llvmContext = getGlobalContext();
-
+    
     PointerType* objectType     = ot.object->getPointerTo();
     PointerType* classType      = ot.klass->getPointerTo();
     PointerType* byteObjectType = ot.byteObject->getPointerTo();
@@ -466,8 +466,8 @@ void JITRuntime::initializeRuntimeAPI() {
     };
     FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
     FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
-
-
+    
+    
     Type* sendParams[] = {
         contextType,                    // callingContext
         ot.symbol->getPointerTo(),      // message selector
@@ -475,27 +475,27 @@ void JITRuntime::initializeRuntimeAPI() {
         classType                       // receiverClass
     };
     FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
-
+    
     Type* createBlockParams[] = {
         contextType,                  // callingContext
         Type::getInt8Ty(llvmContext), // argLocation
         Type::getInt16Ty(llvmContext) // bytePointer
     };
     FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams, false);
-
+    
     Type* invokeBlockParams[] = {
         blockType,  // block
         contextType // callingContext
     };
     FunctionType* invokeBlockType = FunctionType::get(objectType, invokeBlockParams, false);
-
-
+    
+    
     Type* emitBlockReturnParams[] = {
         objectType, // value
         contextType // targetContext
     };
     FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
-
+    
     Type* checkRootParams[] = {
         objectType,     // value
         objectSlotType  // slot
@@ -510,7 +510,7 @@ void JITRuntime::initializeRuntimeAPI() {
         objectType  // destinationStartOffset
     };
     FunctionType* bulkReplaceType = FunctionType::get(Type::getInt1Ty(llvmContext), bulkReplaceParams, false);
-
+    
     // Creating function references
     m_runtimeAPI.newOrdinaryObject  = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
     m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
@@ -520,7 +520,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
     m_runtimeAPI.checkRoot          = Function::Create(checkRootType, Function::ExternalLinkage, "checkRoot", m_JITModule );
     m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
-
+    
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newBinaryObject, reinterpret_cast<void*>(& ::newBinaryObject));
@@ -530,12 +530,11 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
-                                                             
+    
     //Type*  rootChainType = m_JITModule->getTypeByName("gc_stackentry")->getPointerTo();
     //GlobalValue* gRootChain    = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("llvm_gc_root_chain", rootChainType) );
     GlobalValue* gRootChain = m_JITModule->getGlobalVariable("llvm_gc_root_chain");
     m_executionEngine->addGlobalMapping(gRootChain, reinterpret_cast<void*>(&llvm_gc_root_chain));
-    
 }
 
 void JITRuntime::initializeExceptionAPI() {
@@ -627,7 +626,7 @@ TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* a
            callingContext,
            message->toString().c_str(),
            arguments);
-
+    
     TObject* self = arguments->getField(0);
     printf("\tself = %p\n", self);
     
@@ -644,7 +643,7 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
         callingContext,
         (uint32_t) argLocation,
         (uint32_t) bytePointer );
-
+    
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
