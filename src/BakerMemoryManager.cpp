@@ -76,13 +76,6 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     // To initialize properly we need a heap with an even size
     heapSize = correctPadding(heapSize);
 
-//     void* base = malloc(heapSize);
-//     if (!base)
-//         return false;
-// 
-//     memset(base, 0, heapSize);
-
-    
     uint32_t mediane = heapSize / 2;
     m_heapSize = heapSize;
     m_maxHeapSize = maxHeapSize;
@@ -109,7 +102,8 @@ void BakerMemoryManager::growHeap()
 {
     // Stage1. Growing inactive heap
     m_heapSize = correctPadding(m_heapSize + m_heapSize / 2);
-    // Check whether we're still may to grow a heap
+
+    printf("MM: Growing heap to %d\n", m_heapSize);
     
     uint32_t newMediane = m_heapSize / 2;
     uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
@@ -141,8 +135,8 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
             // If even after collection there is too less space
             // we may try to expand the heap
-//             if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 16))
-//                 growHeap();
+            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 16))
+                growHeap();
 
             if (gcOccured)
                 *gcOccured = true;
