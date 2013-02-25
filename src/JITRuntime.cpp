@@ -82,7 +82,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     // Initializing LLVM subsystem
     InitializeNativeTarget();
-    llvm::linkShadowStackGC();
+    linkShadowStackGC();
     
     LLVMContext& llvmContext = getGlobalContext();
     
@@ -101,7 +101,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     TargetOptions Opts;
     Opts.JITExceptionHandling = true;
-    Opts.JITEmitDebugInfo = true;
+//    Opts.JITEmitDebugInfo = true;
+//     Opts.PrintMachineCode = true;
     
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule)
@@ -236,6 +237,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             // If function was not found then the whole method needs compilation.
             
             // Compiling function and storing it to the table for further use
+            outs() << "Compiling block method " << blockFunctionName << "\n";
             llvm::Function* methodFunction = m_methodCompiler->compileMethod(block->method, callingContext);
             blockFunction = m_JITModule->getFunction(blockFunctionName);
             if (!methodFunction || !blockFunction) {
@@ -264,10 +266,6 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     block->previousContext = callingContext->previousContext;
     TObject* result = compiledBlockFunction(block);
     
-    //     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
-    //     printf("Block function result: %p\n", result);
-    //     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
-    
     return result;
 }
 
@@ -277,8 +275,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     TClass*  klass = 0;
     
     if (receiverClass) {
-        outs() << "receiverClass = " << receiverClass << "\n";
-        outs() << "name = " << receiverClass->name->toString() << "\n";
         klass = receiverClass;
     } else {
         TObject* receiver = arguments->getField(0);
@@ -329,9 +325,10 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         
         if (! methodFunction) {
             // Compiling function and storing it to the table for further use
+            outs() << "Compiling method " << functionName << "\n";
             methodFunction = m_methodCompiler->compileMethod(method, callingContext);
             
-            outs() << *methodFunction;
+//             outs() << *methodFunction;
             
             if (verifyModule(*m_JITModule)) {
                 outs() << "Module verification failed.\n";
@@ -340,14 +337,14 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             
             
             // Running the optimization passes on a function
-            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
+            m_modulePassManager->run(*m_JITModule);   //TODO too expensive to run on each function compilation?
                                                       //we may get rid of TObject::getFields on our own.
             m_functionPassManager->run(*methodFunction);
         }
         
         // Calling the method and returning the result
         compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
-        outs() << *methodFunction;
+//         outs() << *methodFunction;
         
         updateFunctionCache(method, compiledMethodFunction);
     }
@@ -373,10 +370,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     
     TObject* result = compiledMethodFunction(newContext);
 
-//     printf("true = %p, false = %p, nil = %p\n", globals.trueObject, globals.falseObject, globals.nilObject);
-//     printf("Function result: %p\n", result);
-//     printf("Result class: %s\n", isSmallInteger(result) ? "SmallInt" : result->getClass()->name->toString().c_str() );
-    
     return result;
 }
 
@@ -441,7 +434,6 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(llvm::createCFGSimplificationPass());
     
     m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
-    m_functionPassManager->add(llvm::createDeadInstEliminationPass());
     m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
     
     m_functionPassManager->add(createLLSTPass());
@@ -608,48 +600,48 @@ extern "C" {
 
 TObject* newOrdinaryObject(TClass* klass, uint32_t slotSize)
 {
-    printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
+//     printf("newOrdinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), slotSize);
     JITRuntime::Instance()->m_objectsAllocated++;
     return JITRuntime::Instance()->getVM()->newOrdinaryObject(klass, slotSize);
 }
 
 TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
 {
-    printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
+//     printf("newBinaryObject(%p '%s', %d)\n", klass, klass->name->toString().c_str(), dataSize);
     JITRuntime::Instance()->m_objectsAllocated++;
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
 TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
 {
-    printf("sendMessage(%p, #%s, %p)\n",
-           callingContext,
-           message->toString().c_str(),
-           arguments);
+//     printf("sendMessage(%p, #%s, %p)\n",
+//            callingContext,
+//            message->toString().c_str(),
+//            arguments);
     
-    TObject* self = arguments->getField(0);
-    printf("\tself = %p\n", self);
-    
-    TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
-    printf("\tself class = %p\n", klass);
-    printf("\tself class name = '%s'\n", klass->name->toString().c_str());
+//     TObject* self = arguments->getField(0);
+//     printf("\tself = %p\n", self);
+//     
+//     TClass* klass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
+//     printf("\tself class = %p\n", klass);
+//     printf("\tself class name = '%s'\n", klass->name->toString().c_str());
     JITRuntime::Instance()->m_messagesDispatched++;
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
 }
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
-    printf("createBlock(%p, %d, %d)\n",
-        callingContext,
-        (uint32_t) argLocation,
-        (uint32_t) bytePointer );
+//     printf("createBlock(%p, %d, %d)\n",
+//         callingContext,
+//         (uint32_t) argLocation,
+//         (uint32_t) bytePointer );
     
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
 TObject* invokeBlock(TBlock* block, TContext* callingContext)
 {
-    printf("invokeBlock %p, %p\n", block, callingContext);
+//     printf("invokeBlock %p, %p\n", block, callingContext);
     JITRuntime::Instance()->m_blocksInvoked++;
     return JITRuntime::Instance()->invokeBlock(block, callingContext);
 }
@@ -662,7 +654,7 @@ void emitBlockReturn(TObject* value, TContext* targetContext)
 
 void checkRoot(TObject* value, TObject** objectSlot)
 {
-    printf("checkRoot %p, %p\n", value, objectSlot);
+//     printf("checkRoot %p, %p\n", value, objectSlot);
     JITRuntime::Instance()->getVM()->checkRoot(value, objectSlot);
 }
 
