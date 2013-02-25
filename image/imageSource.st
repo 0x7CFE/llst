@@ -1298,41 +1298,23 @@ runAllFrom: testSuite | suite |
 !
 
 METHOD Undefined
-main    | command x1 x2 list ms1 ms2 selector args block |
-        " initialize classes "
-
-        Char initialize.
-
-        "nil testArrayAllMethods."
-
-        "CompareTest      new runAll.
-        SmallIntTest     new runAll.
-        LoopTest         new runAll.
-        ClassTest        new runAll.
-        MethodLookupTest new runAll.
-        StringTest       new runAll.
-        ArrayTest        new runAll.
-        GCTest           new runAll.
-        ContextTest      new runAll.
-        PrimitiveTest    new runAll."
-        
-        "LLVMTestStatements new runAll.
-        LLVMTestStatements new classAsString."
-
-        "StringTest new runAllInLLVM."
-        "LLVMTestStatements new testCat. ^nil."
-        
+runSort | x1 list ms1 selector args1 block1 |
         list <- List new.
-        1 to: 500 do: [ :x | list add: 1000 atRandom ].
-        selector <- ('sortTest2:' asSymbol).
-        args <- Array with: nil with: list.
-        block <- [ LLVM sendMessage: selector withArguments: args ].
-        ms1 <- Timer millisecondsToRun: block.
-        ms2 <- Timer millisecondsToRun: block.
+        1 to: 10000 do: [ :x | list add: 1000 atRandom ].
 
-        "x2 printNl."
-        '1 Sorted in ms: ' print. ms1 printNl.
-        '2 Sorted in ms: ' print. ms2 printNl.
+        selector <- ('sortTest2:' asSymbol).
+        args1 <- Array with: nil with: list.
+
+        System collectGarbage.
+        ms1 <- Timer millisecondsToRun: [ LLVM sendMessage: selector withArguments: args1 ].
+
+        'Sorted in ms: ' print. ms1 printNl.
+!
+
+METHOD Undefined
+main    | command |
+        " initialize classes "
+        Char initialize.
         
         "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
         
@@ -1887,7 +1869,7 @@ sort: criteria | left right mediane |
     (self isEmpty) ifTrue: [^self].
 
     mediane <- self popFirst.
-
+    
     left  <- List new.
     right <- List new.
     self do: [ :x |
