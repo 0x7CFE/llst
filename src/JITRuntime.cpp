@@ -410,6 +410,9 @@ void JITRuntime::initializePassManager() {
     // target lays out data structures.
     m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
     
+    //Force GC to do its job
+    m_functionPassManager->add(llvm::createGCLoweringPass());
+    
     // Basic AliasAnslysis support for GVN.
     m_functionPassManager->add(llvm::createBasicAliasAnalysisPass());
     
