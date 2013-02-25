@@ -101,11 +101,11 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
 void BakerMemoryManager::growHeap()
 {
     // Stage1. Growing inactive heap
-    m_heapSize = correctPadding(m_heapSize + m_heapSize / 2);
+    uint32_t newHeapSize = correctPadding(m_heapSize + m_heapSize / 2);
 
     printf("MM: Growing heap to %d\n", m_heapSize);
     
-    uint32_t newMediane = m_heapSize / 2;
+    uint32_t newMediane = newHeapSize / 2;
     uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
     uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
 //    uint8_t** inactiveHeapPointer = &m_inactiveHeapPointer;
@@ -122,6 +122,8 @@ void BakerMemoryManager::growHeap()
     // We need to reallocate it too
     *activeHeapBase = (uint8_t*) realloc(*activeHeapBase, newMediane);
     memset(*activeHeapBase, 0, newMediane);
+    
+    m_heapSize = newHeapSize;
 }
 
 void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
