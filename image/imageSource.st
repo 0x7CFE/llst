@@ -69,7 +69,7 @@ RAWCLASS Symbol        MetaSymbol    Magnitude
 RAWCLASS MetaChar      Class         MetaMagnitude     chars
 RAWCLASS Char          MetaChar      Magnitude         value
 CLASS Collection    Magnitude
-CLASS List          Collection         elements
+CLASS List          Collection         elements size
 CLASS Dictionary    Collection        keys values
 CLASS Array         Collection
 CLASS OrderedArray  Array
@@ -1298,9 +1298,9 @@ runAllFrom: testSuite | suite |
 !
 
 METHOD Undefined
-runSort | x1 list ms1 selector args1 block1 |
+runSort: size | x1 list ms1 selector args1 block1 |
         list <- List new.
-        1 to: 10000 do: [ :x | list add: 1000 atRandom ].
+        1 to: size do: [ :x | list add: 1000000 atRandom ].
 
         selector <- ('sortTest2:' asSymbol).
         args1 <- Array with: nil with: list.
@@ -1864,9 +1864,45 @@ sort
     ^ self sort: [ :x :y | x < y ]
 !
 
+METHOD List
+insert: aValue onCondition: aBlock
+    | link current newLink next |
+    
+    (self isEmpty) ifTrue: [ self add: aValue. ^aValue ].
+    
+    link <- elements.
+    [link notNil] whileTrue: [ 
+        current <- link value.
+        (aBlock value: aValue value: current)
+            ifTrue: [ 
+                newLink <- Link value: current next: link next.
+                link value: aValue next: newLink. 
+                ^aValue 
+            ].
+        
+        next <- link next.
+        next isNil ifTrue: [ 
+            link next: (Link value: aValue next: nil).
+            ^aValue.
+        ] 
+        link <- next.
+    ]
+!
+
+METHOD Collection
+insertSort: criteria | result |
+    (self isEmpty) ifTrue: [^self].
+    
+    result <- List new.
+    self do: [ :x | result insert: x onCondition: criteria ].
+    
+    ^result
+!
+
 METHOD Collection
 sort: criteria | left right mediane |
-    (self isEmpty) ifTrue: [^self].
+    (self size < 42) 
+        ifTrue: [ ^ self insertSort: criteria ].
 
     mediane <- self popFirst.
     
@@ -2339,6 +2375,12 @@ indexOf: val | c s |
 !
 COMMENT --------- List -----------
 METHOD MetaList
+new | instance |
+    instance <- super new.
+    self in: instance at: 2 put: 0. "set size to 0"
+    ^instance
+!
+METHOD MetaList
 with: elemA	| newList |
 	newList <- self new.
 	newList add: elemA.
@@ -2357,15 +2399,20 @@ with: elemA with: elemB with: elemC	| newList |
 	^ newList
 !
 METHOD List
+size
+    ^size
+!
+METHOD List
 add: anElement
 	elements <- Link value: anElement next: elements.
+	size <- size + 1.
 	^ anElement
 !
 METHOD List
 addLast: anElement
 	elements isNil
 		ifTrue: [ self add: anElement]
-		ifFalse: [ elements addLast: anElement ].
+		ifFalse: [ elements addLast: anElement. size <- size + 1 ].
 	^ anElement
 !
 METHOD List
@@ -2374,18 +2421,22 @@ firstLink
 !
 METHOD List
 appendList: aList | element |
-    (elements isNil)
-        ifTrue: [ elements <- aList firstLink. ^self ].
+    (elements isNil) ifTrue: [ 
+        elements <- aList firstLink. 
+        size <- aList size.
+        ^self 
+    ].
 
     element <- elements.
     [element next isNil]
         whileFalse: [element <- element next].
     element next: aList firstLink.
-
+    size <- size + aList size.
     ^self
 !
 METHOD List
 addAll: aCollection
+    "self appendList: aCollection asList."
 	aCollection do: [ :element | self addLast: element ]
 !
 METHOD List
@@ -2444,7 +2495,7 @@ METHOD List
 removeFirst
 	elements isNil
 		ifTrue: [ self emptyCollection ]
-		ifFalse: [ elements <- elements next ]
+		ifFalse: [ elements <- elements next. size <- size - 1. ]
 !
 METHOD List
 popFirst | value |
@@ -2453,6 +2504,7 @@ popFirst | value |
         ifFalse: [
             value <- elements value.
             elements <- elements next.
+            size <- size - 1.
             ^value ]
 !
 METHOD List
@@ -2469,8 +2521,9 @@ reverse | newList |
 METHOD List
 remove: anElement ifAbsent: exceptionBlock
 	elements isNil
-		ifTrue: [ exceptionBlock value ]
-		ifFalse: [ elements remove: anElement ifAbsent: exceptionBlock ]
+		ifTrue: [ exceptionBlock value. ^self ]
+		ifFalse: [ elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
+    size <- size - 1.
 !
 METHOD List
 do: aBlock
@@ -3152,6 +3205,11 @@ value: val
 METHOD Link
 next
 	^ next
+!
+METHOD Link
+value: aValue next: aLink
+    value <- aValue.
+    next  <- aLink
 !
 METHOD Link
 next: aLink
