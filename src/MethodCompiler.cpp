@@ -574,7 +574,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
         uint32_t currentOffset = jit.bytePointer;
         // printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
-        std::map<uint32_t, llvm::BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
+        std::map<uint32_t, BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {
             // Somewhere in the code we have a branch instruction that
             // points to the current offset. We need to end the current
@@ -1528,7 +1528,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                     jit.builder->CreateCondBr(isZero, primitiveFailed, divBB);
                     
                     jit.builder->SetInsertPoint(divBB);
-                    Value* intResult = jit.builder->CreateExactSDiv(leftOperand, rightOperand);
+                    Value* intResult = jit.builder->CreateSDiv(leftOperand, rightOperand);
                     primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
                 } break;
                 case primitive::smallIntMod: {

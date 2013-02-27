@@ -223,7 +223,7 @@ void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blo
 }
 
 
-void JITRuntime::optimizeFunction(llvm::Function* function)
+void JITRuntime::optimizeFunction(Function* function)
 {
     m_modulePassManager->run(*m_JITModule); 
     
@@ -338,7 +338,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         if (! compiledMethodFunction) {
             // If function was not found in the cache looking it in the LLVM directly
             std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-            llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
+            Function* methodFunction = m_JITModule->getFunction(functionName);
             
             if (! methodFunction) {
                 // Compiling function and storing it to the table for further use
