@@ -458,6 +458,7 @@ public:
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
     llvm::Module* getModule() { return m_JITModule; }
 
+    void optimizeFunction(llvm::Function* function);
     void printStat();
     
     void initialize(SmalltalkVM* softVM);

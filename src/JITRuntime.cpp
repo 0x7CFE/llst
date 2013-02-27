@@ -103,6 +103,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     TargetOptions Opts;
     Opts.JITExceptionHandling = true;
+    Opts.GuaranteedTailCallOpt = true;
 //    Opts.JITEmitDebugInfo = true;
 //     Opts.PrintMachineCode = true;
     
@@ -221,6 +222,15 @@ void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blo
     entry.function = function;
 }
 
+
+void JITRuntime::optimizeFunction(llvm::Function* function)
+{
+    m_modulePassManager->run(*m_JITModule); 
+    
+    // Running the optimization passes on a function
+    m_functionPassManager->run(*function);
+}
+
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
@@ -273,105 +283,122 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
 {
-    // First of all we need to find the actual method object
-    TClass*  klass = 0;
+    TMethodFunction compiledMethodFunction = 0;
+    TContext*       newContext = 0;
     
-    if (receiverClass) {
-        klass = receiverClass;
-    } else {
-        TObject* receiver = arguments->getField(0);
-        klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
-    }
-    
-    // Searching for the actual method to be called
-    hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, klass));
-    
-    // Checking whether we found a method
-    if (method == 0) {
-        // Oops. Method was not found. In this case we should
-        // send #doesNotUnderstand: message to the receiver
+    {
         
-        // Looking up the #doesNotUnderstand: method:
-        method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, klass));
-        if (method == 0) {
-            // Something goes really wrong.
-            // We could not continue the execution
-            errs() << "\nCould not locate #doesNotUnderstand:\n";
-            exit(1);
+        // First of all we need to find the actual method object
+        TClass*  klass = 0;
+        
+        if (receiverClass) {
+            klass = receiverClass;
+        } else {
+            TObject* receiver = arguments->getField(0);
+            klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
         }
         
-        // Protecting the selector pointer because it may be invalidated later
-        hptr<TSymbol> failedSelector = m_softVM->newPointer(message);
+        // Searching for the actual method to be called
+        hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, klass));
         
-        // We're replacing the original call arguments with custom one
-        hptr<TObjectArray> errorArguments = m_softVM->newObject<TObjectArray>(2);
-        
-        // Filling in the failed call context information
-        errorArguments[0] = arguments->getField(0); // receiver object
-        errorArguments[1] = failedSelector;      // message selector that failed
-        
-        // Replacing the arguments with newly created one
-        arguments = errorArguments; //TODO is it okay? I think its not.
-        
-        // Continuing the execution just as if #doesNotUnderstand:
-        // was the actual selector that we wanted to call
-    }
-    
-    // Searching for the jit compiled function
-    TMethodFunction compiledMethodFunction = lookupFunctionInCache(method); 
-    
-    if (! compiledMethodFunction) {
-        // If function was not found in the cache looking it in the LLVM directly
-        std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-        Function* methodFunction = m_JITModule->getFunction(functionName);
-        
-        if (! methodFunction) {
-            // Compiling function and storing it to the table for further use
-            outs() << "Compiling method " << functionName << "\n";
-            methodFunction = m_methodCompiler->compileMethod(method, callingContext);
+        // Checking whether we found a method
+        if (method == 0) {
+            // Oops. Method was not found. In this case we should
+            // send #doesNotUnderstand: message to the receiver
             
-//             outs() << *methodFunction;
-            
-            if (verifyModule(*m_JITModule)) {
-                outs() << "Module verification failed.\n";
+            // Looking up the #doesNotUnderstand: method:
+            method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, klass));
+            if (method == 0) {
+                // Something goes really wrong.
+                // We could not continue the execution
+                errs() << "\nCould not locate #doesNotUnderstand:\n";
                 exit(1);
             }
             
+            // Protecting the selector pointer because it may be invalidated later
+            hptr<TSymbol> failedSelector = m_softVM->newPointer(message);
             
-            // Running the optimization passes on a function
-            m_modulePassManager->run(*m_JITModule);   //TODO too expensive to run on each function compilation?
-                                                      //we may get rid of TObject::getFields on our own.
-            m_functionPassManager->run(*methodFunction);
+            // We're replacing the original call arguments with custom one
+            hptr<TObjectArray> errorArguments = m_softVM->newObject<TObjectArray>(2);
+            
+            // Filling in the failed call context information
+            errorArguments[0] = arguments->getField(0); // receiver object
+            errorArguments[1] = failedSelector;      // message selector that failed
+            
+            // Replacing the arguments with newly created one
+            arguments = errorArguments; //TODO is it okay? I think its not.
+            
+            // Continuing the execution just as if #doesNotUnderstand:
+            // was the actual selector that we wanted to call
         }
         
-        // Calling the method and returning the result
-        compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
-//         outs() << *methodFunction;
+        // Searching for the jit compiled function
+        compiledMethodFunction = lookupFunctionInCache(method); 
         
-        updateFunctionCache(method, compiledMethodFunction);
+        if (! compiledMethodFunction) {
+            // If function was not found in the cache looking it in the LLVM directly
+            std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+            llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
+            
+            if (! methodFunction) {
+                // Compiling function and storing it to the table for further use
+                outs() << "Compiling method " << functionName << "\n";
+                methodFunction = m_methodCompiler->compileMethod(method, callingContext);
+                
+    //             outs() << *methodFunction;
+                
+                if (verifyModule(*m_JITModule)) {
+                    outs() << "Module verification failed.\n";
+                    exit(1);
+                }
+                
+                
+                // Running the optimization passes on a function
+                //m_modulePassManager->run(*m_JITModule);   //TODO too expensive to run on each function compilation?
+                                                        //we may get rid of TObject::getFields on our own.
+                //m_functionPassManager->run(*methodFunction);
+                optimizeFunction(methodFunction);
+            }
+            
+            // Calling the method and returning the result
+            compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
+    //         outs() << *methodFunction;
+            
+            updateFunctionCache(method, compiledMethodFunction);
+        }
+        
+        // Preparing the context objects. Because we do not call the software
+        // implementation here, we do not need to allocate the stack object
+        // because it is not used by JIT runtime. We also may skip the proper
+        // initialization of various objects such as stackTop and bytePointer.
+        
+        // Protecting the pointers before allocation
+        hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
+        hptr<TContext>     previousContext  = m_softVM->newPointer(callingContext);
+        
+        // Creating context object and temporaries
+        hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+        newContext = m_softVM->newObject<TContext>(0, false);
+        
+        // Initializing context variables
+        newContext->temporaries       = newTemps;
+        newContext->arguments         = messageArguments;
+        newContext->method            = method;
+        newContext->previousContext   = previousContext;
+        
     }
     
-    // Preparing the context objects. Because we do not call the software
-    // implementation here, we do not need to allocate the stack object
-    // because it is not used by JIT runtime. We also may skip the proper
-    // initialization of various objects such as stackTop and bytePointer.
+//     static int messageDepth = 0;
+//     static int messageDepthMax = 0;
+//         
+//     messageDepth++;
+//     messageDepthMax = (messageDepth > messageDepthMax ? messageDepth : messageDepthMax);
     
-    // Protecting the pointers before allocation
-    hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
-    hptr<TContext>     previousContext  = m_softVM->newPointer(callingContext);
-    
-    // Creating context object and temporaries
-    hptr<TContext>     newContext = m_softVM->newObject<TContext>();
-    hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
-    
-    // Initializing context variables
-    newContext->temporaries       = newTemps;
-    newContext->arguments         = messageArguments;
-    newContext->method            = method;
-    newContext->previousContext   = previousContext;
-    
+//     outs() << messageDepth << " on enter, max " << messageDepthMax << "\n";
     TObject* result = compiledMethodFunction(newContext);
-
+//     messageDepth--;
+//     outs() << messageDepth << " on exit, max " << messageDepthMax << "\n";
+    
     return result;
 }
 
