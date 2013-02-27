@@ -569,7 +569,7 @@ void JITRuntime::initializeExceptionAPI() {
     Type* VoidTy         = Type::getVoidTy(Context);
     Type* throwParams[] = { Int8PtrTy, Int8PtrTy, Int8PtrTy };
     
-    m_exceptionAPI.gxx_personality = Function::Create(FunctionType::get(Int32Ty, true), Function::ExternalLinkage, "__gxx_personality_v0", m_JITModule);
+    m_exceptionAPI.gcc_personality = Function::Create(FunctionType::get(Int32Ty, true), Function::ExternalLinkage, "__gcc_personality_v0", m_JITModule);
     m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Int8PtrTy, Int8PtrTy, false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
     m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
     m_exceptionAPI.cxa_rethrow     = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_rethrow", m_JITModule);
@@ -617,10 +617,9 @@ void JITRuntime::createExecuteProcessFunction() {
     builder.CreateRet( builder.getInt32(SmalltalkVM::returnReturned) );
     
     builder.SetInsertPoint(Fail);
-    Value* gxx_personality_i8 = builder.CreateBitCast(m_exceptionAPI.gxx_personality, builder.getInt8PtrTy());
     Type* caughtType = StructType::get(builder.getInt8PtrTy(), builder.getInt32Ty(), NULL);
     
-    LandingPadInst* caughtResult = builder.CreateLandingPad(caughtType, gxx_personality_i8, 1);
+    LandingPadInst* caughtResult = builder.CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
     caughtResult->addClause(ConstantPointerNull::get(builder.getInt8PtrTy()));
     
     Value* thrownException  = builder.CreateExtractValue(caughtResult, 0);

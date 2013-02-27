@@ -655,10 +655,9 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
     
-    Value* gxx_personality_i8 = jit.builder->CreateBitCast(m_exceptionAPI.gxx_personality, jit.builder->getInt8PtrTy());
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
     
-    LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, gxx_personality_i8, 1);
+    LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
     caughtResult->addClause(m_exceptionAPI.blockReturnType);
     
     Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
@@ -1194,6 +1193,14 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     //outs() << "Primitive opcode = " << opcode << "\n";
     
     Value* primitiveResult = 0;
+    Value* primitiveCondition = jit.builder->getTrue();
+    // br primitiveCondition, primitiveSucceeded, primitiveFailed
+    // By default we use primitiveFailed BB as a trash code collecting block
+    // llvm passes may eliminate primitiveFailed BB, becase br true, A, B -> br label A || If there is no other paths to B
+    // But sometimes CFG of primitive may depend on primitiveCondition result (bulkReplace)
+    // If your primitive may fail, you may use 2 ways:
+    // 1) set br primitiveFailed
+    // 2) bind primitiveCondition with any i1 result
     BasicBlock* primitiveSucceeded = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
     BasicBlock* primitiveFailed = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
     
@@ -1394,6 +1401,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             };
             
             jit.builder->CreateCall(m_exceptionAPI.cxa_throw, throwArgs);
+            primitiveSucceeded->eraseFromParent();
             jit.builder->CreateBr(primitiveFailed);
             jit.builder->SetInsertPoint(primitiveFailed);
             return;
@@ -1601,9 +1609,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             };
             
             Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
-            jit.builder->CreateCondBr(isSucceeded, primitiveSucceeded, primitiveFailed);
-            jit.builder->SetInsertPoint(primitiveSucceeded);
             primitiveResult = destination;
+            primitiveCondition = isSucceeded;
         } break;
         
         default:
@@ -1613,7 +1620,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     // Linking pop chain
     jit.basicBlockContexts[primitiveSucceeded].referers.insert(jit.builder->GetInsertBlock());
     
-    jit.builder->CreateCondBr(jit.builder->getTrue(), primitiveSucceeded, primitiveFailed);
+    jit.builder->CreateCondBr(primitiveCondition, primitiveSucceeded, primitiveFailed);
     jit.builder->SetInsertPoint(primitiveSucceeded);
     
     jit.builder->CreateRet(primitiveResult);
