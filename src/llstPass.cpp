@@ -2,25 +2,26 @@
 #include <llstPass.h>
 
 STATISTIC(rootLoadsRemoved, "Number of removed loads from gc.root protected pointers                                <<<<<<");
+STATISTIC(rootsRemoved,     "Number of removed roots                                                                <<<<<<");
 
 using namespace llvm;
 
 namespace {
     struct LLSTPass : public FunctionPass {
     private:
-        std::set<std::string> GCFunctionNames;
+        std::set<std::string> m_GCFunctionNames;
         bool isPotentialGCFunction(std::string name);
         bool removeRootLoads(BasicBlock* B);
-    
+        bool removeRedundantRoots(Function* F);
     public:
         virtual bool runOnFunction(Function &F) ;
         static char ID;
         LLSTPass(): FunctionPass(ID) {
-            GCFunctionNames.insert("newOrdinaryObject");
-            GCFunctionNames.insert("newBinaryObject");
-            GCFunctionNames.insert("sendMessage");
-            GCFunctionNames.insert("invokeBlock");
-            GCFunctionNames.insert("createBlock");
+            m_GCFunctionNames.insert("newOrdinaryObject");
+            m_GCFunctionNames.insert("newBinaryObject");
+            m_GCFunctionNames.insert("sendMessage");
+            m_GCFunctionNames.insert("invokeBlock");
+            m_GCFunctionNames.insert("createBlock");
         }
     };
 }
@@ -38,7 +39,7 @@ bool LLSTPass::runOnFunction(Function& F)
     for (Function::iterator B = F.begin(); B != F.end(); ++B) {
         CFGChanged |= removeRootLoads(B);
     }
-    
+    CFGChanged |= removeRedundantRoots(&F);
     return CFGChanged;
 }
 
@@ -50,7 +51,7 @@ bool isLoadFromRoot(Instruction* Instr) {
 
 bool LLSTPass::isPotentialGCFunction(std::string name)
 {
-    return GCFunctionNames.find(name) != GCFunctionNames.end();
+    return m_GCFunctionNames.find(name) != m_GCFunctionNames.end();
 }
 
 
@@ -110,3 +111,40 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
     return BBChanged;
 }
 
+bool LLSTPass::removeRedundantRoots(Function* F)
+{
+
+    std::set<Instruction*> toDelete;
+    BasicBlock* entryBB = & F->getEntryBlock();
+    for (BasicBlock::iterator Instr = entryBB->begin(); Instr != entryBB->end(); Instr++ )
+    {
+        if (CallInst* createRootCall = dyn_cast<CallInst>(Instr)) {
+            if(createRootCall->getCalledFunction()->getName() == "llvm.gcroot") {
+                Value* root = createRootCall->getArgOperand(0);
+                Value* holder = cast<Instruction>(root)->getOperand(0);
+                bool onlyStoresToRoot = true;
+                for(Value::use_iterator U = holder->use_begin(); U != holder->use_end() ; U++) {
+                    Instruction* I = cast<Instruction>(*U);
+                    switch( I->getOpcode() ) {
+                        case Instruction::Load: {
+                            onlyStoresToRoot = false;
+                            break;
+                        }
+                    }
+                }
+                if (onlyStoresToRoot) {
+                    toDelete.insert(createRootCall);
+                } else {
+                    //TODO Find something else
+                }
+            }
+        }
+    }
+    bool CFGChanged = !toDelete.empty();
+    rootsRemoved += toDelete.size();
+    for(std::set<Instruction*>::iterator I = toDelete.begin(); I != toDelete.end(); I++) {
+        (*I)->eraseFromParent();
+    }
+    
+    return CFGChanged;
+}

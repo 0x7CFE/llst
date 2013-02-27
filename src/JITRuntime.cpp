@@ -466,6 +466,10 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     m_functionPassManager->add(createLLSTPass());
+    //If llstPass removed GC roots, we may try DCE again
+    
+    m_functionPassManager->add(createDeadCodeEliminationPass());
+    m_functionPassManager->add(createDeadStoreEliminationPass());
     
     m_modulePassManager->add(createFunctionInliningPass());
     m_functionPassManager->doInitialization();
