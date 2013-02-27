@@ -1868,7 +1868,7 @@ METHOD List
 insert: aValue onCondition: aBlock
     | link current newLink next |
     
-    (self isEmpty) ifTrue: [ self add: aValue. ^aValue ].
+    (self isEmpty) ifTrue: [ ^self add: aValue ].
     
     link <- elements.
     [link notNil] whileTrue: [ 

@@ -1012,9 +1012,6 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* arguments = jit.popValue();
     
     // First of all we need to get the actual message selector
-//     Value* messageSelectorPtr    = jit.builder->CreateGEP(jit.literals, jit.builder->getInt32(jit.instruction.low));
-//     Value* messageSelectorObject = jit.builder->CreateLoad(messageSelectorPtr);
-    
     Value* selectorObject  = jit.getLiteral(jit.instruction.low);
     Value* messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
     
