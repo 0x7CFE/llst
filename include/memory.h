@@ -212,7 +212,7 @@ protected:
 
     /*virtual*/ TMovableObject* moveObject(TMovableObject* object);
     virtual void moveObjects();
-    virtual void growHeap();
+    virtual void growHeap(uint32_t requestedSize);
     
 private:
     // These variables contain an array of pointers to objects from the

@@ -816,7 +816,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     blockContext.builder->SetInsertPoint(blockBody);
     
     writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
-    
+
     // Create block object and fill it with context information
     Value* args[] = {
         jit.getCurrentContext(),                   // creatingContext
@@ -830,6 +830,9 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     
     Value* blockHolder = protectPointer(jit, blockObject);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
+
+    // Running optimization passes on a block function
+    JITRuntime::Instance()->optimizeFunction(blockContext.function);
 }
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)

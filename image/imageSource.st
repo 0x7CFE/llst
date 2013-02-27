@@ -1318,6 +1318,8 @@ main    | command |
         
         "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
         
+        "nil runSort: 10."
+        
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
                 whileTrue: [ command isEmpty
@@ -1877,6 +1879,7 @@ insert: aValue onCondition: aBlock
             ifTrue: [ 
                 newLink <- Link value: current next: link next.
                 link value: aValue next: newLink. 
+                
                 ^aValue 
             ].
         
@@ -1894,14 +1897,15 @@ insertSort: criteria | result |
     (self isEmpty) ifTrue: [^self].
     
     result <- List new.
-    self do: [ :x | result insert: x onCondition: criteria ].
+    self do: [ :x | result insert: x onCondition: criteria. "result printNl." ].
     
     ^result
 !
 
 METHOD Collection
 sort: criteria | left right mediane |
-    (self size < 42) 
+    "(self isEmpty) ifTrue: [^self]."
+    (self size < 30) 
         ifTrue: [ ^ self insertSort: criteria ].
 
     mediane <- self popFirst.
@@ -1916,6 +1920,8 @@ sort: criteria | left right mediane |
     left  <- left  sort: criteria.
     right <- right sort: criteria.
 
+    "left print. $| print. mediane print. $| print. right printNl."
+    
     right add: mediane.
     ^ left appendList: right
 !
@@ -2526,7 +2532,7 @@ remove: anElement ifAbsent: exceptionBlock
     size <- size - 1.
 !
 METHOD List
-do: aBlock
+do: aBlock | link |
 	^ elements notNil ifTrue: [ elements do: aBlock ]
 !
 METHOD List
@@ -3216,9 +3222,13 @@ next: aLink
     next <- aLink
 !
 METHOD Link
-do: aBlock
-	aBlock value: value.
-	next notNil ifTrue: [ ^ next do: aBlock ]
+do: aBlock | link |
+    link <- self.
+    [link notNil] whileTrue: 
+        [ aBlock value: link value. link <- link next ] 
+
+	"aBlock value: value.
+	next notNil ifTrue: [ ^ next do: aBlock ]"
 !
 METHOD Link
 remove: anElement ifAbsent: exceptionBlock
