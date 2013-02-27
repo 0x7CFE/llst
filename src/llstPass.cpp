@@ -1,17 +1,27 @@
+#define DEBUG_TYPE "llst"
 #include <llstPass.h>
-#include <jit.h>
+
+STATISTIC(rootLoadsRemoved, "Number of removed loads from gc.root protected pointers                                <<<<<<");
+
+using namespace llvm;
 
 namespace {
     struct LLSTPass : public FunctionPass {
-        void getAnalysisUsage(AnalysisUsage &AU) const {
-            FunctionPass::getAnalysisUsage(AU);
-        };
+    private:
+        std::set<std::string> GCFunctionNames;
+        bool isPotentialGCFunction(std::string name);
+        bool removeRootLoads(BasicBlock* B);
+    
+    public:
         virtual bool runOnFunction(Function &F) ;
         static char ID;
-        LLSTPass(): FunctionPass(ID) { }
-    private:
-        
-        bool removeRootLoads(BasicBlock* B);
+        LLSTPass(): FunctionPass(ID) {
+            GCFunctionNames.insert("newOrdinaryObject");
+            GCFunctionNames.insert("newBinaryObject");
+            GCFunctionNames.insert("sendMessage");
+            GCFunctionNames.insert("invokeBlock");
+            GCFunctionNames.insert("createBlock");
+        }
     };
 }
 
@@ -32,34 +42,38 @@ bool LLSTPass::runOnFunction(Function& F)
     return CFGChanged;
 }
 
+bool isLoadFromRoot(Instruction* Instr) {
+    return true;
+    ///TODO ensure Instr.getOperand(0) points to root
+    
+}
+
+bool LLSTPass::isPotentialGCFunction(std::string name)
+{
+    return GCFunctionNames.find(name) != GCFunctionNames.end();
+}
+
+
 bool LLSTPass::removeRootLoads(BasicBlock* B)
 {
     typedef std::vector<Instruction*>   InstructionVector;
     typedef std::set<Instruction*>      InstructionSet;
     typedef InstructionSet::iterator    InstructionSI;
     
-    typedef std::map<Instruction*, Instruction*>    InstructionMap;
-    typedef InstructionMap::iterator                InstructionMI;
-    
-    
     InstructionVector LoadNCall;
     InstructionSet toDelete;
     
-    for (BasicBlock::iterator Instr = B->begin(); Instr != B->end(); Instr++ ) {
-        if ( isa<LoadInst>(Instr) )
-            LoadNCall.push_back(&*Instr); //TODO ensure Instr.getOperand(0) points to root
-
-        if ( isa<CallInst>(Instr) ) {
+    for (BasicBlock::iterator Instr = B->begin(); Instr != B->end(); Instr++ )
+    {
+        if ( LoadInst* load = dyn_cast<LoadInst>(Instr) ) {
+            if (isLoadFromRoot(load))
+                LoadNCall.push_back(load); 
+        }
+        if ( CallInst* call = dyn_cast<CallInst>(Instr) ) {
             //Is it a call that might collect garbage?
-            CallInst* call = dyn_cast<CallInst>(Instr);
             std::string name = call->getCalledFunction()->getName();
-            if (   name == "newOrdinaryObject"
-                || name == "newBinaryObject"
-                || name == "sendMessage"
-                || name == "invokeBlock"
-                || name == "createBlock"
-            ) {
-                LoadNCall.push_back(&*Instr);
+            if ( isPotentialGCFunction(name) ) {
+                LoadNCall.push_back(call);
             }
         }
     }
@@ -74,27 +88,25 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
         for(size_t j = i+1; j < LoadNCall.size(); j++)
         {
             if( isa<CallInst>(LoadNCall[j]) )
-                break; // we face a call that might collect garbage
+                break; // we have faced a call that might collect garbage
             
             LoadInst* NextLoad = dyn_cast<LoadInst>(LoadNCall[j]);
             
-            if ( NextLoad->getPointerOperand() != CurrentLoad->getPointerOperand() ) {
-                // Loads do not point to the same pointer
-                continue;
+            if (NextLoad->isIdenticalTo(CurrentLoad)) {
+                //Loads are equal
+                NextLoad->replaceAllUsesWith( CurrentLoad );
+                toDelete.insert( NextLoad ); //remove usless loads later
             }
-            
-            NextLoad->replaceAllUsesWith( CurrentLoad );
-            toDelete.insert( NextLoad ); //remove usless loads later
-            continue;
-
         }
     }
+    
+    rootLoadsRemoved += toDelete.size();
     
     bool BBChanged = !toDelete.empty();
     for(InstructionSI I = toDelete.begin(); I != toDelete.end(); I++) {
         (*I)->eraseFromParent();
     }
-
+    
     return BBChanged;
 }
 

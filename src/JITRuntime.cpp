@@ -72,6 +72,7 @@ void JITRuntime::printStat()
         m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
         m_cacheHits, m_cacheMisses, hitRatio
     );
+    PrintStatistics(outs());
 }
 
 
@@ -83,6 +84,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Initializing LLVM subsystem
     InitializeNativeTarget();
     linkShadowStackGC();
+    EnableStatistics();
     
     LLVMContext& llvmContext = getGlobalContext();
     
@@ -231,14 +233,14 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
         ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << blockOffset;
         std::string blockFunctionName = ss.str();
         
-        llvm::Function* blockFunction = m_JITModule->getFunction(blockFunctionName);
+        Function* blockFunction = m_JITModule->getFunction(blockFunctionName);
         if (!blockFunction) {
             // Block functions are created when wrapping method gets compiled.
             // If function was not found then the whole method needs compilation.
             
             // Compiling function and storing it to the table for further use
             outs() << "Compiling block method " << blockFunctionName << "\n";
-            llvm::Function* methodFunction = m_methodCompiler->compileMethod(block->method, callingContext);
+            Function* methodFunction = m_methodCompiler->compileMethod(block->method, callingContext);
             blockFunction = m_JITModule->getFunction(blockFunctionName);
             if (!methodFunction || !blockFunction) {
                 // Something is really wrong!
@@ -321,7 +323,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     if (! compiledMethodFunction) {
         // If function was not found in the cache looking it in the LLVM directly
         std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-        llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
+        Function* methodFunction = m_JITModule->getFunction(functionName);
         
         if (! methodFunction) {
             // Compiling function and storing it to the table for further use
@@ -411,34 +413,34 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
     
     // Basic AliasAnslysis support for GVN.
-    m_functionPassManager->add(llvm::createBasicAliasAnalysisPass());
+    m_functionPassManager->add(createBasicAliasAnalysisPass());
     
     // Promote allocas to registers.
-    m_functionPassManager->add(llvm::createPromoteMemoryToRegisterPass());
+    m_functionPassManager->add(createPromoteMemoryToRegisterPass());
 
     // Do simple "peephole" optimizations and bit-twiddling optzns.
-    m_functionPassManager->add(llvm::createInstructionCombiningPass());
+    m_functionPassManager->add(createInstructionCombiningPass());
 
     // Reassociate expressions.
-    m_functionPassManager->add(llvm::createReassociatePass());
+    m_functionPassManager->add(createReassociatePass());
 
     // Eliminate Common SubExpressions.
-    m_functionPassManager->add(llvm::createGVNPass());
+    m_functionPassManager->add(createGVNPass());
 
-    m_functionPassManager->add(llvm::createAggressiveDCEPass());
+    m_functionPassManager->add(createAggressiveDCEPass());
     
-    m_functionPassManager->add(llvm::createTailCallEliminationPass());
+    m_functionPassManager->add(createTailCallEliminationPass());
     
     // Simplify the control flow graph (deleting unreachable
     // blocks, etc).
-    m_functionPassManager->add(llvm::createCFGSimplificationPass());
+    m_functionPassManager->add(createCFGSimplificationPass());
     
-    m_functionPassManager->add(llvm::createDeadCodeEliminationPass());
-    m_functionPassManager->add(llvm::createDeadStoreEliminationPass());
+    m_functionPassManager->add(createDeadCodeEliminationPass());
+    m_functionPassManager->add(createDeadStoreEliminationPass());
     
     m_functionPassManager->add(createLLSTPass());
     
-    m_modulePassManager->add(llvm::createFunctionInliningPass());
+    m_modulePassManager->add(createFunctionInliningPass());
     m_functionPassManager->doInitialization();
 }
 
