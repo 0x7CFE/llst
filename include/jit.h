@@ -76,6 +76,7 @@ struct TExceptionAPI {
     llvm::Function*    cxa_allocate_exception;
     llvm::Function*    cxa_throw;
     llvm::GlobalValue* blockReturnType;
+    llvm::GlobalValue* contextTypeInfo;
 };
 
 struct TObjectTypes {

@@ -283,6 +283,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 
 TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
 {
+    hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
     TContext*       newContext = 0;
     
@@ -294,7 +295,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         if (receiverClass) {
             klass = receiverClass;
         } else {
-            TObject* receiver = arguments->getField(0);
+            TObject* receiver = messageArguments[0];
             klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
         }
         
@@ -322,11 +323,11 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             hptr<TObjectArray> errorArguments = m_softVM->newObject<TObjectArray>(2);
             
             // Filling in the failed call context information
-            errorArguments[0] = arguments->getField(0); // receiver object
+            errorArguments[0] = messageArguments[0]; // receiver object
             errorArguments[1] = failedSelector;      // message selector that failed
             
             // Replacing the arguments with newly created one
-            arguments = errorArguments; //TODO is it okay? I think its not.
+            messageArguments = errorArguments;
             
             // Continuing the execution just as if #doesNotUnderstand:
             // was the actual selector that we wanted to call
@@ -373,7 +374,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         // initialization of various objects such as stackTop and bytePointer.
         
         // Protecting the pointers before allocation
-        hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
         hptr<TContext>     previousContext  = m_softVM->newPointer(callingContext);
         
         // Creating context object and temporaries
@@ -578,6 +578,9 @@ void JITRuntime::initializeExceptionAPI() {
     
     m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Int8PtrTy));
     m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, reinterpret_cast<void*>( TBlockReturn::getBlockReturnType() ));
+    
+    m_exceptionAPI.contextTypeInfo = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("contextTypeInfo", Int8PtrTy));
+    m_executionEngine->addGlobalMapping(m_exceptionAPI.contextTypeInfo, const_cast<void*>(reinterpret_cast<const void*>( &typeid(TContext*) )));
 }
 
 void JITRuntime::createExecuteProcessFunction() {
