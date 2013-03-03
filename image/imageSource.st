@@ -1291,6 +1291,23 @@ isKindOf |kindOf|
     [ kindOf value: 'hello' value: Array ] assertWithComment: '7'.
 !
 
+METHOD LLVMTestStatements
+testPushConstants |testBlock|
+    testBlock <- [
+        ['0' asNumber ] assertEq: 0 withComment: '0'.
+        ['1' asNumber ] assertEq: 1 withComment: '1'.
+        ['2' asNumber ] assertEq: 2 withComment: '2'.
+        ['3' asNumber ] assertEq: 3 withComment: '3'.
+        ['4' asNumber ] assertEq: 4 withComment: '4'.
+        ['5' asNumber ] assertEq: 5 withComment: '5'.
+        ['6' asNumber ] assertEq: 6 withComment: '6'.
+        ['7' asNumber ] assertEq: 7 withComment: '7'.
+        ['8' asNumber ] assertEq: 8 withComment: '8'.
+        ['9' asNumber ] assertEq: 9 withComment: '9'.
+    ].
+    LLVM sendMessage: #value withArguments: (Array with: testBlock).
+!
+
 METHOD MetaLLVMTest
 runAllFrom: testSuite | suite |
     suite <- testSuite new.
@@ -1316,15 +1333,12 @@ selfFromBlockReturn
     nil testResume: [ ^self ].
 !
 
+
+
 METHOD Undefined
 testLLVMBlockReturn |testBlock y|
-    testBlock <- [:x| y <- x asString selfFromBlockReturn asNumber.
-                        (y == x)
-                        ifTrue:  [ x printString + ' is OK (x:' + (x class printString) + ', y:' + (y class printString) + ')'; printNl. ]
-                        ifFalse: [ self error: ('y is wrong. x = ' + (x printString) + ', y = ' + (y printString)) ] ].
-    1 to: 5 do: testBlock.
-    'ok for now' printNl.
-    5 to: 10 do: testBlock.
+    testBlock <- [:x| y <- x asString asNumber. y printNl. ].
+    8 to: 9 do: testBlock. "FIXME"
 !
 
 METHOD Undefined
@@ -1332,7 +1346,9 @@ main    | command |
         " initialize classes "
         Char initialize.
         
-        1 to: 1 do: [:ignore| LLVM sendMessage: #testLLVMBlockReturn withArguments: (Array with: nil). ].
+        LLVMTestStatements new testPushConstants.
+        
+        "1 to: 1 do: [:ignore| LLVM sendMessage: #testLLVMBlockReturn withArguments: (Array with: nil). ]. FIXME"
         
         "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
         "LLVMTest runAllFrom: GCTest."
