@@ -1311,14 +1311,34 @@ runSort: size | x1 list ms1 selector args1 block1 |
         'Sorted in ms: ' print. ms1 printNl.
 !
 
+METHOD Object
+selfFromBlockReturn
+    nil testResume: [ ^self ].
+!
+
+METHOD Undefined
+testLLVMBlockReturn |testBlock y|
+    testBlock <- [:x| y <- x asString selfFromBlockReturn asNumber.
+                        (y == x)
+                        ifTrue:  [ x printString + ' is OK (x:' + (x class printString) + ', y:' + (y class printString) + ')'; printNl. ]
+                        ifFalse: [ self error: ('y is wrong. x = ' + (x printString) + ', y = ' + (y printString)) ] ].
+    1 to: 5 do: testBlock.
+    'ok for now' printNl.
+    5 to: 10 do: testBlock.
+!
+
 METHOD Undefined
 main    | command |
         " initialize classes "
         Char initialize.
         
-        "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
+        1 to: 1 do: [:ignore| LLVM sendMessage: #testLLVMBlockReturn withArguments: (Array with: nil). ].
         
-        "nil runSort: 10."
+        "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
+        "LLVMTest runAllFrom: GCTest."
+        "LLVMTest runAllFrom: StringTest."
+        "1 to: 20 do: [:ignore| LLVM sendMessage: ('error:' asSymbol) withArguments: (Array with: nil with: 'error text') ]."
+        "LLVMTest runAllFrom: SmallIntTest."
         
         " main execution loop  "
         [ '-> ' print. command <- String input. command notNil ]
