@@ -72,7 +72,6 @@ struct TExceptionAPI {
     llvm::Function*    gcc_personality;
     llvm::Function*    cxa_begin_catch;
     llvm::Function*    cxa_end_catch;
-    llvm::Function*    cxa_rethrow;
     llvm::Function*    cxa_allocate_exception;
     llvm::Function*    cxa_throw;
     llvm::GlobalValue* blockReturnType;

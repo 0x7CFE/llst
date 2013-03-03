@@ -572,12 +572,11 @@ void JITRuntime::initializeExceptionAPI() {
     m_exceptionAPI.gcc_personality = Function::Create(FunctionType::get(Int32Ty, true), Function::ExternalLinkage, "__gcc_personality_v0", m_JITModule);
     m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Int8PtrTy, Int8PtrTy, false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
     m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
-    m_exceptionAPI.cxa_rethrow     = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_rethrow", m_JITModule);
     m_exceptionAPI.cxa_allocate_exception = Function::Create(FunctionType::get(Int8PtrTy, Int32Ty, false), Function::ExternalLinkage, "__cxa_allocate_exception", m_JITModule);
     m_exceptionAPI.cxa_throw       = Function::Create(FunctionType::get(VoidTy, throwParams, false), Function::ExternalLinkage, "__cxa_throw", m_JITModule);
     
     m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Int8PtrTy));
-    m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, reinterpret_cast<void*>( TBlockReturn::getBlockReturnType() ));
+    m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, TBlockReturn::getBlockReturnType());
     
     m_exceptionAPI.contextTypeInfo = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("contextTypeInfo", Int8PtrTy));
     m_executionEngine->addGlobalMapping(m_exceptionAPI.contextTypeInfo, const_cast<void*>(reinterpret_cast<const void*>( &typeid(TContext*) )));
