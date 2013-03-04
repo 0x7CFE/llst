@@ -160,10 +160,13 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     // NOTE We do not allocating stack because it's not used in LLVM
     hptr<TBlock> newBlock      = m_softVM->newObject<TBlock>();
     newBlock->argumentLocation = newInteger(argLocation);
-    newBlock->bytePointer      = newInteger(bytePointer);
+    newBlock->blockBytePointer = newInteger(bytePointer);
     newBlock->method           = previousContext->method;
     newBlock->arguments        = previousContext->arguments;
     newBlock->temporaries      = previousContext->temporaries;
+    
+    newBlock->bytePointer = 0;
+    newBlock->stackTop = 0;
     
     // Assigning creatingContext depending on the hierarchy
     // Nested blocks inherit the outer creating context
@@ -234,7 +237,7 @@ void JITRuntime::optimizeFunction(Function* function)
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
-    const uint16_t blockOffset = getIntegerValue(block->bytePointer);
+    const uint16_t blockOffset = getIntegerValue(block->blockBytePointer);
     
     TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
     
@@ -263,16 +266,12 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 //                 //exit(1);
 //             }
             
-            m_modulePassManager->run(*m_JITModule); //TODO too expensive to run on each function compilation?
-            
-            // Running the optimization passes on a function
-            m_functionPassManager->run(*blockFunction);
-            
+            optimizeFunction(blockFunction);
         }
         
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
         updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
-        outs() << *blockFunction;
+//         outs() << *blockFunction;
     }
     
     block->previousContext = callingContext->previousContext;
@@ -378,14 +377,16 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         
         // Creating context object and temporaries
         hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
-        newContext = m_softVM->newObject<TContext>(0, false);
+        newContext = m_softVM->newObject<TContext>();
         
         // Initializing context variables
         newContext->temporaries       = newTemps;
         newContext->arguments         = messageArguments;
         newContext->method            = method;
         newContext->previousContext   = previousContext;
-        
+
+        newContext->bytePointer       = 0;
+        newContext->stackTop          = 0;
     }
     
 //     static int messageDepth = 0;
@@ -465,11 +466,11 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-    m_functionPassManager->add(createLLSTPass());
+//     m_functionPassManager->add(createLLSTPass());
     //If llstPass removed GC roots, we may try DCE again
     
-    m_functionPassManager->add(createDeadCodeEliminationPass());
-    m_functionPassManager->add(createDeadStoreEliminationPass());
+//     m_functionPassManager->add(createDeadCodeEliminationPass());
+//     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     m_modulePassManager->add(createFunctionInliningPass());
     m_functionPassManager->doInitialization();
