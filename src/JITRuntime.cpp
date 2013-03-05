@@ -123,6 +123,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_baseTypes.initializeFromModule(m_JITModule);
     
     initializeGlobals();
+    m_globals.initializeFromModule(m_JITModule);
+    
     initializePassManager();
     initializeRuntimeAPI();
     initializeExceptionAPI();
@@ -616,7 +618,7 @@ void JITRuntime::createExecuteProcessFunction() {
     BasicBlock* Fail = BasicBlock::Create(m_JITModule->getContext(), "FAIL", executeProcess);
     
     Value* sendMessageArgs[] = {
-        context,
+        builder.CreateBitCast(m_globals.nilObject, m_baseTypes.context->getPointerTo()),
         selector,
         args,
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) 

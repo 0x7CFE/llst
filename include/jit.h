@@ -395,8 +395,8 @@ private:
 
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
-
-    TObjectTypes m_baseTypes;
+    TJITGlobals   m_globals;
+    TObjectTypes  m_baseTypes;
 
     static JITRuntime* s_instance;
 
