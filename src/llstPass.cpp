@@ -6,6 +6,10 @@ STATISTIC(rootsRemoved,     "Number of removed roots                            
 
 using namespace llvm;
 
+typedef std::vector<Instruction*>   InstructionVector;
+typedef std::set<Instruction*>      InstructionSet;
+typedef InstructionSet::iterator    InstructionSI;
+
 namespace {
     struct LLSTPass : public FunctionPass {
     private:
@@ -13,6 +17,7 @@ namespace {
         bool isPotentialGCFunction(std::string name);
         bool removeRootLoads(BasicBlock* B);
         bool removeRedundantRoots(Function* F);
+        int  getNumRoots(Function* F);
     public:
         virtual bool runOnFunction(Function &F) ;
         static char ID;
@@ -57,10 +62,6 @@ bool LLSTPass::isPotentialGCFunction(std::string name)
 
 bool LLSTPass::removeRootLoads(BasicBlock* B)
 {
-    typedef std::vector<Instruction*>   InstructionVector;
-    typedef std::set<Instruction*>      InstructionSet;
-    typedef InstructionSet::iterator    InstructionSI;
-    
     InstructionVector LoadNCall;
     InstructionSet toDelete;
     
@@ -111,17 +112,33 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
     return BBChanged;
 }
 
+int LLSTPass::getNumRoots(Function* F) {
+    int result = 0;
+    for (Function::iterator BB = F->begin(); BB != F->end(); BB++)
+    {
+        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
+        {
+            if (IntrinsicInst* Intr = dyn_cast<IntrinsicInst>(II)) {
+                if (Intr->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot) {
+                    result++;
+                }
+            }
+        }
+    }
+    return result;
+}
+
 bool LLSTPass::removeRedundantRoots(Function* F)
 {
-
-    std::set<Instruction*> toDelete;
-    BasicBlock* entryBB = & F->getEntryBlock();
-    for (BasicBlock::iterator Instr = entryBB->begin(); Instr != entryBB->end(); Instr++ )
+    InstructionSet toDelete;
+    BasicBlock& entryBB = F->getEntryBlock();
+    for (BasicBlock::iterator Instr = entryBB.begin(); Instr != entryBB.end(); Instr++ )
     {
-        if (CallInst* createRootCall = dyn_cast<CallInst>(Instr)) {
-            if(createRootCall->getCalledFunction()->getName() == "llvm.gcroot") {
-                Value* root = createRootCall->getArgOperand(0);
-                Value* holder = cast<Instruction>(root)->getOperand(0);
+        if (IntrinsicInst* createRootCall = dyn_cast<IntrinsicInst>(Instr))
+        {
+            if(createRootCall->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot)
+            {
+                Value* holder = cast<Instruction>( createRootCall->getArgOperand(0)->stripPointerCasts() );
                 bool onlyStoresToRoot = true;
                 for(Value::use_iterator U = holder->use_begin(); U != holder->use_end() ; U++) {
                     Instruction* I = cast<Instruction>(*U);
@@ -142,9 +159,13 @@ bool LLSTPass::removeRedundantRoots(Function* F)
     }
     bool CFGChanged = !toDelete.empty();
     rootsRemoved += toDelete.size();
-    for(std::set<Instruction*>::iterator I = toDelete.begin(); I != toDelete.end(); I++) {
+    for(InstructionSI I = toDelete.begin(); I != toDelete.end(); I++) {
         (*I)->eraseFromParent();
     }
+    
+    //If there are no gc.root intrinsics why should we use GC for that function?
+    if (getNumRoots(F) == 0)
+        F->clearGC();
     
     return CFGChanged;
 }
