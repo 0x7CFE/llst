@@ -396,8 +396,7 @@ private:
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
 
-    TObjectTypes ot;
-    llvm::GlobalVariable* m_jitGlobals;
+    TObjectTypes m_baseTypes;
 
     static JITRuntime* s_instance;
 
@@ -442,10 +441,10 @@ private:
     void updateFunctionCache(TMethod* method, TMethodFunction function);
     void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
     
-    void initializeGlobals();
     void initializePassManager();
 
-    //uses m_baseTypes. dont forget to init it before calling this method
+    //The following methods use m_baseTypes. Don't forget to init it before calling these methods
+    void initializeGlobals();
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
     void createExecuteProcessFunction();

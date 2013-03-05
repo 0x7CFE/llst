@@ -120,7 +120,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
         exit(1);
     }
     
-    ot.initializeFromModule(m_JITModule);
+    m_baseTypes.initializeFromModule(m_JITModule);
     
     initializeGlobals();
     initializePassManager();
@@ -404,31 +404,31 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 }
 
 void JITRuntime::initializeGlobals() {
-    GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", ot.globals) );
+    GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", m_baseTypes.globals) );
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
     
-    GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", ot.object) );
+    GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", m_baseTypes.object) );
     m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(globals.nilObject));
     
-    GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", ot.object) );
+    GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", m_baseTypes.object) );
     m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(globals.trueObject));
     
-    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", ot.object) );
+    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", m_baseTypes.object) );
     m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(globals.falseObject));
     
-    GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", ot.klass) );
+    GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", m_baseTypes.klass) );
     m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(globals.smallIntClass));
     
-    GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", ot.klass) );
+    GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", m_baseTypes.klass) );
     m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(globals.arrayClass));
     
-    GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", ot.symbol) );
+    GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(globals.binaryMessages[0]));
     
-    GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", ot.symbol) );
+    GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(globals.binaryMessages[1]));
     
-    GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", ot.symbol) );
+    GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(globals.binaryMessages[2]));
 }
 
@@ -479,12 +479,12 @@ void JITRuntime::initializePassManager() {
 void JITRuntime::initializeRuntimeAPI() {
     LLVMContext& llvmContext = getGlobalContext();
     
-    PointerType* objectType     = ot.object->getPointerTo();
-    PointerType* classType      = ot.klass->getPointerTo();
-    PointerType* byteObjectType = ot.byteObject->getPointerTo();
-    PointerType* contextType    = ot.context->getPointerTo();
-    PointerType* blockType      = ot.block->getPointerTo();
-    PointerType* objectSlotType = ot.object->getPointerTo()->getPointerTo(); // TObject**
+    PointerType* objectType     = m_baseTypes.object->getPointerTo();
+    PointerType* classType      = m_baseTypes.klass->getPointerTo();
+    PointerType* byteObjectType = m_baseTypes.byteObject->getPointerTo();
+    PointerType* contextType    = m_baseTypes.context->getPointerTo();
+    PointerType* blockType      = m_baseTypes.block->getPointerTo();
+    PointerType* objectSlotType = m_baseTypes.object->getPointerTo()->getPointerTo(); // TObject**
     
     Type* params[] = {
         classType,                    // klass
@@ -496,8 +496,8 @@ void JITRuntime::initializeRuntimeAPI() {
     
     Type* sendParams[] = {
         contextType,                    // callingContext
-        ot.symbol->getPointerTo(),      // message selector
-        ot.objectArray->getPointerTo(), // arguments
+        m_baseTypes.symbol->getPointerTo(),      // message selector
+        m_baseTypes.objectArray->getPointerTo(), // arguments
         classType                       // receiverClass
     };
     FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
@@ -585,7 +585,7 @@ void JITRuntime::initializeExceptionAPI() {
 
 void JITRuntime::createExecuteProcessFunction() {
     Type* executeProcessParams[] = {
-        ot.process->getPointerTo()
+        m_baseTypes.process->getPointerTo()
     };
     FunctionType* executeProcessType = FunctionType::get(Type::getInt32Ty(m_JITModule->getContext()), executeProcessParams, false);
     
@@ -598,7 +598,7 @@ void JITRuntime::createExecuteProcessFunction() {
     Value* process = (Value*) (executeProcess->arg_begin());
     process->setName("process");
     
-    Value* processHolder = builder.CreateAlloca(ot.process->getPointerTo());
+    Value* processHolder = builder.CreateAlloca(m_baseTypes.process->getPointerTo());
     Function* gcRootFunction = m_JITModule->getFunction("llvm.gcroot");
     builder.CreateCall2(gcRootFunction, builder.CreateBitCast(processHolder, builder.getInt8PtrTy()->getPointerTo()), ConstantPointerNull::get(builder.getInt8PtrTy()) );
     builder.CreateStore(process, processHolder);
@@ -619,7 +619,7 @@ void JITRuntime::createExecuteProcessFunction() {
         context,
         selector,
         args,
-        ConstantPointerNull::get(ot.klass->getPointerTo()) 
+        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) 
     };
     
     builder.CreateInvoke(m_runtimeAPI.sendMessage, OK, Fail, sendMessageArgs);
@@ -635,7 +635,7 @@ void JITRuntime::createExecuteProcessFunction() {
     
     Value* exceptionObject  = builder.CreateExtractValue(exceptionStruct, 0);
     Value* thrownException  = builder.CreateCall(m_exceptionAPI.cxa_begin_catch, exceptionObject);
-    Value* thrownContext    = builder.CreateBitCast(thrownException, ot.context->getPointerTo());
+    Value* thrownContext    = builder.CreateBitCast(thrownException, m_baseTypes.context->getPointerTo());
     
     process = builder.CreateLoad(processHolder);
     contextPtr = builder.CreateStructGEP(process, 1);
