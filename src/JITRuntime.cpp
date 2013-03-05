@@ -123,7 +123,6 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_baseTypes.initializeFromModule(m_JITModule);
     
     initializeGlobals();
-    m_globals.initializeFromModule(m_JITModule);
     
     initializePassManager();
     initializeRuntimeAPI();
@@ -601,8 +600,8 @@ void JITRuntime::createExecuteProcessFunction() {
     process->setName("process");
     
     Value* processHolder = builder.CreateAlloca(m_baseTypes.process->getPointerTo());
-    Function* gcRootFunction = m_JITModule->getFunction("llvm.gcroot");
-    builder.CreateCall2(gcRootFunction, builder.CreateBitCast(processHolder, builder.getInt8PtrTy()->getPointerTo()), ConstantPointerNull::get(builder.getInt8PtrTy()) );
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    builder.CreateCall2(gcrootIntrinsic, builder.CreateBitCast(processHolder, builder.getInt8PtrTy()->getPointerTo()), ConstantPointerNull::get(builder.getInt8PtrTy()) );
     builder.CreateStore(process, processHolder);
     
     Value* contextPtr  = builder.CreateStructGEP(process, 1);
@@ -613,12 +612,14 @@ void JITRuntime::createExecuteProcessFunction() {
     Value* method      = builder.CreateLoad(methodPtr);
     Value* selectorPtr = builder.CreateStructGEP(method, 1);
     Value* selector    = builder.CreateLoad(selectorPtr);
+    Value* previousContextPtr = builder.CreateStructGEP(context, 7);
+    Value* previousContext    = builder.CreateLoad(previousContextPtr);
     
     BasicBlock* OK   = BasicBlock::Create(m_JITModule->getContext(), "OK", executeProcess);
     BasicBlock* Fail = BasicBlock::Create(m_JITModule->getContext(), "FAIL", executeProcess);
     
     Value* sendMessageArgs[] = {
-        builder.CreateBitCast(m_globals.nilObject, m_baseTypes.context->getPointerTo()),
+        previousContext,
         selector,
         args,
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) 

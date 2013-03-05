@@ -160,9 +160,6 @@ define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %valu
     ret %TObject** %fieldPtr
 }
 
-declare void @llvm.memcpy.p0i8.p0i8.i32(i8* %dest, i8* %src, i32 %size, i32 %align, i1 %volatile)
-declare void @llvm.gcroot(i8** %ptrloc, i8* %metadata)
-
 define %TObject* @dummy() gc "shadow-stack" {
     ; enabling shadow stack init on this module
     ret %TObject* null

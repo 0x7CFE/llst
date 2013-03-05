@@ -51,6 +51,7 @@
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/PassManager.h>
+#include <llvm/Intrinsics.h>
 
 // These functions are used in the IR code
 // as a bindings between the VM and the object world
@@ -395,7 +396,6 @@ private:
 
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
-    TJITGlobals   m_globals;
     TObjectTypes  m_baseTypes;
 
     static JITRuntime* s_instance;

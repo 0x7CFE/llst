@@ -301,8 +301,8 @@ Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
     
     // Registering holder as a GC root
     Value* stackRoot = jit.builder->CreateBitCast(holder, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
-    Function* gcRootFunction = m_JITModule->getFunction("llvm.gcroot");
-    jit.builder->CreateCall2(gcRootFunction, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    jit.builder->CreateCall2(gcrootIntrinsic, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
     
     // Returning to the original edit location
     jit.builder->SetInsertPoint(insertBlock, insertPoint);
@@ -1318,9 +1318,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 source,
                 dataSize,
                 jit.builder->getInt32(0), // no alignment
-                jit.builder->getInt1(0)  // not volatile
+                jit.builder->getFalse()   // not volatile
             };
-            Function* memcpyIntrinsic = m_JITModule->getFunction("llvm.memcpy.p0i8.p0i8.i32");
+            
+            Type* memcpyType[] = {jit.builder->getInt8PtrTy(), jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty() };
+            Function* memcpyIntrinsic = getDeclaration(m_JITModule, Intrinsic::memcpy, memcpyType);
+            
             jit.builder->CreateCall(memcpyIntrinsic, copyArgs);
             
             //Value*    resultObject = jit.builder->CreateBitCast( clone, ot.object->getPointerTo());
