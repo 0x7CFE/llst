@@ -590,11 +590,19 @@ void JITRuntime::createExecuteProcessFunction() {
     FunctionType* executeProcessType = FunctionType::get(Type::getInt32Ty(m_JITModule->getContext()), executeProcessParams, false);
     
     Function* executeProcess = cast<Function>( m_JITModule->getOrInsertFunction("executeProcess", executeProcessType));
+    executeProcess->setGC("shadow-stack");
     BasicBlock* entry = BasicBlock::Create(m_JITModule->getContext(), "", executeProcess);
     
     IRBuilder<> builder(entry);
     
-    Value* process     = (Value*) (executeProcess->arg_begin());
+    Value* process = (Value*) (executeProcess->arg_begin());
+    process->setName("process");
+    
+    Value* processHolder = builder.CreateAlloca(ot.process->getPointerTo());
+    Function* gcRootFunction = m_JITModule->getFunction("llvm.gcroot");
+    builder.CreateCall2(gcRootFunction, builder.CreateBitCast(processHolder, builder.getInt8PtrTy()->getPointerTo()), ConstantPointerNull::get(builder.getInt8PtrTy()) );
+    builder.CreateStore(process, processHolder);
+    
     Value* contextPtr  = builder.CreateStructGEP(process, 1);
     Value* context     = builder.CreateLoad(contextPtr);
     Value* argsPtr     = builder.CreateStructGEP(context, 2);
@@ -622,11 +630,17 @@ void JITRuntime::createExecuteProcessFunction() {
     builder.SetInsertPoint(Fail);
     Type* caughtType = StructType::get(builder.getInt8PtrTy(), builder.getInt32Ty(), NULL);
     
-    LandingPadInst* caughtResult = builder.CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
-    caughtResult->addClause(ConstantPointerNull::get(builder.getInt8PtrTy()));
+    LandingPadInst* exceptionStruct = builder.CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
+    exceptionStruct->addClause(m_exceptionAPI.contextTypeInfo);
     
-    Value* thrownException  = builder.CreateExtractValue(caughtResult, 0);
-    builder.CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
+    Value* exceptionObject  = builder.CreateExtractValue(exceptionStruct, 0);
+    Value* thrownException  = builder.CreateCall(m_exceptionAPI.cxa_begin_catch, exceptionObject);
+    Value* thrownContext    = builder.CreateBitCast(thrownException, ot.context->getPointerTo());
+    
+    process = builder.CreateLoad(processHolder);
+    contextPtr = builder.CreateStructGEP(process, 1);
+    builder.CreateStore(thrownContext, contextPtr);
+    
     builder.CreateCall(m_exceptionAPI.cxa_end_catch);
     builder.CreateRet( builder.getInt32(SmalltalkVM::returnError) );
 }
