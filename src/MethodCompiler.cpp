@@ -1309,8 +1309,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* sourceFields   = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, originalObject);
             Value* destFields     = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, cloneObject);
             
-            Value* source       = jit.builder->CreateBitCast(sourceFields, Type::getInt8PtrTy(m_JITModule->getContext()));
-            Value* destination  = jit.builder->CreateBitCast(destFields, Type::getInt8PtrTy(m_JITModule->getContext()));
+            Value* source       = jit.builder->CreateBitCast(sourceFields, jit.builder->getInt8PtrTy());
+            Value* destination  = jit.builder->CreateBitCast(destFields, jit.builder->getInt8PtrTy());
             
             // Copying the data
             Value* copyArgs[] = {
@@ -1358,7 +1358,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             
             //Checking the passed temps size TODO unroll stack
             Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
-            Value* tempSizeOk = jit.builder->CreateICmpSLE(blockAcceptsArgCount, jit.builder->getInt32(argCount));
+            Value* tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount);
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailed);
             
             jit.basicBlockContexts[tempsChecked].referers.insert(jit.builder->GetInsertBlock());
