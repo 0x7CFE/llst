@@ -79,7 +79,10 @@ int main(int argc, char **argv) {
     vm.pushProcess(initProcess);
     
     // And starting the image execution!
-    SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
+    //SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
+    typedef int32_t (*TExecuteProcessFunction)(TProcess*);
+    TExecuteProcessFunction executeProcess = reinterpret_cast<TExecuteProcessFunction>(runtime.getExecutionEngine()->getPointerToFunction(runtime.getModule()->getFunction("executeProcess")));
+    SmalltalkVM::TExecuteResult result = (SmalltalkVM::TExecuteResult) executeProcess(initProcess);
     
     // Finally, parsing the result
     switch (result) {

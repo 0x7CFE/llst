@@ -1328,40 +1328,32 @@ runSort: size | x1 list ms1 selector args1 block1 |
         'Sorted in ms: ' print. ms1 printNl.
 !
 
-METHOD Object
-selfFromBlockReturn
-    nil testResume: [ ^self ].
-!
-
-
-
 METHOD Undefined
-testLLVMBlockReturn |testBlock y|
-    testBlock <- [:x| y <- x asString asNumber. y printNl. ].
-    8 to: 9 do: testBlock. "FIXME"
+boot
+    self main.
 !
 
 METHOD Undefined
 main    | command |
-        " initialize classes "
-        Char initialize.
+    " initialize classes "
+    Char initialize.
+    
+    CompareTest new runAll.
+    
+    "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
         
-        LLVMTestStatements new testPushConstants.
-        
-        "1 to: 1 do: [:ignore| LLVM sendMessage: #testLLVMBlockReturn withArguments: (Array with: nil). ]. FIXME"
-        
-        "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
-        "LLVMTest runAllFrom: GCTest."
-        "LLVMTest runAllFrom: StringTest."
-        "1 to: 20 do: [:ignore| LLVM sendMessage: ('error:' asSymbol) withArguments: (Array with: nil with: 'error text') ]."
-        "LLVMTest runAllFrom: SmallIntTest."
-        
-        " main execution loop  "
-        [ '-> ' print. command <- String input. command notNil ]
-                whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ]
-
-        ^nil.
+    "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
+    "LLVMTest runAllFrom: GCTest."
+    "LLVMTest runAllFrom: StringTest."
+    "1 to: 20 do: [:ignore| LLVM sendMessage: ('error:' asSymbol) withArguments: (Array with: nil with: 'error text') ]."
+    "LLVMTest runAllFrom: SmallIntTest."
+    
+    " main execution loop  
+    [ '-> ' print. command <- String input. command notNil ]
+            whileTrue: [ command isEmpty
+                ifFalse: [ command doIt printNl ] ]"
+    
+    ^nil.
 !
 
 
