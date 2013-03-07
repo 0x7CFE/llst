@@ -301,8 +301,8 @@ Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
     
     // Registering holder as a GC root
     Value* stackRoot = jit.builder->CreateBitCast(holder, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
-    Function* gcRootFunction = m_JITModule->getFunction("llvm.gcroot");
-    jit.builder->CreateCall2(gcRootFunction, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    jit.builder->CreateCall2(gcrootIntrinsic, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
     
     // Returning to the original edit location
     jit.builder->SetInsertPoint(insertBlock, insertPoint);
@@ -657,32 +657,29 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     
     Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
     
-    LandingPadInst* caughtResult = jit.builder->CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
-    caughtResult->addClause(m_exceptionAPI.blockReturnType);
+    LandingPadInst* exceptionStruct = jit.builder->CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
+    exceptionStruct->addClause(m_exceptionAPI.blockReturnType);
     
-    Value* thrownException  = jit.builder->CreateExtractValue(caughtResult, 0);
-    Value* exceptionObject  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, thrownException);
-    Value* blockResult      = jit.builder->CreateBitCast(exceptionObject, m_baseTypes.blockReturn->getPointerTo());
+    Value* exceptionObject  = jit.builder->CreateExtractValue(exceptionStruct, 0);
+    Value* thrownException  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, exceptionObject);
+    Value* blockReturn      = jit.builder->CreateBitCast(thrownException, m_baseTypes.blockReturn->getPointerTo());
     
-    Value* returnValuePtr   = jit.builder->CreateStructGEP(blockResult, 0);
-    Value* returnValue      = jit.builder->CreateLoad(returnValuePtr);
+    Value* returnValue      = jit.builder->CreateLoad( jit.builder->CreateStructGEP(blockReturn, 0) );
+    Value* targetContext    = jit.builder->CreateLoad( jit.builder->CreateStructGEP(blockReturn, 1) );
     
-    Value* targetContextPtr = jit.builder->CreateStructGEP(blockResult, 1);
-    Value* targetContext    = jit.builder->CreateLoad(targetContextPtr);
+    jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
     
+    Value* compareTargets = jit.builder->CreateICmpEQ(jit.getCurrentContext(), targetContext);
     BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
     BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
     
-    Value* compareTargets = jit.builder->CreateICmpEQ(jit.getCurrentContext(), targetContext);
     jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
     
     jit.builder->SetInsertPoint(returnBlock);
-    jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
     jit.builder->CreateRet(returnValue);
     
     jit.builder->SetInsertPoint(rethrowBlock);
-    jit.builder->CreateCall(m_exceptionAPI.cxa_rethrow);
-    jit.builder->CreateUnreachable();
+    jit.builder->CreateResume(exceptionStruct);
 }
 
 void MethodCompiler::printOpcode(TInstruction instruction)
@@ -1312,8 +1309,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             Value* sourceFields   = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, originalObject);
             Value* destFields     = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, cloneObject);
             
-            Value* source       = jit.builder->CreateBitCast(sourceFields, Type::getInt8PtrTy(m_JITModule->getContext()));
-            Value* destination  = jit.builder->CreateBitCast(destFields, Type::getInt8PtrTy(m_JITModule->getContext()));
+            Value* source       = jit.builder->CreateBitCast(sourceFields, jit.builder->getInt8PtrTy());
+            Value* destination  = jit.builder->CreateBitCast(destFields, jit.builder->getInt8PtrTy());
             
             // Copying the data
             Value* copyArgs[] = {
@@ -1321,9 +1318,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
                 source,
                 dataSize,
                 jit.builder->getInt32(0), // no alignment
-                jit.builder->getInt1(0)  // not volatile
+                jit.builder->getFalse()   // not volatile
             };
-            Function* memcpyIntrinsic = m_JITModule->getFunction("llvm.memcpy.p0i8.p0i8.i32");
+            
+            Type* memcpyType[] = {jit.builder->getInt8PtrTy(), jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty() };
+            Function* memcpyIntrinsic = getDeclaration(m_JITModule, Intrinsic::memcpy, memcpyType);
+            
             jit.builder->CreateCall(memcpyIntrinsic, copyArgs);
             
             //Value*    resultObject = jit.builder->CreateBitCast( clone, ot.object->getPointerTo());
@@ -1358,7 +1358,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             
             //Checking the passed temps size TODO unroll stack
             Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
-            Value* tempSizeOk = jit.builder->CreateICmpSLE(blockAcceptsArgCount, jit.builder->getInt32(argCount));
+            Value* tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount);
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailed);
             
             jit.basicBlockContexts[tempsChecked].referers.insert(jit.builder->GetInsertBlock());
@@ -1385,18 +1385,14 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             //after calling cxa_throw. But! Someone may add Smalltalk code after <19>
             //Thats why we have to create unconditional br to 'primitiveFailed'
             //to catch any generated code into that BB
-            
-            int errCode = 0; //TODO we may extend it in the future
-            
-            Value* slotI8Ptr  = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, jit.builder->getInt32(4));
-            Value* slotI32Ptr = jit.builder->CreateBitCast(slotI8Ptr, jit.builder->getInt32Ty()->getPointerTo());
-            jit.builder->CreateStore(jit.builder->getInt32(errCode), slotI32Ptr);
-            
-            Value* typeId = jit.builder->CreateGlobalString("int");
-            
+             
+            Value* expnBuffer      = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, jit.builder->getInt32( sizeof(TContext*) ));
+            Value* expnTypedBuffer = jit.builder->CreateBitCast(expnBuffer, m_baseTypes.context->getPointerTo()->getPointerTo());
+            jit.builder->CreateStore(jit.getCurrentContext(), expnTypedBuffer);
+             
             Value* throwArgs[] = {
-                slotI8Ptr,
-                jit.builder->CreateBitCast(typeId, jit.builder->getInt8PtrTy()),
+                expnBuffer,
+                jit.builder->CreateBitCast(m_exceptionAPI.contextTypeInfo, jit.builder->getInt8PtrTy()),
                 ConstantPointerNull::get(jit.builder->getInt8PtrTy())
             };
             

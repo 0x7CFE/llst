@@ -51,6 +51,7 @@
 #include <llvm/Linker.h>
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/PassManager.h>
+#include <llvm/Intrinsics.h>
 
 // These functions are used in the IR code
 // as a bindings between the VM and the object world
@@ -72,10 +73,10 @@ struct TExceptionAPI {
     llvm::Function*    gcc_personality;
     llvm::Function*    cxa_begin_catch;
     llvm::Function*    cxa_end_catch;
-    llvm::Function*    cxa_rethrow;
     llvm::Function*    cxa_allocate_exception;
     llvm::Function*    cxa_throw;
     llvm::GlobalValue* blockReturnType;
+    llvm::GlobalValue* contextTypeInfo;
 };
 
 struct TObjectTypes {
@@ -395,9 +396,7 @@ private:
 
     TRuntimeAPI   m_runtimeAPI;
     TExceptionAPI m_exceptionAPI;
-
-    TObjectTypes ot;
-    llvm::GlobalVariable* m_jitGlobals;
+    TObjectTypes  m_baseTypes;
 
     static JITRuntime* s_instance;
 
@@ -442,10 +441,10 @@ private:
     void updateFunctionCache(TMethod* method, TMethodFunction function);
     void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
     
-    void initializeGlobals();
     void initializePassManager();
 
-    //uses m_baseTypes. dont forget to init it before calling this method
+    //The following methods use m_baseTypes. Don't forget to init it before calling these methods
+    void initializeGlobals();
     void initializeRuntimeAPI();
     void initializeExceptionAPI();
     void createExecuteProcessFunction();

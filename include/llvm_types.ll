@@ -1,82 +1,83 @@
-; ModuleID = 'types'
+; This module implements types described in types.h within LLVM.
+; Also it implements some base functions and methods such as TObject::getClass(). 
+;  LLVM passes may optimize/inline them => we will gain more perfomance.
+
 %TSize = type { i32 ; data
-                     }
+              }
 %TObject = type { %TSize, ; size
-                         %TClass*, ; class
-                         [0 x %TObject*] ; fields
-                       }
+                  %TClass*, ; class
+                  [0 x %TObject*] ; fields
+                }
 %TByteObject = type { %TObject }
 %TSymbol = type { %TByteObject }
 %TString = type { %TByteObject }
 %TChar = type { %TObject,
-                       i32 ; value
-                     }
+                i32 ; value
+              }
 %TArray = type { %TObject }
 %TObjectArray = type { %TObject }
 %TSymbolArray = type { %TObject }
 %TContext = type { %TObject,
-                          %TMethod*,
-                          %TObjectArray*, ; arguments
-                          %TObjectArray*, ; temporaries
-                          %TObjectArray*, ; stack
-                          i32, ; bytePointer
-                          i32, ; stackTop
-                          %TContext* ; previousContext
-                        }
+                   %TMethod*,
+                   %TObjectArray*, ; arguments
+                   %TObjectArray*, ; temporaries
+                   %TObjectArray*, ; stack
+                   i32, ; bytePointer
+                   i32, ; stackTop
+                   %TContext* ; previousContext
+                 }
 %TBlock = type { %TContext,
-                        i32, ; argumentLocation
-                        %TContext*, ; creatingContext
-                        i32  ; blockBytePointer
-                      }
+                 i32, ; argumentLocation
+                 %TContext*, ; creatingContext
+                 i32 ; blockBytePointer
+               }
 %TMethod = type { %TObject,
-                         %TSymbol*, ; name
-                         %TByteObject*, ; byteCodes
-                         %TSymbolArray*, ; literals
-                         i32, ; stackSize
-                         i32, ; temporarySize
-                         %TClass*, ; class
-                         %TString*, ; text
-                         %TObject* ; package
-                       }
+                  %TSymbol*, ; name
+                  %TByteObject*, ; byteCodes
+                  %TSymbolArray*, ; literals
+                  i32, ; stackSize
+                  i32, ; temporarySize
+                  %TClass*, ; class
+                  %TString*, ; text
+                  %TObject* ; package
+                }
 %TDictionary = type { %TObject,
-                             %TSymbolArray*, ; keys
-                             %TObjectArray* ; values
-                           }
+                      %TSymbolArray*, ; keys
+                      %TObjectArray* ; values
+                    }
 %TClass = type { %TObject,
-                        %TSymbol*, ; name
-                        %TClass*, ; parentClass
-                        %TDictionary*, ; methods
-                        i32, ; instanceSize
-                        %TSymbolArray*, ; variables
-                        %TObject* ; package
-                      }
+                 %TSymbol*, ; name
+                 %TClass*, ; parentClass
+                 %TDictionary*, ; methods
+                 i32, ; instanceSize
+                 %TSymbolArray*, ; variables
+                 %TObject* ; package
+               }
 %TProcess = type { %TObject,
-                          %TContext*, ; context
-                          %TObject*, ; state
-                          %TObject* ; result
-                        }
+                   %TContext*, ; context
+                   %TObject*, ; state
+                   %TObject* ; result
+                 }
 %TGlobals = type { %TObject*, ; nilObject
-                          %TObject*, ; trueObject
-                          %TObject*, ; falseObject
-                          %TClass*, ; smallIntClass
-                          %TClass*, ; arrayClass
-                          %TClass*, ; blockClass
-                          %TClass*, ; contextClass
-                          %TClass*, ; stringClass
-                          %TDictionary*, ; globalsObject
-                          %TMethod*, ; initialMethod
-                          [3 x %TObject*], ; binaryMessages : [<, <=, +]
-                          %TClass*, ; integerClass
-                          %TSymbol* ; badMethodSymbol
-                        }
+                   %TObject*, ; trueObject
+                   %TObject*, ; falseObject
+                   %TClass*, ; smallIntClass
+                   %TClass*, ; arrayClass
+                   %TClass*, ; blockClass
+                   %TClass*, ; contextClass
+                   %TClass*, ; stringClass
+                   %TDictionary*, ; globalsObject
+                   %TMethod*, ; initialMethod
+                   [3 x %TObject*], ; binaryMessages : [<, <=, +]
+                   %TClass*, ; integerClass
+                   %TSymbol* ; badMethodSymbol
+                 }
 
 %TBlockReturn = type {
-    %TObject*, ; value
-    %TContext* ; targetContext
-}
+                       %TObject*, ; value
+                       %TContext* ; targetContext
+                     }
 
-; We can use extern C++ function but
-; llvm passes may optimize/inline IR code.
 
 define i1 @"isSmallInteger()"(%TObject* %value) {
     %int = ptrtoint %TObject* %value to i32
@@ -158,9 +159,6 @@ define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %valu
     store %TObject* %value, %TObject** %fieldPtr
     ret %TObject** %fieldPtr
 }
-
-declare void @llvm.memcpy.p0i8.p0i8.i32(i8* %dest, i8* %src, i32 %size, i32 %align, i1 %volatile)
-declare void @llvm.gcroot(i8** %ptrloc, i8* %metadata)
 
 define %TObject* @dummy() gc "shadow-stack" {
     ; enabling shadow stack init on this module

@@ -38,6 +38,8 @@
 #include <stdio.h>
 #include <sys/time.h>
 
+#include <jit.h>
+
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
     // Class may be moved during GC in allocation,
@@ -789,8 +791,14 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
             try {
                 return sendMessage(ec.currentContext, selector, args, 0);
-            } catch(...) { //TODO ........
-                failed = true;
+            } catch(TContext* executedContext) { //TODO ........
+                //process = popProcess();
+                process->context = executedContext;
+                printf("VM: Uncaught exception from managed code\n");
+                //failed = true;
+            } catch(TBlockReturn e) {
+                printf("VM: Uncaught TBlockReturn from managed code\n");
+                exit(1);
             }
         } break;
         
