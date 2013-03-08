@@ -611,20 +611,27 @@ CLASS CompareTest Test
 
 METHOD CompareTest
 greater
-    [ 3 > 2  ] assertWithComment: 'int int'.
+    [ 3 > 2  ] assertWithComment: 'small ints'.
     [ 3 > #2 ] assertWithComment: 'int symbol'.
+    ['ac' > 'ab' ] assertWithComment: 'strings'.
+    [$b > $a ] assertWithComment: 'chars'.
 !
 
 METHOD CompareTest
 equal
-    [ 42 == 42 ] assertWithComment: '1'.
-    [ $z  = $z ] assertWithComment: '2'.
+    [ 42 == 42 ] assertWithComment: 'small ints'.
+    [ $z  = $z ] assertWithComment: 'chars'.
+    [ 0  == -0 ] assertWithComment: 'zero -zero'.
+    [ ''  = '' ] assertWithComment: 'empty strings'.
+    [ ' ' = ' '] assertWithComment: 'non-emty strings'.
+    [ Array new = Array new ] assertWithComment: 'emty arrays'.
 !
 
 METHOD CompareTest
 less
     [ -1 < 0 ] assertWithComment: 'int int'.
     [ #2 < 3 ] assertWithComment: 'symbol int'.
+    [ '12' < '13' ] assertWithComment: 'strings'.
 !
 
 METHOD CompareTest
@@ -642,40 +649,48 @@ COMMENT                                                                         
 CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
-    [12 + 64] assertEq: 76
+    [ 12 + 64 ] assertEq: 76  withComment: '1'.
+    [ 0  + 0  ] assertEq: 0   withComment: '2'.
+    [ 0  + -0 ] assertEq: 0   withComment: '3'.
+    [-12 + -14] assertEq: -26 withComment: '4'.
+    [ 17 + -17] assertEq: 0   withComment: '5'.
 !
 
 METHOD SmallIntTest
 sub
-    [22 - 42 ] assertEq: -20
+    [22 - 42 ] assertEq: -20 withComment: '1'.
+    [0  - 0  ] assertEq: 0   withComment: '2'.
+    [0  - 1  ] assertEq: -1  withComment: '3'.
+    [1  - -41] assertEq: 42  withComment: '4'.
 !
 
 METHOD SmallIntTest
 div
-    [ 10 / 5 ] assertEq: 2
+    [ 10 / 5 ] assertEq: 2   withComment: '1'.
+    [ 11 / 5 ] assertEq: 2   withComment: '2'.
+    [ 1  / 0 ] assertEq: nil withComment: '3'.
+    [ 0  / 1 ] assertEq: 0   withComment: '4'.
 !
 
 METHOD SmallIntTest
 mul
-    [ 21 * 2 ] assertEq: 42
+    [ 21 * 2   ] assertEq: 42 withComment: '1'.
+    [ 0  * 42  ] assertEq: 0  withComment: '2'.
+    [ -1 * -17 ] assertEq: 17 withComment: '3'.
 !
 
 METHOD SmallIntTest
 negative
     [ -42 negative ] assertWithComment: '1'.
     [  42 negative ] assertEq: false withComment: '2'.
+    [ -0  negative ] assertEq: false withComment: '3'.
 !
 
 METHOD SmallIntTest
 negated
     [ -42 negated ] assertEq:  42 withComment: '1'.
     [  42 negated ] assertEq: -42 withComment: '2'.
-!
-
-METHOD SmallIntTest
-quo
-    [ 5 / 2 ] assertEq: 2 withComment: '1'.
-    [ 200 / 1001 ] assertEq: 0 withComment: '2'.
+    [   0 negated printString ] assertEq: '0' withComment: '3'.
 !
 
 COMMENT                                                                                                 --------BranchTest----------
@@ -696,19 +711,25 @@ ifFalse |x|
     [ x ] assertEq: 521
 !
 
-CLASS MyArray Array
-METHOD MyArray
-location: value | low high mid |
-        low <- 1.
-        high <- self size + 1.
-        [ low < high ]
-            whileTrue: [
-                mid <- (low + high) quo: 2.
-                (self at: mid) < value
-                        ifTrue: [ low <- mid + 1 ]
-                        ifFalse: [ high <- mid ]
-        ].
-        ^ low
+METHOD BranchTest
+goto |x testBlock|
+    x <- SmallInt new.
+    testBlock <- [:val |
+        x <- val.
+        (x = 1) ifTrue: [ x <- 1 ].
+        (x = 2)
+            ifTrue:  [ x <- 2 ]
+            ifFalse: [ (x = 3)
+                        ifTrue: [ x <- 3 ]
+                        ifFalse: [x <- 4]
+                    ].
+    ].
+    
+    [ testBlock value: 0. x ] assertEq: 4 withComment: '1'.
+    [ testBlock value: 1. x ] assertEq: 4 withComment: '2'.
+    [ testBlock value: 2. x ] assertEq: 2 withComment: '3'.
+    [ testBlock value: 3. x ] assertEq: 3 withComment: '4'.
+    [ testBlock value: 4. x ] assertEq: 4 withComment: '5'.
 !
 
 COMMENT                                                                                                 --------LoopTest----------
@@ -730,6 +751,21 @@ sum |result|
     1 to: 100 do: [:i| result <- result + i ]
 
     [ result ] assertEq: 5050
+!
+
+CLASS MyArray Array
+METHOD MyArray
+location: value | low high mid |
+    low <- 1.
+    high <- self size + 1.
+    [ low < high ]
+        whileTrue: [
+            mid <- (low + high) quo: 2.
+            (self at: mid) < value
+                    ifTrue: [ low <- mid + 1 ]
+                    ifFalse: [ high <- mid ]
+        ].
+    ^ low
 !
 
 METHOD LoopTest
@@ -772,8 +808,8 @@ COMMENT                                                                         
 CLASS StringTest Test
 
 METHOD StringTest
-plus
-    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: 'operator +. 1'.
+concat
+    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: '1'.
     [ 'b' + 'a' ] assertEq: 'ba' withComment: '2'.
     [ '' + 'asd' ] assertEq: 'asd' withComment: '3'.
     [ '12' + 'asd' ] assertEq: '12asd' withComment: '4'.
@@ -791,17 +827,23 @@ asSymbol
 
 METHOD StringTest
 lowerCase
-    [ 'FoXBar' lowerCase ] assertEq: 'foxbar'
+    [ 'FoXBar' lowerCase ] assertEq: 'foxbar' withComment: 'non-empty'.
+    [ '' lowerCase ] assertEq: '' withComment: 'empty'.
 !
 
 METHOD StringTest
 asNumber
-    [ '42' asNumber ] assertEq: 42
+    [ '42'  asNumber ] assertEq: 42  withComment: 'only digits'.
+    [ ''    asNumber ] assertEq: 0   withComment: 'empty'. "FIXME is it okay?"
+    [ '0a'  asNumber ] assertEq: nil withComment: 'non-digit suffix'.
+    [ 'a0'  asNumber ] assertEq: nil withComment: 'non-digit prefix'.
+    [ '1 3' asNumber ] assertEq: nil withComment: 'splitted digits'.
 !
 
 METHOD StringTest
 copy
-    [ 'foobar' copy ] assertEq: 'foobar'
+    [ 'foobar' copy ] assertEq: 'foobar' withComment: 'non-empty'.
+    [ '' copy ] assertEq: '' withComment: 'empty'.
 !
 
 METHOD StringTest
@@ -816,13 +858,22 @@ at | str |
 !
 
 METHOD StringTest
-indexOf
-    [ 'foobar' indexOf: 'b' ] assertEq: 4
+indexOf |str|
+    str <- 'foobar'.
+    [ str indexOf: 'f' ] assertEq: 1 withComment: 'foobar(f)'.
+    [ str indexOf: 'o' ] assertEq: 2 withComment: 'o'.
+    [ str indexOf: 'b' ] assertEq: 4 withComment: 'b'.
+    [ str indexOf: 'a' ] assertEq: 5 withComment: 'a'.
+    [ str indexOf: 'r' ] assertEq: 6 withComment: 'r'.
 !
 
 METHOD StringTest
 reverse
-    [ 'reverse' reverse ] assertEq: 'esrever'
+    [ '' reverse ] assertEq: '' withComment: 'empty'.
+    [ 'x' reverse ] assertEq: 'x' withComment: '1 char'.
+    [ 'zy' reverse ] assertEq: 'yz' withComment: '2 chars'.
+    [ 'reverse' reverse ] assertEq: 'esrever' withComment: 'odd-char string'.
+    [ 'little smalltalk' reverse ] assertEq: 'klatllams elttil' withComment: 'even-char string'.
 !
 
 METHOD StringTest
@@ -971,42 +1022,12 @@ bulkReplace
 !
 
 
-METHOD Array
-replaceFrom: start to: stop with: replacement startingAt: repStart | base |
-       <38 start stop replacement repStart self>.
-       base <- repStart-1.
-       0 to: (stop - start) do: [:idx|
-               self at: (idx + start) put:
-                       (replacement at: (idx + repStart))
-       ]
-!
+
 
 METHOD Undefined
 printHierarchy: aClass | class |
     class <- aClass.
     [ class isNil ] whileFalse: [ class printNl. class <- class parent ]
-!
-
-CLASS MyDict Dictionary
-METHOD MyDict
-at: key put: value | position |
-    $" print. value name print. $" printNl.
-        position <- keys location: key.
-        (position <= keys size and: [ key = (keys at: position)])
-                ifTrue: [ values at: position put: value ]
-                ifFalse: [ keys <- keys insert: key at: position.
-                        values <- values insert: value at: position ].
-        ^ value
-!
-
-METHOD Undefined
-testArrayAllMethods |allMethods|
-    allMethods <- MyDict new.
-
-    Object methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from = to ~~"
-    Magnitude methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from <= to min:"
-    "Collection methods binaryDo: [ :n :m | allMethods at: n put: m ]."
-    "Array methods binaryDo: [ :n :m | allMethods at: n put: m ]."
 !
 
 CLASS Timer Object initValue
@@ -1138,14 +1159,6 @@ testNil
 !
 
 METHOD Undefined
-testBranches: x
-     (x = 1) ifTrue: [ ^x ].
-     (x = 2)
-        ifTrue:  [ ^x ]
-        ifFalse: [ (x = 3) ifTrue: [ ^x ]. ].
-!
-
-METHOD Undefined
 testBlockReturn: x |block|
      block <- [
         (x = 4) ifTrue: [ ^x ].
@@ -1170,17 +1183,6 @@ return42FromBlockReturn
 !
 
 CLASS LLVMTestStatements Test
-METHOD LLVMTestStatements
-branch |x|
-    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 1).
-    [ x ] assertEq: 1 withComment: '1'.
-    
-    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 2).
-    [ x ] assertEq: 2 withComment: '2'.
-    
-    x <- LLVM sendMessage: ('testBranches:' asSymbol) withArguments: (Array with: nil with: 3).
-    [ x ] assertEq: 3 withComment: '3'.
-!
 
 METHOD LLVMTestStatements
 blockReturn |x|
@@ -1338,15 +1340,17 @@ main    | command |
     " initialize classes "
     Char initialize.
     
-    CompareTest new runAll.
+    "CompareTest new runAll.
+    StringTest new runAll.
+    LoopTest new runAll.
+    SmallIntTest new runAll."
     
     "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
         
-    "LLVMTest runAllFrom: CompareTest. // Works fine in console. fails in image"
-    "LLVMTest runAllFrom: GCTest."
-    "LLVMTest runAllFrom: StringTest."
-    "1 to: 20 do: [:ignore| LLVM sendMessage: ('error:' asSymbol) withArguments: (Array with: nil with: 'error text') ]."
-    "LLVMTest runAllFrom: SmallIntTest."
+    "LLVMTest runAllFrom: CompareTest.
+    LLVMTest runAllFrom: GCTest.
+    LLVMTest runAllFrom: StringTest.
+    LLVMTest runAllFrom: SmallIntTest."
     
     " main execution loop  
     [ '-> ' print. command <- String input. command notNil ]
@@ -2181,7 +2185,15 @@ sort: aBlock
     ^ (super asList sort: aBlock) asArray
 !
 
-COMMENT FIXME insert replaceFrom:..... here
+METHOD Array
+replaceFrom: start to: stop with: replacement startingAt: repStart | base |
+	<38 start stop replacement repStart self>.
+	base <- repStart-1.
+	0 to: (stop - start) do: [:idx|
+		self at: (idx + start) put:
+		(replacement at: (idx + repStart))
+	]
+!
 
 COMMENT ---------- OrderedArray ------------
 METHOD OrderedArray
