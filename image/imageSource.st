@@ -644,6 +644,13 @@ nilEqNil
     [ nil ] assertEq: nil
 !
 
+METHOD CompareTest
+min
+    [  1 min: 0  ] assertEq:  0 withComment: '1'.
+    [ -1 min: 0  ] assertEq: -1 withComment: '2'.
+    [' ' min: '' ] assertEq: '' withComment: '3'.
+!
+
 
 COMMENT                                                                                                 --------SmallIntTest----------
 CLASS SmallIntTest Test
@@ -691,6 +698,38 @@ negated
     [ -42 negated ] assertEq:  42 withComment: '1'.
     [  42 negated ] assertEq: -42 withComment: '2'.
     [   0 negated printString ] assertEq: '0' withComment: '3'.
+!
+
+METHOD SmallIntTest
+rem
+    [ 10 rem: 3  ] assertEq: 1  withComment: '1'.
+    [ 0  rem: 1  ] assertEq: 0  withComment: '2'.
+    [ 1  rem: 1  ] assertEq: 0  withComment: '3'.
+    [ 42 rem: 1  ] assertEq: 0  withComment: '4'.
+    [ 16 rem: 12 ] assertEq: 4  withComment: '5'.
+    [ 12 rem: 16 ] assertEq: 12 withComment: '6'.
+    [100 rem: 10 ] assertEq: 0  withComment: '7'.
+!
+
+METHOD SmallIntTest
+abs
+    [  0 absolute ] assertEq: 0  withComment: '1'.
+    [  1 absolute ] assertEq: 1  withComment: '2'.
+    [ -1 absolute ] assertEq: 1  withComment: '3'.
+    [-42 absolute ] assertEq: 42 withComment: '4'.
+    [ 42 absolute ] assertEq: 42 withComment: '5'.
+!
+
+METHOD SmallIntTest
+asChar |testBlock|
+    testBlock <- [:x |
+        (x asChar) = (Char new: x)
+    ].
+    [ testBlock value: 0 ] assertWithComment: '1'.
+    [ testBlock value: 1 ] assertWithComment: '2'.
+    [ testBlock value: 2 ] assertWithComment: '3'.
+    [ testBlock value: 3 ] assertWithComment: '4'.
+    [ testBlock value: 4 ] assertWithComment: '5'.
 !
 
 COMMENT                                                                                                 --------BranchTest----------
@@ -753,8 +792,9 @@ sum |result|
     [ result ] assertEq: 5050
 !
 
-CLASS MyArray Array
-METHOD MyArray
+CLASS MyArray Array
+
+METHOD MyArray
 location: value | low high mid |
     low <- 1.
     high <- self size + 1.
@@ -1112,9 +1152,14 @@ primes: n | cand count |
 !
 
 METHOD MetaLLVM
-sendMessage: aSelector withArguments: anArguments
+sendMessage: aSelector withArguments: arguments
     "calling context will be taken from VM"
-    <252 aSelector anArguments>
+    <252 aSelector arguments>
+!
+
+METHOD MetaLLVM
+do: aBlock
+    self sendMessage: #value withArguments: (Array with: aBlock).
 !
 
 METHOD LLVMTest
@@ -1197,12 +1242,6 @@ METHOD LLVMTestStatements
 resume |x|
     x <- LLVM sendMessage: ('return42FromBlockReturn' asSymbol) withArguments: (Array with: nil).
     [ x ] assertEq: 42.
-!
-
-METHOD LLVMTestStatements
-rem |x|
-    x <- LLVM sendMessage: ('rem:' asSymbol) withArguments: (Array with: 10 with: 3).
-    [ x ] assertEq: 1.
 !
 
 METHOD String
@@ -1339,23 +1378,26 @@ METHOD Undefined
 main    | command |
     " initialize classes "
     Char initialize.
+    "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
+    
     
     "CompareTest new runAll.
     StringTest new runAll.
     LoopTest new runAll.
     SmallIntTest new runAll."
     
-    "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
-        
-    "LLVMTest runAllFrom: CompareTest.
-    LLVMTest runAllFrom: GCTest.
-    LLVMTest runAllFrom: StringTest.
-    LLVMTest runAllFrom: SmallIntTest."
+    "LLVM do: [
+        CompareTest new runAll.
+        StringTest new runAll.
+        LoopTest new runAll.
+        SmallIntTest new runAll.
+        GCTest new runAll.
+    ]."
     
-    " main execution loop  
+    " main execution loop  "
     [ '-> ' print. command <- String input. command notNil ]
             whileTrue: [ command isEmpty
-                ifFalse: [ command doIt printNl ] ]"
+                ifFalse: [ command doIt printNl ] ]
     
     ^nil.
 !
