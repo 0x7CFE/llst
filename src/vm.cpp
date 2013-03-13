@@ -791,13 +791,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
             try {
                 return sendMessage(ec.currentContext, selector, args, 0);
-            } catch(TContext* executedContext) { //TODO ........
-                //process = popProcess();
-                process->context = executedContext;
-                printf("VM: Uncaught exception from managed code\n");
-                //failed = true;
-            } catch(TBlockReturn e) {
-                printf("VM: Uncaught TBlockReturn from managed code\n");
+            } catch(...) {
+                printf("error caught\n");
                 exit(1);
             }
         } break;

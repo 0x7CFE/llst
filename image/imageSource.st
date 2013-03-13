@@ -1374,15 +1374,34 @@ boot
     self main.
 !
 
+CLASS TestGc Object chars
+
+METHOD TestGc
+run
+    chars <- Array new: 97.
+    1 to: 5 do: [:ignore| "remove '1 to: 5 do:' to revoke segfault"
+        1 to: (chars size) do: [:idx|
+            LLVM do: [
+                chars at: (idx) put: ( self in: Char new at: 1 put: (idx+30)).
+            ].
+            System collectGarbage.
+        ].
+        chars do: [:c| c print. ].
+        chars <- Array new: 97.
+        Char newline printNl.
+    ].
+!
+
 METHOD Undefined
 main    | command |
     " initialize classes "
     Char initialize.
     "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
     
-    
-    CompareTest new runAll.
-    "StringTest new runAll.
+    TestGc new run.
+
+    "CompareTest new runAll.
+    StringTest new runAll.
     LoopTest new runAll.
     SmallIntTest new runAll."
     
