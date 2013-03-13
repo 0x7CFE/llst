@@ -1381,8 +1381,8 @@ main    | command |
     "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
     
     
-    "CompareTest new runAll.
-    StringTest new runAll.
+    CompareTest new runAll.
+    "StringTest new runAll.
     LoopTest new runAll.
     SmallIntTest new runAll."
     
@@ -1394,10 +1394,10 @@ main    | command |
         GCTest new runAll.
     ]."
     
-    " main execution loop  "
+    " main execution loop  
     [ '-> ' print. command <- String input. command notNil ]
             whileTrue: [ command isEmpty
-                ifFalse: [ command doIt printNl ] ]
+                ifFalse: [ command doIt printNl ] ]"
     
     ^nil.
 !

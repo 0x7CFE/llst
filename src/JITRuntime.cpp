@@ -467,7 +467,7 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-    m_functionPassManager->add(createLLSTPass());
+    //m_functionPassManager->add(createLLSTPass());
     //If llstPass removed GC roots, we may try DCE again
     
     m_functionPassManager->add(createDeadCodeEliminationPass());
@@ -638,7 +638,7 @@ void JITRuntime::createExecuteProcessFunction() {
     
     Value* exceptionObject  = builder.CreateExtractValue(exceptionStruct, 0);
     Value* thrownException  = builder.CreateCall(m_exceptionAPI.cxa_begin_catch, exceptionObject);
-    Value* thrownContext    = builder.CreateBitCast(thrownException, m_baseTypes.context->getPointerTo());
+    Value* thrownContext    = builder.CreateLoad( builder.CreateBitCast(thrownException, m_baseTypes.context->getPointerTo()->getPointerTo()) );
     
     process = builder.CreateLoad(processHolder);
     contextPtr = builder.CreateStructGEP(process, 1);

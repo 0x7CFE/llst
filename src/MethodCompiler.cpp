@@ -1377,8 +1377,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             //after calling cxa_throw. But! Someone may add Smalltalk code after <19>
             //Thats why we have to create unconditional br to 'primitiveFailed'
             //to catch any generated code into that BB
-             
-            Value* expnBuffer      = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, jit.builder->getInt32( sizeof(TContext*) ));
+            Value* contextPtr2Size = jit.builder->CreateTrunc(ConstantExpr::getSizeOf(m_baseTypes.context->getPointerTo()->getPointerTo()), jit.builder->getInt32Ty());
+            Value* expnBuffer      = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, contextPtr2Size);
             Value* expnTypedBuffer = jit.builder->CreateBitCast(expnBuffer, m_baseTypes.context->getPointerTo()->getPointerTo());
             jit.builder->CreateStore(jit.getCurrentContext(), expnTypedBuffer);
              
