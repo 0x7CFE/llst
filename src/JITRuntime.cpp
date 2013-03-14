@@ -166,8 +166,8 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     newBlock->arguments        = previousContext->arguments;
     newBlock->temporaries      = previousContext->temporaries;
     
-    newBlock->bytePointer = 0;
-    newBlock->stackTop = 0;
+//     newBlock->bytePointer = 0;
+//     newBlock->stackTop = 0;
     
     // Assigning creatingContext depending on the hierarchy
     // Nested blocks inherit the outer creating context
@@ -285,7 +285,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 {
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
-    TContext*       newContext = 0;
+    // Protecting the pointers before allocation
+    hptr<TContext> previousContext  = m_softVM->newPointer(callingContext);
+    hptr<TContext> newContext = m_softVM->newObject<TContext>();
     
     {
         
@@ -344,7 +346,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             if (! methodFunction) {
                 // Compiling function and storing it to the table for further use
                 outs() << "Compiling method " << functionName << "\n";
-                methodFunction = m_methodCompiler->compileMethod(method, callingContext);
+                methodFunction = m_methodCompiler->compileMethod(method, previousContext);
                 
     //             outs() << *methodFunction;
                 
@@ -373,12 +375,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         // because it is not used by JIT runtime. We also may skip the proper
         // initialization of various objects such as stackTop and bytePointer.
         
-        // Protecting the pointers before allocation
-        hptr<TContext>     previousContext  = m_softVM->newPointer(callingContext);
-        
         // Creating context object and temporaries
         hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
-        newContext = m_softVM->newObject<TContext>();
+//        newContext = m_softVM->newObject<TContext>();
         
         // Initializing context variables
         newContext->temporaries       = newTemps;
@@ -386,8 +385,8 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         newContext->method            = method;
         newContext->previousContext   = previousContext;
 
-        newContext->bytePointer       = 0;
-        newContext->stackTop          = 0;
+//         newContext->bytePointer       = 0;
+//         newContext->stackTop          = 0;
     }
     
 //     static int messageDepth = 0;
