@@ -285,9 +285,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
 {
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
+    TContext*       newContext = 0;
     // Protecting the pointers before allocation
     hptr<TContext> previousContext  = m_softVM->newPointer(callingContext);
-    hptr<TContext> newContext = m_softVM->newObject<TContext>();
     
     {
         
@@ -377,7 +377,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         
         // Creating context object and temporaries
         hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
-//        newContext = m_softVM->newObject<TContext>();
+        newContext = m_softVM->newObject<TContext>();
         
         // Initializing context variables
         newContext->temporaries       = newTemps;

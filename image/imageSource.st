@@ -1374,21 +1374,20 @@ boot
     self main.
 !
 
-CLASS TestGc Object chars
+CLASS TestGc Object
+
+
+METHOD TestGc
+nest: i block: b
+    b value.
+    (i = 0) ifFalse: [ self nest: (i-1) block: b ].
+!
 
 METHOD TestGc
 run
-    chars <- Array new: 97.
-    1 to: 5 do: [:ignore| "remove '1 to: 5 do:' to revoke segfault"
-        1 to: (chars size) do: [:idx|
-            LLVM do: [
-                chars at: (idx) put: ( self in: Char new at: 1 put: (idx+30)).
-            ].
-            System collectGarbage.
-        ].
-        chars do: [:c| c print. ].
-        chars <- Array new: 97.
-        Char newline printNl.
+    LLVM do: [
+        self nest: 5 block: [ self class printString + self printString ].
+        ^nil.
     ].
 !
 

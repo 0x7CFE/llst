@@ -1419,14 +1419,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->CreateCondBr(indexOk, indexChecked, primitiveFailed);
             jit.builder->SetInsertPoint(indexChecked);
             
-            Value* fields    = jit.builder->CreateCall(m_baseFunctions.TObject__getFields, arrayObject);
-            Value* fieldPtr  = jit.builder->CreateGEP(fields, actualIndex);
-            
             if (opcode == primitive::arrayAtPut) {
-                jit.builder->CreateStore(valueObejct, fieldPtr);
+                Value* fieldPointer = jit.builder->CreateCall3(m_baseFunctions.TObject__setField, arrayObject, actualIndex, valueObejct);
+                jit.builder->CreateCall2(m_runtimeAPI.checkRoot, valueObejct, fieldPointer);
                 primitiveResult = arrayObject; // valueObejct;
             } else {
-                primitiveResult = jit.builder->CreateLoad(fieldPtr);
+                primitiveResult = jit.builder->CreateCall2(m_baseFunctions.TObject__getField, arrayObject, actualIndex);
             }
         } break;
         
