@@ -292,17 +292,13 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     {
         
         // First of all we need to find the actual method object
-        TClass*  klass = 0;
-        
-        if (receiverClass) {
-            klass = receiverClass;
-        } else {
+        if (!receiverClass) {
             TObject* receiver = messageArguments[0];
-            klass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+            receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
         }
         
         // Searching for the actual method to be called
-        hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, klass));
+        hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
         
         // Checking whether we found a method
         if (method == 0) {
@@ -310,7 +306,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // send #doesNotUnderstand: message to the receiver
             
             // Looking up the #doesNotUnderstand: method:
-            method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, klass));
+            method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, receiverClass));
             if (method == 0) {
                 // Something goes really wrong.
                 // We could not continue the execution
@@ -407,28 +403,28 @@ void JITRuntime::initializeGlobals() {
     GlobalValue* m_jitGlobals = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals", m_baseTypes.globals) );
     m_executionEngine->addGlobalMapping(m_jitGlobals, reinterpret_cast<void*>(&globals));
     
-    GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.nilObject", m_baseTypes.object) );
+    GlobalValue* gNil = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("nilObject", m_baseTypes.object) );
     m_executionEngine->addGlobalMapping(gNil, reinterpret_cast<void*>(globals.nilObject));
     
-    GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.trueObject", m_baseTypes.object) );
+    GlobalValue* gTrue = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("trueObject", m_baseTypes.object) );
     m_executionEngine->addGlobalMapping(gTrue, reinterpret_cast<void*>(globals.trueObject));
     
-    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.falseObject", m_baseTypes.object) );
+    GlobalValue* gFalse = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("falseObject", m_baseTypes.object) );
     m_executionEngine->addGlobalMapping(gFalse, reinterpret_cast<void*>(globals.falseObject));
     
-    GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.smallIntClass", m_baseTypes.klass) );
+    GlobalValue* gSmallIntClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("SmallInt", m_baseTypes.klass) );
     m_executionEngine->addGlobalMapping(gSmallIntClass, reinterpret_cast<void*>(globals.smallIntClass));
     
-    GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.arrayClass", m_baseTypes.klass) );
+    GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("Array", m_baseTypes.klass) );
     m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(globals.arrayClass));
     
-    GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<", m_baseTypes.symbol) );
+    GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("<", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(globals.binaryMessages[0]));
     
-    GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.<=", m_baseTypes.symbol) );
+    GlobalValue* gmessageLE = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("<=", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessageLE, reinterpret_cast<void*>(globals.binaryMessages[1]));
     
-    GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("globals.+", m_baseTypes.symbol) );
+    GlobalValue* gmessagePlus = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("+", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessagePlus, reinterpret_cast<void*>(globals.binaryMessages[2]));
 }
 

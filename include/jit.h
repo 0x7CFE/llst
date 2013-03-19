@@ -121,14 +121,14 @@ struct TJITGlobals {
     llvm::GlobalValue* binarySelectors[3];
 
     void initializeFromModule(llvm::Module* module) {
-        nilObject          = module->getGlobalVariable("globals.nilObject");
-        trueObject         = module->getGlobalVariable("globals.trueObject");
-        falseObject        = module->getGlobalVariable("globals.falseObject");
-        smallIntClass      = module->getGlobalVariable("globals.smallIntClass");
-        arrayClass         = module->getGlobalVariable("globals.arrayClass");
-        binarySelectors[0] = module->getGlobalVariable("globals.<");
-        binarySelectors[1] = module->getGlobalVariable("globals.<=");
-        binarySelectors[2] = module->getGlobalVariable("globals.+");
+        nilObject          = module->getGlobalVariable("nilObject");
+        trueObject         = module->getGlobalVariable("trueObject");
+        falseObject        = module->getGlobalVariable("falseObject");
+        smallIntClass      = module->getGlobalVariable("SmallInt");
+        arrayClass         = module->getGlobalVariable("Array");
+        binarySelectors[0] = module->getGlobalVariable("<");
+        binarySelectors[1] = module->getGlobalVariable("<=");
+        binarySelectors[2] = module->getGlobalVariable("+");
 
     //badMethodSymbol =
     }
@@ -138,23 +138,23 @@ struct TBaseFunctions {
     llvm::Function* isSmallInteger;
     llvm::Function* getIntegerValue;
     llvm::Function* newInteger;
-    llvm::Function* TObject__getSize;
-    llvm::Function* TObject__getClass;
-    llvm::Function* TObject__getFields;
-    llvm::Function* TObject__getField;
-    llvm::Function* TObject__setField;
+    llvm::Function* getObjectSize;
+    llvm::Function* getObjectClass;
+    llvm::Function* getObjectFields;
+    llvm::Function* getObjectField;
+    llvm::Function* setObjectField;
     llvm::Function* getSlotSize;
 
     void initializeFromModule(llvm::Module* module) {
-        isSmallInteger     = module->getFunction("isSmallInteger()");
-        getIntegerValue    = module->getFunction("getIntegerValue()");
-        newInteger         = module->getFunction("newInteger()");
-        TObject__getSize   = module->getFunction("TObject::getSize()");
-        TObject__getClass  = module->getFunction("TObject::getClass()");
-        TObject__getFields = module->getFunction("TObject::getFields()");
-        TObject__getField  = module->getFunction("getObjectField");
-        TObject__setField  = module->getFunction("setObjectField");
-        getSlotSize        = module->getFunction("getSlotSize()");
+        isSmallInteger   = module->getFunction("isSmallInteger");
+        getIntegerValue  = module->getFunction("getIntegerValue");
+        newInteger       = module->getFunction("newInteger");
+        getObjectSize    = module->getFunction("getObjectSize");
+        getObjectClass   = module->getFunction("getObjectClass");
+        getObjectFields  = module->getFunction("getObjectFields");
+        getObjectField   = module->getFunction("getObjectField");
+        setObjectField   = module->getFunction("setObjectField");
+        getSlotSize      = module->getFunction("getSlotSize");
     }
 };
 
