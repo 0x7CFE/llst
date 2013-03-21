@@ -1369,11 +1369,6 @@ runSort: size | x1 list ms1 selector args1 block1 |
         'Sorted in ms: ' print. ms1 printNl.
 !
 
-METHOD Undefined
-boot
-    self main.
-!
-
 CLASS TestGc Object
 
 
@@ -1397,7 +1392,7 @@ main    | command  x|
     
     Char initialize.
     
-    'GC works! !111 /me gusta' printNl.
+    TestGc new run.
     
     "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
 
@@ -1414,10 +1409,10 @@ main    | command  x|
         GCTest new runAll.
     ]."
     
-    " main execution loop  
+    " main execution loop  "
     [ '-> ' print. command <- String input. command notNil ]
             whileTrue: [ command isEmpty
-                ifFalse: [ command doIt printNl ] ]"
+                ifFalse: [ command doIt printNl ] ]
     
     ^nil.
 !

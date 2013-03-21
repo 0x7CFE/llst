@@ -79,8 +79,8 @@ int main(int argc, char **argv) {
     vm.pushProcess(initProcess);
     
     // And starting the image execution!
-    //SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
-    typedef int32_t (*TExecuteProcessFunction)(TProcess*);
+    SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
+    /*typedef int32_t (*TExecuteProcessFunction)(TProcess*);
     TExecuteProcessFunction executeProcess = reinterpret_cast<TExecuteProcessFunction>(runtime.getExecutionEngine()->getPointerToFunction(runtime.getModule()->getFunction("executeProcess")));
     SmalltalkVM::TExecuteResult result;
     try {
@@ -88,7 +88,7 @@ int main(int argc, char **argv) {
     } catch(...) {
         printf("error caught\n");
         exit(1);
-    }
+    }*/
     // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:
