@@ -62,7 +62,7 @@ CLASS False         Boolean
 CLASS Process       Object context state result
 CLASS Context       Object method arguments temporaries stack bytePointer stackTop previousContext
 CLASS Block         Context argumentLocation creatingContext oldBytePointer
-CLASS Method        Object name byteCodes literals stackSize temporarySize class text package llvmBitcode
+CLASS Method        Object name byteCodes literals stackSize temporarySize class text package
 CLASS Magnitude     Object
 RAWCLASS MetaSymbol    Class         MetaMagnitude     symbols
 RAWCLASS Symbol        MetaSymbol    Magnitude
@@ -1392,12 +1392,14 @@ run
 !
 
 METHOD Undefined
-main    | command |
+main    | command  x|
     " initialize classes "
-    Char initialize.
-    "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
     
-    TestGc new run.
+    Char initialize.
+    
+    'GC works! !111 /me gusta' printNl.
+    
+    "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
 
     "CompareTest new runAll.
     StringTest new runAll.

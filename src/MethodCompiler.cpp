@@ -829,9 +829,11 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
     IRBuilder<>& builder = * jit.builder;
     
     Value* self  = jit.getSelf();
-    Value* fieldPointer = builder.CreateCall3(m_baseFunctions.setObjectField, self, builder.getInt32(index), value);
     
+    Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
+    Value* fieldPointer = builder.CreateCall2(getObjectFieldPtr, self, builder.getInt32(index));
     builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
+    builder.CreateStore(value, fieldPointer);
 }
 
 void MethodCompiler::doMarkArguments(TJITContext& jit)
@@ -1392,9 +1394,12 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             jit.builder->SetInsertPoint(indexChecked);
             
             if (opcode == primitive::arrayAtPut) {
-                Value* fieldPointer = jit.builder->CreateCall3(m_baseFunctions.setObjectField, arrayObject, actualIndex, valueObejct);
+                Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
+                Value* fieldPointer = jit.builder->CreateCall2(getObjectFieldPtr, arrayObject, actualIndex);
                 jit.builder->CreateCall2(m_runtimeAPI.checkRoot, valueObejct, fieldPointer);
-                primitiveResult = arrayObject; // valueObejct;
+                jit.builder->CreateStore(valueObejct, fieldPointer);
+                //jit.builder->CreateCall3(m_baseFunctions.setObjectField, arrayObject, actualIndex, valueObejct);
+                primitiveResult = arrayObject;
             } else {
                 primitiveResult = jit.builder->CreateCall2(m_baseFunctions.getObjectField, arrayObject, actualIndex);
             }
