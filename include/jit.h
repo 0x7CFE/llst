@@ -302,8 +302,6 @@ private:
     void doSpecial(TJITContext& jit);
     void doPrimitive(TJITContext& jit);
 
-    void printOpcode(TInstruction instruction);
-
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
 public:

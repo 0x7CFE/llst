@@ -1,3 +1,6 @@
+#ifndef LLST_OPCODES_H_INCLUDED
+#define LLST_OPCODES_H_INCLUDED
+
 namespace opcode
 {
 enum Opcode {
@@ -112,3 +115,5 @@ enum IntegerOpcode {
     integerEqual,
 };
 };
+
+#endif

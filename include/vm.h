@@ -40,8 +40,9 @@
 #include <types.h>
 #include <memory.h>
 #include <stdlib.h>
-#include "opcodes.h"
+#include <opcodes.h>
 #include <stdio.h>
+#include <instruction.h>
 
 class SmalltalkVM {
 public:

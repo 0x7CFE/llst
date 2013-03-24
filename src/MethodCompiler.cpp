@@ -661,34 +661,6 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     jit.builder->CreateResume(exceptionStruct);
 }
 
-void MethodCompiler::printOpcode(TInstruction instruction)
-{
-    switch (instruction.high) {
-        // TODO Boundary checks against container's real size
-        case opcode::pushInstance:    printf("doPushInstance %d\n", instruction.low);  break;
-        case opcode::pushArgument:    printf("doPushArgument %d\n", instruction.low);  break;
-        case opcode::pushTemporary:   printf("doPushTemporary %d\n", instruction.low); break;
-        case opcode::pushLiteral:     printf("doPushLiteral %d\n", instruction.low);   break;
-        case opcode::pushConstant:    printf("doPushConstant %d\n", instruction.low);  break;
-        case opcode::pushBlock:       printf("doPushBlock %d\n", instruction.low);     break;
-        
-        case opcode::assignTemporary: printf("doAssignTemporary %d\n", instruction.low); break;
-        case opcode::assignInstance:  printf("doAssignInstance %d\n", instruction.low);  break;
-        
-        case opcode::markArguments:   printf("doMarkArguments %d\n", instruction.low); break;
-        
-        case opcode::sendUnary:       printf("doSendUnary\n");     break;
-        case opcode::sendBinary:      printf("doSendBinary\n");    break;
-        case opcode::sendMessage:     printf("doSendMessage\n");   break;
-        
-        case opcode::doSpecial:       printf("doSpecial\n");       break;
-        case opcode::doPrimitive:     printf("doPrimitive\n");     break;
-        
-        default:
-            fprintf(stderr, "JIT: Unknown opcode %d\n", instruction.high);
-    }
-}
-
 void MethodCompiler::doPushInstance(TJITContext& jit)
 {
     // Self is interpreted as object array.
