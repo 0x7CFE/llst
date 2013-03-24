@@ -59,9 +59,9 @@ std::string TInstruction::toString()
         case opcode::sendBinary: {
             ss << "SendBinary ";
             switch(low) {
-                case binaryMessage::smallIntAdd:       ss << "+";  break;
-                case binaryMessage::smallIntLess:      ss << "<";  break;
-                case binaryMessage::smallIntLessOrEq:  ss << "<="; break;
+                case binaryMessage::operatorPlus:     ss << "+";  break;
+                case binaryMessage::operatorLess:     ss << "<";  break;
+                case binaryMessage::operatorLessOrEq: ss << "<="; break;
                 default: {
                     throw std::runtime_error(errSs.str());
                 }

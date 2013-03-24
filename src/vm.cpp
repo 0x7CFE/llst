@@ -506,16 +506,16 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
         
         // Performing an operation
-        switch ((binaryMessage::Opcode) ec.instruction.low) {
-            case binaryMessage::smallIntLess: // operator <
+        switch ((binaryMessage::Operator) ec.instruction.low) {
+            case binaryMessage::operatorLess:
                 ec.returnedValue = (leftOperand < rightOperand) ? globals.trueObject : globals.falseObject;
                 break;
             
-            case binaryMessage::smallIntLessOrEq: // operator <=
+            case binaryMessage::operatorLessOrEq:
                 ec.returnedValue = (leftOperand <= rightOperand) ? globals.trueObject : globals.falseObject;
                 break;
             
-            case binaryMessage::smallIntAdd: // operator +
+            case binaryMessage::operatorPlus:
                 //FIXME possible overflow?
                 ec.returnedValue = reinterpret_cast<TObject*>(newInteger(leftOperand+rightOperand));
                 break;

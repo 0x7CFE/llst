@@ -878,10 +878,10 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     Value* intResult       = 0;  // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
-    switch ((binaryMessage::Opcode) opcode) {
-        case binaryMessage::smallIntLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break; // operator <
-        case binaryMessage::smallIntLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break; // operator <=
-        case binaryMessage::smallIntAdd     : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break; // operator +
+    switch ((binaryMessage::Operator) opcode) {
+        case binaryMessage::operatorLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
+        case binaryMessage::operatorLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break;
+        case binaryMessage::operatorPlus    : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
     }

@@ -30,10 +30,10 @@ enum Opcode {
 };
 
 namespace binaryMessage {
-enum Opcode {
-    smallIntLess  = 0,
-    smallIntLessOrEq,
-    smallIntAdd
+enum Operator {
+    operatorLess  = 0,
+    operatorLessOrEq,
+    operatorPlus
 };
 };
 

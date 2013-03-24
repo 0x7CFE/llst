@@ -5,7 +5,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <opcodes.h>
-#include <memory.h>
+#include <stdint.h>
 // TInstruction represents one decoded Smalltalk instruction.
 // Actual meaning of parts is determined during the execution.
 struct TInstruction {
