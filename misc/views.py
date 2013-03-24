@@ -2,10 +2,10 @@ import gdb
 
 #add lines to ~/.gdbinit
 #python
-#  import sys
-#  sys.path.insert(0, '/LLSTPATH/misc/')
-#  from views import register_printers
-#  register_printers ()
+#import sys
+#sys.path.insert(0, '/LLSTPATH/misc/')
+#from views import register_printers
+#register_printers ()
 #end
 
 def g_nil():
