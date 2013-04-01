@@ -587,7 +587,8 @@ CLASS Test Class
 METHOD Test
 runAll |reservedNames|
     self init.
-    reservedNames <- Array with: #init.
+    reservedNames <- Array with: #init with: #reservedNames.
+    reservedNames <- reservedNames + self reservedNames.
 
     Char newline print.
     'Running ' print. self class printNl.
@@ -604,7 +605,10 @@ init
     ^nil
 !
 
-COMMENT FIXME make tests be singletons
+METHOD Test
+reservedNames
+    ^Array new.
+!
 
 COMMENT                                                                                                --------CompareTest----------
 CLASS CompareTest Test
@@ -624,7 +628,7 @@ equal
     [ 0  == -0 ] assertWithComment: 'zero -zero'.
     [ ''  = '' ] assertWithComment: 'empty strings'.
     [ ' ' = ' '] assertWithComment: 'non-emty strings'.
-    [ Array new = Array new ] assertWithComment: 'emty arrays'.
+    [ Array new = Array new ] assertWithComment: 'empty arrays'.
 !
 
 METHOD CompareTest
@@ -827,6 +831,17 @@ className
 METHOD ClassTest
 sendSuper
     [ Array super printString ] assertEq: 'Collection'
+!
+
+METHOD ClassTest
+isKindOf |kindOf|
+    [ 1 isKindOf: Object ] assertWithComment: '1'.
+    [ Class isKindOf: Object ] assertWithComment: '2'.
+    [ Object isKindOf: Class ] assertWithComment: '3'.
+    [ 1 isKindOf: Magnitude ] assertWithComment: '4'.
+    [ 'hello' isKindOf: Magnitude ] assertWithComment: '5'.
+    [ 'hello' isKindOf: Collection ] assertWithComment: '6'.
+    [ 'hello' isKindOf: Array ] assertWithComment: '7'.
 !
 
 COMMENT                                                                                                --------MethodLookupTest----
@@ -1063,7 +1078,6 @@ bulkReplace
 
 
 
-
 METHOD Undefined
 printHierarchy: aClass | class |
     class <- aClass.
@@ -1162,103 +1176,69 @@ do: aBlock
     self sendMessage: #value withArguments: (Array with: aBlock).
 !
 
-METHOD LLVMTest
-test1: arg1  | temp1 |
-    temp1 <- 42.
-    (arg1 < temp1)
-        ifTrue:  [self doSomething]
-        ifFalse: [arg1 do: [ :x | ^field1 theOtherThing: x ] ].
-    ^self
+CLASS StatementsTest Test
+
+METHOD StatementsTest
+reservedNames |res|
+    res <- Array new: 5.
+    res at: 1 put: ('doBlockReturn:' asSymbol).
+    res at: 2 put: ('doRethrow:' asSymbol).
+    res at: 3 put: #returnFortyTwoByBlockReturn.
+    res at: 4 put: #customSize.
+    res at: 5 put: #doTempAssignInBlock.
+    ^res
 !
 
-
-METHOD LLVMTest
-invokeBlock: aBlock withArg: anArg
-    ^ aBlock value: anArg
-!
-
-METHOD LLVMTest
-testBlockReturn | block |
-    block <- [:arg | ^arg].
-    ^ self invokeBlock: block withArg: 42
-!
-
-METHOD LLVMTest
-test42Lt: arg
-    ^ 42 < arg
-!
-
-METHOD LLVMTest
-runTestBlockReturn
-    LLVM sendMessage: #testBlockReturn withArguments: (Array with: self).
-!
-
-METHOD LLVMTest
-testPrint | result |
-    LLVM sendMessage: #printNl withArguments: (Array with: '123').
-!
-
-METHOD LLVMTest
-testNil
-    LLVM sendMessage: #returnNil withArguments: (Array with: self).
-!
-
-METHOD Undefined
-testBlockReturn: x |block|
-     block <- [
+METHOD StatementsTest
+doBlockReturn: x |block|
+    "This method returns x with blockReturn opcode"
+    block <- [
         (x = 4) ifTrue: [ ^x ].
         (x = 5) ifTrue: [ ^x ].
-     ].
+    ].
      
-     [true] ifTrue: [ ^block value ].
+    [true] ifTrue: [ ^block value ].
 !
 
-METHOD Undefined
-testResume: blockSurelyThrows |blockThatCanThrow|
-     blockThatCanThrow <- [ ^123 ].
-     
-     blockSurelyThrows value.
-     
-     ^nil.
-!
 
-METHOD Undefined
-return42FromBlockReturn
-     nil testResume: [ ^42 ].
-!
-
-CLASS LLVMTestStatements Test
-
-METHOD LLVMTestStatements
-blockReturn |x|
-    x <- LLVM sendMessage: ('testBlockReturn:' asSymbol) withArguments: (Array with: nil with: 4).
-    [ x ] assertEq: 4 withComment: '1'.
+METHOD StatementsTest
+doRethrow: blockSurelyThrows |blockThatCanThrow|
+    "In LLVM blockReturn opcode is implemented as an exception with 2 fields: the creatin context and the value that we need to return from the block.
+    While compiling methods we scan blocks on blockReturn opcode.
+    If we find it, we replace each 'call @sendMessage' with invoke instruction
+    When we catch exception we check whether the context of exception and the context of current method are equal.
+    If they are, we do 'ret' from current function, if not, we rethrow exception"
     
-    x <- LLVM sendMessage: ('testBlockReturn:' asSymbol) withArguments: (Array with: nil with: 5).
-    [ x ] assertEq: 5 withComment: '2'.
+    "That line forces JIT to create 'invoke' instead of 'call' :" 
+    blockThatCanThrow <- [ ^1234567 ].
+    
+    "We are invoking block that has a blockReturn opcode. The exception must be rethrown because 'blockSurelyThrows' is not created in the current method"
+    blockSurelyThrows value.
+    
+    "In LLVM IR exception must be rethrown so ^nil must not be executed"
+     
+    ^nil.
 !
 
-METHOD LLVMTestStatements
-resume |x|
-    x <- LLVM sendMessage: ('return42FromBlockReturn' asSymbol) withArguments: (Array with: nil).
-    [ x ] assertEq: 42.
+METHOD StatementsTest
+returnFortyTwoByBlockReturn
+     self doRethrow: [ ^42 ].
 !
 
-METHOD String
-customSize |size|
-    size <- 0.
-    self do: [:ignore| size <- size + 1 ].
-    ^size.
+METHOD StatementsTest
+blockReturn |x|
+    x <- self doBlockReturn: 4.
+    [ x ] assertEq: 4  withComment: 'simple 1'.
+    
+    x <- self doBlockReturn: 5.
+    [ x ] assertEq: 5  withComment: 'simple 2'.
+    
+    x <- self returnFortyTwoByBlockReturn.
+    [ x ] assertEq: 42 withComment: 'rethrow'.
 !
 
-METHOD LLVMTestStatements
-closure |x|
-    x <- LLVM sendMessage: #customSize withArguments: (Array with: '1234').
-    [ x ] assertEq: 4.
-!
-
-METHOD Undefined
-testblockParam | block a b |
+METHOD StatementsTest
+doTempAssignInBlock | block a b |
     block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
     block value: 1 value: 2.
 
@@ -1267,22 +1247,25 @@ testblockParam | block a b |
         ifFalse: [ ^ 666]
 !
 
-METHOD LLVMTestStatements
-blockParam |x|
-    x <- LLVM sendMessage: #testblockParam withArguments: (Array with: nil).
+METHOD StatementsTest
+tempAssignInBlock |x|
+    x <- self doTempAssignInBlock.
     [ x ] assertEq: 42.
 !
 
-METHOD LLVMTestStatements
-getClass |x metaClass|
-    x <- LLVM sendMessage: #class withArguments: (Array with: 42).
-    [ x ] assertEq: SmallInt withComment: '1'.
-    
-    metaClass <- Object class.
-    x <- LLVM sendMessage: #class withArguments: (Array with: metaClass).
-    [ x ] assertEq: Class withComment: '2'.
+METHOD StatementsTest
+pushConstants |testBlock|
+    ['0' asNumber ] assertEq: 0 withComment: '0'.
+    ['1' asNumber ] assertEq: 1 withComment: '1'.
+    ['2' asNumber ] assertEq: 2 withComment: '2'.
+    ['3' asNumber ] assertEq: 3 withComment: '3'.
+    ['4' asNumber ] assertEq: 4 withComment: '4'.
+    ['5' asNumber ] assertEq: 5 withComment: '5'.
+    ['6' asNumber ] assertEq: 6 withComment: '6'.
+    ['7' asNumber ] assertEq: 7 withComment: '7'.
+    ['8' asNumber ] assertEq: 8 withComment: '8'.
+    ['9' asNumber ] assertEq: 9 withComment: '9'.
 !
-
 
 METHOD Undefined
 sortTest | list |
@@ -1300,53 +1283,9 @@ sortTest2: aList
     ^ aList sort
 !
 
-METHOD LLVMTestStatements
-testCat |x|
-    x <- LLVM sendMessage: ('+' asSymbol) withArguments: (Array with: 'hello ' with: 'world').
-    [ x ] assertEq: 'hello world'.
-!
-
 METHOD Class "TODO for tests only"
 name
     ^name.
-!
-
-METHOD LLVMTestStatements
-classAsString |x|
-    "x <- LLVM sendMessage: #name withArguments: (Array with: SmallInt).
-    [ x printString ] assertEq: 'SmallInt' withComment: '1'."
-    
-    x <- LLVM sendMessage: #asString withArguments: (Array with: SmallInt).
-    [ x ] assertEq: 'SmallInt' withComment: '2'.
-!
-
-METHOD LLVMTestStatements
-isKindOf |kindOf|
-    kindOf <- [:child :parent | LLVM sendMessage: ('isKindOf:' asSymbol) withArguments: (Array with: child with: parent). ]. 
-    [ kindOf value: 1 value: Object ] assertWithComment: '1'.
-    [ kindOf value: Class value: Object ] assertWithComment: '2'.
-    [ kindOf value: Object value: Class ] assertWithComment: '3'.
-    [ kindOf value: 1 value: Magnitude ] assertWithComment: '4'.
-    [ kindOf value: 'hello' value: Magnitude ] assertWithComment: '5'.
-    [ kindOf value: 'hello' value: Collection ] assertWithComment: '6'.
-    [ kindOf value: 'hello' value: Array ] assertWithComment: '7'.
-!
-
-METHOD LLVMTestStatements
-testPushConstants |testBlock|
-    testBlock <- [
-        ['0' asNumber ] assertEq: 0 withComment: '0'.
-        ['1' asNumber ] assertEq: 1 withComment: '1'.
-        ['2' asNumber ] assertEq: 2 withComment: '2'.
-        ['3' asNumber ] assertEq: 3 withComment: '3'.
-        ['4' asNumber ] assertEq: 4 withComment: '4'.
-        ['5' asNumber ] assertEq: 5 withComment: '5'.
-        ['6' asNumber ] assertEq: 6 withComment: '6'.
-        ['7' asNumber ] assertEq: 7 withComment: '7'.
-        ['8' asNumber ] assertEq: 8 withComment: '8'.
-        ['9' asNumber ] assertEq: 9 withComment: '9'.
-    ].
-    LLVM sendMessage: #value withArguments: (Array with: testBlock).
 !
 
 METHOD MetaLLVMTest
@@ -1392,7 +1331,7 @@ main    | command  x|
     
     Char initialize.
     
-    TestGc new run.
+    CompareTest new runAll.
     
     "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
 
