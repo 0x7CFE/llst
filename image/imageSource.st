@@ -1331,10 +1331,7 @@ main    | command  x|
     
     Char initialize.
     
-    CompareTest new runAll.
-    
-    "LLVM sendMessage: #initialize withArguments: (Array with: Char)."
-
+    TestGc new run.
     "CompareTest new runAll.
     StringTest new runAll.
     LoopTest new runAll.

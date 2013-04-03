@@ -169,3 +169,95 @@ bool LLSTPass::removeRedundantRoots(Function* F)
     
     return CFGChanged;
 }
+
+#include <jit.h> //TObjectTypes
+#include <llvm/Support/IRBuilder.h>
+namespace {
+    struct BrokenPointerPass : public FunctionPass {
+    TObjectTypes m_baseTypes;
+    public:
+        virtual bool runOnFunction(Function &F) ;
+        static char ID;
+        BrokenPointerPass(): FunctionPass(ID) { }
+        bool belongsToSmalltalkType(Type* type);
+    };
+}
+
+char BrokenPointerPass::ID = 0;
+static RegisterPass<BrokenPointerPass> LLSTBrokenPointerPass("load-debug", "Pass inserts checks for loads, if the class of load inst result points to null, a message will be reported", false /* Only looks at CFG */, false /* Analysis Pass */);
+
+FunctionPass* createBrokenPointerPass() {
+  return new BrokenPointerPass();
+}
+
+bool BrokenPointerPass::belongsToSmalltalkType(Type* type)
+{
+    if (   type == m_baseTypes.block->getPointerTo()
+        || type == m_baseTypes.byteObject->getPointerTo()
+        || type == m_baseTypes.process->getPointerTo()
+        || type == m_baseTypes.object->getPointerTo()
+      //  || type == m_baseTypes.objectArray->getPointerTo()
+        || type == m_baseTypes.symbol->getPointerTo()
+      //  || type == m_baseTypes.symbolArray->getPointerTo()
+        || type == m_baseTypes.dictionary->getPointerTo()
+        || type == m_baseTypes.method->getPointerTo()
+        || type == m_baseTypes.context->getPointerTo()
+        || type == m_baseTypes.klass->getPointerTo()
+    )
+        return true;
+    return false;
+}
+
+
+bool BrokenPointerPass::runOnFunction(Function& F)
+{
+    Module* jitModule = F.getParent();
+    m_baseTypes.initializeFromModule(jitModule);
+    IRBuilder<>* builder = new IRBuilder<>(F.begin());
+    FunctionType* _printfType = FunctionType::get(builder->getInt32Ty(), builder->getInt8PtrTy(), true);
+    Constant*     _printf     = jitModule->getOrInsertFunction("printf", _printfType);
+    Value* BrokenPointerMessage = builder->CreateGlobalStringPtr("\npointer is broken\n");
+    
+    InstructionVector Loads;
+    for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
+    {
+        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
+        {
+            if (LoadInst* Load = dyn_cast<LoadInst>(II)) {
+                Loads.push_back(Load);
+            }
+        }
+    }
+    
+    for(size_t i = 0; i < Loads.size(); i++)
+    {
+        LoadInst* Load = dyn_cast<LoadInst>(Loads[i]);
+        if (belongsToSmalltalkType( Load->getType() )) {
+        
+            //split BB right after load inst. The new BB contains code that will be executed if pointer is OK
+            BasicBlock* PointerIsOkBB = Load->getParent()->splitBasicBlock(++((BasicBlock::iterator) Load));
+            BasicBlock* PointerIsBrokenBB = BasicBlock::Create(jitModule->getContext(), "", &F, PointerIsOkBB);
+            
+            Instruction* branchToPointerIsOkBB = ++((BasicBlock::iterator) Load);
+            //branchToPointerIsOkBB is created by splitBasicBlock() just after load inst
+            //We force builder to insert instructions before branchToPointerIsOkBB
+            builder->SetInsertPoint(branchToPointerIsOkBB);
+            
+            //If pointer to class is null, jump to PointerIsBroken, otherwise to PointerIsOkBB
+            Value* objectPtr = builder->CreateBitCast( Load, m_baseTypes.object->getPointerTo());
+            Value* klassPtr = builder->CreateLoad( builder->CreateStructGEP(objectPtr, 1) );
+            
+            Value* pointerIsNull = builder->CreateICmpEQ(klassPtr, ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) );
+            builder->CreateCondBr(pointerIsNull, PointerIsBrokenBB, PointerIsOkBB);
+            branchToPointerIsOkBB->eraseFromParent(); //We don't need it anymore
+            
+            builder->SetInsertPoint(PointerIsBrokenBB);
+            builder->CreateCall(_printf, BrokenPointerMessage);
+            builder->CreateBr(PointerIsOkBB);
+        }
+    }
+    
+    //outs() << F;
+    delete builder;
+    return true;
+}

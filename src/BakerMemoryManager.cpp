@@ -111,7 +111,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     
     // Reallocating space and zeroing it
     *inactiveHeapBase = (uint8_t*) realloc(*inactiveHeapBase, newMediane);
-    memset(*inactiveHeapBase, 0xFF, newMediane);
+    memset(*inactiveHeapBase, 0, newMediane);
 
     // Stage 2. Collecting garbage so that 
     // active objects will be moved to a new home
@@ -120,7 +120,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     // Now pointers are swapped and previously active heap is now inactive
     // We need to reallocate it too
     *activeHeapBase = (uint8_t*) realloc(*activeHeapBase, newMediane);
-    memset(*activeHeapBase, 0xFF, newMediane);
+    memset(*activeHeapBase, 0, newMediane);
     
     collectGarbage();
     
@@ -364,7 +364,7 @@ void BakerMemoryManager::collectGarbage()
     timeval tv2;
     gettimeofday(&tv2, NULL);
     
-    memset(m_inactiveHeapBase, 0xFF, m_heapSize / 2);
+    memset(m_inactiveHeapBase, 0, m_heapSize / 2);
     
     // Calculating total microseconds spent in the garbage collection procedure
     m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);

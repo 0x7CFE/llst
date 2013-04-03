@@ -9,3 +9,4 @@
 #include <set>
 
 llvm::FunctionPass* createLLSTPass();
+llvm::FunctionPass* createBrokenPointerPass();
