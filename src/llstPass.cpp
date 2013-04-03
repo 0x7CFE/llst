@@ -196,9 +196,9 @@ bool BrokenPointerPass::belongsToSmalltalkType(Type* type)
         || type == m_baseTypes.byteObject->getPointerTo()
         || type == m_baseTypes.process->getPointerTo()
         || type == m_baseTypes.object->getPointerTo()
-      //  || type == m_baseTypes.objectArray->getPointerTo()
+        || type == m_baseTypes.objectArray->getPointerTo()
         || type == m_baseTypes.symbol->getPointerTo()
-      //  || type == m_baseTypes.symbolArray->getPointerTo()
+        || type == m_baseTypes.symbolArray->getPointerTo()
         || type == m_baseTypes.dictionary->getPointerTo()
         || type == m_baseTypes.method->getPointerTo()
         || type == m_baseTypes.context->getPointerTo()
@@ -217,6 +217,10 @@ bool BrokenPointerPass::runOnFunction(Function& F)
     FunctionType* _printfType = FunctionType::get(builder->getInt32Ty(), builder->getInt8PtrTy(), true);
     Constant*     _printf     = jitModule->getOrInsertFunction("printf", _printfType);
     Value* BrokenPointerMessage = builder->CreateGlobalStringPtr("\npointer is broken\n");
+    Value* BrokenSelfMessage = builder->CreateGlobalStringPtr("\nself is broken\n");
+    Function* isSmallInteger = jitModule->getFunction("isSmallInteger");
+    Function* getObjectField = jitModule->getFunction("getObjectField");
+    Function* getObjectClass = jitModule->getFunction("getObjectClass");
     
     InstructionVector Loads;
     for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
@@ -237,6 +241,7 @@ bool BrokenPointerPass::runOnFunction(Function& F)
             //split BB right after load inst. The new BB contains code that will be executed if pointer is OK
             BasicBlock* PointerIsOkBB = Load->getParent()->splitBasicBlock(++((BasicBlock::iterator) Load));
             BasicBlock* PointerIsBrokenBB = BasicBlock::Create(jitModule->getContext(), "", &F, PointerIsOkBB);
+            BasicBlock* PointerIsNotSmallIntBB = BasicBlock::Create(jitModule->getContext(), "", &F, PointerIsBrokenBB);
             
             Instruction* branchToPointerIsOkBB = ++((BasicBlock::iterator) Load);
             //branchToPointerIsOkBB is created by splitBasicBlock() just after load inst
@@ -245,16 +250,63 @@ bool BrokenPointerPass::runOnFunction(Function& F)
             
             //If pointer to class is null, jump to PointerIsBroken, otherwise to PointerIsOkBB
             Value* objectPtr = builder->CreateBitCast( Load, m_baseTypes.object->getPointerTo());
-            Value* klassPtr = builder->CreateLoad( builder->CreateStructGEP(objectPtr, 1) );
             
+            Value* isSmallInt = builder->CreateCall(isSmallInteger, objectPtr);
+            builder->CreateCondBr(isSmallInt, PointerIsOkBB, PointerIsNotSmallIntBB);
+            
+            builder->SetInsertPoint(PointerIsNotSmallIntBB);
+            Value* klassPtr = builder->CreateCall(getObjectClass, objectPtr);
             Value* pointerIsNull = builder->CreateICmpEQ(klassPtr, ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) );
             builder->CreateCondBr(pointerIsNull, PointerIsBrokenBB, PointerIsOkBB);
+            
             branchToPointerIsOkBB->eraseFromParent(); //We don't need it anymore
             
             builder->SetInsertPoint(PointerIsBrokenBB);
             builder->CreateCall(_printf, BrokenPointerMessage);
             builder->CreateBr(PointerIsOkBB);
         }
+    }
+
+    InstructionVector Calls;
+    for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
+    {
+        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
+        {
+            if (CallInst* Call = dyn_cast<CallInst>(II)) {
+                if (Call->getCalledFunction()->getName() == "sendMessage")
+                    Calls.push_back(Call);
+            }
+        }
+    }
+    
+    for(size_t i = 0; i < Calls.size(); i++)
+    {
+        CallInst* Call = dyn_cast<CallInst>(Calls[i]);
+        
+        BasicBlock* PointerIsOkBB = Call->getParent()->splitBasicBlock(((BasicBlock::iterator) Call));
+        BasicBlock* PointerIsBrokenBB = BasicBlock::Create(jitModule->getContext(), "", &F, PointerIsOkBB);
+        BasicBlock* PointerIsNotSmallIntBB = BasicBlock::Create(jitModule->getContext(), "", &F, PointerIsBrokenBB);
+        
+        Instruction* branchToPointerIsOkBB = & PointerIsOkBB->getSinglePredecessor()->back();
+        builder->SetInsertPoint(branchToPointerIsOkBB);
+        
+        
+        Value* argsPtr = builder->CreateBitCast( Call->getArgOperand(2), m_baseTypes.object->getPointerTo());
+        Value* self = builder->CreateCall2(getObjectField, argsPtr, builder->getInt32(0));
+        
+        Value* isSmallInt = builder->CreateCall(isSmallInteger, self);
+        builder->CreateCondBr(isSmallInt, PointerIsOkBB, PointerIsNotSmallIntBB);
+        
+        
+        builder->SetInsertPoint(PointerIsNotSmallIntBB);
+        Value* klassPtr = builder->CreateCall(getObjectClass, self);
+        Value* pointerIsNull = builder->CreateICmpEQ(klassPtr, ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) );
+        builder->CreateCondBr(pointerIsNull, PointerIsBrokenBB, PointerIsOkBB);
+        branchToPointerIsOkBB->eraseFromParent();
+        
+        builder->SetInsertPoint(PointerIsBrokenBB);
+        builder->CreateCall(_printf, BrokenSelfMessage);
+        builder->CreateBr(PointerIsOkBB);
     }
     
     //outs() << F;
