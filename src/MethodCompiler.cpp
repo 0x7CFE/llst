@@ -667,18 +667,57 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.instruction.low;
+    
+//     Function* getObjectField = m_JITModule->getFunction("getObjectField");
+//     Value* self  = jit.getSelf();
+//     Value* field = jit.builder->CreateCall2(getObjectField, self, jit.builder->getInt32(index));
+//     
+//     Value* fieldHolder = protectPointer(jit, field);
+//     
+//     std::ostringstream ss;
+//     ss << "pField" << (uint32_t) index << ".";
+//     fieldHolder->setName(ss.str());
+//     
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, fieldHolder));
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
+    
+//     Function* getArgFromContext = m_JITModule->getFunction("getArgFromContext");
+//     Value* context  = jit.getCurrentContext();
+//     Value* argument = jit.builder->CreateCall2(getArgFromContext, context, jit.builder->getInt32(index));
+//     
+//     Value* argHolder = protectPointer(jit, argument);
+//     
+//     std::ostringstream ss;
+//     ss << "pArg" << (uint32_t) index << ".";
+//     argHolder->setName(ss.str());
+//     
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argHolder));
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
+    
+//     Function* getObjectField = m_JITModule->getFunction("getObjectField");
+//     Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
+//     
+//     Value* context    = jit.getCurrentContext();
+//     Value* temps      = jit.builder->CreateCall(getTempsFromContext, context);
+//     Value* temporary  = jit.builder->CreateCall2(getObjectField, temps, jit.builder->getInt32(index));
+//     
+//     Value* tempHolder = protectPointer(jit, temporary);
+//     
+//     std::ostringstream ss;
+//     ss << "pTemp" << (uint32_t) index << ".";
+//     tempHolder->setName(ss.str());
+//     
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, tempHolder));
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
 }
 
