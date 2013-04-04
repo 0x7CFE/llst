@@ -41,7 +41,7 @@
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
-    memoryManager->initializeHeap(12040, 0);
+    memoryManager->initializeHeap(65536, 1048576 * 100);
     
     std::auto_ptr<Image> testImage(new Image(memoryManager.get()));
     if (argc == 2)

@@ -1325,13 +1325,24 @@ run
     ].
 !
 
+METHOD TestGc
+run2 |a b c d|
+    "TODO move to GCTest"
+    a <- 5.
+    b <- 5.
+    c <- 5.
+    LLVM do: [
+        d <- a - ( b + c).
+    ].
+!
+
 METHOD Undefined
 main    | command  x|
     " initialize classes "
     
     Char initialize.
     
-    TestGc new run.
+    TestGc new run2.
     "CompareTest new runAll.
     StringTest new runAll.
     LoopTest new runAll.
