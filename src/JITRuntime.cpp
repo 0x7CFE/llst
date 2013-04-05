@@ -468,7 +468,7 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-    m_functionPassManager->add(createBrokenPointerPass());
+    //m_functionPassManager->add(createBrokenPointerPass());
     
     m_modulePassManager->add(createFunctionInliningPass());
     m_functionPassManager->doInitialization();
