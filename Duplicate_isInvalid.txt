@@ -1,0 +1,42 @@
+METHOD Char
+asString
+    ^ String new: 1; at: 1 put: self
+!
+
+
+0000 PushLiteral 0
+0001 PushConstant 1
+0002 MarkArguments 2
+0003 SendMessage new:
+0004 DoSpecial duplicate  <----------
+0005 PushConstant 1
+0006 PushArgument 0
+0007 MarkArguments 3
+0008 SendMessage at:put:
+0009 DoSpecial stackReturn
+0010 DoSpecial popTop
+0011 DoSpecial selfReturn
+
+
+
+  %9 = call %TObject* @sendMessage(%TContext* %context.4, %TSymbol* %"#new:.", %TObjectArray* %8, %TClass* null)
+  store %TObject* %9, %TObject** %holder.
+  %10 = load %TObject** %holder.        <----------
+  %11 = call %TObject* @newOrdinaryObject(%TClass* @Array, i32 20)
+  %context.6 = load %TContext** %pContext
+  %arg0. = call %TObject* @getArgFromContext(%TContext* %context.6, i32 0)
+  %12 = call %TObject** @setObjectField(%TObject* %11, i32 2, %TObject* %arg0.)
+  %13 = call %TObject** @setObjectField(%TObject* %11, i32 1, %TObject* inttoptr (i32 3 to %TObject*))
+  %14 = call %TObject** @setObjectField(%TObject* %11, i32 0, %TObject* %10)    <----------
+  %15 = bitcast %TObject* %11 to %TObjectArray*
+  store %TObjectArray* %15, %TObjectArray** %pArgs.9
+  %16 = load %TObjectArray** %pArgs.9
+  %context.10 = load %TContext** %pContext
+  %lit2. = call %TObject* @getLiteralFromContext(%TContext* %context.10, i32 2)
+  %"#at:put:." = bitcast %TObject* %lit2. to %TSymbol*
+  %context.11 = load %TContext** %pContext
+  %17 = call %TObject* @sendMessage(%TContext* %context.11, %TSymbol* %"#at:put:.", %TObjectArray* %16, %TClass* null)
+  store %TObject* %17, %TObject** %holder.12
+  %18 = load %TObject** %holder.12
+  ret %TObject* %18
+}
