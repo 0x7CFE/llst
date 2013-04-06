@@ -16,8 +16,8 @@ namespace {
         std::set<std::string> m_GCFunctionNames;
         bool isPotentialGCFunction(std::string name);
         bool removeRootLoads(BasicBlock* B);
-        bool removeRedundantRoots(Function* F);
-        int  getNumRoots(Function* F);
+        bool removeRedundantRoots(Function& F);
+        int  getNumRoots(Function& F);
     public:
         virtual bool runOnFunction(Function &F) ;
         static char ID;
@@ -44,14 +44,29 @@ bool LLSTPass::runOnFunction(Function& F)
     for (Function::iterator B = F.begin(); B != F.end(); ++B) {
         CFGChanged |= removeRootLoads(B);
     }
-    CFGChanged |= removeRedundantRoots(&F);
+    CFGChanged |= removeRedundantRoots(F);
     return CFGChanged;
 }
 
-bool isLoadFromRoot(Instruction* Instr) {
-    return true;
-    ///TODO ensure Instr.getOperand(0) points to root
+bool isLoadFromRoot(LoadInst* Load) {
+    AllocaInst* pointerAlloc = dyn_cast<AllocaInst>(Load->getPointerOperand());
+    if (!pointerAlloc)
+        return false;
     
+    Function* F = Load->getParent()->getParent();
+    BasicBlock& entryBB = F->getEntryBlock();
+    
+    for (BasicBlock::iterator I = entryBB.begin(); I != entryBB.end(); I++ ) {
+        if (IntrinsicInst* createRootCall = dyn_cast<IntrinsicInst>(I)) {
+            if(createRootCall->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot) {
+                Value* holder = createRootCall->getArgOperand(0)->stripPointerCasts();
+                if (pointerAlloc->isIdenticalTo(cast<AllocaInst>(holder)) && pointerAlloc->getName() == holder->getName()) {
+                    return true;
+                }
+            }
+        }
+    }
+    return false;
 }
 
 bool LLSTPass::isPotentialGCFunction(std::string name)
@@ -69,7 +84,7 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
     {
         if ( LoadInst* load = dyn_cast<LoadInst>(Instr) ) {
             if (isLoadFromRoot(load))
-                LoadNCall.push_back(load); 
+                LoadNCall.push_back(load);
         }
         if ( CallInst* call = dyn_cast<CallInst>(Instr) ) {
             //Is it a call that might collect garbage?
@@ -112,9 +127,9 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
     return BBChanged;
 }
 
-int LLSTPass::getNumRoots(Function* F) {
+int LLSTPass::getNumRoots(Function& F) {
     int result = 0;
-    for (Function::iterator BB = F->begin(); BB != F->end(); BB++)
+    for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
     {
         for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
         {
@@ -128,10 +143,10 @@ int LLSTPass::getNumRoots(Function* F) {
     return result;
 }
 
-bool LLSTPass::removeRedundantRoots(Function* F)
+bool LLSTPass::removeRedundantRoots(Function& F)
 {
     InstructionSet toDelete;
-    BasicBlock& entryBB = F->getEntryBlock();
+    BasicBlock& entryBB = F.getEntryBlock();
     for (BasicBlock::iterator Instr = entryBB.begin(); Instr != entryBB.end(); Instr++ )
     {
         if (IntrinsicInst* createRootCall = dyn_cast<IntrinsicInst>(Instr))
@@ -165,7 +180,7 @@ bool LLSTPass::removeRedundantRoots(Function* F)
     
     //If there are no gc.root intrinsics why should we use GC for that function?
     if (getNumRoots(F) == 0)
-        F->clearGC();
+        F.clearGC();
     
     return CFGChanged;
 }
