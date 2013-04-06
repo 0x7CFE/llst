@@ -45,6 +45,7 @@
 
 #include <llvm/CodeGen/GCs.h>
 #include <llstPass.h>
+#include <llstDebuggingPass.h>
 
 #include <iostream>
 #include <sstream>
@@ -468,7 +469,7 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-    m_functionPassManager->add(createBrokenPointerPass());
+    m_functionPassManager->add(createLLSTDebuggingPass());
     
     m_modulePassManager->add(createFunctionInliningPass());
     m_functionPassManager->doInitialization();
