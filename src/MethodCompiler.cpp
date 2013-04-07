@@ -222,7 +222,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
             case 1: {
                 // Recursively processing referer's block
                 BasicBlock* referer = *blockContext.referers.begin();
-                Value* value = popValue(referer);
+                Value* value = popValue(referer, dropValue);
                 return value;
             } break;
             
@@ -230,7 +230,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
                 if (dropValue) {
                     TRefererSet::iterator iReferer = blockContext.referers.begin();
                     for (; iReferer != blockContext.referers.end(); ++iReferer)
-                        popValue(*iReferer);
+                        popValue(*iReferer, true);
                     return 0;
                 }
                 
