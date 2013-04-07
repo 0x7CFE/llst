@@ -162,6 +162,7 @@ class TStackValue {
 public:
     virtual ~TStackValue() { }
     virtual llvm::Value* get() = 0;
+    virtual bool isLazy() = 0;
 };
 
 class TPlainValue : public TStackValue {
@@ -172,6 +173,7 @@ public:
     virtual ~TPlainValue() { }
     
     virtual llvm::Value* get() { return m_value; }
+    virtual bool isLazy() { return true; }
 };
 
 class MethodCompiler {
@@ -338,25 +340,29 @@ private:
     TOperation   m_operation;
     uint32_t     m_index;
     llvm::Value* m_argument;
+    bool         m_isLazy;
     
     MethodCompiler::TJITContext* m_jit;
 public:
-    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index) {
+    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index, bool isLazy = false) {
         m_argument = 0;
         m_operation = operation;
         m_index = index;
         m_jit = jit;
+        m_isLazy = isLazy;
     }
     
-    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument) {
+    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument, bool isLazy = false) {
         m_operation = operation;
         m_argument = argument;
         m_index = 0;
         m_jit = jit;
+        m_isLazy = isLazy;
     }
     
     virtual ~TDeferredValue() { }
     virtual llvm::Value* get();
+    virtual bool isLazy() { return m_isLazy; } // lazy deffered value, LOL
 };
 
 

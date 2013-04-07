@@ -180,19 +180,21 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
     if (! valueStack.empty()) {
         // If local stack is not empty
         // then we simply pop the value from it
+        TStackValue* stackValue = valueStack.back();
         
         BasicBlock* currentBasicBlock = builder->GetInsertBlock();
         BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
-        if (overrideBlock) {
-            Instruction* terminator = overrideBlock->getTerminator();
-            if (terminator)
-                builder->SetInsertPoint(terminator);
-            else 
-                builder->SetInsertPoint(overrideBlock);
+        if (!stackValue->isLazy()) {
+            if (overrideBlock) {
+                Instruction* terminator = overrideBlock->getTerminator();
+                if (terminator)
+                    builder->SetInsertPoint(terminator);
+                else 
+                    builder->SetInsertPoint(overrideBlock);
+            }
         }
         
-        TStackValue* stackValue = valueStack.back();
-        Value* value = stackValue->get(); // NOTE May perform code injection
+        Value* value = stackValue->get(); // NOTE May and probably will perform code injection
         delete stackValue;
         valueStack.pop_back();
         
@@ -619,6 +621,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
         }
 
+
 //         uint32_t instCountAfter = jit.builder->GetInsertBlock()->getInstList().size();
 // 
 //          if (instCountAfter > instCountBefore)
@@ -667,64 +670,54 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.instruction.low;
+
+    Function* getObjectField = m_JITModule->getFunction("getObjectField");
+    Value* self  = jit.getSelf();
+    Value* field = jit.builder->CreateCall2(getObjectField, self, jit.builder->getInt32(index));
+
+    Value* fieldHolder = protectPointer(jit, field);
+
+    std::ostringstream ss;
+    ss << "pField" << (uint32_t) index << ".";
+    fieldHolder->setName(ss.str());
+
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, fieldHolder, true));
     
-//     Function* getObjectField = m_JITModule->getFunction("getObjectField");
-//     Value* self  = jit.getSelf();
-//     Value* field = jit.builder->CreateCall2(getObjectField, self, jit.builder->getInt32(index));
-//     
-//     Value* fieldHolder = protectPointer(jit, field);
-//     
-//     std::ostringstream ss;
-//     ss << "pField" << (uint32_t) index << ".";
-//     fieldHolder->setName(ss.str());
-//     
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, fieldHolder));
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index, true));
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    
-//     Function* getArgFromContext = m_JITModule->getFunction("getArgFromContext");
-//     Value* context  = jit.getCurrentContext();
-//     Value* argument = jit.builder->CreateCall2(getArgFromContext, context, jit.builder->getInt32(index));
-//     
-//     Value* argHolder = protectPointer(jit, argument);
-//     
-//     std::ostringstream ss;
-//     ss << "pArg" << (uint32_t) index << ".";
-//     argHolder->setName(ss.str());
-//     
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argHolder));
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index, true));
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    
-//     Function* getObjectField = m_JITModule->getFunction("getObjectField");
-//     Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-//     
-//     Value* context    = jit.getCurrentContext();
-//     Value* temps      = jit.builder->CreateCall(getTempsFromContext, context);
-//     Value* temporary  = jit.builder->CreateCall2(getObjectField, temps, jit.builder->getInt32(index));
-//     
-//     Value* tempHolder = protectPointer(jit, temporary);
-//     
-//     std::ostringstream ss;
-//     ss << "pTemp" << (uint32_t) index << ".";
-//     tempHolder->setName(ss.str());
-//     
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, tempHolder));
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
+
+    Function* getObjectField = m_JITModule->getFunction("getObjectField");
+    Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
+
+    Value* context    = jit.getCurrentContext();
+    Value* temps      = jit.builder->CreateCall(getTempsFromContext, context);
+    Value* temporary  = jit.builder->CreateCall2(getObjectField, temps, jit.builder->getInt32(index));
+
+    Value* tempHolder = protectPointer(jit, temporary);
+
+    std::ostringstream ss;
+    ss << "pTemp" << (uint32_t) index << ".";
+    tempHolder->setName(ss.str());
+
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, tempHolder, true));
+
+    //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index, true));
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index, true));
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
