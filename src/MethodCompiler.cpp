@@ -1077,7 +1077,20 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         case special::duplicate:
             // FIXME Duplicate the TStackValue, not the result
             outs() << "dup used!\n";
-            jit.pushValue(jit.lastValue());
+            {
+                // We're popping the value from the stack to a temporary holder
+                // and then pushing two lazy stack values pointing to it.
+
+                Value* dupValue  = jit.popValue();
+                Value* dupHolder = protectPointer(jit, dupHolder);
+                dupHolder->setName("dup.");
+
+                // Two equal values are pushed on the stack
+                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder, true));
+                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder, true));
+            }
+            
+            //jit.pushValue(jit.lastValue());
             break;
         
         case special::popTop:
