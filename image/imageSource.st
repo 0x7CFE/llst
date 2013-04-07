@@ -1343,6 +1343,9 @@ main    | command  x|
     Char initialize.
     
     TestGc new run2.
+
+    LLVM do: [ 'hello' at: 1 printNl ].
+    
     "CompareTest new runAll.
     StringTest new runAll.
     LoopTest new runAll.

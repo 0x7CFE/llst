@@ -1082,8 +1082,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 // and then pushing two lazy stack values pointing to it.
 
                 Value* dupValue  = jit.popValue();
-                Value* dupHolder = protectPointer(jit, dupHolder);
-                dupHolder->setName("dup.");
+                Value* dupHolder = protectPointer(jit, dupValue);
+                dupHolder->setName("pDup.");
 
                 // Two equal values are pushed on the stack
                 jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder, true));
