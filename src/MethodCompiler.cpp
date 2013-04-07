@@ -172,7 +172,7 @@ bool MethodCompiler::TJITContext::hasValue()
     return ! basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
 }
 
-Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
+Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/, bool dropValue /*= false*/)
 {
     TBasicBlockContext& blockContext = basicBlockContexts[overrideBlock ? overrideBlock : builder->GetInsertBlock()];
     TValueStack& valueStack = blockContext.valueStack;
@@ -181,27 +181,31 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
         // If local stack is not empty
         // then we simply pop the value from it
         TStackValue* stackValue = valueStack.back();
-        
-        BasicBlock* currentBasicBlock = builder->GetInsertBlock();
-        BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
-        if (!stackValue->isLazy()) {
-            if (overrideBlock) {
-                Instruction* terminator = overrideBlock->getTerminator();
-                if (terminator)
-                    builder->SetInsertPoint(terminator);
-                else 
-                    builder->SetInsertPoint(overrideBlock);
+        Value* result = 0;
+
+        if (!dropValue) {
+            BasicBlock* currentBasicBlock = builder->GetInsertBlock();
+            BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
+            if (!stackValue->isLazy()) {
+                if (overrideBlock) {
+                    Instruction* terminator = overrideBlock->getTerminator();
+                    if (terminator)
+                        builder->SetInsertPoint(terminator);
+                    else
+                        builder->SetInsertPoint(overrideBlock);
+                }
             }
+
+            result = stackValue->get(); // NOTE May and probably will perform code injection
+
+            if (overrideBlock)
+                builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
         }
-        
-        Value* value = stackValue->get(); // NOTE May and probably will perform code injection
+
         delete stackValue;
         valueStack.pop_back();
         
-        if (overrideBlock)
-            builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
-        
-        return value;
+        return result;
     } else {
         // If value stack is empty then it means that we're dealing with
         // a value pushed in the predcessor block (or a stack underflow)
@@ -223,6 +227,13 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/)
             } break;
             
             default: {
+                if (dropValue) {
+                    TRefererSet::iterator iReferer = blockContext.referers.begin();
+                    for (; iReferer != blockContext.referers.end(); ++iReferer)
+                        popValue(*iReferer);
+                    return 0;
+                }
+                
                 // Storing current insert position for further use
                 BasicBlock* currentBasicBlock = builder->GetInsertBlock();
                 BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
@@ -589,6 +600,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             jit.instruction.high =  jit.instruction.low;
             jit.instruction.low  =  byteCodes[jit.bytePointer++];
         }
+
+        outs() << jit.instruction.toString() << "\n";
         
 //         printOpcode(jit.instruction);
         
@@ -1095,7 +1108,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         
         case special::popTop:
             if (jit.hasValue())
-                jit.popValue();
+                jit.popValue(0, true);
             break;
         
         case special::branch: {

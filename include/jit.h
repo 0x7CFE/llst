@@ -224,7 +224,7 @@ public:
         bool hasValue();
         void pushValue(llvm::Value* value); 
         llvm::Value* lastValue(); 
-        llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0);
+        llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0, bool dropValue = false);
 
         llvm::Value* contextHolder;
         llvm::Value* selfHolder;
