@@ -251,22 +251,22 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
                 // Creating a phi function at the beginning of the block
                 const uint32_t numReferers = blockContext.referers.size();
                 PHINode* phi = builder->CreatePHI(compiler->m_baseTypes.object->getPointerTo(), numReferers, "phi.");
-                    
+                Value* holder = compiler->protectPointer(*this, phi);
+                
                 // Filling incoming nodes with values from the referer stacks
                 TRefererSet::iterator iReferer = blockContext.referers.begin();
                 for (; iReferer != blockContext.referers.end(); ++iReferer) {
                     // FIXME non filled block will not yet have the value
                     //       we need to store them to a special post processing list
                     //       and update the current phi function when value will be available
-                    
+                    builder->SetInsertPoint((*iReferer)->getTerminator());
                     Value* value = popValue(*iReferer);
                     phi->addIncoming(value, *iReferer);
                 }
                 
-                if (overrideBlock || firstInsertionPoint != insertBlock->end())
-                    builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
+                builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
                 
-                return phi;
+                return builder->CreateLoad(holder);
             }
         }
     }

@@ -345,8 +345,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 outs() << "Compiling method " << functionName << "\n";
                 methodFunction = m_methodCompiler->compileMethod(method, previousContext);
                 
-                 outs() << *methodFunction;
-                
                 if (verifyModule(*m_JITModule)) {
                     outs() << "Module verification failed.\n";
                     exit(1);

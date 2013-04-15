@@ -1308,56 +1308,26 @@ runSort: size | x1 list ms1 selector args1 block1 |
         'Sorted in ms: ' print. ms1 printNl.
 !
 
-CLASS TestGc Object
-
-
-METHOD TestGc
-nest: i block: b
-    b value.
-    (i = 0) ifFalse: [ self nest: (i-1) block: b ].
-!
-
-METHOD TestGc
-run
-    LLVM do: [
-        self nest: 5 block: [ self class printString + self printString ].
-        ^nil.
-    ].
-!
-
-METHOD TestGc
-run2 |a b c d|
-    "TODO move to GCTest"
-    a <- 5.
-    b <- 5.
-    c <- 5.
-    LLVM do: [
-        d <- a - ( b + c).
-    ].
-!
-
 METHOD Undefined
 main    | command  x|
     " initialize classes "
     
     Char initialize.
     
-    TestGc new run2.
-
-    LLVM do: [ 'hello' at: 1 printNl ].
-    
     "CompareTest new runAll.
     StringTest new runAll.
     LoopTest new runAll.
     SmallIntTest new runAll."
     
-    "LLVM do: [
-        CompareTest new runAll.
-        StringTest new runAll.
-        LoopTest new runAll.
-        SmallIntTest new runAll.
-        GCTest new runAll.
-    ]."
+    LLVM do: [
+        10 times: [:i|
+            CompareTest new runAll.
+            StringTest new runAll.
+            LoopTest new runAll.
+            SmallIntTest new runAll.
+            GCTest new runAll.
+        ].
+    ].
     
     " main execution loop  "
     [ '-> ' print. command <- String input. command notNil ]
