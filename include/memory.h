@@ -10,18 +10,12 @@
 // Generic interface to a memory manager.
 // Custom implementations such as BakerMemoryManager
 // implement this interface.
-
-class IMemoryManagerUser {
-public:
-    virtual void onCollectionOccured() = 0;
-};
-
 class IMemoryManager {
 public:
     virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
     virtual bool initializeStaticHeap(size_t staticHeapSize) = 0;
     
-    virtual void* allocate(size_t size) = 0;
+    virtual void* allocate(size_t size, bool* collectionOccured = 0) = 0;
     virtual void* staticAllocate(size_t size) = 0;
     virtual void  collectGarbage() = 0;
     
@@ -34,9 +28,6 @@ public:
     virtual void  releaseExternalPointer(TObject** pointer) = 0;
     
     virtual uint32_t allocsBeyondCollection() = 0;
-    virtual void  addMemoryUser(IMemoryManagerUser* user) = 0;
-    virtual void  notifyMemoryUsers() = 0;
-    virtual void  printStat() = 0;
 };
 
 // When pointer to a heap object is stored outside of the heap,
@@ -242,19 +233,14 @@ private:
     typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_externalPointers;
     
-    typedef std::list<IMemoryManagerUser*> TMemoryUsersList;
-    typedef std::list<IMemoryManagerUser*>::iterator TMemoryUserIterator;
-    TMemoryUsersList m_memoryUsers;
-    
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
     
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
-    virtual void* allocate(size_t requestedSize);
+    virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
-    
     virtual void  collectGarbage();
     
     virtual void  addStaticRoot(TObject** pointer);
@@ -268,10 +254,6 @@ public:
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocsBeyondGC; }
-    
-    virtual void  addMemoryUser(IMemoryManagerUser* user);
-    virtual void  notifyMemoryUsers();
-    virtual void  printStat();
 };
 
 class Image {
