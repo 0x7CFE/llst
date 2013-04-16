@@ -286,6 +286,12 @@ private:
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);
+    void writeSmallIntPrimitive(TJITContext& jit,
+                                primitive::SmallIntOpcode opcode,
+                                llvm::Value* rightObject,
+                                llvm::Value* leftObject,
+                                llvm::Value*& primitiveResult,
+                                llvm::BasicBlock* primitiveFailedBB);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
