@@ -297,9 +297,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             
             default:
                 fprintf(stderr, "VM: Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
-                fprintf(stderr, "'%s' of class '%s' \n",
-                        ec.currentContext->method->name->toString().c_str(),
-                        ec.lastReceiver == globals.nilObject ? "unknown" : ec.lastReceiver->name->toString().c_str());
+                fprintf(stderr, "'%s' of class\n", ec.currentContext->method->name->toString().c_str() );
                 exit(1);
         }
     }
@@ -381,7 +379,6 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
         receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
     }
     
-    ec.lastReceiver = newPointer(receiverClass);
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
     
     // Checking whether we found a method
@@ -449,9 +446,9 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     {
         // Optimizing block return
         newContext->previousContext = ec.currentContext.cast<TBlock>()->creatingContext->previousContext;
-    } else
+    } else {
         newContext->previousContext = ec.currentContext;
-    
+    }
     // Replace current context with the new one. On the next iteration,
     // VM will start interpreting instructions from the new context.
     ec.currentContext = newContext;

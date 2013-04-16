@@ -539,7 +539,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
-        // printf("Processing offset %d / %d : ", currentOffset, stopPointer);
         
         std::map<uint32_t, BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
         if (iBlock != m_targetToBlockMap.end()) {

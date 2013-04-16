@@ -198,7 +198,6 @@ public:
         TMethod*            method;       // Smalltalk method we're currently processing
         TContext*           callingContext;
         uint32_t            bytePointer;
-        uint32_t            byteCount;
 
         llvm::Function*     function;     // LLVM function that is created based on method
         TInstruction        instruction;  // currently processed instruction
@@ -240,7 +239,7 @@ public:
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
-            byteCount = method->byteCodes->getSize();
+            
         };
 
         ~TJITContext() {

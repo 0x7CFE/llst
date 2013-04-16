@@ -69,7 +69,6 @@ private:
         uint32_t       stackTop;
 
         hptr<TObject>  returnedValue;
-        hptr<TClass>   lastReceiver;
 
         void loadPointers() {
             bytePointer = getIntegerValue(currentContext->bytePointer);
@@ -84,8 +83,7 @@ private:
         TVMExecutionContext(IMemoryManager* mm) :
             memoryManager(mm),
             currentContext((TContext*) globals.nilObject, mm),
-            returnedValue(globals.nilObject, mm),
-            lastReceiver((TClass*)globals.nilObject, mm)
+            returnedValue(globals.nilObject, mm)
         { }
     };
 
