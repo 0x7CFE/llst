@@ -182,22 +182,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
         Value* result = 0;
 
         if (!dropValue) {
-            BasicBlock* currentBasicBlock = builder->GetInsertBlock();
-            BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
-            if (!stackValue->isLazy()) {
-                if (overrideBlock) {
-                    Instruction* terminator = overrideBlock->getTerminator();
-                    if (terminator)
-                        builder->SetInsertPoint(terminator);
-                    else
-                        builder->SetInsertPoint(overrideBlock);
-                }
-            }
-
             result = stackValue->get(); // NOTE May and probably will perform code injection
-
-            if (overrideBlock)
-                builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
         }
 
         delete stackValue;
@@ -657,25 +642,25 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.instruction.low;
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index, true));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index, true));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index, true));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.instruction.low;
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index, true));
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -1041,8 +1026,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 dupHolder->setName("pDup.");
 
                 // Two equal values are pushed on the stack
-                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder, true));
-                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder, true));
+                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
+                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
             }
             
             //jit.pushValue(jit.lastValue());
