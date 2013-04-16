@@ -42,7 +42,7 @@
 #include <stdlib.h>
 #include <opcodes.h>
 #include <stdio.h>
-#include <instruction.h>
+#include <TInstruction.h>
 
 class SmalltalkVM {
 public:

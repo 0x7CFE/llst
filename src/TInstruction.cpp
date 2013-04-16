@@ -1,4 +1,4 @@
-#include <instruction.h>
+#include <TInstruction.h>
 
 std::string TInstruction::toString()
 {
