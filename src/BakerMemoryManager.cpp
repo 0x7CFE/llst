@@ -76,28 +76,55 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     // To initialize properly we need a heap with an even size
     heapSize = correctPadding(heapSize);
 
-    void* base = malloc(heapSize);
-    if (!base)
-        return false;
-
-    memset(base, 0, heapSize);
-
+    uint32_t mediane = heapSize / 2;
     m_heapSize = heapSize;
     m_maxHeapSize = maxHeapSize;
 
-    uint32_t mediane = heapSize / 2;
-    m_heapOne = (uint8_t*) base;
-    m_heapTwo = (uint8_t*) base + mediane;
+    m_heapOne = (uint8_t*) malloc(mediane);
+    m_heapTwo = (uint8_t*) malloc(mediane);
+    // TODO check for allocation errors
 
+    memset(m_heapOne, 0, mediane);
+    memset(m_heapTwo, 0, mediane);
+    
     m_activeHeapOne = true;
     
     m_activeHeapBase = m_heapOne;
-    m_activeHeapPointer = (uint8_t*) base + mediane;
+    m_activeHeapPointer = m_heapOne + mediane;
     
-    m_inactiveHeapBase = (uint8_t*) base + mediane;
-    m_inactiveHeapPointer = (uint8_t*) base + heapSize;
+    m_inactiveHeapBase =  m_heapTwo;
+    m_inactiveHeapPointer = m_heapTwo + mediane;
 
     return true;
+}
+
+void BakerMemoryManager::growHeap(uint32_t requestedSize)
+{
+    // Stage1. Growing inactive heap
+    uint32_t newHeapSize = correctPadding(requestedSize + m_heapSize + m_heapSize / 2);
+
+    printf("MM: Growing heap to %d\n", newHeapSize);
+    
+    uint32_t newMediane = newHeapSize / 2;
+    uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
+    uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
+    
+    // Reallocating space and zeroing it
+    *inactiveHeapBase = (uint8_t*) realloc(*inactiveHeapBase, newMediane);
+    memset(*inactiveHeapBase, 0, newMediane);
+
+    // Stage 2. Collecting garbage so that 
+    // active objects will be moved to a new home
+    collectGarbage();
+
+    // Now pointers are swapped and previously active heap is now inactive
+    // We need to reallocate it too
+    *activeHeapBase = (uint8_t*) realloc(*activeHeapBase, newMediane);
+    memset(*activeHeapBase, 0, newMediane);
+    
+    collectGarbage();
+    
+    m_heapSize = newHeapSize;
 }
 
 void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
@@ -109,6 +136,12 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
+
+            // If even after collection there is too less space
+            // we may try to expand the heap
+            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 8))
+                growHeap(requestedSize);
+
             if (gcOccured)
                 *gcOccured = true;
             continue;
@@ -323,25 +356,33 @@ void BakerMemoryManager::collectGarbage()
     // Storing timestamp on start
     timeval tv1;
     gettimeofday(&tv1, NULL);
-    
-    // Here we need to check the rootStack, staticRoots and the VM execution context
-    TStaticRootsIterator iRoot = m_staticRoots.begin();
-    for (; iRoot != m_staticRoots.end(); ++iRoot) {
-        **iRoot = moveObject(**iRoot);
-    }
 
-    // Updating external references. Typically this is pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
-    }
+    // Moving the live objects in the new heap
+    moveObjects();
     
     // Storing timestamp of the end
     timeval tv2;
     gettimeofday(&tv2, NULL);
     
+    memset(m_inactiveHeapBase, 0, m_heapSize / 2);
+    
     // Calculating total microseconds spent in the garbage collection procedure
     m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+}
+
+void BakerMemoryManager::moveObjects()
+{
+    // Here we need to check the rootStack, staticRoots and the VM execution context
+    TStaticRootsIterator iRoot = m_staticRoots.begin();
+    for (; iRoot != m_staticRoots.end(); ++iRoot) {
+        **iRoot = moveObject(**iRoot);
+    }
+    
+    // Updating external references. Typically this is pointers stored in the hptr<>
+    TPointerIterator iExternalPointer = m_externalPointers.begin();
+    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+        **iExternalPointer = moveObject(**iExternalPointer);
+    }
 }
 
 bool BakerMemoryManager::isInStaticHeap(void* location)

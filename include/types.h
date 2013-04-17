@@ -64,13 +64,6 @@ inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TIntege
 inline int32_t  getIntegerValue(TInteger value) { return (int32_t) (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
 
-// TInstruction represents one decoded Smalltalk instruction.
-// Actual meaning of parts is determined during the execution.
-struct TInstruction {
-    uint8_t low;
-    uint8_t high;
-};
-
 // Helper struct used to hold object size and special 
 // status flags packed in a 4 bytes space. TSize is used
 // in the TObject hierarchy and in the TMovableObject in GC
@@ -306,6 +299,9 @@ struct TMethod : public TObject {
     TClass*       klass;
     TString*      text;
     TObject*      package;
+
+    // LLVM Extension
+    TByteArray*   llvmBitcode;
     
     static const char* InstanceClassName() { return "Method"; }
 };

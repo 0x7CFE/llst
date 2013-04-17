@@ -63,7 +63,7 @@ int TDictionary::compareSymbols(TSymbol* left, const char* right)
     uint32_t minSize    = (leftSize < rightSize) ? leftSize : rightSize;
     
     uint8_t* leftBytes  = left->getBytes();
-    uint8_t* rightBytes = (uint8_t*) right;
+    const uint8_t* rightBytes = (const uint8_t*) right;
     
     // Comparing the byte strings byte by byte
     int result = memcmp(leftBytes, rightBytes, minSize);
