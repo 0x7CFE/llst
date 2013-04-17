@@ -297,7 +297,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             
             default:
                 fprintf(stderr, "VM: Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
-                fprintf(stderr, "'%s' of class\n", ec.currentContext->method->name->toString().c_str() );
+                fprintf(stderr, "'%s'\n", ec.currentContext->method->name->toString().c_str() );
                 exit(1);
         }
     }
@@ -480,7 +480,7 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
         
         default:
             fprintf(stderr, "VM: Invalid opcode %d passed to sendUnary\n", ec.instruction.low);
-            ec.returnedValue = globals.nilObject;
+            exit(1);
     }
     
     stack[ec.stackTop++] = ec.returnedValue;
@@ -519,7 +519,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
             
             default:
                 fprintf(stderr, "VM: Invalid opcode %d passed to sendBinary\n", ec.instruction.low);
-                ec.returnedValue = globals.nilObject;
+                exit(1);
         }
         
         // Pushing result back to the stack
@@ -679,7 +679,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         default:
             /* TODO unknown push constant */ ;
             fprintf(stderr, "VM: unknown push constant %d\n", constant);
-            stack[ec.stackTop++] = globals.nilObject;
+            exit(1);
     }
 }
 
@@ -704,7 +704,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
     //If primitive failed during execution we should continue execution in the current method
     if (failed) {
         stack[ec.stackTop++] = globals.nilObject;
-        //failPrimitive(stack, ec.stackTop, opcode);
         return returnNoReturn;
     }
     
@@ -754,7 +753,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
             ec.currentContext->stackTop = newInteger(ec.stackTop);
             
             ec.bytePointer = getIntegerValue(ec.currentContext->bytePointer);
-            // TODO lastReceiver = (*currentContext->arguments)[0][0].getClass();
     }
     
     return returnNoReturn;
@@ -1097,6 +1095,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             //TODO call primitive(opcode, args)
             
             fprintf(stderr, "VM: Unimplemented or invalid primitive %d\n", opcode);
+            exit(1);
         }
     }
     
@@ -1164,7 +1163,7 @@ TObject* SmalltalkVM::doSmallInt( primitive::SmallIntOpcode opcode, int32_t left
         
         default:
             fprintf(stderr, "VM: Invalid SmallInt opcode %d\n", opcode);
-            return globals.nilObject;
+            exit(1);
     }
 }
 
@@ -1181,7 +1180,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
          ! isSmallInteger(destinationStartOffset) ||
          ! isSmallInteger(destinationStopOffset) )
     {
-        printf("(0) : %p %p %p\n", sourceStartOffset, destinationStartOffset, destinationStopOffset);
         return false;
     }
     
@@ -1197,15 +1195,12 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
          iDestinationStopOffset  < 0 ||
          iCount < 1 )
     {
-        if (iCount != 0)
-            printf("(1) %d %d %d %d\n", iSourceStartOffset, iDestinationStartOffset, iDestinationStopOffset, iCount);
         return false;
     }
     
     if (destination->getSize() < (uint32_t) iDestinationStopOffset ||
         source->getSize() < (uint32_t) (iSourceStartOffset + iCount) )
     {
-        printf("(2)\n");
         return false;
     }
     
@@ -1225,7 +1220,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
     // let the VM hadle it because pointer checking is required. See checkRoot()
     if (m_memoryManager->isInStaticHeap(source) != m_memoryManager->isInStaticHeap(destination))
     {
-        printf("(3)\n");
         return false;
     }
     
@@ -1240,7 +1234,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return true;
     }
     
-    printf("(4)\n");
     return false;
 }
 

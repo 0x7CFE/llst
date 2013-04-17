@@ -153,7 +153,6 @@ JITRuntime::~JITRuntime() {
 
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
-    // Protecting pointer
     hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
     
     // Creating new context object and inheriting context variables
@@ -257,10 +256,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 exit(1);
             }
             
-            if (verifyModule(*m_JITModule)) {
-                outs() << "Module verification failed.\n";
-                exit(1);
-            }
+            verifyModule(*m_JITModule, AbortProcessAction);
             
             optimizeFunction(blockFunction);
         }
@@ -280,11 +276,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
     TContext*       newContext = 0;
-    // Protecting the pointers before allocation
-    hptr<TContext> previousContext  = m_softVM->newPointer(callingContext);
+    hptr<TContext>  previousContext  = m_softVM->newPointer(callingContext);
     
     {
-        
         // First of all we need to find the actual method object
         if (!receiverClass) {
             TObject* receiver = messageArguments[0];
@@ -337,11 +331,8 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 // Compiling function and storing it to the table for further use
                 methodFunction = m_methodCompiler->compileMethod(method, previousContext);
                 
-                if (verifyModule(*m_JITModule)) {
-                    outs() << "Module verification failed.\n";
-                    exit(1);
-                }
-                // Running the optimization passes on a function
+                verifyModule(*m_JITModule, AbortProcessAction);
+                
                 optimizeFunction(methodFunction);
             }
             
