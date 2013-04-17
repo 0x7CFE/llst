@@ -1,3 +1,37 @@
+/*
+ *    Image.cpp 
+ *    
+ *    Implementation of Image class which loads the file image into memory
+ *    
+ *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+ *    
+ *    LLST is 
+ *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
+ *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+ *    
+ *    LLST is based on the LittleSmalltalk which is 
+ *        Copyright (C) 1987-2005 by Timothy A. Budd
+ *        Copyright (C) 2007 by Charles R. Childers
+ *        Copyright (C) 2005-2007 by Danny Reinhold
+ *        
+ *    Original license of LittleSmalltalk may be found in the LICENSE file.
+ *        
+ *    
+ *    This file is part of LLST.
+ *    LLST is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *    
+ *    LLST is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *    
+ *    You should have received a copy of the GNU General Public License
+ *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include <vm.h>
 #include <memory.h>
 
@@ -53,12 +87,12 @@ bool Image::openImageFile(const char* fileName)
 
     // Mapping the image file to the memory
     m_imageMap = mmap(
-        0,              // let the kernel provide the address
+        0,                // let the kernel provide the address
         m_imageFileSize,  // map the entire image file
-        PROT_READ,      // read only access
-        MAP_PRIVATE,    // private mapping only for us
+        PROT_READ,        // read only access
+        MAP_PRIVATE,      // private mapping only for us
         m_imageFileFD,    // map this file
-        0);             // from the very beginning (zero offset)
+        0);               // from the very beginning (zero offset)
         
     if (!m_imageMap) {
         fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
@@ -106,9 +140,7 @@ TObject* Image::readObject()
 {
     // TODO error checking 
     
-    //fprintf(stderr, "Reading image record type\n");
     TImageRecordType type = (TImageRecordType) readWord();
-    //fprintf(stderr, "Reading record %d\n", (uint32_t) type);
     switch (type) {
         case invalidObject: 
             fprintf(stderr, "Invalid object at offset %p\n", (void*) (m_imagePointer - (uint8_t*)m_imageMap));
@@ -129,7 +161,6 @@ TObject* Image::readObject()
             
             for (uint32_t i = 0; i < fieldsCount; i++)
                 newObject->putField(i, readObject());
-                //FIXME ? globals.initialMethod.temporarySize pointing to nilObject. i == 4
             
             return newObject;
         }

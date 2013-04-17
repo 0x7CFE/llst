@@ -1,3 +1,37 @@
+/*
+ *    types.h 
+ *    
+ *    Basic Smalltalk related types and structures
+ *    
+ *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+ *    
+ *    LLST is 
+ *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
+ *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+ *    
+ *    LLST is based on the LittleSmalltalk which is 
+ *        Copyright (C) 1987-2005 by Timothy A. Budd
+ *        Copyright (C) 2007 by Charles R. Childers
+ *        Copyright (C) 2005-2007 by Danny Reinhold
+ *        
+ *    Original license of LittleSmalltalk may be found in the LICENSE file.
+ *        
+ *    
+ *    This file is part of LLST.
+ *    LLST is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU General Public License as published by
+ *    the Free Software Foundation, either version 3 of the License, or
+ *    (at your option) any later version.
+ *    
+ *    LLST is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU General Public License for more details.
+ *    
+ *    You should have received a copy of the GNU General Public License
+ *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 #ifndef LLST_TYPES_H_INCLUDED
 #define LLST_TYPES_H_INCLUDED
 
@@ -9,7 +43,11 @@
 
 struct TClass;
 struct TObject;
+struct TMethod;
 
+// All our objects needed to be aligned by the 4 bytes at least.
+// This function helps to calculate the buffer size enough to fit the data,
+// yet being a multiple of 4 (or 8 depending on the pointer size)
 inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
 //inline size_t correctPadding(size_t size) { return (size + 3) & ~3; }
 
@@ -21,16 +59,10 @@ inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & 
 // TODO May be we should refactor TInteger to a class which provides cast operators.
 typedef int32_t TInteger;
 
+// Helper functions for TInteger operation
 inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
 inline int32_t  getIntegerValue(TInteger value) { return (int32_t) (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
-
-// TInstruction represents one decoded Smalltalk instruction.
-// Actual meaning of parts is determined during the execution.
-struct TInstruction {
-    uint8_t low;
-    uint8_t high;
-};
 
 // Helper struct used to hold object size and special 
 // status flags packed in a 4 bytes space. TSize is used
@@ -134,7 +166,7 @@ public:
     // Byte objects are said to be binary
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
     {
-        // Zeroing data
+        // Zeroing byte object data
         memset((void*)fields, 0, dataSize);
     }
     
@@ -188,10 +220,13 @@ struct TSymbol : public TByteObject {
 // TString represents the Smalltalk's String class. 
 // Strings are binary objects that hold raw character bytes. 
 struct TString : public TByteObject { 
-    
     static const char* InstanceClassName() { return "String"; }
 };
 
+// Chars are intermediate representation of single printable character
+// When #String>>at: method is called an instance of Char is returned.
+// Note that actually String is NOT the array of Chars. String is binary
+// object holding raw character bytes which then interpreted as characters
 struct TChar : public TObject {
     TInteger value;
     static const char* InstanceClassName() { return "Char"; }
@@ -220,11 +255,8 @@ struct TArray : public TObject {
     Element& operator [] (I index) { return (Element&) fields[index]; }
 };
 
-struct TMethod;
 typedef TArray<TObject*> TObjectArray;
 typedef TArray<TSymbol*> TSymbolArray;
-typedef TArray<TMethod*> TMethodArray;
-
 
 // Context class is the heart of Smalltalk's VM execution mechanism.
 // Basicly, it holds all information needed to execute a method.
@@ -267,6 +299,9 @@ struct TMethod : public TObject {
     TClass*       klass;
     TString*      text;
     TObject*      package;
+
+    // LLVM Extension
+    TByteArray*   llvmBitcode;
     
     static const char* InstanceClassName() { return "Method"; }
 };

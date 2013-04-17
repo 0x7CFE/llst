@@ -13,31 +13,35 @@ COMMENT Copyright (C) 1987-2005 by Timothy A. Budd
 COMMENT Copyright (C) 2007 by Charles R. Childers
 COMMENT Copyright (C) 2005-2007 by Danny Reinhold
 COMMENT
+COMMENT Some parts of this file are
+COMMENT Copyright (C) 2012 Dmitry Kashitsyn   <korvin@deeptown.org>
+COMMENT Copyright (C) 2012 Roman Proskuryakov <humbug@deeptown.org>
+COMMENT
 COMMENT ============================================================================
-COMMENT This license applies to the virtual machine and to the initial image of 
-COMMENT the Little Smalltalk system and to all files in the Little Smalltalk 
+COMMENT This license applies to the virtual machine and to the initial image of
+COMMENT the Little Smalltalk system and to all files in the Little Smalltalk
 COMMENT packages.
 COMMENT ============================================================================
-COMMENT Permission is hereby granted, free of charge, to any person obtaining a copy 
-COMMENT of this software and associated documentation files (the "Software"), to deal 
-COMMENT in the Software without restriction, including without limitation the rights 
-COMMENT to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-COMMENT copies of the Software, and to permit persons to whom the Software is 
+COMMENT Permission is hereby granted, free of charge, to any person obtaining a copy
+COMMENT of this software and associated documentation files (the "Software"), to deal
+COMMENT in the Software without restriction, including without limitation the rights
+COMMENT to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+COMMENT copies of the Software, and to permit persons to whom the Software is
 COMMENT furnished to do so, subject to the following conditions:
 COMMENT
-COMMENT The above copyright notice and this permission notice shall be included in 
+COMMENT The above copyright notice and this permission notice shall be included in
 COMMENT all copies or substantial portions of the Software.
 COMMENT
-COMMENT THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-COMMENT IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-COMMENT FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-COMMENT AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-COMMENT LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-COMMENT FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+COMMENT THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+COMMENT IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+COMMENT FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COMMENT AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+COMMENT LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+COMMENT FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 COMMENT DEALINGS IN THE SOFTWARE.
 COMMENT
 COMMENT
-COMMENT	
+COMMENT
 COMMENT-----------------------------------------------------------
 COMMENT RAWCLASS name   instanceOf subclassOf  (instance variable names)
 COMMENT  or... CLASS name subclassOf (instance vars)
@@ -65,7 +69,7 @@ RAWCLASS Symbol        MetaSymbol    Magnitude
 RAWCLASS MetaChar      Class         MetaMagnitude     chars
 RAWCLASS Char          MetaChar      Magnitude         value
 CLASS Collection    Magnitude
-CLASS List          Collection         elements
+CLASS List          Collection         elements size
 CLASS Dictionary    Collection        keys values
 CLASS Array         Collection
 CLASS OrderedArray  Array
@@ -113,6 +117,10 @@ COMMENT ---------------------------------------------------
 COMMENT --- Package: GUI
 RAWCLASS MetaGuiPrimitives Class MetaObject theInstance
 RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
+
+CLASS LLVM Object
+CLASS LLVMTest Object field1
+
 COMMENT ---------- method bodies ------------
 COMMENT -----------Object-------------------
 METHOD MetaObject
@@ -200,7 +208,7 @@ error: str
 	" print the message "
 	'ERROR' printNl.
 	String newline print.
-	
+
 	str printNl.
 	" then halt "
 	<19>
@@ -247,6 +255,10 @@ METHOD Object
 basicDo: aBlock
 	^ self do: aBlock
 !
+METHOD Object
+withSelf: aBlock
+    ^ aBlock value: self
+!
 COMMENT ---------Class-------------------
 METHOD Class
 name: n parent: c variables: v
@@ -290,6 +302,14 @@ subclasses: indent
 				1 to: indent do: [:ignore| $  print ].
 				obj printNl.
 				obj subclasses: indent + 4 ] ]
+!
+METHOD Class
+hierarchy | class list |
+    list <- List new.
+    class <- self.
+    [class isNil] whileFalse:
+        [ list add: class. class <- class parent ]
+    ^list
 !
 METHOD Class
 listMethods
@@ -465,35 +485,33 @@ notNil
 	^ false
 !
 
-
 METHOD Block
 assertEq: arg withComment: comment
     |result header headerTab|
     header <- String new.
     header <- header + (method name printString).
 
-    comment notNil ifTrue: [ header <- header + ( '(' + comment + ') ' ) ]
-    
+    comment notNil ifTrue: [ header <- header + '(' + comment + ') ' ].
+
     header print.
-    
+
     headerTab <- 42 - (header size).
     [headerTab > 0] whileTrue: [
         ' ' print.
         headerTab <- headerTab - 1
-    ]
-    
+    ].
+
     result <- self value.
-    
-    result = arg
+
+    (result = arg)
         ifTrue:  [ 'OK'   printNl ]
         ifFalse: [
                    'FAIL' printNl.
                    ('Expected ' + arg printString + ', ') print.
                    'got ' print. result printNl. String newline print.
-                   
+
                    method text printNl.
                  ]
-               
 !
 
 METHOD Block
@@ -509,6 +527,26 @@ assertWithComment: comment
 METHOD Block
 assert
     self assertWithComment: nil.
+!
+
+METHOD Block
+method
+    ^method
+!
+
+METHOD Block
+creatingContext
+    ^creatingContext
+!
+
+METHOD Context
+method
+    ^method
+!
+
+METHOD Context
+arguments
+    ^arguments
 !
 
 METHOD Dictionary
@@ -549,44 +587,55 @@ CLASS Test Class
 METHOD Test
 runAll |reservedNames|
     self init.
-    reservedNames <- Array with: #init.
-    
+    reservedNames <- Array with: #init with: #reservedNames.
+    reservedNames <- reservedNames + self reservedNames.
+
     Char newline print.
     'Running ' print. self class printNl.
-    
+
     self class methods
             do: [:m |
                     ( reservedNames includes: (m name) )
                         ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
+
 METHOD Test
 init
     ^nil
 !
 
-COMMENT FIXME make tests be singletons 
+METHOD Test
+reservedNames
+    ^Array new.
+!
 
-COMMENT              --------CompareTest----------
+COMMENT                                                                                                --------CompareTest----------
 CLASS CompareTest Test
 
 METHOD CompareTest
 greater
-    [ 3 > 2  ] assertWithComment: 'int int'.
+    [ 3 > 2  ] assertWithComment: 'small ints'.
     [ 3 > #2 ] assertWithComment: 'int symbol'.
+    ['ac' > 'ab' ] assertWithComment: 'strings'.
+    [$b > $a ] assertWithComment: 'chars'.
 !
 
 METHOD CompareTest
 equal
-    [ 42 == 42 ] assertWithComment: '1'.
-    [ $x == $x ] assertWithComment: '2'.
-    [ $z  = $z ] assertWithComment: '3'.
+    [ 42 == 42 ] assertWithComment: 'small ints'.
+    [ $z  = $z ] assertWithComment: 'chars'.
+    [ 0  == -0 ] assertWithComment: 'zero -zero'.
+    [ ''  = '' ] assertWithComment: 'empty strings'.
+    [ ' ' = ' '] assertWithComment: 'non-emty strings'.
+    [ Array new = Array new ] assertWithComment: 'empty arrays'.
 !
 
 METHOD CompareTest
 less
     [ -1 < 0 ] assertWithComment: 'int int'.
     [ #2 < 3 ] assertWithComment: 'symbol int'.
+    [ '12' < '13' ] assertWithComment: 'strings'.
 !
 
 METHOD CompareTest
@@ -599,48 +648,95 @@ nilEqNil
     [ nil ] assertEq: nil
 !
 
+METHOD CompareTest
+min
+    [  1 min: 0  ] assertEq:  0 withComment: '1'.
+    [ -1 min: 0  ] assertEq: -1 withComment: '2'.
+    [' ' min: '' ] assertEq: '' withComment: '3'.
+!
 
-COMMENT              --------SmallIntTest----------
+
+COMMENT                                                                                                 --------SmallIntTest----------
 CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
-    [12 + 64] assertEq: 76
+    [ 12 + 64 ] assertEq: 76  withComment: '1'.
+    [ 0  + 0  ] assertEq: 0   withComment: '2'.
+    [ 0  + -0 ] assertEq: 0   withComment: '3'.
+    [-12 + -14] assertEq: -26 withComment: '4'.
+    [ 17 + -17] assertEq: 0   withComment: '5'.
 !
 
 METHOD SmallIntTest
 sub
-    [22 - 42 ] assertEq: -20
+    [22 - 42 ] assertEq: -20 withComment: '1'.
+    [0  - 0  ] assertEq: 0   withComment: '2'.
+    [0  - 1  ] assertEq: -1  withComment: '3'.
+    [1  - -41] assertEq: 42  withComment: '4'.
 !
 
 METHOD SmallIntTest
 div
-    [ 10 / 5 ] assertEq: 2
+    [ 10 / 5 ] assertEq: 2   withComment: '1'.
+    [ 11 / 5 ] assertEq: 2   withComment: '2'.
+    [ 1  / 0 ] assertEq: nil withComment: '3'.
+    [ 0  / 1 ] assertEq: 0   withComment: '4'.
 !
 
 METHOD SmallIntTest
 mul
-    [ 21 * 2 ] assertEq: 42
+    [ 21 * 2   ] assertEq: 42 withComment: '1'.
+    [ 0  * 42  ] assertEq: 0  withComment: '2'.
+    [ -1 * -17 ] assertEq: 17 withComment: '3'.
 !
 
 METHOD SmallIntTest
 negative
     [ -42 negative ] assertWithComment: '1'.
     [  42 negative ] assertEq: false withComment: '2'.
+    [ -0  negative ] assertEq: false withComment: '3'.
 !
 
 METHOD SmallIntTest
 negated
     [ -42 negated ] assertEq:  42 withComment: '1'.
     [  42 negated ] assertEq: -42 withComment: '2'.
+    [   0 negated printString ] assertEq: '0' withComment: '3'.
 !
 
 METHOD SmallIntTest
-quo
-    [ 5 / 2 ] assertEq: 2 withComment: '1'.
-    [ 200 / 1001 ] assertEq: 0 withComment: '2'.
+rem
+    [ 10 rem: 3  ] assertEq: 1  withComment: '1'.
+    [ 0  rem: 1  ] assertEq: 0  withComment: '2'.
+    [ 1  rem: 1  ] assertEq: 0  withComment: '3'.
+    [ 42 rem: 1  ] assertEq: 0  withComment: '4'.
+    [ 16 rem: 12 ] assertEq: 4  withComment: '5'.
+    [ 12 rem: 16 ] assertEq: 12 withComment: '6'.
+    [100 rem: 10 ] assertEq: 0  withComment: '7'.
 !
 
-COMMENT              --------BranchTest----------
+METHOD SmallIntTest
+abs
+    [  0 absolute ] assertEq: 0  withComment: '1'.
+    [  1 absolute ] assertEq: 1  withComment: '2'.
+    [ -1 absolute ] assertEq: 1  withComment: '3'.
+    [-42 absolute ] assertEq: 42 withComment: '4'.
+    [ 42 absolute ] assertEq: 42 withComment: '5'.
+!
+
+METHOD SmallIntTest
+asChar |testBlock|
+    testBlock <- [:x |
+        (x asChar) = (Char new: x)
+    ].
+    [ testBlock value: 0 ] assertWithComment: '1'.
+    [ testBlock value: 1 ] assertWithComment: '2'.
+    [ testBlock value: 2 ] assertWithComment: '3'.
+    [ testBlock value: 3 ] assertWithComment: '4'.
+    [ testBlock value: 4 ] assertWithComment: '5'.
+!
+
+COMMENT                                                                                                 --------BranchTest----------
 CLASS BranchTest Test
 
 METHOD BranchTest
@@ -658,28 +754,72 @@ ifFalse |x|
     [ x ] assertEq: 521
 !
 
-COMMENT              --------LoopTest----------
+METHOD BranchTest
+goto |x testBlock|
+    x <- SmallInt new.
+    testBlock <- [:val |
+        x <- val.
+        (x = 1) ifTrue: [ x <- 1 ].
+        (x = 2)
+            ifTrue:  [ x <- 2 ]
+            ifFalse: [ (x = 3)
+                        ifTrue: [ x <- 3 ]
+                        ifFalse: [x <- 4]
+                    ].
+    ].
+    
+    [ testBlock value: 0. x ] assertEq: 4 withComment: '1'.
+    [ testBlock value: 1. x ] assertEq: 4 withComment: '2'.
+    [ testBlock value: 2. x ] assertEq: 2 withComment: '3'.
+    [ testBlock value: 3. x ] assertEq: 3 withComment: '4'.
+    [ testBlock value: 4. x ] assertEq: 4 withComment: '5'.
+!
+
+COMMENT                                                                                                 --------LoopTest----------
 CLASS LoopTest Test
 
 METHOD LoopTest
 loopCount |count|
     count <- SmallInt new.
-    
+
     1 to: 151251 do: [:i| count <- count + 1 ]
-    
+
     [ count ] assertEq: 151251
 !
 
 METHOD LoopTest
 sum |result|
     result <- SmallInt new.
-    
+
     1 to: 100 do: [:i| result <- result + i ]
-    
+
     [ result ] assertEq: 5050
 !
 
-COMMENT              --------ClassTest----------
+CLASS MyArray Array
+
+METHOD MyArray
+location: value | low high mid |
+    low <- 1.
+    high <- self size + 1.
+    [ low < high ]
+        whileTrue: [
+            mid <- (low + high) quo: 2.
+            (self at: mid) < value
+                    ifTrue: [ low <- mid + 1 ]
+                    ifFalse: [ high <- mid ]
+        ].
+    ^ low
+!
+
+METHOD LoopTest
+symbolStressTest |x|
+    x <- MyArray new: 100.
+    100 times: [:idx| x at: idx put: (idx asString asSymbol) ]. "FIXME speedup"
+    [ x location: #0; ] assertEq: 0.
+!
+
+COMMENT                                                                                                ----------ClassTest--------
 CLASS ClassTest Test
 
 METHOD ClassTest
@@ -693,7 +833,18 @@ sendSuper
     [ Array super printString ] assertEq: 'Collection'
 !
 
-COMMENT              --------MethodLookupTest----------
+METHOD ClassTest
+isKindOf |kindOf|
+    [ 1 isKindOf: Object ] assertWithComment: '1'.
+    [ Class isKindOf: Object ] assertWithComment: '2'.
+    [ Object isKindOf: Class ] assertWithComment: '3'.
+    [ 1 isKindOf: Magnitude ] assertWithComment: '4'.
+    [ 'hello' isKindOf: Magnitude ] assertWithComment: '5'.
+    [ 'hello' isKindOf: Collection ] assertWithComment: '6'.
+    [ 'hello' isKindOf: Array ] assertWithComment: '7'.
+!
+
+COMMENT                                                                                                --------MethodLookupTest----
 CLASS MethodLookupTest Test
 
 METHOD MethodLookupTest
@@ -708,12 +859,12 @@ parentMethods
     [Dictionary respondsTo: #error: ] assertWithComment: '2'
 !
 
-COMMENT              --------StringTest----------
+COMMENT                                                                                                -----------StringTest--------
 CLASS StringTest Test
 
 METHOD StringTest
-plus
-    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: 'operator +. 1'.
+concat
+    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: '1'.
     [ 'b' + 'a' ] assertEq: 'ba' withComment: '2'.
     [ '' + 'asd' ] assertEq: 'asd' withComment: '3'.
     [ '12' + 'asd' ] assertEq: '12asd' withComment: '4'.
@@ -722,7 +873,6 @@ plus
     [ 'fox' + 'baz' + 'bar' ] assertEq: 'foxbazbar' withComment: '7'.
     [ 'fox' + 'baz' + 'bar' + 'bam' ] assertEq: 'foxbazbarbam' withComment: '8'.
     [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '9'.
-    
 !
 
 METHOD StringTest
@@ -732,17 +882,23 @@ asSymbol
 
 METHOD StringTest
 lowerCase
-    [ 'FoXBar' lowerCase ] assertEq: 'foxbar'
+    [ 'FoXBar' lowerCase ] assertEq: 'foxbar' withComment: 'non-empty'.
+    [ '' lowerCase ] assertEq: '' withComment: 'empty'.
 !
 
 METHOD StringTest
 asNumber
-    [ '42' asNumber ] assertEq: 42
+    [ '42'  asNumber ] assertEq: 42  withComment: 'only digits'.
+    [ ''    asNumber ] assertEq: 0   withComment: 'empty'. "FIXME is it okay?"
+    [ '0a'  asNumber ] assertEq: nil withComment: 'non-digit suffix'.
+    [ 'a0'  asNumber ] assertEq: nil withComment: 'non-digit prefix'.
+    [ '1 3' asNumber ] assertEq: nil withComment: 'splitted digits'.
 !
 
 METHOD StringTest
 copy
-    [ 'foobar' copy ] assertEq: 'foobar'
+    [ 'foobar' copy ] assertEq: 'foobar' withComment: 'non-empty'.
+    [ '' copy ] assertEq: '' withComment: 'empty'.
 !
 
 METHOD StringTest
@@ -757,13 +913,22 @@ at | str |
 !
 
 METHOD StringTest
-indexOf
-    [ 'foobar' indexOf: 'b' ] assertEq: 4
+indexOf |str|
+    str <- 'foobar'.
+    [ str indexOf: 'f' ] assertEq: 1 withComment: 'foobar(f)'.
+    [ str indexOf: 'o' ] assertEq: 2 withComment: 'o'.
+    [ str indexOf: 'b' ] assertEq: 4 withComment: 'b'.
+    [ str indexOf: 'a' ] assertEq: 5 withComment: 'a'.
+    [ str indexOf: 'r' ] assertEq: 6 withComment: 'r'.
 !
 
 METHOD StringTest
 reverse
-    [ 'reverse' reverse ] assertEq: 'esrever'
+    [ '' reverse ] assertEq: '' withComment: 'empty'.
+    [ 'x' reverse ] assertEq: 'x' withComment: '1 char'.
+    [ 'zy' reverse ] assertEq: 'yz' withComment: '2 chars'.
+    [ 'reverse' reverse ] assertEq: 'esrever' withComment: 'odd-char string'.
+    [ 'little smalltalk' reverse ] assertEq: 'klatllams elttil' withComment: 'even-char string'.
 !
 
 METHOD StringTest
@@ -774,7 +939,7 @@ size
     [ 'foo' + 'bar' + 'baz'; size ] assertEq: 9 withComment: '4'.
 !
 
-COMMENT              --------ArrayTest----------
+COMMENT                                                                                               --------ArrayTest----------
 CLASS ArrayTest Test arrOfInts arrOfChars
 
 METHOD ArrayTest
@@ -783,12 +948,11 @@ init
     1 to: 100 do: [:idx|
         arrOfInts at: idx put: idx
     ].
-    
+
     arrOfChars <- Array new: 257.
     1 to: 257 do: [:idx|
         arrOfChars at: idx put: (Char basicNew: idx-1)
     ].
-    
 !
 
 METHOD ArrayTest
@@ -804,7 +968,7 @@ atPut | tmpArr |
     [ tmpArr at: 6 ] assertEq: 37834.
 !
 
-COMMENT              --------GCTest----------
+COMMENT                                                                                                 ----------GCTest------------
 CLASS GCTest Test
 
 METHOD GCTest
@@ -814,61 +978,363 @@ copy |x|
     [ x ] assertEq: 'Hello world!'
 !
 
-METHOD Array
-replaceFrom: start to: stop with: replacement startingAt: repStart | base |
-       <38 start stop replacement repStart self>.
-       base <- repStart-1.
-       0 to: (stop - start) do: [:idx|
-               self at: (idx + start) put:
-                       (replacement at: (idx + repStart))
-       ]
+COMMENT                                                                                                 --------ContextTest----------
+CLASS ContextTest Test
+
+METHOD ContextTest
+backtrace
+    [ [] method name ] assertEq: 'backtrace' withComment: '1'.
+    [ [] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
 !
+
+METHOD ContextTest
+instanceClass
+    [ [] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
+!
+
+COMMENT                                                                                                 -------PrimitiveTest----------
+CLASS PrimitiveTest Test
+
+METHOD PrimitiveTest
+SmallIntAdd
+    [ <10 3 5> ] assertEq: 8.
+!
+
+METHOD PrimitiveTest
+SmallIntDiv
+    [ <11 51 5> ] assertEq: 10.
+!
+
+METHOD PrimitiveTest
+SmallIntMod
+    [ <12 8 3> ] assertEq: 2.
+!
+
+METHOD PrimitiveTest
+SmallIntLess
+    [ <13 -1 0> ] assert.
+!
+
+METHOD PrimitiveTest
+SmallIntEqual
+    [ <14 30 30> ] assert.
+!
+
+METHOD PrimitiveTest
+SmallIntMul
+    [ <15 8 6> ] assertEq: 48.
+!
+
+METHOD PrimitiveTest
+SmallIntSub
+    [ <16 3 5> ] assertEq: -2.
+!
+
+METHOD PrimitiveTest
+smallIntBitOr
+    [ <36 12 6> ] assertEq: 14.
+!
+
+METHOD PrimitiveTest
+smallIntBitAnd
+    [ <37 5 12> ] assertEq: 4.
+!
+
+METHOD PrimitiveTest
+smallIntShiftLeft
+    [ <39 5 3> ] assertEq: 40.
+!
+
+METHOD PrimitiveTest
+smallIntShiftRight
+    [ <39 234 -4> ] assertEq: 14.
+!
+
+METHOD PrimitiveTest
+objectSize
+    [ <4 1> ] assertEq: 0 withComment: 'SmallInt'.
+    [ <4 Char> ] assertEq: 7 withComment: 'Char'.
+    [ <4 Object> ] assertEq: 6 withComment: 'Object'.
+!
+
+METHOD PrimitiveTest
+objectsAreEqual |x|
+    x <- Array with: 'a' with: 42.
+    [ <1 x x> ] assertWithComment: '1'.
+
+    [ <1 $z $z> ] assertEq: false withComment: '2'.
+!
+
+METHOD PrimitiveTest
+objectClass
+    [ [[[<2 1>] value] value] value printString ] assertEq: 'SmallInt' withComment: 'SmallInt'.
+    [ [[[<2 Object>] value] value] value printString ] assertEq: 'MetaObject' withComment: 'Object'.
+!
+
+METHOD PrimitiveTest
+bulkReplace
+    [ <38 1 7 'Hello W' 1 'hello world!'> ] assertEq: 'Hello World!'.
+!
+
+
 
 METHOD Undefined
 printHierarchy: aClass | class |
     class <- aClass.
-    [ class isNil ] whileFalse: [ class printNl. class <- class parent ] 
+    [ class isNil ] whileFalse: [ class printNl. class <- class parent ]
+!
+
+CLASS Timer Object initValue
+METHOD MetaTimer
+get
+    <253>
+!
+
+METHOD MetaTimer
+new | instance |
+    instance <- super new.
+    self in: instance at: 1 put: self get.
+    ^instance
+!
+
+METHOD MetaTimer
+millisecondsToRun: aBlock | timer |
+    timer <- Timer new.
+    aBlock value.
+    ^timer value.
+!
+
+METHOD Timer
+initValue
+    ^initValue
+!
+
+METHOD Timer
+value
+    ^ self class get - initValue
 !
 
 METHOD Undefined
-main    | command x |
-        " initialize classes "
-        
-        Char initialize.
-        
-        "100 times: [ self printHierarchy: Array ].
-        ^nil.
-        
-        ^nil.
-        [ x ] assertEq: 'Hello world!' withComment: 'copy'.
-        
-        'String' class printNl.
+benchmark: size | list ms |
+    list <- List new.
+    1 to: size do: [ :x | list add: 1000 atRandom ].
+    ms <- Timer millisecondsToRun: [ list <- list sort. ].
+    'Sorted in ms: ' print. ms printNl.
+    list printNl.
+!
 
-        [ 1 ] assertEq: 1 withComment: 'test'.
+METHOD Undefined
+benchmark2: random | dict ms |
+    dict <- Dictionary new.
+    ms <- Timer millisecondsToRun: [
+    random
+        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
+        ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
+    dict printNl. 'size ' print. dict size printNl.
+    ms printNl
+!
 
-        
-        (Array with: 1 with: 2) + (Array with: 1 with: 2)."
-        
-        "1 to: 1000 do: [ 'Array allMethods' doIt ]."
-        
-        CompareTest      new runAll.
-        SmallIntTest     new runAll.
-       " LoopTest         new runAll."
-        ClassTest        new runAll.
-        MethodLookupTest new runAll.
-        StringTest       new runAll.
-        ArrayTest        new runAll.
-        GCTest           new runAll.
-        
-        "'Array with: 1' doIt printNl."
-        
-        " main execution loop "
-        [ '-> ' print. command <- String input. command notNil ]
-                whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ]
-        
-        
-        ^nil.                  
+METHOD Undefined
+benchmark3: count | ms |
+    ms <- Timer millisecondsToRun: [ Number primes: count ].
+    'Found in ms: ' print. ms printNl.
+!
+
+METHOD Number
+isPrime
+        ((self rem: 2) = 0) ifTrue: [ ^ false ].
+        (3 to: (self quo: 2) by: 2) do: [:cand|
+                ((self rem: cand) = 0) ifTrue: [ ^ false ]
+        ].
+        ^ true
+!
+
+METHOD MetaNumber
+primes: n | cand count |
+        2 print.
+        cand <- 3.
+        count <- 0.
+        [count < n] whileTrue: [
+                [cand isPrime not] whileTrue: [
+                        cand <- cand + 2
+                ].
+                ' ' print. cand print.
+                count <- count + 1.
+                cand <- cand + 2
+        ].
+        Char newline print
+!
+
+METHOD MetaLLVM
+sendMessage: aSelector withArguments: arguments
+    "calling context will be taken from VM"
+    <252 aSelector arguments>
+!
+
+METHOD MetaLLVM
+do: aBlock
+    self sendMessage: #value withArguments: (Array with: aBlock).
+!
+
+CLASS StatementsTest Test
+
+METHOD StatementsTest
+reservedNames |res|
+    res <- Array new: 5.
+    res at: 1 put: ('doBlockReturn:' asSymbol).
+    res at: 2 put: ('doRethrow:' asSymbol).
+    res at: 3 put: #returnFortyTwoByBlockReturn.
+    res at: 4 put: #customSize.
+    res at: 5 put: #doTempAssignInBlock.
+    ^res
+!
+
+METHOD StatementsTest
+doBlockReturn: x |block|
+    "This method returns x with blockReturn opcode"
+    block <- [
+        (x = 4) ifTrue: [ ^x ].
+        (x = 5) ifTrue: [ ^x ].
+    ].
+     
+    [true] ifTrue: [ ^block value ].
+!
+
+
+METHOD StatementsTest
+doRethrow: blockSurelyThrows |blockThatCanThrow|
+    "In LLVM blockReturn opcode is implemented as an exception with 2 fields: the creatin context and the value that we need to return from the block.
+    While compiling methods we scan blocks on blockReturn opcode.
+    If we find it, we replace each 'call @sendMessage' with invoke instruction
+    When we catch exception we check whether the context of exception and the context of current method are equal.
+    If they are, we do 'ret' from current function, if not, we rethrow exception"
+    
+    "That line forces JIT to create 'invoke' instead of 'call' :" 
+    blockThatCanThrow <- [ ^1234567 ].
+    
+    "We are invoking block that has a blockReturn opcode. The exception must be rethrown because 'blockSurelyThrows' is not created in the current method"
+    blockSurelyThrows value.
+    
+    "In LLVM IR exception must be rethrown so ^nil must not be executed"
+     
+    ^nil.
+!
+
+METHOD StatementsTest
+returnFortyTwoByBlockReturn
+     self doRethrow: [ ^42 ].
+!
+
+METHOD StatementsTest
+blockReturn |x|
+    x <- self doBlockReturn: 4.
+    [ x ] assertEq: 4  withComment: 'simple 1'.
+    
+    x <- self doBlockReturn: 5.
+    [ x ] assertEq: 5  withComment: 'simple 2'.
+    
+    x <- self returnFortyTwoByBlockReturn.
+    [ x ] assertEq: 42 withComment: 'rethrow'.
+!
+
+METHOD StatementsTest
+doTempAssignInBlock | block a b |
+    block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
+    block value: 1 value: 2.
+
+    (((a = 2) and: [ b = 4 ]) and: [ a < b ])
+        ifTrue:  [ ^ 42]
+        ifFalse: [ ^ 666]
+!
+
+METHOD StatementsTest
+tempAssignInBlock |x|
+    x <- self doTempAssignInBlock.
+    [ x ] assertEq: 42.
+!
+
+METHOD StatementsTest
+pushConstants |testBlock|
+    ['0' asNumber ] assertEq: 0 withComment: '0'.
+    ['1' asNumber ] assertEq: 1 withComment: '1'.
+    ['2' asNumber ] assertEq: 2 withComment: '2'.
+    ['3' asNumber ] assertEq: 3 withComment: '3'.
+    ['4' asNumber ] assertEq: 4 withComment: '4'.
+    ['5' asNumber ] assertEq: 5 withComment: '5'.
+    ['6' asNumber ] assertEq: 6 withComment: '6'.
+    ['7' asNumber ] assertEq: 7 withComment: '7'.
+    ['8' asNumber ] assertEq: 8 withComment: '8'.
+    ['9' asNumber ] assertEq: 9 withComment: '9'.
+!
+
+METHOD Undefined
+sortTest | list |
+    list <- List new.
+    1 to: 100 do: [ :x | list add: 1000 atRandom ].
+    list <- list sort. 
+    ^list
+
+    "x <- '#(2 7 4 5 2 0 9 1 4 7 3)' doIt.
+    ^x sort."
+!
+
+METHOD Undefined
+sortTest2: aList
+    ^ aList sort
+!
+
+METHOD Class "TODO for tests only"
+name
+    ^name.
+!
+
+METHOD MetaLLVMTest
+runAllFrom: testSuite | suite |
+    suite <- testSuite new.
+    LLVM sendMessage: #runAll withArguments: (Array with: suite).
+!
+
+METHOD Undefined
+runSort: size | x1 list ms1 selector args1 block1 |
+        list <- List new.
+        1 to: size do: [ :x | list add: 1000000 atRandom ].
+
+        selector <- ('sortTest2:' asSymbol).
+        args1 <- Array with: nil with: list.
+
+        System collectGarbage.
+        ms1 <- Timer millisecondsToRun: [ LLVM sendMessage: selector withArguments: args1 ].
+
+        'Sorted in ms: ' print. ms1 printNl.
+!
+
+METHOD Undefined
+main    | command  x|
+    " initialize classes "
+    
+    Char initialize.
+    
+    "CompareTest new runAll.
+    StringTest new runAll.
+    LoopTest new runAll.
+    SmallIntTest new runAll."
+    
+    LLVM do: [
+        10 times: [:i|
+            CompareTest new runAll.
+            StringTest new runAll.
+            LoopTest new runAll.
+            SmallIntTest new runAll.
+            GCTest new runAll.
+        ].
+    ].
+    
+    " main execution loop  "
+    [ '-> ' print. command <- String input. command notNil ]
+            whileTrue: [ command isEmpty
+                ifFalse: [ command doIt printNl ] ]
+    
+    ^nil.
 !
 
 
@@ -1033,19 +1499,19 @@ argCount
 METHOD Block
 value
 	" start block execution "
-	<8 self>
+	<8 self>.
 	(self argCount)
 !
 METHOD Block
 value: a
 	" start block execution "
-	<8 a self>
+	<8 a self>.
 	(self argCount)
 !
 METHOD Block
 value: a value: b
 	" start block execution "
-	<8 a b self>
+	<8 a b self>.
 	(self argCount)
 !
 METHOD Block
@@ -1403,13 +1869,79 @@ reject: testBlock
 		" select the things that do not match predicate "
 	^ self select: [:x | (testBlock value: x) not ]
 !
+
+METHOD Collection
+sort
+    ^ self sort: [ :x :y | x < y ]
+!
+
+METHOD List
+insert: aValue onCondition: aBlock
+    | link current newLink next |
+    
+    (self isEmpty) ifTrue: [ ^self add: aValue ].
+    
+    link <- elements.
+    [link notNil] whileTrue: [ 
+        current <- link value.
+        (aBlock value: aValue value: current)
+            ifTrue: [ 
+                newLink <- Link value: current next: link next.
+                link value: aValue next: newLink. 
+                
+                ^aValue 
+            ].
+        
+        next <- link next.
+        next isNil ifTrue: [ 
+            link next: (Link value: aValue next: nil).
+            ^aValue.
+        ] 
+        link <- next.
+    ]
+!
+
+METHOD Collection
+insertSort: criteria | result |
+    (self isEmpty) ifTrue: [^self].
+    
+    result <- List new.
+    self do: [ :x | result insert: x onCondition: criteria. "result printNl." ].
+    
+    ^result
+!
+
+METHOD Collection
+sort: criteria | left right mediane |
+    "(self isEmpty) ifTrue: [^self]."
+    (self size < 30) 
+        ifTrue: [ ^ self insertSort: criteria ].
+
+    mediane <- self popFirst.
+    
+    left  <- List new.
+    right <- List new.
+    self do: [ :x |
+        (criteria value: x value: mediane)
+            ifTrue:  [ left  add: x ]
+            ifFalse: [ right add: x ] ].
+
+    left  <- left  sort: criteria.
+    right <- right sort: criteria.
+
+    "left print. $| print. mediane print. $| print. right printNl."
+    
+    right add: mediane.
+    ^ left appendList: right
+!
+
 METHOD Collection
 printString | count res |
 	res <- super printString.
 	(self respondsTo: #do:) ifFalse: [ ^ res ].
 	count <- 0.
 	res <- res + ' ('.
-	self basicDo: [:elem| 
+	self basicDo: [:elem|
 		(count = 0) ifFalse: [ res <- res + ' ' ].
 		res <- res + elem printString.
 		count <- count + 1.
@@ -1476,13 +2008,13 @@ badIndex: index
 !
 METHOD Array
 at: index
-	<24 self index>
+	<24 self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD Array
 at: index ifAbsent: exceptionBlock
-	<24 self index>
+	<24 self index>.
 	exceptionBlock value
 !
 METHOD Array
@@ -1542,7 +2074,7 @@ size
 !
 METHOD Array
 at: index put: value
-	<5 value self index>
+	<5 value self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
@@ -1576,8 +2108,11 @@ insert: value at: position | newArray newSize |
 	newArray <- self class new: newSize.
 	newArray replaceFrom: 1 to: position-1 with: self.
 	newArray at: position put: value.
-	newArray replaceFrom: position+1 to: newSize with:
-		self startingAt: position.
+	newArray
+        replaceFrom: position+1
+        to: newSize
+        with: self
+        startingAt: position.
 	^ newArray
 !
 METHOD Array
@@ -1622,8 +2157,20 @@ METHOD Array
 replaceFrom: start to: stop with: replacement
 	^ self replaceFrom: start to: stop with: replacement startingAt: 1
 !
+METHOD Array
+sort: aBlock
+    ^ (super asList sort: aBlock) asArray
+!
 
-COMMENT FIXME insert replaceFrom:..... here
+METHOD Array
+replaceFrom: start to: stop with: replacement startingAt: repStart | base |
+	<38 start stop replacement repStart self>.
+	base <- repStart-1.
+	0 to: (stop - start) do: [:idx|
+		self at: (idx + start) put:
+		(replacement at: (idx + repStart))
+	]
+!
 
 COMMENT ---------- OrderedArray ------------
 METHOD OrderedArray
@@ -1642,7 +2189,7 @@ location: value | low high mid |
 	[ low < high ] whileTrue:
 		[ mid <- (low + high) quo: 2.
 		(self at: mid) < value
-			ifTrue: [ low <- mid + 1 ]
+			ifTrue:  [ low  <- mid + 1 ]
 			ifFalse: [ high <- mid ] ].
 	^ low
 !
@@ -1653,23 +2200,23 @@ new: size
 !
 METHOD ByteArray
 basicAt: index
-	<21 self index>
+	<21 self index>.
 	^nil
 !
 METHOD ByteArray
 at: index
-	<21 self index>
+	<21 self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
 METHOD ByteArray
 at: index ifAbsent: exceptionBlock
-	<21 self index>
+	<21 self index>.
 	exceptionBlock value
 !
 METHOD ByteArray
 at: index put: aValue
-	<22 aValue self index>
+	<22 aValue self index>.
 	(self includesKey: index) ifFalse: [ self badIndex: index ].
 	self primitiveFailed
 !
@@ -1723,6 +2270,10 @@ break: separators  | words word |
 	^ words
 !
 METHOD String
+words
+    ^self break: ' '
+!
+METHOD String
 collect: transformationBlock
 	^ (super collect: transformationBlock) asString
 !
@@ -1769,7 +2320,7 @@ doIt	| meth |
 !
 METHOD String
 basicAt: index
-	<21 self index>
+	<21 self index>.
 	^nil
 !
 METHOD String
@@ -1785,7 +2336,7 @@ at: index ifAbsent: exceptionBlock | c |
 !
 METHOD String
 basicAt: index put: value
-	<22 value self index>
+	<22 value self index>.
 	^nil
 !
 METHOD String
@@ -1847,6 +2398,12 @@ indexOf: val | c s |
 !
 COMMENT --------- List -----------
 METHOD MetaList
+new | instance |
+    instance <- super new.
+    self in: instance at: 2 put: 0. "set size to 0"
+    ^instance
+!
+METHOD MetaList
 with: elemA	| newList |
 	newList <- self new.
 	newList add: elemA.
@@ -1865,19 +2422,44 @@ with: elemA with: elemB with: elemC	| newList |
 	^ newList
 !
 METHOD List
+size
+    ^size
+!
+METHOD List
 add: anElement
 	elements <- Link value: anElement next: elements.
+	size <- size + 1.
 	^ anElement
 !
 METHOD List
 addLast: anElement
 	elements isNil
 		ifTrue: [ self add: anElement]
-		ifFalse: [ elements addLast: anElement ].
+		ifFalse: [ elements addLast: anElement. size <- size + 1 ].
 	^ anElement
 !
 METHOD List
+firstLink
+    ^elements
+!
+METHOD List
+appendList: aList | element |
+    (elements isNil) ifTrue: [ 
+        elements <- aList firstLink. 
+        size <- aList size.
+        ^self 
+    ].
+
+    element <- elements.
+    [element next isNil]
+        whileFalse: [element <- element next].
+    element next: aList firstLink.
+    size <- size + aList size.
+    ^self
+!
+METHOD List
 addAll: aCollection
+    "self appendList: aCollection asList."
 	aCollection do: [ :element | self addLast: element ]
 !
 METHOD List
@@ -1936,7 +2518,17 @@ METHOD List
 removeFirst
 	elements isNil
 		ifTrue: [ self emptyCollection ]
-		ifFalse: [ elements <- elements next ]
+		ifFalse: [ elements <- elements next. size <- size - 1. ]
+!
+METHOD List
+popFirst | value |
+    elements isNil
+        ifTrue: [ ^nil ]
+        ifFalse: [
+            value <- elements value.
+            elements <- elements next.
+            size <- size - 1.
+            ^value ]
 !
 METHOD List
 remove: anElement
@@ -1952,11 +2544,12 @@ reverse | newList |
 METHOD List
 remove: anElement ifAbsent: exceptionBlock
 	elements isNil
-		ifTrue: [ exceptionBlock value ]
-		ifFalse: [ elements remove: anElement ifAbsent: exceptionBlock ]
+		ifTrue: [ exceptionBlock value. ^self ]
+		ifFalse: [ elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
+    size <- size - 1.
 !
 METHOD List
-do: aBlock
+do: aBlock | link |
 	^ elements notNil ifTrue: [ elements do: aBlock ]
 !
 METHOD List
@@ -2050,7 +2643,7 @@ METHOD Dictionary
 printString | count res |
 	res <- self class printString + ' ('.
 	count <- 0.
-	self binaryDo: [:k :elem| 
+	self binaryDo: [:k :elem|
 		(count = 0) ifFalse: [ res <- res + ', ' ].
 		res <- res + (k printString + ' -> ' + elem printString).
 		count <- count + 1.
@@ -2344,21 +2937,21 @@ asInteger
 !
 METHOD SmallInt
 quo: arg
-	<11 self arg>
+	<11 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self quo: arg asSmallInt].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD SmallInt
 rem: arg
-	<12 self arg>
+	<12 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self rem: arg asSmallInt].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD SmallInt
 + arg
-	<10 self arg>
+	<10 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self + arg asSmallInt].
 	self primitiveFailed
 !
@@ -2368,25 +2961,25 @@ METHOD SmallInt
 !
 METHOD SmallInt
 * arg
-	<15 self arg>
+	<15 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self * arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 - arg
-	<16 self arg>
+	<16 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self - arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 < arg
-	<13 self arg>
+	<13 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self < arg asSmallInt].
 	self primitiveFailed
 !
 METHOD SmallInt
 = arg
-	<14 self arg>
+	<14 self arg>.
 	(arg isMemberOf: SmallInt) ifFalse: [^self = arg asSmallInt].
 	self primitiveFailed
 !
@@ -2415,7 +3008,7 @@ METHOD MetaInteger
 new: low
 	<32 low>
 	low <- low asSmallInt.
-	<32 low>
+	<32 low>.
 	self primitiveFailed
 !
 METHOD Integer
@@ -2439,45 +3032,45 @@ hash
 !
 METHOD Integer
 quo: arg
-	<25 self arg>
+	<25 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self quo: arg asInteger].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD Integer
 rem: arg
-	<26 self arg>
+	<26 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self rem: arg asInteger].
 	(0 = arg) ifTrue: [^ self error: 'division by zero'].
 	self primitiveFailed
 !
 METHOD Integer
 + arg
-	<27 self arg>
+	<27 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self + arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 * arg
-	<28 self arg>
+	<28 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self * arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 - arg
-	<29 self arg>
+	<29 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self - arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 < arg
-	<30 self arg>
+	<30 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self < arg asInteger].
 	self primitiveFailed
 !
 METHOD Integer
 = arg
-	<31 self arg>
+	<31 self arg>.
 	(arg isMemberOf: Integer) ifFalse: [^self = arg asInteger].
 	self primitiveFailed
 !
@@ -2637,9 +3230,22 @@ next
 	^ next
 !
 METHOD Link
-do: aBlock
-	aBlock value: value.
-	next notNil ifTrue: [ ^ next do: aBlock ]
+value: aValue next: aLink
+    value <- aValue.
+    next  <- aLink
+!
+METHOD Link
+next: aLink
+    next <- aLink
+!
+METHOD Link
+do: aBlock | link |
+    link <- self.
+    [link notNil] whileTrue: 
+        [ aBlock value: link value. link <- link next ] 
+
+	"aBlock value: value.
+	next notNil ifTrue: [ ^ next do: aBlock ]"
 !
 METHOD Link
 remove: anElement ifAbsent: exceptionBlock
@@ -3028,7 +3634,7 @@ nextChar
 	^self currentChar
 !
 METHOD Parser
-nextLex	
+nextLex
 	self skipBlanks.
 	tokenType <- self currentChar.
 	tokenType isEOF   " end of input "
@@ -3447,8 +4053,8 @@ value: v
 METHOD LiteralNode
 compile: encoder block: inBlock
 	super compile: encoder.
-	value == nil ifTrue: [ ^ encoder genHigh: 5 low: 10 ].
-	value == true ifTrue: [ ^ encoder genHigh: 5 low: 11 ].
+	value == nil   ifTrue: [ ^ encoder genHigh: 5 low: 10 ].
+	value == true  ifTrue: [ ^ encoder genHigh: 5 low: 11 ].
 	value == false ifTrue: [ ^ encoder genHigh: 5 low: 12 ].
 	(((value class == SmallInt) and:
 	 [value < 10]) and: [value negative not])
@@ -3961,6 +4567,11 @@ COMMENT --------- System ----------
 METHOD MetaSystem
 name
   ^<109>
+!
+METHOD MetaSystem
+collectGarbage
+    <254>
+    self primitiveFailed
 !
 METHOD MetaSystem
 isWindows
