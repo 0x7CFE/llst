@@ -347,6 +347,15 @@ Value* MethodCompiler::TJITContext::getSelf()
 
 bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
 {
+    // This pass is used to find out whether method code contains block return instruction.
+    // This instruction is handled in a very different way than the usual opcodes. 
+    // Thus requires special handling. Block return is done by trowing an exception out of
+    // the block containing it. Then it's catched by the method's code to perform a return.
+    // In order not to bloat the code with unused try-catch code we're previously scanning
+    // the method's code to ensure that try-catch is really needed. If it is not, we simply
+    // skip its generation. Note that we need to scan not only the actual method code but 
+    // also every nested block, because typically block return is located there.
+    
     uint32_t previousBytePointer = jit.bytePointer;
     
     TByteObject& byteCodes   = * jit.method->byteCodes;

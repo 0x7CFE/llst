@@ -158,12 +158,29 @@ struct TBaseFunctions {
     }
 };
 
+// Value stack is used as a FIFO value holder during the compilation process.
+// Software VM uses object arrays to hold the values in dynamic.
+// Instead we're interpriting the push, pop and assign instructions
+// as a commands which values should be linked together. For example,
+// two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
+// will be linked together with effect of instanceVariables[2] = temporaries[1]
+//
+// TStackValue is a base class for stack values. Descendant value may contain either
+// raw value or a deferred command to be done when evaluation takes place.
+// Use get() method to get the stored value.
+// 
+// NOTE: Depending on the actual implementation, invoking method get() may result in
+//       a code generation. This should be done in a known context.
+//       
+// See also: TPlainValue and TDeferredValue
 class TStackValue {
 public:
     virtual ~TStackValue() { }
     virtual llvm::Value* get() = 0;
 };
 
+// TPlainValue represents simple llvm::Value* holder which does not 
+// perform any additional actions when get() is called. Only stored value is returned.
 class TPlainValue : public TStackValue {
 private:
     llvm::Value* m_value;
@@ -209,13 +226,6 @@ public:
 
         typedef std::map<llvm::BasicBlock*, TBasicBlockContext> TBlockContextMap;
         TBlockContextMap basicBlockContexts;
-
-        // Value stack is used as a FIFO value holder during the compilation process.
-        // Software VM uses object arrays to hold the values in dynamic.
-        // Instead we're interpriting the push, pop and assign instructions
-        // as a commands which values should be linked together. For example,
-        // two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
-        // will be linked together with effect of instanceVariables[2] = temporaries[1]
 
         MethodCompiler* compiler; // link to outer class for variable access
         bool hasValue();
@@ -326,6 +336,9 @@ public:
     }
 };
 
+// TDeferredValue is used in cases when some particular actions should be done 
+// when get() method is invoked. Typically this is used to pass an llvm Value*
+// to the later code ensuring that it will not be broken by a garbage collection.
 class TDeferredValue : public TStackValue {
 public:
     enum TOperation {
