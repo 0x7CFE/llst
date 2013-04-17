@@ -37,6 +37,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/time.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #include <jit.h>
 
@@ -717,7 +719,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
             // Debug break
             // Leave the context alone
             break;
-        
+            
         case primitive::throwError: // 19
             fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
             return returnError;
@@ -790,6 +792,32 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 printf("error caught\n");
                 exit(1);
             }
+        } break;
+        
+        case 251: {
+            // TODO Unicode support
+            
+            TString* prompt = (TString*) stack[--ec.stackTop];
+            std::string strPrompt((const char*)prompt->getBytes(), prompt->getSize());
+            
+            char* input = readline(strPrompt.c_str());
+            if (input) {
+                uint32_t inputSize = strlen(input);
+                
+                if (inputSize > 0) {
+                    add_history(input);
+                    
+                    TString* result = (TString*) newBinaryObject(globals.stringClass, inputSize);
+                    memcpy(result->getBytes(), input, inputSize);
+                    
+                    free(input);
+                    return result;
+                }
+                
+                free(input);
+                return globals.nilObject;
+            } else
+                return globals.nilObject;
         } break;
         
         case primitive::objectsAreEqual: { // 1

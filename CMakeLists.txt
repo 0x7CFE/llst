@@ -32,6 +32,6 @@ include_directories(include)
 file(GLOB CPP_FILES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "src/*.cpp")
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} -ldl -lpthread)
+target_link_libraries(llst ${LLVM_LIBS} -ldl -lpthread -lreadline)
 set_target_properties(llst PROPERTIES COMPILE_FLAGS "${COMPILER_FLAGS}")
 set_target_properties(llst PROPERTIES LINK_FLAGS "${LINKER_FLAGS}")

@@ -1319,7 +1319,7 @@ main    | command  x|
     LoopTest new runAll.
     SmallIntTest new runAll."
     
-    LLVM do: [
+    "LLVM do: [
         10 times: [:i|
             CompareTest new runAll.
             StringTest new runAll.
@@ -1327,12 +1327,15 @@ main    | command  x|
             SmallIntTest new runAll.
             GCTest new runAll.
         ].
-    ].
+    ]."
     
     " main execution loop  "
-    [ '-> ' print. command <- String input. command notNil ]
-            whileTrue: [ command isEmpty
-                ifFalse: [ command doIt printNl ] ]
+    [ true ] whileTrue: [
+        command <- String readline: '->'.
+        command = 'exit' ifTrue: [ ^ nil ].
+        
+        command notNil ifTrue: [ command doIt printNl ].
+    ]
     
     ^nil.
 !
@@ -2231,6 +2234,10 @@ COMMENT ---------- Strings ------------
 METHOD MetaString
 new: size
 	<20 self size>
+!
+METHOD MetaString 
+readline: prompt
+    ^<251 prompt>
 !
 METHOD MetaString
 input	| value c nl |
