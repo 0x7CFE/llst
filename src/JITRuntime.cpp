@@ -293,7 +293,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         // Checking whether we found a method
         if (method == 0) {
             // Oops. Method was not found. In this case we should send #doesNotUnderstand: message to the receiver
-            m_softVM->setupVarsForDoesNotUnderstand(method, messageArguments, /*receiver*/ messageArguments[0], message, receiverClass);
+            m_softVM->setupVarsForDoesNotUnderstand(method, messageArguments, message, receiverClass);
             // Continuing the execution just as if #doesNotUnderstand: was the actual selector that we wanted to call
         }
         

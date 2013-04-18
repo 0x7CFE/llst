@@ -386,7 +386,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     // Checking whether we found a method
     if (receiverMethod == 0) {
         // Oops. Method was not found. In this case we should send #doesNotUnderstand: message to the receiver
-        setupVarsForDoesNotUnderstand(receiverMethod, messageArguments, /*receiver*/ messageArguments[0], selector, receiverClass);
+        setupVarsForDoesNotUnderstand(receiverMethod, messageArguments, selector, receiverClass);
         // Continuing the execution just as if #doesNotUnderstand: was the actual selector that we wanted to call
     }
     
@@ -435,7 +435,7 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     m_messagesSent++;
 }
 
-void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObjectArray>& arguments, TObject* receiver, TSymbol* selector, TClass* receiverClass) {
+void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObjectArray>& arguments, TSymbol* selector, TClass* receiverClass) {
         // Looking up the #doesNotUnderstand: method:
         method = newPointer(lookupMethod(globals.badMethodSymbol, receiverClass));
         if (method == 0) {
@@ -447,14 +447,13 @@ void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObj
         
         // Protecting the selector pointer because it may be invalidated later
         hptr<TSymbol> failedSelector = newPointer(selector);
-        hptr<TObject> pReciever      = newPointer(receiver);
         
         // We're replacing the original call arguments with custom one
         hptr<TObjectArray> errorArguments = newObject<TObjectArray>(2);
 
         // Filling in the failed call context information
-        errorArguments[0] = pReciever; // receiver object
-        errorArguments[1] = failedSelector;      // message selector that failed
+        errorArguments[0] = arguments[0];   // receiver object
+        errorArguments[1] = failedSelector; // message selector that failed
 
         // Replacing the arguments with newly created one
         arguments = errorArguments;
