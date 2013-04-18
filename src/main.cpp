@@ -39,6 +39,8 @@
 #include <vm.h>
 #include <jit.h>
 
+#include <trie.h>
+
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
     memoryManager->initializeHeap(65536, 1048576 * 100);
@@ -50,6 +52,51 @@ int main(int argc, char **argv) {
         testImage->loadImage("../image/testImage");
 
     SmalltalkVM vm(testImage.get(), memoryManager.get());
+    
+    
+    rtv::Trie<char, std::string> trie('\0');
+    TDictionary* globalObjects = globals.globalsObject;
+    TObject* metaClass = globalObjects->find("MetaClass");
+    trie.insert("Object", std::string());
+    
+    for (uint32_t i = 0; i < globalObjects->keys->getSize(); i++) {
+        TSymbol* key   = (*globalObjects->keys)[i];
+        TObject* value = (*globalObjects->values)[i];
+        
+        std::string keyString = key->toString();
+        printf("key '%s' class '%s'\n", keyString.c_str(), value->getClass()->name->toString().c_str());
+        
+        char firstLetter = keyString[0];
+        if ( (keyString != "Smalltalk") && (firstLetter >= 'A') && (firstLetter <= 'Z') ) {
+            printf("ok\n");
+            
+            TClass* currentClass = (TClass*) value;
+            TDictionary* methods = currentClass->methods;
+            const uint32_t keysSize = methods->keys->getSize();
+            
+            // Inserting class name to the trie
+            trie.insert(currentClass->name->toString().c_str(), std::string());
+            
+            for ( uint32_t methodIndex = 0; methodIndex < keysSize; methodIndex++) {
+                const std::string methodName = (*methods->keys)[methodIndex]->toString();
+                printf("method: '%s'\n", methodName.c_str());
+                
+                if (trie.find(methodName.c_str()) == trie.end()) {
+                    printf("inserting: '%s'\n", methodName.c_str());
+                    
+                    // Inserting method name to the trie
+                    trie.insert(methodName.c_str(), std::string());
+                }
+            }
+        }
+    }
+
+    // should return classes starting with 'Co' like Collection, Context, etc.
+    rtv::Trie<char, std::string>::Iterator iTrie = trie.startsWith("Co");
+    while (iTrie != trie.end()) {
+        printf("found: '%s'\n", iTrie->first);
+        ++iTrie;
+    }
     
     JITRuntime runtime;
 
