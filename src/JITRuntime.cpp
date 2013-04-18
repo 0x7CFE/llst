@@ -399,42 +399,26 @@ void JITRuntime::initializePassManager() {
     // Start with registering info about how the
     // target lays out data structures.
     m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
-    
-    // Basic AliasAnslysis support for GVN.
     m_functionPassManager->add(createBasicAliasAnalysisPass());
-    
-    // Promote allocas to registers.
     m_functionPassManager->add(createPromoteMemoryToRegisterPass());
-
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
     m_functionPassManager->add(createInstructionCombiningPass());
-
-    // Reassociate expressions.
     m_functionPassManager->add(createReassociatePass());
-
-    // Eliminate Common SubExpressions.
     m_functionPassManager->add(createGVNPass());
-
     m_functionPassManager->add(createAggressiveDCEPass());
-    
     m_functionPassManager->add(createTailCallEliminationPass());
-    
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
     m_functionPassManager->add(createCFGSimplificationPass());
-    
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     m_functionPassManager->add(createLLSTPass());
     //If llstPass removed GC roots, we may try DCE again
-    
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     //m_functionPassManager->add(createLLSTDebuggingPass());
+    m_functionPassManager->doInitialization();
     
     m_modulePassManager->add(createFunctionInliningPass());
-    m_functionPassManager->doInitialization();
 }
 
 void JITRuntime::initializeRuntimeAPI() {
@@ -465,17 +449,14 @@ void JITRuntime::initializeRuntimeAPI() {
 }
 
 void JITRuntime::initializeExceptionAPI() {
-    LLVMContext& Context = getGlobalContext();
-    Type* Int32Ty        = Type::getInt32Ty(Context);
-    Type* Int8PtrTy      = Type::getInt8PtrTy(Context);
-    Type* VoidTy         = Type::getVoidTy(Context);
-    Type* throwParams[] = { Int8PtrTy, Int8PtrTy, Int8PtrTy };
+    m_exceptionAPI.gcc_personality = m_JITModule->getFunction("__gcc_personality_v0");
+    m_exceptionAPI.cxa_begin_catch = m_JITModule->getFunction("__cxa_begin_catch");
+    m_exceptionAPI.cxa_end_catch   = m_JITModule->getFunction("__cxa_end_catch");
+    m_exceptionAPI.cxa_allocate_exception = m_JITModule->getFunction("__cxa_allocate_exception");
+    m_exceptionAPI.cxa_throw       = m_JITModule->getFunction("__cxa_throw");
     
-    m_exceptionAPI.gcc_personality = Function::Create(FunctionType::get(Int32Ty, true), Function::ExternalLinkage, "__gcc_personality_v0", m_JITModule);
-    m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Int8PtrTy, Int8PtrTy, false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
-    m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
-    m_exceptionAPI.cxa_allocate_exception = Function::Create(FunctionType::get(Int8PtrTy, Int32Ty, false), Function::ExternalLinkage, "__cxa_allocate_exception", m_JITModule);
-    m_exceptionAPI.cxa_throw       = Function::Create(FunctionType::get(VoidTy, throwParams, false), Function::ExternalLinkage, "__cxa_throw", m_JITModule);
+    LLVMContext& Context = m_JITModule->getContext();
+    Type* Int8PtrTy      = Type::getInt8PtrTy(Context);
     
     m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Int8PtrTy));
     m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, TBlockReturn::getBlockReturnType());

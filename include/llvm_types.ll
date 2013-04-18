@@ -209,3 +209,14 @@ declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
 declare void @checkRoot(%TObject* %value, %TObject** %slot)
 declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+declare i32 @__gcc_personality_v0(...)
+declare i8* @__cxa_begin_catch(i8*)
+declare void @__cxa_end_catch()
+declare i8* @__cxa_allocate_exception(i32)
+declare void @__cxa_throw(i8*, i8*, i8*)
+
