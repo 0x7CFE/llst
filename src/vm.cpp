@@ -39,6 +39,7 @@
 #include <sys/time.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <opcodes.h>
 
 #include <jit.h>
 
@@ -939,7 +940,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             
             // Performing an operation
             // The result may be nil if the opcode execution fails (division by zero etc)
-            TObject* result = doSmallInt((primitive::SmallIntOpcode) opcode, leftOperand, rightOperand);
+            TObject* result = doSmallInt(opcode, leftOperand, rightOperand);
             if (result == globals.nilObject) {
                 failed = true;
                 break;
@@ -1130,7 +1131,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
     return globals.nilObject;
 }
 
-TObject* SmalltalkVM::doSmallInt( primitive::SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand)
+TObject* SmalltalkVM::doSmallInt(uint8_t opcode, int32_t leftOperand, int32_t rightOperand)
 {
     switch (opcode) {
         case primitive::smallIntAdd:

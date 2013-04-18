@@ -296,7 +296,7 @@ private:
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);
     void writeSmallIntPrimitive(TJITContext& jit,
-                                primitive::SmallIntOpcode opcode,
+                                uint8_t /*primitive::SmallIntOpcode*/ opcode,
                                 llvm::Value* rightObject,
                                 llvm::Value* leftObject,
                                 llvm::Value*& primitiveResult,

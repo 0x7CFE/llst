@@ -34,11 +34,11 @@
  */
 
 #include <jit.h>
-#include <vm.h>
 #include <stdarg.h>
 #include <llvm/Support/CFG.h>
 #include <iostream>
 #include <sstream>
+#include <opcodes.h>
 
 using namespace llvm;
 
@@ -1126,7 +1126,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 }
 
 void MethodCompiler::writeSmallIntPrimitive(TJITContext& jit,
-                                            primitive::SmallIntOpcode opcode,
+                                            uint8_t opcode,
                                             Value* rightObject,
                                             Value* leftObject,
                                             Value*& primitiveResult,
@@ -1526,7 +1526,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case primitive::smallIntBitShift: { // 39
             Value* rightObject = jit.popValue();
             Value* leftObject  = jit.popValue();
-            writeSmallIntPrimitive(jit, (primitive::SmallIntOpcode) opcode, rightObject, leftObject, primitiveResult, primitiveFailedBB);
+            writeSmallIntPrimitive(jit, opcode, rightObject, leftObject, primitiveResult, primitiveFailedBB);
         } break;
         
         case primitive::bulkReplace: {

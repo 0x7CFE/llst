@@ -40,9 +40,7 @@
 #include <types.h>
 #include <memory.h>
 #include <stdlib.h>
-#include <opcodes.h>
 #include <stdio.h>
-#include <TInstruction.h>
 
 class SmalltalkVM {
 public:
@@ -143,7 +141,7 @@ public:
     //This function is used to lookup and return method for #doesNotUnderstand for a given selector of a given object with appropriate arguments.
     void setupVarsForDoesNotUnderstand(/*out*/ hptr<TMethod>& method,/*out*/ hptr<TObjectArray>& arguments, TSymbol* selector, TClass* receiverClass);
     // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(primitive::SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
+    TObject* doSmallInt(uint8_t /*primitive::SmallIntOpcode*/ opcode, int32_t leftOperand, int32_t rightOperand);
 
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
