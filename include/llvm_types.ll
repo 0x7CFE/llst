@@ -2,6 +2,11 @@
 ; Also it implements some base functions and methods such as TObject::getClass(). 
 ;  LLVM passes may optimize/inline them => we will gain more perfomance.
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;; types ;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 %TSize = type { i32 ; data
               }
 %TObject = type { %TSize, ; size
@@ -79,20 +84,29 @@
                      }
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                     
 define i1 @isSmallInteger(%TObject* %value) {
+    ; return reinterpret_cast<int32_t>(value) & 1;
+    
     %int = ptrtoint %TObject* %value to i32
-    ;%flag = and i32 %int, 1
     %result = trunc i32 %int to i1
     ret i1 %result
 }
 
 define i32 @getIntegerValue(%TObject* %value) {
+    ; return (int32_t) (value >> 1)
+    
     %int = ptrtoint %TObject* %value to i32
     %result = ashr i32 %int, 1
     ret i32 %result
 }
 
 define %TObject* @newInteger(i32 %value) {
+    ; return reinterpret_cast<TObject>( (value << 1) | 1 );
+    
     %shled = shl i32 %value, 1
     %ored  = or  i32 %shled, 1
     %result = inttoptr i32 %ored to %TObject*

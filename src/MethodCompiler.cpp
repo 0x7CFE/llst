@@ -1125,101 +1125,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
     }
 }
 
-void MethodCompiler::writeSmallIntPrimitive(TJITContext& jit,
-                                            uint8_t opcode,
-                                            Value* rightObject,
-                                            Value* leftObject,
-                                            Value*& primitiveResult,
-                                            BasicBlock* primitiveFailedBB)
-{
-    Value* rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightObject);
-    Value* leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftObject);
-    Value* areIntsCond = jit.builder->CreateAnd(rightIsInt, leftIsInt);
-    
-    BasicBlock* areIntsBB = BasicBlock::Create(m_JITModule->getContext(), "areInts", jit.function);
-    jit.builder->CreateCondBr(areIntsCond, areIntsBB, primitiveFailedBB);
-    
-    jit.builder->SetInsertPoint(areIntsBB);
-    Value* rightOperand = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightObject);
-    Value* leftOperand  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftObject);
-    
-    switch(opcode) {
-        case primitive::smallIntAdd: {
-            Value* intResult = jit.builder->CreateAdd(leftOperand, rightOperand);
-            //FIXME overflow
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntDiv: {
-            Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
-            BasicBlock* divBB  = BasicBlock::Create(m_JITModule->getContext(), "div", jit.function);
-            jit.builder->CreateCondBr(isZero, primitiveFailedBB, divBB);
-            
-            jit.builder->SetInsertPoint(divBB);
-            Value* intResult = jit.builder->CreateSDiv(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntMod: {
-            Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
-            BasicBlock* modBB  = BasicBlock::Create(m_JITModule->getContext(), "mod", jit.function);
-            jit.builder->CreateCondBr(isZero, primitiveFailedBB, modBB);
-            
-            jit.builder->SetInsertPoint(modBB);
-            Value* intResult = jit.builder->CreateSRem(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntLess: {
-            Value* condition = jit.builder->CreateICmpSLT(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
-        } break;
-        case primitive::smallIntEqual: {
-            Value* condition = jit.builder->CreateICmpEQ(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
-        } break;
-        case primitive::smallIntMul: {
-            Value* intResult = jit.builder->CreateMul(leftOperand, rightOperand);
-            //FIXME overflow
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntSub: {
-            Value* intResult = jit.builder->CreateSub(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntBitOr: {
-            Value* intResult = jit.builder->CreateOr(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntBitAnd: {
-            Value* intResult = jit.builder->CreateAnd(leftOperand, rightOperand);
-            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
-        } break;
-        case primitive::smallIntBitShift: {
-            BasicBlock* shiftRightBB  = BasicBlock::Create(m_JITModule->getContext(), ">>", jit.function);
-            BasicBlock* shiftLeftBB   = BasicBlock::Create(m_JITModule->getContext(), "<<", jit.function);
-            BasicBlock* shiftResultBB = BasicBlock::Create(m_JITModule->getContext(), "shiftResult", jit.function);
-            
-            Value* rightIsNeg = jit.builder->CreateICmpSLT(rightOperand, jit.builder->getInt32(0));
-            jit.builder->CreateCondBr(rightIsNeg, shiftRightBB, shiftLeftBB);
-            
-            jit.builder->SetInsertPoint(shiftRightBB);
-            Value* rightOperandNeg  = jit.builder->CreateNeg(rightOperand);
-            Value* shiftRightResult = jit.builder->CreateAShr(leftOperand, rightOperandNeg);
-            jit.builder->CreateBr(shiftResultBB);
-            
-            jit.builder->SetInsertPoint(shiftLeftBB);
-            Value* shiftLeftResult = jit.builder->CreateShl(leftOperand, rightOperand);
-            Value* shiftLeftFailed = jit.builder->CreateICmpSGT(leftOperand, shiftLeftResult);
-            jit.builder->CreateCondBr(shiftLeftFailed, primitiveFailedBB, shiftResultBB);
-            
-            jit.builder->SetInsertPoint(shiftResultBB);
-            PHINode* phi = jit.builder->CreatePHI(jit.builder->getInt32Ty(), 2);
-            phi->addIncoming(shiftRightResult, shiftRightBB);
-            phi->addIncoming(shiftLeftResult, shiftLeftBB);
-            
-            primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, phi);
-        } break;
-    }
-}
-
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
     uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
@@ -1239,6 +1144,28 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     // Linking pop chain
     jit.basicBlockContexts[primitiveFailedBB].referers.insert(jit.builder->GetInsertBlock());
     
+    compilePrimitive(jit, opcode, primitiveResult, primitiveCondition, primitiveSucceededBB, primitiveFailedBB);
+    
+    // Linking pop chain
+    jit.basicBlockContexts[primitiveSucceededBB].referers.insert(jit.builder->GetInsertBlock());
+    
+    jit.builder->CreateCondBr(primitiveCondition, primitiveSucceededBB, primitiveFailedBB);
+    jit.builder->SetInsertPoint(primitiveSucceededBB);
+    
+    jit.builder->CreateRet(primitiveResult);
+    jit.builder->SetInsertPoint(primitiveFailedBB);
+    
+    jit.pushValue(m_globals.nilObject);
+}
+
+
+void MethodCompiler::compilePrimitive(TJITContext& jit,
+                                    uint8_t opcode,
+                                    Value*& primitiveResult,
+                                    Value*& primitiveCondition,
+                                    BasicBlock* primitiveSucceededBB,
+                                    BasicBlock* primitiveFailedBB)
+{
     switch (opcode) {
         case primitive::objectsAreEqual: {
             Value* object2 = jit.popValue();
@@ -1422,10 +1349,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
             };
             
             jit.builder->CreateCall(m_exceptionAPI.cxa_throw, throwArgs);
-            primitiveSucceededBB->eraseFromParent();
-            jit.builder->CreateBr(primitiveFailedBB);
-            jit.builder->SetInsertPoint(primitiveFailedBB);
-            return;
+            primitiveResult = m_globals.nilObject;
         } break;
         
         case primitive::arrayAt:       // 24
@@ -1526,7 +1450,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         case primitive::smallIntBitShift: { // 39
             Value* rightObject = jit.popValue();
             Value* leftObject  = jit.popValue();
-            writeSmallIntPrimitive(jit, opcode, rightObject, leftObject, primitiveResult, primitiveFailedBB);
+            compileSmallIntPrimitive(jit, opcode, rightObject, leftObject, primitiveResult, primitiveFailedBB);
         } break;
         
         case primitive::bulkReplace: {
@@ -1552,15 +1476,101 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
         default:
             outs() << "JIT: Unknown primitive code " << opcode << "\n";
     }
+}
+
+
+
+void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
+                                            uint8_t opcode,
+                                            Value* rightObject,
+                                            Value* leftObject,
+                                            Value*& primitiveResult,
+                                            BasicBlock* primitiveFailedBB)
+{
+    Value* rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightObject);
+    Value* leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftObject);
+    Value* areIntsCond = jit.builder->CreateAnd(rightIsInt, leftIsInt);
     
-    // Linking pop chain
-    jit.basicBlockContexts[primitiveSucceededBB].referers.insert(jit.builder->GetInsertBlock());
+    BasicBlock* areIntsBB = BasicBlock::Create(m_JITModule->getContext(), "areInts", jit.function);
+    jit.builder->CreateCondBr(areIntsCond, areIntsBB, primitiveFailedBB);
     
-    jit.builder->CreateCondBr(primitiveCondition, primitiveSucceededBB, primitiveFailedBB);
-    jit.builder->SetInsertPoint(primitiveSucceededBB);
+    jit.builder->SetInsertPoint(areIntsBB);
+    Value* rightOperand = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightObject);
+    Value* leftOperand  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftObject);
     
-    jit.builder->CreateRet(primitiveResult);
-    jit.builder->SetInsertPoint(primitiveFailedBB);
-    
-    jit.pushValue(m_globals.nilObject);
+    switch(opcode) {
+        case primitive::smallIntAdd: {
+            Value* intResult = jit.builder->CreateAdd(leftOperand, rightOperand);
+            //FIXME overflow
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntDiv: {
+            Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
+            BasicBlock* divBB  = BasicBlock::Create(m_JITModule->getContext(), "div", jit.function);
+            jit.builder->CreateCondBr(isZero, primitiveFailedBB, divBB);
+            
+            jit.builder->SetInsertPoint(divBB);
+            Value* intResult = jit.builder->CreateSDiv(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntMod: {
+            Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
+            BasicBlock* modBB  = BasicBlock::Create(m_JITModule->getContext(), "mod", jit.function);
+            jit.builder->CreateCondBr(isZero, primitiveFailedBB, modBB);
+            
+            jit.builder->SetInsertPoint(modBB);
+            Value* intResult = jit.builder->CreateSRem(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntLess: {
+            Value* condition = jit.builder->CreateICmpSLT(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
+        } break;
+        case primitive::smallIntEqual: {
+            Value* condition = jit.builder->CreateICmpEQ(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
+        } break;
+        case primitive::smallIntMul: {
+            Value* intResult = jit.builder->CreateMul(leftOperand, rightOperand);
+            //FIXME overflow
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntSub: {
+            Value* intResult = jit.builder->CreateSub(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntBitOr: {
+            Value* intResult = jit.builder->CreateOr(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntBitAnd: {
+            Value* intResult = jit.builder->CreateAnd(leftOperand, rightOperand);
+            primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
+        } break;
+        case primitive::smallIntBitShift: {
+            BasicBlock* shiftRightBB  = BasicBlock::Create(m_JITModule->getContext(), ">>", jit.function);
+            BasicBlock* shiftLeftBB   = BasicBlock::Create(m_JITModule->getContext(), "<<", jit.function);
+            BasicBlock* shiftResultBB = BasicBlock::Create(m_JITModule->getContext(), "shiftResult", jit.function);
+            
+            Value* rightIsNeg = jit.builder->CreateICmpSLT(rightOperand, jit.builder->getInt32(0));
+            jit.builder->CreateCondBr(rightIsNeg, shiftRightBB, shiftLeftBB);
+            
+            jit.builder->SetInsertPoint(shiftRightBB);
+            Value* rightOperandNeg  = jit.builder->CreateNeg(rightOperand);
+            Value* shiftRightResult = jit.builder->CreateAShr(leftOperand, rightOperandNeg);
+            jit.builder->CreateBr(shiftResultBB);
+            
+            jit.builder->SetInsertPoint(shiftLeftBB);
+            Value* shiftLeftResult = jit.builder->CreateShl(leftOperand, rightOperand);
+            Value* shiftLeftFailed = jit.builder->CreateICmpSGT(leftOperand, shiftLeftResult);
+            jit.builder->CreateCondBr(shiftLeftFailed, primitiveFailedBB, shiftResultBB);
+            
+            jit.builder->SetInsertPoint(shiftResultBB);
+            PHINode* phi = jit.builder->CreatePHI(jit.builder->getInt32Ty(), 2);
+            phi->addIncoming(shiftRightResult, shiftRightBB);
+            phi->addIncoming(shiftLeftResult, shiftLeftBB);
+            
+            primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, phi);
+        } break;
+    }
 }

@@ -437,27 +437,27 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
 }
 
 void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObjectArray>& arguments, TSymbol* selector, TClass* receiverClass) {
-        // Looking up the #doesNotUnderstand: method:
-        method = newPointer(lookupMethod(globals.badMethodSymbol, receiverClass));
-        if (method == 0) {
-            // Something goes really wrong.
-            // We could not continue the execution
-            fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
-            exit(1);
-        }
-        
-        // Protecting the selector pointer because it may be invalidated later
-        hptr<TSymbol> failedSelector = newPointer(selector);
-        
-        // We're replacing the original call arguments with custom one
-        hptr<TObjectArray> errorArguments = newObject<TObjectArray>(2);
-
-        // Filling in the failed call context information
-        errorArguments[0] = arguments[0];   // receiver object
-        errorArguments[1] = failedSelector; // message selector that failed
-
-        // Replacing the arguments with newly created one
-        arguments = errorArguments;
+    // Looking up the #doesNotUnderstand: method:
+    method = newPointer(lookupMethod(globals.badMethodSymbol, receiverClass));
+    if (method == 0) {
+        // Something goes really wrong.
+        // We could not continue the execution
+        fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
+        exit(1);
+    }
+    
+    // Protecting the selector pointer because it may be invalidated later
+    hptr<TSymbol> failedSelector = newPointer(selector);
+    
+    // We're replacing the original call arguments with custom one
+    hptr<TObjectArray> errorArguments = newObject<TObjectArray>(2);
+    
+    // Filling in the failed call context information
+    errorArguments[0] = arguments[0];   // receiver object
+    errorArguments[1] = failedSelector; // message selector that failed
+    
+    // Replacing the arguments with newly created one
+    arguments = errorArguments;
 }
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
