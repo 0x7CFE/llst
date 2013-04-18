@@ -71,12 +71,10 @@ int main(int argc, char **argv) {
             const uint32_t keysSize = methods->keys->getSize();
             
             // Inserting class name to the trie
-            printf("class '%s'\n", keyString.c_str());
             completionEngine->addWord(currentClass->name->toString());
             
             for ( uint32_t methodIndex = 0; methodIndex < keysSize; methodIndex++) {
                 const std::string methodName = (*methods->keys)[methodIndex]->toString();
-                printf("method: '%s'\n", methodName.c_str());
                 
                 // Inserting method name to the trie
                 completionEngine->addWord(methodName);
