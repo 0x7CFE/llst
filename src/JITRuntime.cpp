@@ -292,33 +292,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         
         // Checking whether we found a method
         if (method == 0) {
-            // Oops. Method was not found. In this case we should
-            // send #doesNotUnderstand: message to the receiver
-            
-            // Looking up the #doesNotUnderstand: method:
-            method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, receiverClass));
-            if (method == 0) {
-                // Something goes really wrong.
-                // We could not continue the execution
-                errs() << "\nCould not locate #doesNotUnderstand:\n";
-                exit(1);
-            }
-            
-            // Protecting the selector pointer because it may be invalidated later
-            hptr<TSymbol> failedSelector = m_softVM->newPointer(message);
-            
-            // We're replacing the original call arguments with custom one
-            hptr<TObjectArray> errorArguments = m_softVM->newObject<TObjectArray>(2);
-            
-            // Filling in the failed call context information
-            errorArguments[0] = messageArguments[0]; // receiver object
-            errorArguments[1] = failedSelector;      // message selector that failed
-            
-            // Replacing the arguments with newly created one
-            messageArguments = errorArguments;
-            
-            // Continuing the execution just as if #doesNotUnderstand:
-            // was the actual selector that we wanted to call
+            // Oops. Method was not found. In this case we should send #doesNotUnderstand: message to the receiver
+            m_softVM->setupVarsForDoesNotUnderstand(method, messageArguments, /*receiver*/ messageArguments[0], message, receiverClass);
+            // Continuing the execution just as if #doesNotUnderstand: was the actual selector that we wanted to call
         }
         
         // Searching for the jit compiled function
