@@ -804,18 +804,14 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             if (input) {
                 uint32_t inputSize = strlen(input);
                 
-                if (inputSize > 0) {
+                if (inputSize > 0)
                     add_history(input);
                     
-                    TString* result = (TString*) newBinaryObject(globals.stringClass, inputSize);
-                    memcpy(result->getBytes(), input, inputSize);
-                    
-                    free(input);
-                    return result;
-                }
+                TString* result = (TString*) newBinaryObject(globals.stringClass, inputSize);
+                memcpy(result->getBytes(), input, inputSize);
                 
                 free(input);
-                return globals.nilObject;
+                return result;
             } else
                 return globals.nilObject;
         } break;

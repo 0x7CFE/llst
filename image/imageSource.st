@@ -1329,13 +1329,11 @@ main    | command  x|
         ].
     ]."
     
-    " main execution loop  "
-    [ true ] whileTrue: [
-        command <- String readline: '->'.
-        command = 'exit' ifTrue: [ ^ nil ].
-        
-        command notNil ifTrue: [ command doIt printNl ].
-    ]
+    " main execution loop "
+    
+    [ command <- String readline: '->'. command notNil ]
+            whileTrue: [ command isEmpty
+            ifFalse: [ command doIt printNl ] ]
     
     ^nil.
 !
