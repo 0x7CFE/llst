@@ -60,6 +60,4 @@ public:
     }
 };
 
-void initialize_readline();
-char** smalltalk_completion(const char* text, int start, int end);
-char* smalltalk_generator(const char* text, int state);
+void initializeCompletion();

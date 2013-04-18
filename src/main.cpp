@@ -54,11 +54,10 @@ int main(int argc, char **argv) {
 
     CompletionEngine* completionEngine = CompletionEngine::Instance();
     completionEngine->addWord("Smalltalk");
-    initialize_readline();
-    
+    initializeCompletion();
+
+    // Populating completion database
     TDictionary* globalObjects = globals.globalsObject;
-    TObject* metaClass = globalObjects->find("MetaClass");
-    
     for (uint32_t i = 0; i < globalObjects->keys->getSize(); i++) {
         TSymbol* key   = (*globalObjects->keys)[i];
         TObject* value = (*globalObjects->values)[i];
@@ -70,20 +69,30 @@ int main(int argc, char **argv) {
             TDictionary* methods = currentClass->methods;
             const uint32_t keysSize = methods->keys->getSize();
             
-            // Inserting class name to the trie
+            // Inserting class name
             completionEngine->addWord(currentClass->name->toString());
             
             for ( uint32_t methodIndex = 0; methodIndex < keysSize; methodIndex++) {
                 const std::string methodName = (*methods->keys)[methodIndex]->toString();
                 
-                // Inserting method name to the trie
+                // Inserting method name
                 completionEngine->addWord(methodName);
             }
+
+            /* std::string metaClassName("Meta");
+            metaClassName += currentClass->name->toString();
+
+            TClass* metaClass = (TClass*) smalltalkImage->getGlobal(metaClassName.c_str());
+            if (metaClass) {
+                // Inserting metaclass name
+                completionEngine->addWord(metaClassName);
+
+                
+            }  */
         }
     }
 
     JITRuntime runtime;
-
     runtime.initialize(&vm);
 
     // Creating runtime context

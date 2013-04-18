@@ -36,18 +36,7 @@
 
 std::auto_ptr<CompletionEngine> CompletionEngine::s_instance(new CompletionEngine);
 
-void initialize_readline() {
-    rl_readline_name = "llst";
-    rl_attempted_completion_function = smalltalk_completion;
-}
-
-char** smalltalk_completion(const char* text, int start, int end) {
-    char** matches = 0;
-    matches = rl_completion_matches(text, smalltalk_generator);
-    return matches;
-}
-
-char* smalltalk_generator(const char* text, int state) {
+static char* smalltalk_generator(const char* text, int state) {
     CompletionEngine* completionEngine = CompletionEngine::Instance();
     
     if (state == 0)
@@ -57,4 +46,13 @@ char* smalltalk_generator(const char* text, int state) {
         return strdup(completionEngine->getNextProposal().c_str());
     else
         return 0;
+}
+
+static char** smalltalk_completion(const char* text, int start, int end) {
+    return rl_completion_matches(text, smalltalk_generator);;
+}
+
+void initializeCompletion() {
+    rl_readline_name = "llst";
+    rl_attempted_completion_function = smalltalk_completion;
 }
