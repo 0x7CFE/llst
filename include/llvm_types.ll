@@ -192,8 +192,20 @@ define %TObject* @dummy() gc "shadow-stack" {
     ret %TObject* null
 }
 
-; memory management functions
-;declare %TObject*     @newOrdinaryFunction(%TClass, i32)
-;declare %TByteObject* @newBinaryFunction(%TClass, i32)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;; memory management functions ;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+declare %TObject* @newOrdinaryObject(%TClass*, i32)
+declare %TByteObject* @newBinaryObject(%TClass*, i32)
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;; runtime API ;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass)
+declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer)
+declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
+declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
+declare void @checkRoot(%TObject* %value, %TObject** %slot)
+declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
