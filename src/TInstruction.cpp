@@ -1,4 +1,6 @@
-#include <TInstruction.h>
+#include <types.h>
+#include <opcodes.h>
+#include <stdexcept>
 
 std::string TInstruction::toString()
 {

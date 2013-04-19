@@ -2,6 +2,11 @@
 ; Also it implements some base functions and methods such as TObject::getClass(). 
 ;  LLVM passes may optimize/inline them => we will gain more perfomance.
 
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;; types ;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 %TSize = type { i32 ; data
               }
 %TObject = type { %TSize, ; size
@@ -79,20 +84,29 @@
                      }
 
 
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+                     
 define i1 @isSmallInteger(%TObject* %value) {
+    ; return reinterpret_cast<int32_t>(value) & 1;
+    
     %int = ptrtoint %TObject* %value to i32
-    ;%flag = and i32 %int, 1
     %result = trunc i32 %int to i1
     ret i1 %result
 }
 
 define i32 @getIntegerValue(%TObject* %value) {
+    ; return (int32_t) (value >> 1)
+    
     %int = ptrtoint %TObject* %value to i32
     %result = ashr i32 %int, 1
     ret i32 %result
 }
 
 define %TObject* @newInteger(i32 %value) {
+    ; return reinterpret_cast<TObject>( (value << 1) | 1 );
+    
     %shled = shl i32 %value, 1
     %ored  = or  i32 %shled, 1
     %result = inttoptr i32 %ored to %TObject*
@@ -192,8 +206,31 @@ define %TObject* @dummy() gc "shadow-stack" {
     ret %TObject* null
 }
 
-; memory management functions
-;declare %TObject*     @newOrdinaryFunction(%TClass, i32)
-;declare %TByteObject* @newBinaryFunction(%TClass, i32)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;; memory management functions ;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
+declare %TObject* @newOrdinaryObject(%TClass*, i32)
+declare %TByteObject* @newBinaryObject(%TClass*, i32)
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;; runtime API ;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass)
+declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer)
+declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
+declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
+declare void @checkRoot(%TObject* %value, %TObject** %slot)
+declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
+declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiveFailed)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+declare i32 @__gcc_personality_v0(...)
+declare i8* @__cxa_begin_catch(i8*)
+declare void @__cxa_end_catch()
+declare i8* @__cxa_allocate_exception(i32)
+declare void @__cxa_throw(i8*, i8*, i8*)
 

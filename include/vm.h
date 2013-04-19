@@ -40,9 +40,7 @@
 #include <types.h>
 #include <memory.h>
 #include <stdlib.h>
-#include <opcodes.h>
 #include <stdio.h>
-#include <TInstruction.h>
 
 class SmalltalkVM {
 public:
@@ -140,8 +138,8 @@ private:
     std::list<TObject*> rootStack;
 public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
-    // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(primitive::SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
+    //This function is used to lookup and return method for #doesNotUnderstand for a given selector of a given object with appropriate arguments.
+    void setupVarsForDoesNotUnderstand(/*out*/ hptr<TMethod>& method,/*out*/ hptr<TObjectArray>& arguments, TSymbol* selector, TClass* receiverClass);
 
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead

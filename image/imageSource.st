@@ -3402,6 +3402,7 @@ test
 METHOD MetaFile
 doOpen: nm mode: mode
 	<100 nm mode>
+	^nil.
 !
 METHOD MetaFile
 openRead: nm
