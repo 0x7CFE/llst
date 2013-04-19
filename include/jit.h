@@ -319,8 +319,8 @@ private:
                             llvm::BasicBlock* primitiveFailedBB);
     void compileSmallIntPrimitive(TJITContext& jit,
                                 uint8_t /*primitive::SmallIntOpcode*/ opcode,
-                                llvm::Value* rightObject,
                                 llvm::Value* leftObject,
+                                llvm::Value* rightObject,
                                 llvm::Value*& primitiveResult,
                                 llvm::BasicBlock* primitiveFailedBB);
 

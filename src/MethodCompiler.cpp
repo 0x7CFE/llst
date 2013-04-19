@@ -1450,7 +1450,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         case primitive::smallIntBitShift: { // 39
             Value* rightObject = jit.popValue();
             Value* leftObject  = jit.popValue();
-            compileSmallIntPrimitive(jit, opcode, rightObject, leftObject, primitiveResult, primitiveFailedBB);
+            compileSmallIntPrimitive(jit, opcode, leftObject, rightObject, primitiveResult, primitiveFailedBB);
         } break;
         
         case primitive::bulkReplace: {
@@ -1499,8 +1499,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
 void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
                                             uint8_t opcode,
-                                            Value* rightObject,
                                             Value* leftObject,
+                                            Value* rightObject,
                                             Value*& primitiveResult,
                                             BasicBlock* primitiveFailedBB)
 {
