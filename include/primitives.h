@@ -4,5 +4,6 @@
 #include <types.h>
 
 TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveFailed);
+TObject* callSmallIntPrimitive(uint8_t opcode, int32_t leftOperand, int32_t rightOperand, bool& primitiveFailed);
 
 #endif

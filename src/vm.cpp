@@ -822,24 +822,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
         } break;
         
-        case primitive::ioPutChar: { // 3
-            TInteger charObject = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
-            int8_t   charValue  = getIntegerValue(charObject);
-
-            putchar(charValue);
-            return globals.nilObject;
-        } break;
-        
-        case primitive::ioGetChar: { // 9
-            int32_t input = getchar();
-            
-            if (input == EOF)
-                return globals.nilObject;
-            else
-                return reinterpret_cast<TObject*>(newInteger(input));
-
-        } break;
-        
         case primitive::startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
             uint32_t  ticks = getIntegerValue(value);
@@ -893,38 +875,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             ec.bytePointer = getIntegerValue(block->blockBytePointer);
             
             return block;
-        } break;
-        
-        case primitive::smallIntAdd:        // 10
-        case primitive::smallIntDiv:        // 11
-        case primitive::smallIntMod:        // 12
-        case primitive::smallIntLess:       // 13
-        case primitive::smallIntEqual:      // 14
-        case primitive::smallIntMul:        // 15
-        case primitive::smallIntSub:        // 16
-        case primitive::smallIntBitOr:      // 36
-        case primitive::smallIntBitAnd:     // 37
-        case primitive::smallIntBitShift: { // 39
-            // Loading operand objects
-            TObject* rightObject = stack[--ec.stackTop];
-            TObject* leftObject  = stack[--ec.stackTop];
-            if ( !isSmallInteger(leftObject) || !isSmallInteger(rightObject) ) {
-                failed = true;
-                break;
-            }
-            
-            // Extracting values
-            int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
-            int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
-            
-            // Performing an operation
-            // The result may be nil if the opcode execution fails (division by zero etc)
-            TObject* result = doSmallInt(opcode, leftOperand, rightOperand);
-            if (result == globals.nilObject) {
-                failed = true;
-                break;
-            }
-            return result;
         } break;
 
         // TODO case 18 // turn on debugging
@@ -981,42 +931,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 
                 // Return self
                 return (TObject*) array;
-            }
-        } break;
-        
-        case primitive::stringAt:      // 21
-        case primitive::stringAtPut: { // 22
-            TObject* indexObject = stack[--ec.stackTop];
-            TString* string      = (TString*) stack[--ec.stackTop];
-            TObject* valueObject = 0;
-            
-            // If the method is String:at:put then pop a value from the stack
-            if (opcode == primitive::stringAtPut)
-                valueObject = stack[--ec.stackTop];
-            
-            if (! isSmallInteger(indexObject)) {
-                failed = true;
-                break;
-            }
-            
-            // Smalltalk indexes arrays starting from 1, not from 0
-            // So we need to recalculate the actual array index before
-            uint32_t actualIndex = getIntegerValue(reinterpret_cast<TInteger>(indexObject)) - 1;
-            
-            // Checking boundaries
-            if (actualIndex >= string->getSize()) {
-                failed = true;
-                break;
-            }
-            
-            if (opcode == primitive::stringAt)
-                // String:at
-                return reinterpret_cast<TObject*>(newInteger( string->getByte(actualIndex) ));
-            else {
-                // String:at:put
-                TInteger value = reinterpret_cast<TInteger>(valueObject);
-                string->putByte(actualIndex, getIntegerValue(value));
-                return (TObject*) string;
             }
         } break;
         
@@ -1090,6 +1004,27 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         
         // TODO cases 33, 35, 40
         
+        case primitive::objectsAreEqual:    // 1
+        case primitive::getClass:           // 2
+        case primitive::getSize:            // 4
+        
+        case primitive::ioPutChar:          // 3
+        case primitive::ioGetChar:          // 9
+        
+        case primitive::stringAt:           // 21
+        case primitive::stringAtPut:        // 22
+        
+        case primitive::smallIntAdd:        // 10
+        case primitive::smallIntDiv:        // 11
+        case primitive::smallIntMod:        // 12
+        case primitive::smallIntLess:       // 13
+        case primitive::smallIntEqual:      // 14
+        case primitive::smallIntMul:        // 15
+        case primitive::smallIntSub:        // 16
+        case primitive::smallIntBitOr:      // 36
+        case primitive::smallIntBitAnd:     // 37
+        case primitive::smallIntBitShift:   // 39
+        
         default: {
             hptr<TObjectArray> pStack = newPointer(ec.currentContext->stack);
             
@@ -1106,71 +1041,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
     }
     
     return globals.nilObject;
-}
-
-TObject* SmalltalkVM::doSmallInt(uint8_t opcode, int32_t leftOperand, int32_t rightOperand)
-{
-    switch (opcode) {
-        case primitive::smallIntAdd:
-            return reinterpret_cast<TObject*>(newInteger( leftOperand + rightOperand )); //FIXME possible overflow
-        
-        case primitive::smallIntDiv:
-            if (rightOperand == 0)
-                return globals.nilObject;
-            return reinterpret_cast<TObject*>(newInteger( leftOperand / rightOperand ));
-        
-        case primitive::smallIntMod:
-            if (rightOperand == 0)
-                return globals.nilObject;
-            return reinterpret_cast<TObject*>(newInteger( leftOperand % rightOperand ));
-        
-        case primitive::smallIntLess:
-            if (leftOperand < rightOperand)
-                return globals.trueObject;
-            else
-                return globals.falseObject;
-        
-        case primitive::smallIntEqual:
-            if (leftOperand == rightOperand)
-                return globals.trueObject;
-            else
-                return globals.falseObject;
-        
-        case primitive::smallIntMul:
-            return reinterpret_cast<TObject*>(newInteger( leftOperand * rightOperand )); //FIXME possible overflow
-        
-        case primitive::smallIntSub:
-            return reinterpret_cast<TObject*>(newInteger( leftOperand - rightOperand )); //FIXME possible overflow
-        
-        case primitive::smallIntBitOr:
-            return reinterpret_cast<TObject*>(newInteger( leftOperand | rightOperand ));
-        
-        case primitive::smallIntBitAnd:
-            return reinterpret_cast<TObject*>(newInteger( leftOperand & rightOperand ));
-        
-        case primitive::smallIntBitShift: {
-            // operator << if rightOperand < 0, operator >> if rightOperand >= 0
-            
-            int32_t result = 0;
-            
-            if (rightOperand < 0) {
-                //shift right
-                result = leftOperand >> -rightOperand;
-            } else {
-                // shift left ; catch overflow
-                result = leftOperand << rightOperand;
-                if (leftOperand > result) {
-                    return globals.nilObject;
-                }
-            }
-            
-            return reinterpret_cast<TObject*>(newInteger(result));
-        }
-        
-        default:
-            fprintf(stderr, "VM: Invalid SmallInt opcode %d\n", opcode);
-            exit(1);
-    }
 }
 
 void SmalltalkVM::onCollectionOccured()
