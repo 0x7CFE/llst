@@ -1,0 +1,27 @@
+Переход из софтовой ВМ в JIT версию происходит посредством вызова примитива 252, в котором
+мы вызываем функцию sendMessage (но не член-функцию SmalltalkVM::doSendMessage !!), куда передаем
+привычный набор аргументов:
+1) Текущий контекст
+2) Селектор метода
+3) Аргументы
+4) Класс, у которого начинаем искать метод (в данном случае 0; используется для реализации sendToSuper)
+
+В ходе исполнения функции sendMessage, как и в софтовой версии, происходит поиск метода, создаётся
+новый контекст, у которого инициализируются все поля, за исключением стэка, он не используется в JIT;
+метод компилируется и вызывается с 1 аргументом - новосозданным контекстом.
+
+Во время компиляции метода создаётся функция вида "ClassName>>methodName" с аргументом TContext*,
+создаётся первый BB - preable (преамбула), в которой мы создаём 2 переменные - pContext и pSelf,
+которые являются зарученными значениями контекста-аргумента и объекта, которому послали вызов.
+
+Вместо использования стэка из TContext для хранения значений, мы используем llvm::Value*. Например,
+последовательность байткодов 'pushTemporary 1' и 'assignInstance 2' превратится в
+'instanceVariables[2] = temporaries[1]', и код будет выглядеть:
+
+%context = load %TContext** %pContext; pContext заручен, после GC его значение обновится
+%temp.1  = call %TObject* @getTempFromContext(%TContext* %context, i32 1)
+%self    = load %TObject* %pSelf
+%instanceVariablePtr = call %TObject** getObjectFieldPtr(%TObject* %self, i32 2)
+call void @checkRoot(%TObject* %temp.1, %TObject** %instanceVariablePtr)
+store %TObject* %temp.1, %TObject** %instanceVariablePtr
+
