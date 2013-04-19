@@ -505,6 +505,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         // Loading actual operand values
         int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
         int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
+        bool unusedCondition;
         
         // Performing an operation
         switch ((binaryMessage::Operator) ec.instruction.low) {
@@ -517,8 +518,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
                 break;
             
             case binaryMessage::operatorPlus:
-                //FIXME possible overflow?
-                ec.returnedValue = reinterpret_cast<TObject*>(newInteger(leftOperand+rightOperand));
+                ec.returnedValue = callSmallIntPrimitive(primitive::smallIntAdd, leftOperand, rightOperand, unusedCondition);
                 break;
             
             default:
