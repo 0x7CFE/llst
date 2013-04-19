@@ -40,6 +40,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <opcodes.h>
+#include <primitives.h>
 
 #include <jit.h>
 
@@ -821,21 +822,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
         } break;
         
-        case primitive::objectsAreEqual: { // 1
-            TObject* arg2 = stack[--ec.stackTop];
-            TObject* arg1 = stack[--ec.stackTop];
-            
-            if (arg1 == arg2)
-                return globals.trueObject;
-            else
-                return globals.falseObject;
-        } break;
-        
-        case primitive::getClass: { // 2
-            TObject* object = stack[--ec.stackTop];
-            return isSmallInteger(object) ? globals.smallIntClass : object->getClass();
-        } break;
-        
         case primitive::ioPutChar: { // 3
             TInteger charObject = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
             int8_t   charValue  = getIntegerValue(charObject);
@@ -852,13 +838,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             else
                 return reinterpret_cast<TObject*>(newInteger(input));
 
-        } break;
-        
-        case primitive::getSize: {
-            TObject* object     = stack[--ec.stackTop];
-            uint32_t objectSize = isSmallInteger(object) ? 0 : object->getSize();
-            
-            return reinterpret_cast<TObject*>(newInteger(objectSize));
         } break;
         
         case primitive::startNewProcess: { // 6
@@ -1121,10 +1100,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             while (i > 0)
                 args[--i] = pStack[--ec.stackTop];
             
-            //TODO call primitive(opcode, args)
-            
-            fprintf(stderr, "VM: Unimplemented or invalid primitive %d\n", opcode);
-            exit(1);
+            TObject* result = callPrimitive(opcode, args, failed);
+            return result;
         }
     }
     

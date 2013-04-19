@@ -65,7 +65,7 @@ struct TRuntimeAPI {
     llvm::Function* invokeBlock;
     llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
-
+    llvm::Function* callPrimitive;
     llvm::Function* bulkReplace;
 };
 

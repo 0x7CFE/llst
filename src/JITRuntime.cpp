@@ -33,6 +33,7 @@
 */
 
 #include <jit.h>
+#include <primitives.h>
 
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/IRReader.h>
@@ -407,6 +408,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_runtimeAPI.emitBlockReturn    = m_JITModule->getFunction("emitBlockReturn");
     m_runtimeAPI.checkRoot          = m_JITModule->getFunction("checkRoot");
     m_runtimeAPI.bulkReplace        = m_JITModule->getFunction("bulkReplace");
+    m_runtimeAPI.callPrimitive      = m_JITModule->getFunction("callPrimitive");
     
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -417,6 +419,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.callPrimitive, reinterpret_cast<void*>(& ::callPrimitive));
     
     //Type*  rootChainType = m_JITModule->getTypeByName("gc_stackentry")->getPointerTo();
     //GlobalValue* gRootChain    = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("llvm_gc_root_chain", rootChainType) );

@@ -1138,8 +1138,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     // If your primitive may fail, you may use 2 ways:
     // 1) set br primitiveFailedBB
     // 2) bind primitiveCondition with any i1 result
-    BasicBlock* primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceeded", jit.function);
-    BasicBlock* primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailed", jit.function);
+    BasicBlock* primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceededBB", jit.function);
+    BasicBlock* primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
     
     // Linking pop chain
     jit.basicBlockContexts[primitiveFailedBB].referers.insert(jit.builder->GetInsertBlock());
@@ -1473,8 +1473,25 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             primitiveCondition = isSucceeded;
         } break;
         
-        default:
-            outs() << "JIT: Unknown primitive code " << opcode << "\n";
+        default: {
+            // Here we need to create the arguments array from the values on the stack
+            uint8_t argumentsCount = jit.instruction.low;
+            Value* argumentsObject    = createArray(jit, argumentsCount);
+            
+            // Filling object with contents
+            uint8_t index = argumentsCount;
+            while (index > 0) {
+                Value* value = jit.popValue();
+                jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), value);
+            }
+            
+            Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
+            Value* primitiveFailedPtr = jit.builder->CreateAlloca(jit.builder->getInt1Ty());
+            jit.builder->CreateStore(jit.builder->getFalse(), primitiveFailedPtr);
+            
+            primitiveResult = jit.builder->CreateCall3(m_runtimeAPI.callPrimitive, jit.builder->getInt8(opcode), argumentsArray, primitiveFailedPtr);
+            primitiveCondition = jit.builder->CreateNot( jit.builder->CreateLoad(primitiveFailedPtr), "primitiveSucceeded" );
+        }
     }
 }
 

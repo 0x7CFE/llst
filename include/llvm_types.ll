@@ -223,7 +223,7 @@ declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
 declare void @checkRoot(%TObject* %value, %TObject** %slot)
 declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
-
+declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiveFailed)
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
