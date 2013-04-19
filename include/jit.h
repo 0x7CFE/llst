@@ -313,8 +313,8 @@ private:
     void doPrimitive(TJITContext& jit);
     void compilePrimitive(TJITContext& jit,
                             uint8_t opcode,
-                            llvm::Value*& primitiveResult,
-                            llvm::Value*& primitiveCondition,
+                            llvm::Value*& primitiveResult, // %TObject*
+                            llvm::Value*& primitiveFailed, // i1
                             llvm::BasicBlock* primitiveSucceededBB,
                             llvm::BasicBlock* primitiveFailedBB);
     void compileSmallIntPrimitive(TJITContext& jit,

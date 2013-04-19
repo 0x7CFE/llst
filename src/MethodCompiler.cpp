@@ -1130,26 +1130,31 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
     
     Value* primitiveResult = 0;
-    Value* primitiveCondition = jit.builder->getTrue();
-    // br primitiveCondition, primitiveSucceededBB, primitiveFailedBB
-    // By default we use primitiveFailed BB as a trash code collecting block
-    // llvm passes may eliminate primitiveFailed BB, becase br true, A, B -> br label A || If there is no other paths to B
-    // But sometimes CFG of primitive may depend on primitiveCondition result (bulkReplace)
+    Value* primitiveFailed = jit.builder->getFalse();
+    // br primitiveFailed, primitiveFailedBB, primitiveSucceededBB
+    // primitiveSucceededBB:
+    //   ret %TObject* primitiveResult
+    // primitiveFailedBB:
+    //  ;fallback
+    //
+    // By default we use primitiveFailed BB as a block that collects trash code.
+    // llvm passes may eliminate primitiveFailed BB, because "br true, A, B -> br label A" if there are no other paths to B
+    // But sometimes CFG of primitive may depend on primitiveFailed result (bulkReplace)
     // If your primitive may fail, you may use 2 ways:
     // 1) set br primitiveFailedBB
-    // 2) bind primitiveCondition with any i1 result
+    // 2) bind primitiveFailed with any i1 result
     BasicBlock* primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceededBB", jit.function);
     BasicBlock* primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
     
     // Linking pop chain
     jit.basicBlockContexts[primitiveFailedBB].referers.insert(jit.builder->GetInsertBlock());
     
-    compilePrimitive(jit, opcode, primitiveResult, primitiveCondition, primitiveSucceededBB, primitiveFailedBB);
+    compilePrimitive(jit, opcode, primitiveResult, primitiveFailed, primitiveSucceededBB, primitiveFailedBB);
     
     // Linking pop chain
     jit.basicBlockContexts[primitiveSucceededBB].referers.insert(jit.builder->GetInsertBlock());
     
-    jit.builder->CreateCondBr(primitiveCondition, primitiveSucceededBB, primitiveFailedBB);
+    jit.builder->CreateCondBr(primitiveFailed, primitiveFailedBB, primitiveSucceededBB);
     jit.builder->SetInsertPoint(primitiveSucceededBB);
     
     jit.builder->CreateRet(primitiveResult);
@@ -1162,7 +1167,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 void MethodCompiler::compilePrimitive(TJITContext& jit,
                                     uint8_t opcode,
                                     Value*& primitiveResult,
-                                    Value*& primitiveCondition,
+                                    Value*& primitiveFailed,
                                     BasicBlock* primitiveSucceededBB,
                                     BasicBlock* primitiveFailedBB)
 {
@@ -1220,7 +1225,6 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         case primitive::startNewProcess: { // 6
             /* ticks. unused */    jit.popValue();
             Value* processObject = jit.popValue();
-            //TODO pushProcess ?
             Value* process       = jit.builder->CreateBitCast(processObject, m_baseTypes.process->getPointerTo());
             
             Function* executeProcess = m_JITModule->getFunction("executeProcess");
@@ -1468,9 +1472,9 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 sourceStartOffset
             };
             
-            Value* isSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
+            Value* isBulkReplaceSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
             primitiveResult = destination;
-            primitiveCondition = isSucceeded;
+            primitiveFailed = jit.builder->CreateNot(isBulkReplaceSucceeded);
         } break;
         
         default: {
@@ -1486,16 +1490,14 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             }
             
             Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-            Value* primitiveFailedPtr = jit.builder->CreateAlloca(jit.builder->getInt1Ty());
+            Value* primitiveFailedPtr = jit.builder->CreateAlloca(jit.builder->getInt1Ty(), 0, "primitiveFailedPtr");
             jit.builder->CreateStore(jit.builder->getFalse(), primitiveFailedPtr);
             
             primitiveResult = jit.builder->CreateCall3(m_runtimeAPI.callPrimitive, jit.builder->getInt8(opcode), argumentsArray, primitiveFailedPtr);
-            primitiveCondition = jit.builder->CreateNot( jit.builder->CreateLoad(primitiveFailedPtr), "primitiveSucceeded" );
+            primitiveFailed = jit.builder->CreateLoad(primitiveFailedPtr);
         }
     }
 }
-
-
 
 void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
                                             uint8_t opcode,
