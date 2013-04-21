@@ -1330,7 +1330,7 @@ main    | command  x|
     ]."
     
     " main execution loop "
-    
+
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
             ifFalse: [ command doIt printNl ] ]
