@@ -172,7 +172,7 @@ public:
 // so thier space may be reused by newly allocated ones.
 // 
 class BakerMemoryManager : public IMemoryManager {
-private:
+protected:
     uint32_t  m_collectionsCount;
     uint32_t  m_allocationsCount;
     uint64_t  m_totalCollectionDelay;
@@ -199,7 +199,6 @@ private:
         TObject* data[0];
     };
 
-protected:
     // During GC we need to treat all objects in a very simple manner,
     // just as pointer holders. Class field is also a pointer so we
     // treat it just as one more object field.
@@ -214,7 +213,6 @@ protected:
     virtual void moveObjects();
     virtual void growHeap(uint32_t requestedSize);
     
-private:
     // These variables contain an array of pointers to objects from the
     // static heap to the dynamic one. Ihey are used during the GC
     // as a root for pointer iteration.
@@ -259,6 +257,25 @@ public:
     virtual uint32_t allocsBeyondCollection() { return m_allocationsCount; }
     
     virtual TMemoryManagerInfo getStat();
+};
+
+class GenerationalMemoryManager : public BakerMemoryManager {
+protected:
+//     enum TCollectorState {
+//         csRightSpaceEmpty,  // [***   |      ]
+//         csRightSpaceActive, // [***   |XX    ]
+//         csRightCollect      // [  <---|XXXXX ]
+//     };
+
+    //TCollectorState m_currentState;
+    void collectLeftToRight();
+    void collectRightToLeft();
+    bool checkThreshold();
+public:
+    GenerationalMemoryManager() /*: m_currentState(csRightSpaceEmpty)*/ { }
+    virtual ~GenerationalMemoryManager();
+    virtual void collectGarbage();
+    
 };
 
 class LLVMMemoryManager : public BakerMemoryManager {
