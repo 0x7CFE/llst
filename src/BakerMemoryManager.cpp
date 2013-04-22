@@ -425,6 +425,8 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
 TMemoryManagerInfo BakerMemoryManager::getStat() 
 {
     TMemoryManagerInfo info;
+    memset(&info, 0, sizeof(info));
+    
     info.allocationsCount     = m_allocationsCount;
     info.collectionsCount     = m_collectionsCount;
     info.totalCollectionDelay = m_totalCollectionDelay;

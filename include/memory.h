@@ -47,6 +47,9 @@ struct TMemoryManagerInfo {
     uint32_t collectionsCount;
     uint32_t allocationsCount;
     uint64_t totalCollectionDelay;
+    
+    uint32_t leftToRightCollections;
+    uint32_t rightToLeftCollections;
 };
 
 // Generic interface to a memory manager.
@@ -264,11 +267,14 @@ protected:
     void collectLeftToRight();
     void collectRightToLeft();
     bool checkThreshold();
+    
+    uint32_t m_leftToRightCollections;
+    uint32_t m_rightToLeftCollections;
 public:
-    GenerationalMemoryManager() { }
+    GenerationalMemoryManager() : m_leftToRightCollections(0), m_rightToLeftCollections(0) { }
     virtual ~GenerationalMemoryManager();
     virtual void collectGarbage();
-    
+    virtual TMemoryManagerInfo getStat();
 };
 
 class LLVMMemoryManager : public BakerMemoryManager {

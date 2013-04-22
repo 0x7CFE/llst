@@ -161,8 +161,8 @@ int main(int argc, char **argv) {
     TMemoryManagerInfo info = memoryManager->getStat();
     
     int averageAllocs = info.collectionsCount ? (int) info.allocationsCount / info.collectionsCount : info.allocationsCount;
-    printf("\nGC count: %d, average allocations per gc: %d, microseconds spent in GC: %d\n", 
-           info.collectionsCount, averageAllocs, (uint32_t) info.totalCollectionDelay);
+    printf("\nGC count: %d (%d/%d), average allocations per gc: %d, microseconds spent in GC: %d\n", 
+           info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, (uint32_t) info.totalCollectionDelay);
     
     vm.printVMStat();
     runtime.printStat();

@@ -1,4 +1,6 @@
 #include <memory.h>
+#include <stdlib.h>
+#include <sys/time.h>
 
 GenerationalMemoryManager::~GenerationalMemoryManager()
 {
@@ -28,9 +30,22 @@ void GenerationalMemoryManager::collectGarbage()
     // additional collection takes place which moves all objects
     // to the left space and resets the state to csRightSpaceEmpty.
 
+    // Storing timestamp on start
+    timeval tv1;
+    gettimeofday(&tv1, NULL);
+    
     collectLeftToRight();
     if (checkThreshold())
         collectRightToLeft();
+    
+    // Storing timestamp of the end
+    timeval tv2;
+    gettimeofday(&tv2, NULL);
+    
+    // Calculating total microseconds spent in the garbage collection procedure
+    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+    
+    m_collectionsCount++;
 }
 
 void GenerationalMemoryManager::collectLeftToRight()
@@ -69,6 +84,7 @@ void GenerationalMemoryManager::collectLeftToRight()
 
     // After this operation active objects from space one now all
     // in space two and are treated as generation 1.
+    m_leftToRightCollections++;
 }
 
 void GenerationalMemoryManager::collectRightToLeft()
@@ -87,9 +103,16 @@ void GenerationalMemoryManager::collectRightToLeft()
     
     // m_activeHeapPointer remains there and used for futher allocations
     // because heap one remains active
+    m_rightToLeftCollections++;
 }
 
 bool GenerationalMemoryManager::checkThreshold()
 {
     return (m_inactiveHeapPointer - m_inactiveHeapBase < m_heapSize / 8);
+}
+
+TMemoryManagerInfo GenerationalMemoryManager::getStat() {
+    TMemoryManagerInfo info = BakerMemoryManager::getStat();
+    info.leftToRightCollections = m_leftToRightCollections;
+    info.rightToLeftCollections = m_rightToLeftCollections;
 }
