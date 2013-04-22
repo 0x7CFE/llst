@@ -7,20 +7,19 @@ GenerationalMemoryManager::~GenerationalMemoryManager()
 
 void GenerationalMemoryManager::collectGarbage()
 {
-    // Generational GC takes advantage of a fact that most of objects
-    // live in a very short amount of time. And those who survived the 
-    // first collection are typically stay there for a long time.
+    // Generational GC takes advantage of a fact that most objects are alive
+    // for a very short amount of time. Those who survived the first collection 
+    // are typically stay there for much longer.
+    //
     // In classic Baker collector both spaces are equal in rights and
     // are used interchangebly. In Generational GC right space is selected
     // as a storage for long living generation 1 whereas immediate generation 0 
     // objects are repeatedly allocated in the space one even after collection.
     
-    // This is a normal, most frequent collection mode.
-    // In this mode we move generation 0 objects from the
-    // left heap (heap one) to the right heap (heap two)
-    // so they'll become a generation 1 objects.
+    // In most frequent collection mode LeftToRight we move generation 0 objects from the
+    // left heap (heap one) to the right heap (heap two) so they'll become a generation 1 objects.
     //
-    // After objects are moved two further scenarios exist:
+    // After objects are moved two possible scenarios exist:
     //
     // 1. Normally, heap one is cleared and again used for further
     // allocations. Collector state is then set to csRightSpaceActive.
@@ -55,7 +54,7 @@ void GenerationalMemoryManager::collectGarbage()
 void GenerationalMemoryManager::collectLeftToRight()
 {
     // Classic baker algorithm moves objects after swapping the spaces, 
-    // but in our case we do not want to swap them now. Still in order to
+    // but in our case we do not want to swap them now. Still, in order to
     // satisfy moveObjects() we do this temporarily and then revert the pointers
     // to the needed state.
     uint8_t* storedHeapOnePointer = m_activeHeapPointer;
@@ -66,14 +65,21 @@ void GenerationalMemoryManager::collectLeftToRight()
     m_inactiveHeapBase = m_heapOne;
     m_inactiveHeapPointer = m_activeHeapPointer;
     
-    // Moving the objects
+    // Moving the objects from the left to the right heap
+    // TODO In certain circumstances right heap may not have
+    //      enough space to store all active objects from gen 0.
+    //      This may happen if massive allocation took place before
+    //      the collection was initiated. In this case we need to interrupt 
+    //      the collection, then allocate a new heap alrger and recollect 
+    //      ALL objects from both spaces to a new allocated heap. 
+    //      Then previous space is freed.
     moveObjects();
 
     uint8_t* lastHeapTwoPointer = m_activeHeapPointer;
     
     // Now, all active objects are located in the space two 
     // (inactive space in terms of classic Baker).
-    // Resetting the space one pointers so that it becomes empty.
+    // Resetting the space one pointers to mark space as empty.
     m_activeHeapBase    = m_heapOne;
     m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2;
     
