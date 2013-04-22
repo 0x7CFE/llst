@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     if (argc == 2)
         smalltalkImage->loadImage(argv[1]);
     else
-        smalltalkImage->loadImage("../image/testImage");
+        smalltalkImage->loadImage("../image/LittleSmalltalk.image");
 
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
@@ -66,29 +66,34 @@ int main(int argc, char **argv) {
         char firstLetter = keyString[0];
         if ( (keyString != "Smalltalk") && (firstLetter >= 'A') && (firstLetter <= 'Z') ) {
             TClass* currentClass = (TClass*) value;
-            TDictionary* methods = currentClass->methods;
-            const uint32_t keysSize = methods->keys->getSize();
-            
-            // Inserting class name
+
+            // Adding class name
             completionEngine->addWord(currentClass->name->toString());
-            
+
+            // Acquiring selectors of class methods
+            TSymbolArray* selectors = currentClass->methods->keys;
+            const uint32_t keysSize = selectors->getSize();
+
+            // Adding selectors
             for ( uint32_t methodIndex = 0; methodIndex < keysSize; methodIndex++) {
-                const std::string methodName = (*methods->keys)[methodIndex]->toString();
+                const std::string methodName = (*selectors)[methodIndex]->toString();
                 
-                // Inserting method name
+                // Adding method name
                 completionEngine->addWord(methodName);
             }
 
-            /* std::string metaClassName("Meta");
-            metaClassName += currentClass->name->toString();
+            // Adding metaclass name and methods
+            TClass* metaClass = currentClass->getClass();
+            //completionEngine->addWord(metaClass->name->toString());
 
-            TClass* metaClass = (TClass*) smalltalkImage->getGlobal(metaClassName.c_str());
-            if (metaClass) {
-                // Inserting metaclass name
-                completionEngine->addWord(metaClassName);
+            TSymbolArray*  metaSelectors = metaClass->methods->keys;
+            const uint32_t metaSize = metaSelectors->getSize();
+            for (uint32_t methodIndex = 0; methodIndex < metaSize; methodIndex++) {
+                const std::string methodName = (*metaSelectors)[methodIndex]->toString();
 
-                
-            }  */
+                // Adding meta method name
+                completionEngine->addWord(methodName);
+            }
         }
     }
 
@@ -156,8 +161,8 @@ int main(int argc, char **argv) {
     TMemoryManagerInfo info = memoryManager->getStat();
     
     int averageAllocs = info.collectionsCount ? (int) info.allocationsCount / info.collectionsCount : info.allocationsCount;
-    printf("\nGC count: %d, average allocations per gc: %d, microseconds spent in GC: %d\n", 
-           info.collectionsCount, averageAllocs, (uint32_t) info.totalCollectionDelay);
+    printf("\nGC count: %d (%d/%d), average allocations per gc: %d, microseconds spent in GC: %d\n", 
+           info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, (uint32_t) info.totalCollectionDelay);
     
     vm.printVMStat();
     runtime.printStat();

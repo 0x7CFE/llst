@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(llst)
+project(llst_project)
 
 if(LLVM_VERSION)
     set (CONFIG_COMMAND "llvm-config-${LLVM_VERSION}")
@@ -35,3 +35,14 @@ add_executable(llst ${CPP_FILES})
 target_link_libraries(llst ${LLVM_LIBS} -ldl -lpthread -lreadline)
 set_target_properties(llst PROPERTIES COMPILE_FLAGS "${COMPILER_FLAGS}")
 set_target_properties(llst PROPERTIES LINK_FLAGS "${LINKER_FLAGS}")
+
+set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
+add_custom_command(
+    OUTPUT  ${IMAGE_DIR}/LittleSmalltalk.image
+    COMMAND ${IMAGE_DIR}/imageBuilder
+    DEPENDS llst ${IMAGE_DIR}/imageSource.st
+    WORKING_DIRECTORY ${IMAGE_DIR}
+    COMMENT "Building image"
+)
+
+add_custom_target(image ALL DEPENDS ${IMAGE_DIR}/LittleSmalltalk.image)

@@ -378,7 +378,7 @@ void BakerMemoryManager::moveObjects()
         **iRoot = moveObject(**iRoot);
     }
     
-    // Updating external references. Typically this is pointers stored in the hptr<>
+    // Updating external references. Typically these are pointers stored in the hptr<>
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
         **iExternalPointer = moveObject(**iExternalPointer);
@@ -425,6 +425,8 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
 TMemoryManagerInfo BakerMemoryManager::getStat() 
 {
     TMemoryManagerInfo info;
+    memset(&info, 0, sizeof(info));
+    
     info.allocationsCount     = m_allocationsCount;
     info.collectionsCount     = m_collectionsCount;
     info.totalCollectionDelay = m_totalCollectionDelay;

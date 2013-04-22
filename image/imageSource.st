@@ -1128,8 +1128,8 @@ benchmark2: random | dict ms |
     dict <- Dictionary new.
     ms <- Timer millisecondsToRun: [
     random
-        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
-        ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
+        ifTrue:  [ 1 to: 20000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
+        ifFalse: [ 1 to: 20000 do: [ :x | dict at: x put: x ] ] ].
     dict printNl. 'size ' print. dict size printNl.
     ms printNl
 !
@@ -1138,6 +1138,19 @@ METHOD Undefined
 benchmark3: count | ms |
     ms <- Timer millisecondsToRun: [ Number primes: count ].
     'Found in ms: ' print. ms printNl.
+!
+
+METHOD Undefined
+benchmark4 | dict ms |
+    dict <- Dictionary new.
+    
+    "creating long living memory consumer"
+    1 to: 10000 do: [ :x | dict at: x put: x ].
+    'Load initialized' printNl.
+    
+    "now performing unrelated memory heavy operations"
+    ms <- Timer millisecondsToRun: [ 1 to: 1000000 do: [ :x | List new ] ].
+    'Cycle in ms: ' print. ms printNl.
 !
 
 METHOD Number
@@ -1330,7 +1343,7 @@ main    | command  x|
     ]."
     
     " main execution loop "
-    
+
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
             ifFalse: [ command doIt printNl ] ]

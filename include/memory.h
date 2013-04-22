@@ -47,6 +47,9 @@ struct TMemoryManagerInfo {
     uint32_t collectionsCount;
     uint32_t allocationsCount;
     uint64_t totalCollectionDelay;
+    
+    uint32_t leftToRightCollections;
+    uint32_t rightToLeftCollections;
 };
 
 // Generic interface to a memory manager.
@@ -172,7 +175,7 @@ public:
 // so thier space may be reused by newly allocated ones.
 // 
 class BakerMemoryManager : public IMemoryManager {
-private:
+protected:
     uint32_t  m_collectionsCount;
     uint32_t  m_allocationsCount;
     uint64_t  m_totalCollectionDelay;
@@ -199,7 +202,6 @@ private:
         TObject* data[0];
     };
 
-protected:
     // During GC we need to treat all objects in a very simple manner,
     // just as pointer holders. Class field is also a pointer so we
     // treat it just as one more object field.
@@ -214,7 +216,6 @@ protected:
     virtual void moveObjects();
     virtual void growHeap(uint32_t requestedSize);
     
-private:
     // These variables contain an array of pointers to objects from the
     // static heap to the dynamic one. Ihey are used during the GC
     // as a root for pointer iteration.
@@ -258,6 +259,21 @@ public:
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocationsCount; }
     
+    virtual TMemoryManagerInfo getStat();
+};
+
+class GenerationalMemoryManager : public BakerMemoryManager {
+protected:
+    void collectLeftToRight();
+    void collectRightToLeft();
+    bool checkThreshold();
+    
+    uint32_t m_leftToRightCollections;
+    uint32_t m_rightToLeftCollections;
+public:
+    GenerationalMemoryManager() : BakerMemoryManager(), m_leftToRightCollections(0), m_rightToLeftCollections(0) { }
+    virtual ~GenerationalMemoryManager();
+    virtual void collectGarbage();
     virtual TMemoryManagerInfo getStat();
 };
 
