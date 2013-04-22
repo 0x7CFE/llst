@@ -723,7 +723,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
             break;
             
         case primitive::throwError: // 19
-            fprintf(stderr, "VM: error trap on context %p\n", ec.currentContext.rawptr());
+            fprintf(stderr, "VM: error trap on context %p\n", (void*) ec.currentContext.rawptr());
             return returnError;
         
         //case flushCache:

@@ -20,14 +20,14 @@ enum Opcode {
     doPrimitive,
     doSpecial = 15
 };
-};
+}
 
 namespace unaryMessage {
 enum Opcode {
     isNil  = 0,
     notNil = 1
 };
-};
+}
 
 namespace binaryMessage {
 enum Operator {
@@ -35,7 +35,7 @@ enum Operator {
     operatorLessOrEq,
     operatorPlus
 };
-};
+}
 
 namespace special
 {
@@ -51,7 +51,7 @@ enum {
     sendToSuper = 11,
     breakpoint = 12
 };
-};
+}
 
 namespace pushConstants
 {
@@ -60,7 +60,7 @@ enum {
     trueObject,
     falseObject
 };
-};
+}
 
 namespace primitive
 {
@@ -112,8 +112,8 @@ enum IntegerOpcode {
     integerMul,
     integerSub,
     integerLess,
-    integerEqual,
+    integerEqual
 };
-};
+}
 
 #endif
