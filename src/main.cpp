@@ -48,7 +48,7 @@ int main(int argc, char **argv) {
     if (argc == 2)
         smalltalkImage->loadImage(argv[1]);
     else
-        smalltalkImage->loadImage("../image/testImage");
+        smalltalkImage->loadImage("../image/LittleSmalltalk.image");
 
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
