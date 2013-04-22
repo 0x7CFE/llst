@@ -120,8 +120,6 @@ int main(int argc, char **argv) {
     // FIXME image builder does not calculate temporary size
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42, false);
-
-    vm.pushProcess(initProcess);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);

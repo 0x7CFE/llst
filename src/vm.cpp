@@ -248,7 +248,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             currentProcess->context = ec.currentContext;
             currentProcess->result  = ec.returnedValue;
             
-            popProcess(); // FIXME get rid of this
             return returnTimeExpired;
         }
         
@@ -559,9 +558,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             ec.currentContext = ec.currentContext->previousContext;
             
             if (ec.currentContext.rawptr() == globals.nilObject) {
-                process = popProcess();
-                process->context  = ec.currentContext;
-                process->result   = ec.returnedValue;
+                process->context = ec.currentContext;
+                process->result  = ec.returnedValue;
                 return returnReturned;
             }
             
@@ -574,9 +572,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             ec.currentContext = ec.currentContext->previousContext;
             
             if (ec.currentContext.rawptr() == globals.nilObject) {
-                process = popProcess();
-                process->context  = ec.currentContext;
-                process->result   = ec.returnedValue;
+                process->context = ec.currentContext;
+                process->result  = ec.returnedValue;
                 return returnReturned;
             }
             
@@ -590,9 +587,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             ec.currentContext = contextAsBlock->creatingContext->previousContext;
             
             if (ec.currentContext.rawptr() == globals.nilObject) {
-                process = popProcess();
-                process->context  = ec.currentContext;
-                process->result   = ec.returnedValue;
+                process->context = ec.currentContext;
+                process->result  = ec.returnedValue;
                 return returnReturned;
             }
             
@@ -644,8 +640,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
         case special::breakpoint: {
             ec.bytePointer -= 1;
             
-            // FIXME do not waste time to store process on the stack. we do not need it
-            process = popProcess();
             process->context = ec.currentContext;
             process->result  = ec.returnedValue;
             
@@ -681,7 +675,6 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case pushConstants::trueObject:  stack[ec.stackTop++] = globals.trueObject;  break;
         case pushConstants::falseObject: stack[ec.stackTop++] = globals.falseObject; break;
         default:
-            /* TODO unknown push constant */ ;
             fprintf(stderr, "VM: unknown push constant %d\n", constant);
             exit(1);
     }
@@ -714,7 +707,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
     // primitiveNumber exceptions:
     // 19 - error trap
     // 8  - block invocation
-    // 34 - flush method cache    TODO
     
     switch (opcode) {
         case 255:
@@ -725,9 +717,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
         case primitive::throwError: // 19
             fprintf(stderr, "VM: error trap on context %p\n", (void*) ec.currentContext.rawptr());
             return returnError;
-        
-        //case flushCache:
-            //We don't need to put anything onto the stack
         
         case primitive::blockInvoke: // 8
             // We do not want to leave the block context which was just loaded
@@ -740,9 +729,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
             ec.currentContext = ec.currentContext->previousContext;
             
             if (ec.currentContext.rawptr() == globals.nilObject) {
-                process = popProcess();
-                process->context  = ec.currentContext;
-                process->result   = ec.returnedValue;
+                process->context = ec.currentContext;
+                process->result  = ec.returnedValue;
                 return returnReturned;
             }
             
@@ -823,7 +811,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             uint32_t  ticks = getIntegerValue(value);
             TProcess* newProcess = (TProcess*) stack[--ec.stackTop];
             
-            pushProcess(newProcess);
             // FIXME possible stack overflow due to recursive call
             TExecuteResult result = this->execute(newProcess, ticks);
             
@@ -872,12 +859,10 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             
             return block;
         } break;
-
-        // TODO case 18 // turn on debugging
         
         case primitive::throwError: // 19
-            process = popProcess();
             process->context = ec.currentContext;
+            process->result  = ec.returnedValue;
             break;
         
         case primitive::allocateByteArray: { // 20
@@ -999,6 +984,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         } break;
         
         // TODO cases 33, 35, 40
+        // TODO case 18 // turn on debugging
         
         case primitive::objectsAreEqual:    // 1
         case primitive::getClass:           // 2
