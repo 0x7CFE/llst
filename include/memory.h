@@ -271,7 +271,7 @@ protected:
     uint32_t m_leftToRightCollections;
     uint32_t m_rightToLeftCollections;
 public:
-    GenerationalMemoryManager() : m_leftToRightCollections(0), m_rightToLeftCollections(0) { }
+    GenerationalMemoryManager() : BakerMemoryManager(), m_leftToRightCollections(0), m_rightToLeftCollections(0) { }
     virtual ~GenerationalMemoryManager();
     virtual void collectGarbage();
     virtual TMemoryManagerInfo getStat();

@@ -1,4 +1,6 @@
 #include <memory.h>
+
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -9,6 +11,8 @@ GenerationalMemoryManager::~GenerationalMemoryManager()
 
 void GenerationalMemoryManager::collectGarbage()
 {
+//     printf("GMM: collectGarbage()\n");
+    
     // Generational GC takes advantage of a fact that most objects are alive
     // for a very short amount of time. Those who survived the first collection 
     // are typically stay there for much longer.
@@ -115,4 +119,5 @@ TMemoryManagerInfo GenerationalMemoryManager::getStat() {
     TMemoryManagerInfo info = BakerMemoryManager::getStat();
     info.leftToRightCollections = m_leftToRightCollections;
     info.rightToLeftCollections = m_rightToLeftCollections;
+    return info;
 }
