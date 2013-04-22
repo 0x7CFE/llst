@@ -31,24 +31,6 @@ void GenerationalMemoryManager::collectGarbage()
     collectLeftToRight();
     if (checkThreshold())
         collectRightToLeft();
-    
-    /* switch (m_currentState) {
-        case csRightSpaceEmpty:
-            collectLeftToRight();
-            break;
-
-        case csRightSpaceActive:
-            collectLeftToRight();
-            checkThreshold();
-            break;
-
-        case csRightCollect:
-            collectRightToLeft();
-            break;
-
-        default:
-            fprintf(stderr, "GMM: Invalid state code %d", (uint32_t) m_currentState);
-    } */
 }
 
 void GenerationalMemoryManager::collectLeftToRight()
@@ -57,13 +39,11 @@ void GenerationalMemoryManager::collectLeftToRight()
     // but in our case we do not want to swap them now. Still, in order to
     // satisfy moveObjects() we do this temporarily and then revert the pointers
     // to the needed state.
-    uint8_t* storedHeapOnePointer = m_activeHeapPointer;
-    uint8_t* storedHeapTwoPointer = m_inactiveHeapPointer;
     
     // Setting the heap two as active leaving the heap pointer as is
-    m_activeHeapBase   = m_heapTwo;
-    m_inactiveHeapBase = m_heapOne;
-    m_inactiveHeapPointer = m_activeHeapPointer;
+    m_activeHeapBase    = m_heapTwo;
+    m_inactiveHeapBase  = m_heapOne;
+    m_activeHeapPointer = m_inactiveHeapPointer; // heap two
     
     // Moving the objects from the left to the right heap
     // TODO In certain circumstances right heap may not have
@@ -88,13 +68,6 @@ void GenerationalMemoryManager::collectLeftToRight()
 
     // After this operation active objects from space one now all
     // in space two and are treated as generation 1.
-
-    // If no objects were moved (all were collected) then we do not need
-    // to switch the collector state because heap two remains empty
-//     if ((m_currentState == csRightSpaceEmpty) && (storedHeapTwoPointer != lastHeapTwoPointer)) {
-//         // Some objects moved to the space two
-//         m_currentState = csRightSpaceActive;
-//     }
 }
 
 void GenerationalMemoryManager::collectRightToLeft()
@@ -112,7 +85,7 @@ void GenerationalMemoryManager::collectRightToLeft()
     m_inactiveHeapPointer = m_heapTwo + m_heapSize / 2;
 }
 
-void GenerationalMemoryManager::checkThreshold()
+bool GenerationalMemoryManager::checkThreshold()
 {
     return (m_inactiveHeapPointer - m_inactiveHeapBase < m_heapSize / 8);
 }

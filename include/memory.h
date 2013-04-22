@@ -261,18 +261,11 @@ public:
 
 class GenerationalMemoryManager : public BakerMemoryManager {
 protected:
-//     enum TCollectorState {
-//         csRightSpaceEmpty,  // [***   |      ]
-//         csRightSpaceActive, // [***   |XX    ]
-//         csRightCollect      // [  <---|XXXXX ]
-//     };
-
-    //TCollectorState m_currentState;
     void collectLeftToRight();
     void collectRightToLeft();
     bool checkThreshold();
 public:
-    GenerationalMemoryManager() /*: m_currentState(csRightSpaceEmpty)*/ { }
+    GenerationalMemoryManager() { }
     virtual ~GenerationalMemoryManager();
     virtual void collectGarbage();
     
