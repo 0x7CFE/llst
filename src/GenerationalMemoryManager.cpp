@@ -50,9 +50,10 @@ void GenerationalMemoryManager::collectLeftToRight()
     //      enough space to store all active objects from gen 0.
     //      This may happen if massive allocation took place before
     //      the collection was initiated. In this case we need to interrupt 
-    //      the collection, then allocate a new heap alrger and recollect 
+    //      the collection, then allocate a new larger heap and recollect 
     //      ALL objects from both spaces to a new allocated heap. 
-    //      Then previous space is freed.
+    //      After that old space is freed and new is treated either as heap one
+    //      or heap two depending on the size.
     moveObjects();
 
     uint8_t* lastHeapTwoPointer = m_activeHeapPointer;
@@ -72,17 +73,20 @@ void GenerationalMemoryManager::collectLeftToRight()
 
 void GenerationalMemoryManager::collectRightToLeft()
 {
-    uint8_t* storedHeapOnePointer = m_activeHeapPointer;
-    uint8_t* storedHeapTwoPointer = m_inactiveHeapPointer;
-
     m_activeHeapBase    = m_heapOne;
     m_inactiveHeapBase  = m_heapTwo;
     m_activeHeapPointer = m_heapOne + m_heapSize / 2;
 
     moveObjects();
+    
+    // Objects were moved from right heap to the left one.
+    // Now right heap may be emptied by resetting the heap pointer
 
     // Resetting heap two
     m_inactiveHeapPointer = m_heapTwo + m_heapSize / 2;
+    
+    // m_activeHeapPointer remains there and used for futher allocations
+    // because heap one remains active
 }
 
 bool GenerationalMemoryManager::checkThreshold()
