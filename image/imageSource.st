@@ -775,6 +775,16 @@ goto |x testBlock|
     [ testBlock value: 4. x ] assertEq: 4 withComment: '5'.
 !
 
+METHOD BranchTest
+phi |x|     
+    x <- (true ifTrue:  [ 11 ]
+               ifFalse: [ 17 ] ) +
+         (true ifTrue:  [ 13 ]
+               ifFalse: [ 15 ] ).
+    
+    [ x ] assertEq: 24.
+!
+
 COMMENT                                                                                                 --------LoopTest----------
 CLASS LoopTest Test
 
