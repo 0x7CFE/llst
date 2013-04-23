@@ -778,6 +778,12 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
             try {
                 return sendMessage(ec.currentContext, selector, args, 0);
+            } catch(TBlockReturn blockReturn) {
+                //When we catch blockReturn we change the current context to block.creatingContext.
+                //The post processing code will change 'block.creatingContext' to the previous one
+                // and the result of blockReturn will be injected on the stack
+                ec.currentContext = blockReturn.targetContext;
+                return blockReturn.value;
             } catch(...) {
                 printf("error caught\n");
                 exit(1);
