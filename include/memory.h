@@ -50,6 +50,7 @@ struct TMemoryManagerInfo {
     
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
+    uint64_t rightCollectionDelay;
 };
 
 // Generic interface to a memory manager.
@@ -64,6 +65,7 @@ public:
     virtual void* staticAllocate(size_t size) = 0;
     virtual void  collectGarbage() = 0;
     
+    virtual bool  checkRoot(TObject* value, TObject** objectSlot) = 0;
     virtual void  addStaticRoot(TObject** pointer) = 0;
     virtual void  removeStaticRoot(TObject** pointer) = 0;
     virtual bool  isInStaticHeap(void* location) = 0;
@@ -247,6 +249,7 @@ public:
     virtual void* staticAllocate(size_t requestedSize);
     virtual void  collectGarbage();
     
+    virtual bool  checkRoot(TObject* value, TObject** objectSlot);
     virtual void  addStaticRoot(TObject** pointer);
     virtual void  removeStaticRoot(TObject** pointer);
     virtual bool  isInStaticHeap(void* location);
@@ -270,9 +273,20 @@ protected:
     
     uint32_t m_leftToRightCollections;
     uint32_t m_rightToLeftCollections;
+    uint32_t m_rightCollectionDelay;
+    
+    bool isInYoungHeap(void* location);
+    void addCrossgenReference(TObject** pointer);
+    void removeCrossgenReference(TObject** pointer);
+    void moveYoungObjects();
+    
+    TPointerList m_crossGenerationalReferences;
 public:
-    GenerationalMemoryManager() : BakerMemoryManager(), m_leftToRightCollections(0), m_rightToLeftCollections(0) { }
+    GenerationalMemoryManager() : BakerMemoryManager(), 
+        m_leftToRightCollections(0), m_rightToLeftCollections(0), m_rightCollectionDelay(0) { }
     virtual ~GenerationalMemoryManager();
+    
+    virtual bool checkRoot(TObject* value, TObject** objectSlot);
     virtual void collectGarbage();
     virtual TMemoryManagerInfo getStat();
 };

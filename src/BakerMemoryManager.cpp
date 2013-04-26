@@ -139,8 +139,8 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
             // If even after collection there is too less space
             // we may try to expand the heap
-            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 8))
-                growHeap(requestedSize);
+            //if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 8))
+            //    growHeap(requestedSize);
 
             if (gcOccured)
                 *gcOccured = true;
@@ -388,6 +388,48 @@ void BakerMemoryManager::moveObjects()
 bool BakerMemoryManager::isInStaticHeap(void* location)
 {
     return (location >= m_staticHeapPointer) && (location < m_staticHeapBase + m_staticHeapSize);
+}
+
+bool BakerMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
+{
+    // Here we need to perform some actions depending on whether the object slot and
+    // the value resides. Generally, all pointers from the static heap to the dynamic one
+    // should be tracked by the GC because it may be the only valid link to the object.
+    // Object may be collected otherwise.
+    
+    bool slotIsStatic  = isInStaticHeap(objectSlot);
+    
+    // Only static slots are subject of our interest
+    if (slotIsStatic) {
+        TObject* oldValue  = *objectSlot;
+        
+        bool valueIsStatic = isInStaticHeap(value);
+        bool oldValueIsStatic = isInStaticHeap(oldValue);
+        
+        if (!valueIsStatic) {
+            // Adding dynamic value to a static slot. If slot previously contained
+            // the dynamic value then it means that slot was already registered before.
+            // In that case we do not need to register it again.
+            
+            if (oldValueIsStatic) {
+                addStaticRoot(objectSlot);
+                return true; // Root list was altered
+            }
+        } else {
+            // Adding static value to a static slot. Typically it means assigning something
+            // like nilObject. We need to check what pointer was in the slot before (oldValue).
+            // If it was dynamic, we need to remove the slot from the root list, so GC will not
+            // try to collect a static value from the static heap (it's just a waste of time).
+            
+            if (!oldValueIsStatic) {
+                removeStaticRoot(objectSlot);
+                return true; // Root list was altered
+            }
+        }
+    }
+    
+    // Root list was not altered
+    return false;
 }
 
 void BakerMemoryManager::addStaticRoot(TObject** pointer)

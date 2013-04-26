@@ -9,6 +9,28 @@ GenerationalMemoryManager::~GenerationalMemoryManager()
     // Nothing to do here
 }
 
+void GenerationalMemoryManager::moveYoungObjects()
+{
+    TPointerIterator iYoungPointer = m_crossGenerationalReferences.begin();
+    for (; iYoungPointer != m_crossGenerationalReferences.end(); ++iYoungPointer)
+        moveObject(**iYoungPointer);
+    
+    m_crossGenerationalReferences.clear();
+    
+    // Updating external references. Typically these are pointers stored in the hptr<>
+    TPointerIterator iExternalPointer = m_externalPointers.begin();
+    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+        **iExternalPointer = moveObject(**iExternalPointer);
+    }
+    
+    TStaticRootsIterator iRoot = m_staticRoots.begin();
+    for (; iRoot != m_staticRoots.end(); ++iRoot) {
+        if (isInYoungHeap(**iRoot))
+            **iRoot = moveObject(**iRoot);
+    }
+    
+}
+
 void GenerationalMemoryManager::collectGarbage()
 {
 //     printf("GMM: collectGarbage()\n");
@@ -28,7 +50,7 @@ void GenerationalMemoryManager::collectGarbage()
     // After objects are moved two possible scenarios exist:
     //
     // 1. Normally, heap one is cleared and again used for further
-    // allocations. Collector state is then set to csRightSpaceActive.
+    // allocations.
     //
     // 2. If amount of free space in the heap two is below threshold,
     // additional collection takes place which moves all objects
@@ -73,7 +95,7 @@ void GenerationalMemoryManager::collectLeftToRight()
     //      ALL objects from both spaces to a new allocated heap. 
     //      After that old space is freed and new is treated either as heap one
     //      or heap two depending on the size.
-    moveObjects();
+    moveYoungObjects();
 
     uint8_t* lastHeapTwoPointer = m_activeHeapPointer;
     
@@ -93,6 +115,10 @@ void GenerationalMemoryManager::collectLeftToRight()
 
 void GenerationalMemoryManager::collectRightToLeft()
 {
+    // Storing timestamp on start
+    timeval tv1;
+    gettimeofday(&tv1, NULL);
+    
     m_activeHeapBase    = m_heapOne;
     m_inactiveHeapBase  = m_heapTwo;
     m_activeHeapPointer = m_heapOne + m_heapSize / 2;
@@ -108,6 +134,13 @@ void GenerationalMemoryManager::collectRightToLeft()
     // m_activeHeapPointer remains there and used for futher allocations
     // because heap one remains active
     m_rightToLeftCollections++;
+    
+    // Storing timestamp of the end
+    timeval tv2;
+    gettimeofday(&tv2, NULL);
+    
+    // Calculating total microseconds spent in the garbage collection procedure
+    m_rightCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
 }
 
 bool GenerationalMemoryManager::checkThreshold()
@@ -119,5 +152,59 @@ TMemoryManagerInfo GenerationalMemoryManager::getStat() {
     TMemoryManagerInfo info = BakerMemoryManager::getStat();
     info.leftToRightCollections = m_leftToRightCollections;
     info.rightToLeftCollections = m_rightToLeftCollections;
+    info.rightCollectionDelay = m_rightCollectionDelay;
     return info;
+}
+
+bool GenerationalMemoryManager::isInYoungHeap(void* location)
+{
+    return (location >= m_activeHeapPointer) && (location < m_activeHeapBase + m_heapSize / 2);
+}
+
+bool GenerationalMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
+{
+    bool inheritedResult = BakerMemoryManager::checkRoot(value, objectSlot);
+    
+    // checkRoot is called during the normal program operation in which
+    // generational GC is using left heap for young objects
+    bool valueIsYoung = isInYoungHeap(value);
+    bool slotIsYoung  = isInYoungHeap(objectSlot);
+    
+    if (! slotIsYoung) {
+        // Slot is either in old generation or in static roots
+        
+        TObject* previousValue = *objectSlot;
+        bool previousValueIsYoung   = isInYoungHeap(previousValue);
+        
+        if (valueIsYoung) {
+            if (! previousValueIsYoung) {
+                addCrossgenReference(objectSlot);
+                return true;
+            }                
+        } else {
+            if (previousValueIsYoung) {
+                removeCrossgenReference(objectSlot);
+                return true;
+            }
+        }
+    }
+    
+    return inheritedResult;
+}
+
+void GenerationalMemoryManager::addCrossgenReference(TObject** pointer) 
+{
+    //printf("addCrossgenReference %p", pointer);
+    m_crossGenerationalReferences.push_front((TMovableObject**) pointer);
+}
+
+void GenerationalMemoryManager::removeCrossgenReference(TObject** pointer)
+{
+    TPointerIterator iPointer = m_crossGenerationalReferences.begin();
+    for (; iPointer != m_crossGenerationalReferences.end(); ++iPointer) {
+        if (*iPointer == (TMovableObject**) pointer) {
+            m_crossGenerationalReferences.erase(iPointer);
+            return;
+        }
+    }
 }

@@ -127,44 +127,7 @@ template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool reg
 
 bool SmalltalkVM::checkRoot(TObject* value, TObject** objectSlot)
 {
-    // Here we need to perform some actions depending on whether the object slot and
-    // the value resides. Generally, all pointers from the static heap to the dynamic one
-    // should be tracked by the GC because it may be the only valid link to the object.
-    // Object may be collected otherwise.
-
-    bool valueIsStatic = m_memoryManager->isInStaticHeap(value);
-    bool slotIsStatic  = m_memoryManager->isInStaticHeap(objectSlot);
-
-    TObject* oldValue  = *objectSlot;
-
-    // Only static slots are subject of our interest
-    if (slotIsStatic) {
-        bool oldValueIsStatic = m_memoryManager->isInStaticHeap(oldValue);
-        
-        if (!valueIsStatic) {
-            // Adding dynamic value to a static slot. If slot previously contained
-            // the dynamic value then it means that slot was already registered before.
-            // In that case we do not need to register it again.
-
-            if (oldValueIsStatic) {
-                m_memoryManager->addStaticRoot(objectSlot);
-                return true; // Root list was altered
-            }
-        } else {
-            // Adding static value to a static slot. Typically it means assigning something
-            // like nilObject. We need to check what pointer was in the slot before (oldValue).
-            // If it was dynamic, we need to remove the slot from the root list, so GC will not
-            // try to collect a static value from the static heap (it's just a waste of time).
-
-            if (!oldValueIsStatic) {
-                m_memoryManager->removeStaticRoot(objectSlot);
-                return true; // Root list was altered
-            }
-        }
-    }
-    
-    // Root list was not altered
-    return false;
+    return m_memoryManager->checkRoot(value, objectSlot);
 }
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)

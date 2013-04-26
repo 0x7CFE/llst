@@ -1145,11 +1145,11 @@ benchmark4 | dict ms |
     dict <- Dictionary new.
     
     "creating long living memory consumer"
-    1 to: 10000 do: [ :x | dict at: x put: x ].
+    1 to: 1000 do: [ :x | dict at: x put: List new ].
     'Load initialized' printNl.
     
     "now performing unrelated memory heavy operations"
-    ms <- Timer millisecondsToRun: [ 1 to: 1000000 do: [ :x | List new ] ].
+    ms <- Timer millisecondsToRun: [ 1 to: 10000000 do: [ :x | List new ] ].
     'Cycle in ms: ' print. ms printNl.
 !
 
@@ -1344,6 +1344,8 @@ main    | command  x|
     
     " main execution loop "
 
+    nil benchmark: 10000.
+    
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
             ifFalse: [ command doIt printNl ] ]
