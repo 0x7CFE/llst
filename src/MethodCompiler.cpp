@@ -1477,6 +1477,30 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             primitiveFailed = jit.builder->CreateNot(isBulkReplaceSucceeded);
         } break;
         
+        case primitive::LLVMsendMessage: {
+            Value* args     = jit.builder->CreateBitCast( jit.popValue(), m_baseTypes.objectArray->getPointerTo() );
+            Value* selector = jit.builder->CreateBitCast( jit.popValue(), m_baseTypes.symbol->getPointerTo() );
+            Value* context  = jit.getCurrentContext();
+            
+            Value* sendMessageArgs[] = {
+                context, // calling context
+                selector,
+                args,
+                // default receiver class
+                ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) //inttoptr 0 works fine too
+            };
+            
+            // Now performing a message call
+            Value* sendMessageResult = 0;
+            if (jit.methodHasBlockReturn) {
+                sendMessageResult = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, primitiveSucceededBB, jit.exceptionLandingPad, sendMessageArgs);
+            } else {
+                sendMessageResult = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
+            }
+            primitiveResult = sendMessageResult;
+        } break;
+        
+        case primitive::getSystemTicks:
         default: {
             // Here we need to create the arguments array from the values on the stack
             uint8_t argumentsCount = jit.instruction.low;

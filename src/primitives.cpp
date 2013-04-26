@@ -4,6 +4,7 @@
 #include <opcodes.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/time.h>
 
 TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveFailed) {
     primitiveFailed = false;
@@ -118,6 +119,13 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
             
             // Performing an operation
             return callSmallIntPrimitive(opcode, leftOperand, rightOperand, primitiveFailed);
+        } break;
+        
+        // FIXME opcodes 253-255 are not standard
+        case primitive::getSystemTicks: { //253
+            timeval tv;
+            gettimeofday(&tv, NULL);
+            return reinterpret_cast<TObject*>(newInteger( (tv.tv_sec*1000000 + tv.tv_usec) / 1000));
         } break;
         
         default: {

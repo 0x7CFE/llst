@@ -36,7 +36,6 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <sys/time.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <opcodes.h>
@@ -686,10 +685,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
     uint8_t      opcode = (*ec.currentContext->method->byteCodes)[ec.bytePointer++];
     
     // First of all, executing the primitive
-    // Then popping back the context to the previous one.
-    // If primitive fails, context does not affected, so
-    // execution flow resumes in the current method after
-    // the primitive call.
+    // If primitive succeeds then stop execution of the current method
+    //   and push the result onto the stack of the previous context
+    //
+    // If primitive fails, execution flow resumes in the current method after the primitive call.
     //
     // NOTE: Some primitives do not affect the execution
     //       context. These are handled separately in the
@@ -698,6 +697,10 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
     bool failed = false;
     ec.returnedValue = performPrimitive(opcode, process, ec, failed);
     
+    //LLVMsendMessage primitive may fail only if during execution throwError was called
+    if (failed && opcode == primitive::LLVMsendMessage) {
+        return returnError;
+    }
     //If primitive failed during execution we should continue execution in the current method
     if (failed) {
         stack[ec.stackTop++] = globals.nilObject;
@@ -715,7 +718,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
             break;
             
         case primitive::throwError: // 19
-            fprintf(stderr, "VM: error trap on context %p\n", (void*) ec.currentContext.rawptr());
             return returnError;
         
         case primitive::blockInvoke: // 8
@@ -733,9 +735,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
                 process->result  = ec.returnedValue;
                 return returnReturned;
             }
-            
-//             if (opcode == 252)
-//                 printf("returnedValue = %d\n", ec.returnedValue.rawptr());
             
             // Inject the result...
             ec.stackTop = getIntegerValue(ec.currentContext->stackTop);
@@ -767,13 +766,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             m_memoryManager->collectGarbage();
             break;
         
-        case 253: {
-            timeval tv;
-            gettimeofday(&tv, NULL);
-            return reinterpret_cast<TObject*>(newInteger( (tv.tv_sec*1000000 + tv.tv_usec) / 1000));
-        } break;
-        
-        case 252: {
+        case primitive::LLVMsendMessage: { //252
             TObjectArray* args = (TObjectArray*) stack[--ec.stackTop];
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
             try {
@@ -784,9 +777,13 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 // and the result of blockReturn will be injected on the stack
                 ec.currentContext = blockReturn.targetContext;
                 return blockReturn.value;
-            } catch(...) {
-                printf("error caught\n");
-                exit(1);
+            } catch(TContext* errorContext) {
+                //context is thrown by LLVM:throwError primitive
+                //that means that it was not caught by LLVM:executeProcess function
+                //so we have to stop execution of the current process and return returnError
+                process->context = errorContext;
+                failed = true;
+                return globals.nilObject;
             }
         } break;
         
@@ -1012,6 +1009,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::smallIntBitOr:      // 36
         case primitive::smallIntBitAnd:     // 37
         case primitive::smallIntBitShift:   // 39
+        
+        case primitive::getSystemTicks:     //253
         
         default: {
             hptr<TObjectArray> pStack = newPointer(ec.currentContext->stack);

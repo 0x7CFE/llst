@@ -77,7 +77,9 @@ enum {
     cloneByteObject   = 23,
     integerNew        = 32,
     flushCache        = 34,
-    bulkReplace       = 38
+    bulkReplace       = 38,
+    LLVMsendMessage   = 252,
+    getSystemTicks    = 253
 };
 
 enum SmallIntOpcode {
