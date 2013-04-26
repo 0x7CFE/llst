@@ -22,14 +22,14 @@ enum Opcode {
 };
 }
 
-namespace unaryMessage {
+namespace unaryBuiltIns {
 enum Opcode {
     isNil  = 0,
     notNil = 1
 };
 }
 
-namespace binaryMessage {
+namespace binaryBuiltIns {
 enum Operator {
     operatorLess  = 0,
     operatorLessOrEq,
@@ -48,8 +48,7 @@ enum {
     branch,
     branchIfTrue,
     branchIfFalse,
-    sendToSuper = 11,
-    breakpoint = 12
+    sendToSuper = 11
 };
 }
 

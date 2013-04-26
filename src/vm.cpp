@@ -476,9 +476,9 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
     TObjectArray& stack = *ec.currentContext->stack;
     TObject*        top = stack[--ec.stackTop];
     
-    switch ((unaryMessage::Opcode) ec.instruction.low) {
-        case unaryMessage::isNil  : ec.returnedValue = (top == globals.nilObject) ? globals.trueObject : globals.falseObject; break;
-        case unaryMessage::notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
+    switch ((unaryBuiltIns::Opcode) ec.instruction.low) {
+        case unaryBuiltIns::isNil  : ec.returnedValue = (top == globals.nilObject) ? globals.trueObject : globals.falseObject; break;
+        case unaryBuiltIns::notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         
         default:
             fprintf(stderr, "VM: Invalid opcode %d passed to sendUnary\n", ec.instruction.low);
@@ -506,16 +506,16 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         bool unusedCondition;
         
         // Performing an operation
-        switch ((binaryMessage::Operator) ec.instruction.low) {
-            case binaryMessage::operatorLess:
+        switch ((binaryBuiltIns::Operator) ec.instruction.low) {
+            case binaryBuiltIns::operatorLess:
                 ec.returnedValue = (leftOperand < rightOperand) ? globals.trueObject : globals.falseObject;
                 break;
             
-            case binaryMessage::operatorLessOrEq:
+            case binaryBuiltIns::operatorLessOrEq:
                 ec.returnedValue = (leftOperand <= rightOperand) ? globals.trueObject : globals.falseObject;
                 break;
             
-            case binaryMessage::operatorPlus:
+            case binaryBuiltIns::operatorPlus:
                 ec.returnedValue = callSmallIntPrimitive(primitive::smallIntAdd, leftOperand, rightOperand, unusedCondition);
                 break;
             
@@ -551,7 +551,8 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
     TObjectArray& arguments  = * ec.currentContext->arguments;
     TSymbolArray& literals   = * ec.currentContext->method->literals;
     
-    switch(ec.instruction.low) {
+    switch(ec.instruction.low)
+    {
         case special::selfReturn: {
             ec.returnedValue  = arguments[0]; // arguments[0] always keep self
             ec.currentContext = ec.currentContext->previousContext;
@@ -635,17 +636,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             
             doSendMessage(ec, messageSelector, messageArguments, receiverClass);
         } break;
-        
-        case special::breakpoint: {
-            ec.bytePointer -= 1;
-            
-            process->context = ec.currentContext;
-            process->result  = ec.returnedValue;
-            
-            ec.storePointers();
-            return returnBreak;
-        } break;
-        
     }
     
     return returnNoReturn;

@@ -816,9 +816,9 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
     Value* value     = jit.popValue();
     Value* condition = 0;
     
-    switch ((unaryMessage::Opcode) jit.instruction.low) {
-        case unaryMessage::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
-        case unaryMessage::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
+    switch ((unaryBuiltIns::Opcode) jit.instruction.low) {
+        case unaryBuiltIns::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
+        case unaryBuiltIns::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
         
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
@@ -859,10 +859,10 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     Value* intResult       = 0;  // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
-    switch ((binaryMessage::Operator) opcode) {
-        case binaryMessage::operatorLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
-        case binaryMessage::operatorLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break;
-        case binaryMessage::operatorPlus    : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
+    switch ((binaryBuiltIns::Operator) opcode) {
+        case binaryBuiltIns::operatorLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
+        case binaryBuiltIns::operatorLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break;
+        case binaryBuiltIns::operatorPlus    : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
         default:
             fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
     }
@@ -1115,10 +1115,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             Value* resultHolder = protectPointer(jit, result);
             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
-        
-        //case SmalltalkVM::breakpoint:
-        // TODO breakpoint
-        //break;
         
         default:
             printf("JIT: unknown special opcode %d\n", opcode);

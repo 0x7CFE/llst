@@ -51,8 +51,8 @@ std::string TInstruction::toString()
         case opcode::sendUnary: {
             ss << "SendUnary ";
             switch(low) {
-                case unaryMessage::isNil:  ss << "isNil";    break;
-                case unaryMessage::notNil: ss << "isNotNil"; break;
+                case unaryBuiltIns::isNil:  ss << "isNil";    break;
+                case unaryBuiltIns::notNil: ss << "isNotNil"; break;
                 default: {
                     throw std::runtime_error(errSs.str());
                 }
@@ -61,9 +61,9 @@ std::string TInstruction::toString()
         case opcode::sendBinary: {
             ss << "SendBinary ";
             switch(low) {
-                case binaryMessage::operatorPlus:     ss << "+";  break;
-                case binaryMessage::operatorLess:     ss << "<";  break;
-                case binaryMessage::operatorLessOrEq: ss << "<="; break;
+                case binaryBuiltIns::operatorPlus:     ss << "+";  break;
+                case binaryBuiltIns::operatorLess:     ss << "<";  break;
+                case binaryBuiltIns::operatorLessOrEq: ss << "<="; break;
                 default: {
                     throw std::runtime_error(errSs.str());
                 }
@@ -83,7 +83,6 @@ std::string TInstruction::toString()
                 case special::branchIfTrue:     ss << "branchIfTrue";   break;
                 case special::branchIfFalse:    ss << "branchIfFalse";  break;
                 case special::sendToSuper:      ss << "sendToSuper";    break;
-                case special::breakpoint:       ss << "breakpoint";     break;
                 default: {
                     throw std::runtime_error(errSs.str());
                 }
