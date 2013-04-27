@@ -335,9 +335,14 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         newContext->method            = method;
         newContext->previousContext   = previousContext;
     }
-    
-    TObject* result = compiledMethodFunction(newContext);
-    return result;
+    try {
+        TObject* result = compiledMethodFunction(newContext);
+        return result;
+    } catch( ... ) {
+        //FIXME
+        //Do not remove this try catch (you will get "terminate called after throwing an instance of 'TContext*' or 'TBlockReturn'")
+        throw;
+    }
 }
 
 void JITRuntime::initializeGlobals() {
