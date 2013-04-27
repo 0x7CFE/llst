@@ -1337,6 +1337,8 @@ main    | command  x|
     
     Char initialize.
     
+    LLVM do: [ BranchTest new phi ].
+    
     "CompareTest new runAll.
     StringTest new runAll.
     LoopTest new runAll.

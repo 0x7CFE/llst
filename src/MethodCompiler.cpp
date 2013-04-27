@@ -198,6 +198,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
         switch (blockContext.referers.size()) {
             case 0: 
                 /* TODO no referers, empty local stack and pop operation = error */ 
+                outs() << * builder->GetInsertBlock()->getParent();
                 outs() << "Value stack underflow\n";
                 exit(1);
                 return compiler->m_globals.nilObject;
@@ -237,8 +238,18 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
                 Value* holder = compiler->protectPointer(*this, phi);
                 
                 // Filling incoming nodes with values from the referer stacks
+                static int indentLevel = 0;
+                if (builder->GetInsertBlock()->getParent()->getName().str() == "BranchTest>>phi") {
+                    const char* m = "processing phi";
+                    printf("\n%*s\n", indentLevel + strlen(m), m );
+                }
+                indentLevel++;
                 TRefererSet::iterator iReferer = blockContext.referers.begin();
                 for (; iReferer != blockContext.referers.end(); ++iReferer) {
+                    if (builder->GetInsertBlock()->getParent()->getName().str() == "BranchTest>>phi") {
+                        const char* m = (*iReferer)->getName().str().c_str();
+                        printf("%*s\n", indentLevel + strlen(m), m );
+                    }
                     // FIXME non filled block will not yet have the value
                     //       we need to store them to a special post processing list
                     //       and update the current phi function when value will be available
@@ -246,7 +257,11 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
                     Value* value = popValue(*iReferer);
                     phi->addIncoming(value, *iReferer);
                 }
-                
+                indentLevel--;
+                if (builder->GetInsertBlock()->getParent()->getName().str() == "BranchTest>>phi") {
+                    const char* m = "end phi";
+                    printf("%*s\n", indentLevel + strlen(m), m );
+                }
                 builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
                 
                 return builder->CreateLoad(holder);
@@ -830,6 +845,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     uint8_t opcode = jit.instruction.low;
     
     Value* rightValue = jit.popValue();
+    if (jit.function->getName() == "BranchTest>>phi") {
+        printf("\n pop leftValue \n");
+    }
     Value* leftValue  = jit.popValue();
     
     // Checking if values are both small integers

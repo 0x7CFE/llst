@@ -1,0 +1,51 @@
+METHOD BranchTest
+phi |x|     
+    x <- (true ifTrue:  [ 11 ]
+               ifFalse: [ 17 ] ) +
+         (true ifTrue:  [ 13 ]
+               ifFalse: [ 15 ] ).
+    
+    [ x ] assertEq: 24.
+!
+
+
+0000 PushConstant true
+0001 DoSpecial branchIfFalse 8
+0004 PushLiteral 0         ; SmallInt 11
+0005 DoSpecial branch 9
+0008 PushLiteral 1         ; SmallInt 17
+0009 PushConstant true
+0010 DoSpecial branchIfFalse 17
+0013 PushLiteral 2         ; SmallInt 13
+0014 DoSpecial branch 18
+0017 PushLiteral 3         ; SmallInt 15
+0018 SendBinary +
+0019 AssignTemporary 0
+0020 DoSpecial popTop
+0021 PushBlock
+0024     PushTemporary 0
+0025     DoSpecial stackReturn
+0026 PushLiteral 4         ; #assertEq:
+0027 MarkArguments 2
+0028 SendMessage assertEq:
+0029 DoSpecial popTop
+0030 DoSpecial selfReturn
+
+
+
+
+A   B    A   B
+ \ /      \ /
+  C        D
+   \      /
+     \  /
+       E
+
+A: push
+B: push
+C: push
+D: push
+
+E: pop -> phi C , D
+E: pop -> phi -> C  pop -> phi A, B
+                 D  pop -> Value stack underflow
