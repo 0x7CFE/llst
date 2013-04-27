@@ -9,24 +9,38 @@ GenerationalMemoryManager::~GenerationalMemoryManager()
     // Nothing to do here
 }
 
-void GenerationalMemoryManager::moveYoungObjects()
+void GenerationalMemoryManager::moveYoungObjects(void* heapOnePointer)
 {
     TPointerIterator iYoungPointer = m_crossGenerationalReferences.begin();
     for (; iYoungPointer != m_crossGenerationalReferences.end(); ++iYoungPointer)
         moveObject(**iYoungPointer);
-    
+
+    // Now all active young objects are moved to the old space
+    // Old space is collected using traditional algorithm, so
+    // cross generational references are no more needed.
     m_crossGenerationalReferences.clear();
     
     // Updating external references. Typically these are pointers stored in the hptr<>
     TPointerIterator iExternalPointer = m_externalPointers.begin();
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
+        TMovableObject* currentObject = **iExternalPointer;
+
+//         if ((currentObject >= heapOnePointer) &&
+//             ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
+        {
+            **iExternalPointer = moveObject(**iExternalPointer);
+        }
     }
     
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
-        if (isInYoungHeap(**iRoot))
+        //if (isInYoungHeap(**iRoot))
+        TMovableObject* currentObject = **iRoot;
+        if ((currentObject >= heapOnePointer) &&
+           ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
+        {
             **iRoot = moveObject(**iRoot);
+        }
     }
     
 }
@@ -74,7 +88,7 @@ void GenerationalMemoryManager::collectGarbage()
     m_collectionsCount++;
 }
 
-void GenerationalMemoryManager::collectLeftToRight()
+void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
 {
     // Classic baker algorithm moves objects after swapping the spaces, 
     // but in our case we do not want to swap them now. Still, in order to
@@ -84,6 +98,8 @@ void GenerationalMemoryManager::collectLeftToRight()
     // Setting the heap two as active leaving the heap pointer as is
     m_activeHeapBase    = m_heapTwo;
     m_inactiveHeapBase  = m_heapOne;
+
+    uint8_t* heapOnePointer = m_activeHeapPointer;
     m_activeHeapPointer = m_inactiveHeapPointer; // heap two
     
     // Moving the objects from the left to the right heap
@@ -95,7 +111,10 @@ void GenerationalMemoryManager::collectLeftToRight()
     //      ALL objects from both spaces to a new allocated heap. 
     //      After that old space is freed and new is treated either as heap one
     //      or heap two depending on the size.
-    moveYoungObjects();
+    if (fullCollect)
+        moveObjects();
+    else
+        moveYoungObjects(heapOnePointer);
 
     uint8_t* lastHeapTwoPointer = m_activeHeapPointer;
     
@@ -104,6 +123,8 @@ void GenerationalMemoryManager::collectLeftToRight()
     // Resetting the space one pointers to mark space as empty.
     m_activeHeapBase    = m_heapOne;
     m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2;
+
+    memset(m_heapOne, 0xAA, m_heapSize / 2);
     
     m_inactiveHeapPointer = lastHeapTwoPointer;
     m_inactiveHeapBase    = m_heapTwo;
@@ -130,6 +151,11 @@ void GenerationalMemoryManager::collectRightToLeft()
 
     // Resetting heap two
     m_inactiveHeapPointer = m_heapTwo + m_heapSize / 2;
+
+    memset(m_heapTwo, 0xBB, m_heapSize / 2);
+        
+    // Moving objects back to the right heap
+    collectLeftToRight(true);
     
     // m_activeHeapPointer remains there and used for futher allocations
     // because heap one remains active
@@ -158,23 +184,24 @@ TMemoryManagerInfo GenerationalMemoryManager::getStat() {
 
 bool GenerationalMemoryManager::isInYoungHeap(void* location)
 {
-    return (location >= m_activeHeapPointer) && (location < m_activeHeapBase + m_heapSize / 2);
+    return (location >= m_activeHeapPointer) && (location < m_heapOne + m_heapSize / 2);
 }
 
 bool GenerationalMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
 {
-    bool inheritedResult = BakerMemoryManager::checkRoot(value, objectSlot);
-    
     // checkRoot is called during the normal program operation in which
     // generational GC is using left heap for young objects
-    bool valueIsYoung = isInYoungHeap(value);
     bool slotIsYoung  = isInYoungHeap(objectSlot);
     
     if (! slotIsYoung) {
         // Slot is either in old generation or in static roots
+        if (isInStaticHeap(objectSlot))
+            return BakerMemoryManager::checkRoot(value, objectSlot);
         
         TObject* previousValue = *objectSlot;
-        bool previousValueIsYoung   = isInYoungHeap(previousValue);
+
+        bool valueIsYoung = isInYoungHeap(value);
+        bool previousValueIsYoung = isInYoungHeap(previousValue);
         
         if (valueIsYoung) {
             if (! previousValueIsYoung) {
@@ -189,7 +216,7 @@ bool GenerationalMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
         }
     }
     
-    return inheritedResult;
+    return false;
 }
 
 void GenerationalMemoryManager::addCrossgenReference(TObject** pointer) 

@@ -267,18 +267,18 @@ public:
 
 class GenerationalMemoryManager : public BakerMemoryManager {
 protected:
-    void collectLeftToRight();
-    void collectRightToLeft();
-    bool checkThreshold();
-    
     uint32_t m_leftToRightCollections;
     uint32_t m_rightToLeftCollections;
     uint32_t m_rightCollectionDelay;
     
+    void collectLeftToRight(bool fullCollect = false);
+    void collectRightToLeft();
+    bool checkThreshold();
+    void moveYoungObjects(void* heapOnePointer);
+    
     bool isInYoungHeap(void* location);
     void addCrossgenReference(TObject** pointer);
     void removeCrossgenReference(TObject** pointer);
-    void moveYoungObjects();
     
     TPointerList m_crossGenerationalReferences;
 public:
