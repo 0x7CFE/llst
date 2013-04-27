@@ -549,20 +549,15 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
     while (jit.bytePointer < stopPointer) {
         uint32_t currentOffset = jit.bytePointer;
         
-        std::map<uint32_t, BasicBlock*>::iterator iBlock = m_targetToBlockMap.find(currentOffset);
-        if (iBlock != m_targetToBlockMap.end()) {
+        if (m_targetToBlockMap.find(currentOffset) != m_targetToBlockMap.end()) {
             // Somewhere in the code we have a branch instruction that
             // points to the current offset. We need to end the current
             // basic block and start a new one, linking previous
             // basic block to a new one.
             
-            BasicBlock* newBlock = iBlock->second; // Picking a basic block
-            BasicBlock::iterator iInst = jit.builder->GetInsertPoint();
-            
-            if (iInst != jit.builder->GetInsertBlock()->begin())
-                --iInst;
-            
-            if (! iInst->isTerminator()) {
+            BasicBlock* newBlock = m_targetToBlockMap.find(currentOffset)->second; // Picking a basic block
+            //If the current BB does not have a terminator, we create a br to newBlock
+            if (! jit.builder->GetInsertBlock()->getTerminator() ) {
                 jit.builder->CreateBr(newBlock); // Linking current block to a new one
                 // Updating the block referers
                 
@@ -572,6 +567,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
                 jit.basicBlockContexts[newBlock].referers.insert(jit.builder->GetInsertBlock());
             }
             
+            newBlock->moveAfter(jit.builder->GetInsertBlock()); //for a pretty sequenced BB output 
             jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
         }
         
