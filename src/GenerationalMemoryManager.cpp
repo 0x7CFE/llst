@@ -36,8 +36,9 @@ void GenerationalMemoryManager::moveYoungObjects(void* heapOnePointer)
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
         //if (isInYoungHeap(**iRoot))
         TMovableObject* currentObject = **iRoot;
-        if ((currentObject >= heapOnePointer) &&
-           ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
+        if ( ((currentObject >= heapOnePointer) && ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
+            || ((*iRoot >= heapOnePointer) && ((uint8_t*)*iRoot < m_heapOne + m_heapSize / 2))
+        )
         {
             **iRoot = moveObject(**iRoot);
         }
@@ -101,6 +102,7 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
 
     uint8_t* heapOnePointer = m_activeHeapPointer;
     m_activeHeapPointer = m_inactiveHeapPointer; // heap two
+    m_inactiveHeapPointer = heapOnePointer;
     
     // Moving the objects from the left to the right heap
     // TODO In certain circumstances right heap may not have
@@ -142,6 +144,7 @@ void GenerationalMemoryManager::collectRightToLeft()
     
     m_activeHeapBase    = m_heapOne;
     m_inactiveHeapBase  = m_heapTwo;
+    m_inactiveHeapPointer = m_activeHeapPointer;
     m_activeHeapPointer = m_heapOne + m_heapSize / 2;
 
     moveObjects();
