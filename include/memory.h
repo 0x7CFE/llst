@@ -274,7 +274,7 @@ protected:
     void collectLeftToRight(bool fullCollect = false);
     void collectRightToLeft();
     bool checkThreshold();
-    void moveYoungObjects(void* heapOnePointer);
+    void moveYoungObjects();
     
     bool isInYoungHeap(void* location);
     void addCrossgenReference(TObject** pointer);

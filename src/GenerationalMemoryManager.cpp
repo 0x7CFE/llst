@@ -9,11 +9,11 @@ GenerationalMemoryManager::~GenerationalMemoryManager()
     // Nothing to do here
 }
 
-void GenerationalMemoryManager::moveYoungObjects(void* heapOnePointer)
+void GenerationalMemoryManager::moveYoungObjects()
 {
     TPointerIterator iYoungPointer = m_crossGenerationalReferences.begin();
     for (; iYoungPointer != m_crossGenerationalReferences.end(); ++iYoungPointer)
-        moveObject(**iYoungPointer);
+        **iYoungPointer = moveObject(**iYoungPointer);
 
     // Now all active young objects are moved to the old space
     // Old space is collected using traditional algorithm, so
@@ -36,9 +36,10 @@ void GenerationalMemoryManager::moveYoungObjects(void* heapOnePointer)
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
         //if (isInYoungHeap(**iRoot))
         TMovableObject* currentObject = **iRoot;
-        if ( ((currentObject >= heapOnePointer) && ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
-            || ((*iRoot >= heapOnePointer) && ((uint8_t*)*iRoot < m_heapOne + m_heapSize / 2))
-        )
+        
+//         if ( ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) && (currentObject < (TMovableObject*)(m_heapOne + m_heapSize / 2)))
+//             || ((*iRoot >= (TMovableObject**) m_inactiveHeapPointer) && (*iRoot < (TMovableObject**)(m_heapOne + m_heapSize / 2)))
+//         )
         {
             **iRoot = moveObject(**iRoot);
         }
@@ -116,7 +117,7 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     if (fullCollect)
         moveObjects();
     else
-        moveYoungObjects(heapOnePointer);
+        moveYoungObjects();
 
     uint8_t* lastHeapTwoPointer = m_activeHeapPointer;
     
@@ -128,8 +129,8 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
 
     memset(m_heapOne, 0xAA, m_heapSize / 2);
     
-    m_inactiveHeapPointer = lastHeapTwoPointer;
     m_inactiveHeapBase    = m_heapTwo;
+    m_inactiveHeapPointer = lastHeapTwoPointer;
 
     // After this operation active objects from space one now all
     // in space two and are treated as generation 1.
@@ -144,7 +145,8 @@ void GenerationalMemoryManager::collectRightToLeft()
     
     m_activeHeapBase    = m_heapOne;
     m_inactiveHeapBase  = m_heapTwo;
-    m_inactiveHeapPointer = m_activeHeapPointer;
+    
+    // m_inactiveHeapPointer remains the same
     m_activeHeapPointer = m_heapOne + m_heapSize / 2;
 
     moveObjects();
@@ -154,6 +156,7 @@ void GenerationalMemoryManager::collectRightToLeft()
 
     // Resetting heap two
     m_inactiveHeapPointer = m_heapTwo + m_heapSize / 2;
+    // m_activeHeapPointer = ?
 
     memset(m_heapTwo, 0xBB, m_heapSize / 2);
         

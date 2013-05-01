@@ -196,9 +196,11 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 break;
             }
 
+            bool inOldSpace = (currentObject >= (TMovableObject*) m_inactiveHeapPointer) && 
+                              (currentObject < (TMovableObject*) (m_inactiveHeapBase + m_heapSize / 2));
+            
             // Checking if object is not in the old space
-            if ( (currentObject > (TMovableObject*) (m_inactiveHeapBase + m_heapSize / 2))
-              || (currentObject < (TMovableObject*) m_inactiveHeapPointer))
+            if (!inOldSpace)
             {
                 // Object does not belong to a heap.
                 // Either it is located in static space 
