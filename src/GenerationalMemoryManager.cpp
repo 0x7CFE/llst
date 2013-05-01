@@ -25,8 +25,8 @@ void GenerationalMemoryManager::moveYoungObjects()
     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
         TMovableObject* currentObject = **iExternalPointer;
 
-//         if ((currentObject >= heapOnePointer) &&
-//             ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
+        if ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) &&
+            ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
         {
             **iExternalPointer = moveObject(**iExternalPointer);
         }
@@ -37,9 +37,9 @@ void GenerationalMemoryManager::moveYoungObjects()
         //if (isInYoungHeap(**iRoot))
         TMovableObject* currentObject = **iRoot;
         
-//         if ( ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) && (currentObject < (TMovableObject*)(m_heapOne + m_heapSize / 2)))
-//             || ((*iRoot >= (TMovableObject**) m_inactiveHeapPointer) && (*iRoot < (TMovableObject**)(m_heapOne + m_heapSize / 2)))
-//         )
+        if ( ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) && (currentObject < (TMovableObject*)(m_heapOne + m_heapSize / 2)))
+            || ((*iRoot >= (TMovableObject**) m_inactiveHeapPointer) && (*iRoot < (TMovableObject**)(m_heapOne + m_heapSize / 2)))
+        )
         {
             **iRoot = moveObject(**iRoot);
         }
