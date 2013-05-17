@@ -52,6 +52,7 @@ BakerMemoryManager::~BakerMemoryManager()
     // TODO Reset the external pointers to catch the null pointers if something goes wrong
     free(m_staticHeapBase);
     free(m_heapOne);
+    free(m_heapTwo);
 }
 
 bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)

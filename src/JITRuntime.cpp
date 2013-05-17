@@ -149,9 +149,11 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 JITRuntime::~JITRuntime() {
     // Finalize stuff and dispose memory
     m_executionEngine->removeModule(m_JITModule);
+    delete m_JITModule;
     delete m_executionEngine;
     delete m_functionPassManager;
     delete m_modulePassManager;
+    delete m_methodCompiler;
 }
 
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)

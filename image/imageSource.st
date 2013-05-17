@@ -1353,9 +1353,6 @@ main    | command  x|
     ]."
     
     " main execution loop "
-
-    nil benchmark4.
-    "nil benchmark: 10000."
     
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty

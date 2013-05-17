@@ -49,9 +49,10 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/Linker.h>
-#include "llvm/Support/raw_ostream.h"
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/PassManager.h>
 #include <llvm/Intrinsics.h>
+#include <llvm/Support/ManagedStatic.h>
 
 // These functions are used in the IR code
 // as a bindings between the VM and the object world
@@ -270,8 +271,7 @@ public:
                 basicBlockContexts.clear();
             }
             
-            if (builder) 
-                delete builder; 
+            delete builder; 
         }
     };
     
