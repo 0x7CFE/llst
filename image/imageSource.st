@@ -1331,6 +1331,13 @@ runSort: size | x1 list ms1 selector args1 block1 |
         'Sorted in ms: ' print. ms1 printNl.
 !
 
+COMMENT Uncomment this method if you are going to run Smalltalk
+COMMENT immediately in LLVM. Don't forget to change main.cpp (executeProcess)
+COMMENT METHOD Undefined
+COMMENT boot
+COMMENT     nil main.
+COMMENT !
+
 METHOD Undefined
 main    | command  x|
     " initialize classes "

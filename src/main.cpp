@@ -123,6 +123,10 @@ int main(int argc, char **argv) {
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
+    
+    /* This code will run Smalltalk immediately in LLVM.
+     * Don't forget to uncomment 'Undefined>>boot'
+     * /
     /*
     typedef int32_t (*TExecuteProcessFunction)(TProcess*);
     TExecuteProcessFunction executeProcess = reinterpret_cast<TExecuteProcessFunction>(runtime.getExecutionEngine()->getPointerToFunction(runtime.getModule()->getFunction("executeProcess")));
