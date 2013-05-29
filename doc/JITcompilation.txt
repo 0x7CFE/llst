@@ -1,18 +1,50 @@
 Переход из софтовой ВМ в JIT версию происходит посредством вызова примитива 252, в котором
-мы вызываем функцию sendMessage (но не член-функцию SmalltalkVM::doSendMessage !!), куда передаем
-привычный набор аргументов:
+мы вызываем функцию sendMessage, куда передаем привычный набор аргументов:
 1) Текущий контекст
 2) Селектор метода
 3) Аргументы
 4) Класс, у которого начинаем искать метод (в данном случае 0; используется для реализации sendToSuper)
 
-В ходе исполнения функции sendMessage, как и в софтовой версии, происходит поиск метода, создаётся
-новый контекст, у которого инициализируются все поля, за исключением стека, он не используется в JIT;
-метод компилируется и вызывается с 1 аргументом - новосозданным контекстом.
+extern "C" TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
+{
+    JITRuntime::Instance()->m_messagesDispatched++;
+    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
+}
 
+В кратце, JITRuntime::sendMessage работает так:
+1. Создаём и наполняем контекст:
+ TContext* newContext = m_softVM->newObject<TContext>();
+ newContext->arguments         = messageArguments;
+ newContext->method            = method;
+ newContext->previousContext   = previousContext;
+ .....
+2. Ищем метод, компилируем его:
+ hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
+ Function* methodFunction = m_methodCompiler->compileMethod(method, previousContext);
+ TMethodFunction compiledMethodFunction = 0;
+ compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
+ 
+3. Вызываем скомпилируемый метод, куда передаём новосозданный контекст:
+ TObject* result = compiledMethodFunction(newContext);
+ return result;
+ 
+ 
 Во время компиляции метода создаётся функция вида "ClassName>>methodName" с аргументом TContext*,
 создаётся первый BB - preable (преамбула), в которой мы создаём 2 переменные - pContext и pSelf,
-которые являются зарученными значениями контекста-аргумента и объекта, которому послали вызов.
+которые являются зарученными (gc root) значениями контекста-аргумента и объекта, которому послали вызов.
+
+
+В ходе реализации JIT компиляции нами не был затронут синтаксис Little Smalltalk. Вот пример,
+как можно выполнить код внутри JIT версии:
+
+METHOD Undefined
+main
+    LLVM do: [
+        42 printNl.
+    ].
+!
+
+
 
 Реализация blockReturn.
 
@@ -20,7 +52,7 @@
 METHOD MyClass
 myMethod
     1 to: 10 do: [:i|
-        ^i. "blockReturn"
+        ^i. "this is an example of blockReturn"
     ].
 !
 При посылке сообщения myMethod объекту результатом всегда будет 1. Данный опкод является очень
@@ -31,21 +63,49 @@ myMethod
 Но в JIT версии всё не так просто, потому что посылка сообщений является честным вызовом С++ функции,
 и мы не можем взять и изменить текущий контекст выполнения присваиванием.
 
-Нами было принято решение реализовать данный опкод с помощью исключений.
+Нами было принято решение реализовать данный опкод с помощью C++ исключений.
 Перед началом кодогенерации мы сканируем байткоды метода на наличие опкода blockReturn. Если
 данный опкод найден, то мы генерируем блок обработки исключений (landingpad BB), при посылке сообщений
 call заменяется на invoke с указанием данного landingpad.
 
-Когда мы встречаем опкод blockReturn, мы возбуждаем С++ исключение типа TBlockReturn с указанием
-целевого контекста(контекста, который породил данный блок), и значением, которое необходимо вернуть
-из метода.
+Когда мы встречаем опкод blockReturn, мы генерируем вызов функции emitBlockReturn, которая возбуждает
+С++ исключение типа TBlockReturn с указанием целевого контекста(контекста, который породил данный блок),
+и с указанием значения, которое необходимо вернуть из метода:
 
-Данное исключение ловится самым первым landingpad BB. Если целевой контекст блока равен контексту,
+extern "C" void emitBlockReturn(TObject* value, TContext* targetContext)
+{
+    throw TBlockReturn(value, targetContext);
+}
+
+Данное исключение ловится самым ближайшим landingpad BB. Если целевой контекст блока равен контексту,
 в котором было поймано исключение (currentContext == block->creatingContext), то мы возвращаем результат
 из JIT функции, иначе данное исключение пробрасывается до тех пор, пока его не поймают и не обработают.
 LLVM использует Itanium ABI zero cost exception handling http://llvm.org/docs/ExceptionHandling.html.
 
+Можно сказать, что мы оборачиваем всё тело метода в try, а в catch проверяем targetContext:
 
+TObject* 'MyClass>>myMethod'(TContext* context) {
+    try {
+        // ... the body of the whole method
+    }  catch(TBlockReturn e) {
+        if (e.targetContext != currentContext)
+            throw;
+        else
+            return e.value;
+    }
+}
+    
+Данный пример не совсем корректен с точки зрения кодогенерации LLVM IR, но хорошо иллюстрирует 
+реализацию опкода blockReturn.
+
+Данная архитектура позволяет нам корректно обработать JIT опкод blockReturn даже внутри софтовой версии:
+
+METHOD MyClass
+myMethod
+    1 to: 10 do: [:i|
+        LLVM do: [ ^i. ] "this is a blockReturn inside JIT method"
+    ].
+!
 
 
 Стек. pushValue и popValue
