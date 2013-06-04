@@ -1492,7 +1492,17 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             primitiveResult = sendMessageResult;
         } break;
         
-        case primitive::getSystemTicks:
+        case primitive::ioGetChar:          // 9
+        case primitive::ioFileOpen:         // 100
+        case primitive::ioFileClose:        // 103
+        case primitive::ioFileGetChar:      // 101
+        case primitive::ioFilePutChar:      // 102
+        case primitive::ioFileReadIntoByteArray:  // 106
+        case primitive::ioFileWriteFromByteArray: // 107
+        case primitive::ioFileSeek:         // 108
+        
+        case primitive::getSystemTicks:     //253
+            
         default: {
             // Here we need to create the arguments array from the values on the stack
             uint8_t argumentsCount = jit.instruction.low;

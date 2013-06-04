@@ -3499,13 +3499,11 @@ METHOD File
 writeCharValue: n
 	<102 fileID n>.
 	fileID isNil ifTrue: [ self notOpened ].
-	self primitiveFailed
 !
 METHOD File
 doRead
 	<101 fileID>.
 	fileID isNil ifTrue: [ self notOpened ].
-	self primitiveFailed
 !
 METHOD File
 readChar	| c |

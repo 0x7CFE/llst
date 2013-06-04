@@ -103,7 +103,14 @@ enum {
 
 enum {
     ioGetChar = 9,
-    ioPutChar = 3
+    ioPutChar = 3,
+    ioFileOpen = 100,
+    ioFileClose = 103,
+    ioFileGetChar = 101,
+    ioFilePutChar = 102,
+    ioFileReadIntoByteArray = 106,
+    ioFileWriteFromByteArray = 107,
+    ioFileSeek = 108
 };
 
 enum IntegerOpcode {
