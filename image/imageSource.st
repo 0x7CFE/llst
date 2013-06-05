@@ -3416,114 +3416,195 @@ METHOD Tree
 isEmpty
 	^ root isNil
 !
+
+
+COMMENT <fcntl.h>
+CLASS FileMode Object
+
+METHOD MetaFileMode
+ReadOnly
+    ^0
+!
+
+METHOD MetaFileMode
+WriteOnly
+    ^1
+!
+
+METHOD MetaFileMode
+ReadWrite
+    ^2
+!
+
+METHOD MetaFileMode
+Create
+    ^64
+!
+
+METHOD MetaFileMode
+Truncate
+    ^512
+!
+
+METHOD MetaFileMode
+Append
+    ^1024
+!
+
 COMMENT --------------file methods-----------------
 METHOD MetaFile
 test
-  | file |
-  file <- File openWrite: 'test.txt'.
-  file opened
-    ifTrue: [ 'opened!' printNl ]
-    ifFalse: [ 'not opened!' printNl. ^nil ].
-  file write: 'foo bar'.
-  file newline.
-  file close.
-  'Done!' printNl.
+    | file |
+    file <- File open: 'test.txt' mode: (FileMode Create bitOr: FileMode ReadWrite).
+    file opened
+        ifTrue: [ 'opened!' printNl ]
+        ifFalse: [ 'not opened!' printNl. ^nil ].
+    file do: [:f |
+        f write: 'foo bar'.
+        f newline.
+    ].
+    'Done!' printNl.
+    file opened
+        ifTrue: [ 'opened!' printNl ]
+        ifFalse: [ 'not opened!' printNl. ^nil ].
 !
 METHOD MetaFile
-doOpen: nm mode: mode
-	<100 nm mode>
-	^nil.
+doOpen: name mode: mode
+    <100 name mode>.
+    self primitiveFailed
 !
 METHOD MetaFile
-openRead: nm
-		" open new file for reading "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'r')
+openRead: name
+    " open new file for reading "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode ReadOnly))
 !
 METHOD MetaFile
-openWrite: nm
-		" open new file for writing "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'w')
+openWrite: name
+    " open new file for writing "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode WriteOnly))
 !
 METHOD MetaFile
-open: nm mode: mode
-  ^self in: (self new) at: 1 put: (self doOpen: nm mode: mode)
+open: name mode: mode
+    ^self in: (self new) at: 1 put: (self doOpen: name mode: mode)
 !
 METHOD MetaFile
-openUpdate: nm
-		" open new file for reading and writing "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'r+')
+openUpdate: name
+    " open new file for reading and writing "
+    ^self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode Append bitOr: FileMode ReadWrite))
 !
-METHOD MetaFile
-fileIn: nm | file |
-	file <- self openRead: nm.
-	file opened ifFalse: [ ^ self error: 'cannot open file ' + nm ].
-	file fileIn.
-	file close.
-	^ 'file in completed'
+METHOD File
+do: block
+    block value: self.
+    self close.
 !
-METHOD MetaFile
-image: nm | file |
-		" open a file, write the image, then close "
-	file <- self openWrite: nm.
-	file opened ifFalse: [ ^ self error: 'cannot open file ' + nm ].
-	file writeImage.
-	file close
+METHOD File
+setPosition: position
+    "return lseek(position, SEEK_SET)"
+    <108 fileID position>.
+    self primitiveFailed
+!
+METHOD File
+rewind
+    self setPosition: 0.
+!
+METHOD File
+write: buffer | size |
+    "return the number of bytes affected by write()"
+    size <- buffer size.
+    <107 fileID buffer size>.
+    self primitiveFailed
+!
+METHOD File
+rawRead: count into: buffer
+    "return the number of bytes affected by read()"
+    <106 fileID buffer count>.
+    self primitiveFailed
+!
+METHOD File
+read: count | buffer bytesRead |
+    buffer <- ByteArray new: count.
+    bytesRead <- self rawRead: count into: buffer.
+    (bytesRead < count) ifTrue: [
+        "truncate buffer"
+        buffer <- buffer from: 1 to: bytesRead
+    ].
+    ^buffer.
+!
+METHOD File
+at: idx put: buffer
+    self setPosition: idx.
+    ^self write: buffer.
+!
+METHOD File
+at: idx size: count | buf res |
+    self setPosition: idx.
+    ^self read: count.
+!
+METHOD File
+newline
+    ^ self write: (String newline)
 !
 METHOD File
 opened
-	^ fileID notNil
+    ^fileID notNil
 !
-METHOD File
+METHOD MetaFile
 close: id
-	<103 id>
+    <103 id>.
+    self primitiveFailed
 !
 METHOD File
 close
-		" close file, return file descriptor "
-	fileID notNil ifTrue: [
-		self close: fileID.
-		fileID <- nil
-	]
+    fileID notNil ifTrue: [
+        File close: fileID.
+        fileID <- nil
+    ]
+!
+METHOD File
+getc | buffer bytesRead |
+    buffer <- ByteArray new: 1.
+    bytesRead <- self rawRead: 1 into: buffer.
+    (bytesRead = 1)
+        ifTrue:  [ ^buffer asString at: 1. ]
+        ifFalse: [ ^nil ].
+!
+METHOD File
+putc: char
+    ^self write: (char asString)
+!
+METHOD File
+readLine	| result  c nl |
+    " read a line from input "
+    fileID isNil ifTrue: [ self error: 'cannot read from unopened file' ].
+    result <- ''.
+    nl <- Char newline.
+    [   c <- self getc.
+        c isNil ifTrue: [ ^nil ].
+        c ~= nl ] whileTrue: [
+            result <- result + c asString
+    ].
+    ^ result
+!
+METHOD MetaFile
+fileIn: name | file |
+    file <- self openRead: name.
+    file opened ifFalse: [ ^ self error: 'cannot open file ' + name ].
+    file fileIn.
+    file close.
+    ^ 'file in completed'
+!
+METHOD MetaFile
+image: name | file |
+    " open a file, write the image, then close "
+    file <- self openWrite: name.
+    file opened ifFalse: [ ^ self error: 'cannot open file ' + name ].
+    file writeImage.
+    file close
 !
 METHOD File
 writeImage
-		" save the current image in a file "
-	fileID notNil
-		ifTrue: [ <104 fileID> ]
-!
-METHOD File
-notOpened
-	self error: 'file is not open'
-!
-METHOD File
-writeCharValue: n
-	<102 fileID n>.
-	fileID isNil ifTrue: [ self notOpened ].
-!
-METHOD File
-doRead
-	<101 fileID>.
-	fileID isNil ifTrue: [ self notOpened ].
-!
-METHOD File
-readChar	| c |
-		" read a single character from a file "
-	c <- self doRead.
-	c notNil ifTrue: [ ^ Char new: c ].
-	^ c
-!
-METHOD File
-readLine	| value  c nl |
-	" read a line from input "
-	fileID isNil ifTrue: [ self error: 'cannot read from unopened file' ].
-	value <- ''.
-	nl <- Char newline.
-	[ c <- self doRead.
-	  c isNil ifTrue: [ ^ nil ].
-	  c <- Char new: c.
-	  c ~= nl ] whileTrue:
-		[ value <- value + c asString ].
-	^ value
+    " save the current image in a file "
+    fileID notNil ifTrue: [ <104 fileID> ]
 !
 METHOD File
 fileInDispatch: cmd | c |
@@ -3575,42 +3656,6 @@ methodCommand: classCmd | name aClass text line |
 	classCmd
 		ifTrue: [ aClass addMethod: text ]
 		ifFalse: [ aClass class addMethod: text ]
-!
-METHOD File
-at: idx
-	<108 fileID idx>.
-	self primitiveFailed
-!
-METHOD File
-write: buf size: count
-	<107 fileID buf count>.
-	self primitiveFailed
-!
-METHOD File
-write: buf
-	^ self write: buf size: (buf size)
-!
-METHOD File
-at: idx put: buf
-	self at: idx.
-	self write: buf size: buf size
-!
-METHOD File
-at: idx get: buf | size |
-	self at: idx.
-	size <- buf size.
-	<106 fileID buf size>
-!
-METHOD File
-at: idx size: count | buf res |
-	buf <- ByteArray new: count.
-	res <- self at: idx get: buf.
-	(res < count) ifTrue: [ buf <- buf from: 1 to: res ].
-	^ buf
-!
-METHOD File
-newline
-	^ self write: (String newline)
 !
 COMMENT --------------parser methods-----------------
 METHOD Parser

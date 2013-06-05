@@ -5,7 +5,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
-#include <map>
+#include <fcntl.h>
+#include <unistd.h>
 
 TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveFailed) {
     primitiveFailed = false;
@@ -82,8 +83,6 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
         case primitive::ioPutChar:          // 3
         case primitive::ioFileOpen:         // 100
         case primitive::ioFileClose:        // 103
-        case primitive::ioFileGetChar:      // 101
-        case primitive::ioFilePutChar:      // 102
         case primitive::ioFileReadIntoByteArray:  // 106
         case primitive::ioFileWriteFromByteArray: // 107
         case primitive::ioFileSeek: {        // 108
@@ -204,14 +203,6 @@ TObject* callSmallIntPrimitive(uint8_t opcode, int32_t leftOperand, int32_t righ
 }
 
 TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFailed) {
-    
-    //Each Smalltalk instance of File contains fileID - handler (int) which points to FILE*
-    typedef std::map<int, FILE*> TFileMap;
-    typedef std::map<int, FILE*>::iterator TFileMapIterator;
-    
-    static TFileMap fileMap;
-    static int fileSequence = 0;
-    
     switch (opcode) {
         
         case primitive::ioGetChar: { // 9
@@ -232,100 +223,46 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
         
         case primitive::ioFileOpen: { // 100
             TString* name = (TString*) args[0];
-            TString* mode = (TString*) args[1];
+            int32_t  mode = getIntegerValue(reinterpret_cast<TInteger>( args[1] ));
             
-            //We have to pass NULL-terminated strings to fopen()
-            //The easiest way is to build them with std::string
-            
+            //We have to pass NULL-terminated string to open()
+            //The easiest way is to build it with std::string
             std::string filename((char*) name->getBytes(), name->getSize());
-            std::string filemode((char*) mode->getBytes(), mode->getSize());
             
-            FILE* file = fopen(filename.c_str(), filemode.c_str());
-            
-            if (!file) {
+            int32_t fileID = open(filename.c_str(), mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
+            if (fileID < 0) {
                 primitiveFailed = true;
             } else {
-                int fileID = fileSequence++;
-                fileMap[fileID] = file;
                 return reinterpret_cast<TObject*>( newInteger(fileID) );
             }
         } break;
         
         case primitive::ioFileClose: { // 103
-            int fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
+            int32_t fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
             
-            TFileMapIterator fileIterator = fileMap.find(fileID);
-            
-            if ( fileIterator == fileMap.end() || !fileIterator->second ) {
+            int32_t result = close(fileID);
+            if (result < 0) {
                 primitiveFailed = true;
-            } else {
-                fclose(fileIterator->second);
-                fileMap.erase(fileIterator);
-            }
-        } break;
-        
-        case primitive::ioFileGetChar: { // 101
-            int fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
-            
-            TFileMapIterator fileIterator = fileMap.find(fileID);
-            
-            if ( fileIterator == fileMap.end() || !fileIterator->second ) {
-                primitiveFailed = true;
-            } else {
-                int32_t input = fgetc(fileIterator->second);
-                
-                if (input == EOF)
-                    return globals.nilObject;
-                else
-                    return reinterpret_cast<TObject*>(newInteger(input));
-            }
-        } break;
-        
-        case primitive::ioFilePutChar: { // 102
-            int fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
-            
-            TFileMapIterator fileIterator = fileMap.find(fileID);
-            
-            if ( fileIterator == fileMap.end() || !fileIterator->second ) {
-                primitiveFailed = true;
-            } else {
-                TInteger charObject = reinterpret_cast<TInteger>(args[1]);
-                int8_t   charValue  = getIntegerValue(charObject);
-                
-                fputc(charValue, fileIterator->second);
             }
         } break;
         
         case primitive::ioFileReadIntoByteArray:    // 106
         case primitive::ioFileWriteFromByteArray: { // 107
-            int fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
-            
-            TFileMapIterator fileIterator = fileMap.find(fileID);
-            
+            int32_t fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
             TByteArray* bufferArray = (TByteArray*) args[1];
-            TObject* sizeObject   = args[2];
+            uint32_t size = getIntegerValue(reinterpret_cast<TInteger>( args[2] ));
             
-            if (   fileIterator == fileMap.end()
-                || !fileIterator->second
-                || !isSmallInteger(sizeObject)
-            ) {
-                primitiveFailed = true;
-                break;
-            }
-            
-            uint32_t size = getIntegerValue(reinterpret_cast<TInteger>(sizeObject));
             if ( size > bufferArray->getSize() ) {
                 primitiveFailed = true;
                 break;
             }
             
-            FILE* file = fileIterator->second;
             int32_t involvedItems;
             
             if (opcode == primitive::ioFileReadIntoByteArray) {
-                involvedItems = fread(bufferArray->getBytes(), sizeof(char), size, file);
+                involvedItems = read(fileID, bufferArray->getBytes(), size);
             } else { // ioFileWriteFromByteArray
-                involvedItems = fwrite(bufferArray->getBytes(), sizeof(char), size, file);
+                involvedItems = write(fileID, bufferArray->getBytes(), size);
             }
             
             if (involvedItems < 0) {
@@ -336,23 +273,10 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
             
         } break;
         case primitive::ioFileSeek: { // 108
-            int fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
+            int32_t   fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
+            int32_t position = getIntegerValue(reinterpret_cast<TInteger>( args[1] ));
             
-            TFileMapIterator fileIterator = fileMap.find(fileID);
-            TObject* positionObject = args[1];
-            
-            if (   fileIterator == fileMap.end()
-                || !fileIterator->second
-                || !isSmallInteger(positionObject)
-            ) {
-                primitiveFailed = true;
-                break;
-            }
-            
-            int32_t position = getIntegerValue(reinterpret_cast<TInteger>( positionObject ));
-            FILE* file = fileIterator->second;
-            
-            if( (position < 0) || ((position = fseek(file, position, SEEK_SET)) < 0) ) {
+            if( (position < 0) || ((position = lseek(fileID, position, SEEK_SET)) < 0) ) {
                 primitiveFailed = true;
             } else {
                 return reinterpret_cast<TObject*>(newInteger(position));

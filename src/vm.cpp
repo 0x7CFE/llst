@@ -950,8 +950,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::ioPutChar:          // 3
         case primitive::ioFileOpen:         // 100
         case primitive::ioFileClose:        // 103
-        case primitive::ioFileGetChar:      // 101
-        case primitive::ioFilePutChar:      // 102
         case primitive::ioFileReadIntoByteArray:  // 106
         case primitive::ioFileWriteFromByteArray: // 107
         case primitive::ioFileSeek:         // 108
