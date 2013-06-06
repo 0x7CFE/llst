@@ -3417,7 +3417,6 @@ isEmpty
 	^ root isNil
 !
 
-
 COMMENT <fcntl.h>
 CLASS FileMode Object
 
@@ -3475,22 +3474,22 @@ doOpen: name mode: mode
 !
 METHOD MetaFile
 openRead: name
-    " open new file for reading "
+    " fopen( , r ) "
     ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode ReadOnly))
 !
 METHOD MetaFile
 openWrite: name
-    " open new file for writing "
-    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode WriteOnly))
+    " fopen( , w ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileMode WriteOnly bitOr: FileMode Create) bitOr: FileMode Truncate))
 !
 METHOD MetaFile
 open: name mode: mode
-    ^self in: (self new) at: 1 put: (self doOpen: name mode: mode)
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: mode)
 !
 METHOD MetaFile
 openUpdate: name
-    " open new file for reading and writing "
-    ^self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode Append bitOr: FileMode ReadWrite))
+    " fopen( , a+ ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileMode Append bitOr: FileMode ReadWrite) bitOr: FileMode Create))
 !
 METHOD File
 do: block
