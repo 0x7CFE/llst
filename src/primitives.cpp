@@ -7,6 +7,7 @@
 #include <sys/time.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveFailed) {
     primitiveFailed = false;
@@ -83,6 +84,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
         case primitive::ioPutChar:          // 3
         case primitive::ioFileOpen:         // 100
         case primitive::ioFileClose:        // 103
+        case primitive::ioFileSetStatIntoArray:   // 105
         case primitive::ioFileReadIntoByteArray:  // 106
         case primitive::ioFileWriteFromByteArray: // 107
         case primitive::ioFileSeek: {        // 108
@@ -243,6 +245,25 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
             int32_t result = close(fileID);
             if (result < 0) {
                 primitiveFailed = true;
+            }
+        } break;
+        
+        case primitive::ioFileSetStatIntoArray: { // 105
+            int32_t fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
+            TObjectArray* array = (TObjectArray*) args[1];
+            
+            struct stat fileStat;
+            if( fstat(fileID, &fileStat) < 0 ) {
+                primitiveFailed = true;
+            } else {
+                TObject* size = reinterpret_cast<TObject*>( newInteger( fileStat.st_size ));
+                array->putField(0, size);
+                
+                TObject* inode = reinterpret_cast<TObject*>( newInteger( fileStat.st_ino ));
+                array->putField(1, inode);
+                
+                TObject* mode = reinterpret_cast<TObject*>( newInteger( fileStat.st_mode ));
+                array->putField(2, mode);
             }
         } break;
         

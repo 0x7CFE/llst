@@ -106,6 +106,7 @@ enum {
     ioPutChar = 3,
     ioFileOpen = 100,
     ioFileClose = 103,
+    ioFileSetStatIntoArray = 105,
     ioFileReadIntoByteArray = 106,
     ioFileWriteFromByteArray = 107,
     ioFileSeek = 108

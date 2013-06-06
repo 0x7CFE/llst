@@ -3450,6 +3450,45 @@ Append
     ^1024
 !
 
+CLASS FileStat Object size inode mode
+
+METHOD MetaFileStat
+setStatTo: array for: descriptor
+    " fstat(descriptor, &stat) "
+    <105 descriptor array>.
+    self primitiveFailed.
+!
+
+METHOD MetaFileStat
+new: descriptor
+    |stat array|
+    array <- Array new: 3.
+    FileStat setStatTo: array for: descriptor.
+    stat <- self new.
+    " extract size "
+    self in: stat at: 1 put: (array at: 1). 
+    " extract inode "
+    self in: stat at: 2 put: (array at: 2).
+    " extract mode "
+    self in: stat at: 3 put: (array at: 3).
+    ^ stat.
+!
+
+METHOD FileStat
+size
+    ^ size
+!
+
+METHOD FileStat
+inode
+    ^ inode
+!
+
+METHOD FileStat
+mode
+    ^ mode
+!
+
 COMMENT --------------file methods-----------------
 METHOD MetaFile
 test
@@ -3472,6 +3511,12 @@ doOpen: name mode: mode
     <100 name mode>.
     self primitiveFailed
 !
+
+METHOD File
+stat
+    ^FileStat new: fileID.
+!
+
 METHOD MetaFile
 openRead: name
     " fopen( , r ) "
