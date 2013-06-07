@@ -262,8 +262,8 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
                 TObject* inode = reinterpret_cast<TObject*>( newInteger( fileStat.st_ino ));
                 array->putField(1, inode);
                 
-                TObject* mode = reinterpret_cast<TObject*>( newInteger( fileStat.st_mode ));
-                array->putField(2, mode);
+                TObject* modeMask = reinterpret_cast<TObject*>( newInteger( fileStat.st_mode ));
+                array->putField(2, modeMask);
             }
         } break;
         

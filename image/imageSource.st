@@ -3417,38 +3417,194 @@ isEmpty
 	^ root isNil
 !
 
-COMMENT <fcntl.h>
-CLASS FileMode Object
+COMMENT -------------- MetaFileOpenFlag -----------------
 
-METHOD MetaFileMode
-ReadOnly
+COMMENT <fcntl.h>
+CLASS FileOpenFlag Object
+
+METHOD MetaFileOpenFlag
+readOnly
     ^0
 !
 
-METHOD MetaFileMode
-WriteOnly
+METHOD MetaFileOpenFlag
+writeOnly
     ^1
 !
 
-METHOD MetaFileMode
-ReadWrite
+METHOD MetaFileOpenFlag
+readWrite
     ^2
 !
 
-METHOD MetaFileMode
-Create
+METHOD MetaFileOpenFlag
+create
     ^64
 !
 
-METHOD MetaFileMode
+METHOD MetaFileOpenFlag
 Truncate
     ^512
 !
 
-METHOD MetaFileMode
+METHOD MetaFileOpenFlag
 Append
     ^1024
 !
+
+COMMENT -------------- FileMode -----------------
+
+COMMENT <sys/stat.h>
+CLASS FileMode Object modeMask
+
+METHOD MetaFileMode
+new: modeMask
+    ^ self in: (self new) at: 1 put: modeMask.
+!
+
+METHOD MetaFileMode
+fyleTypeMask
+    " 0170000 "
+    ^ 61440.
+!
+
+METHOD MetaFileMode
+isDirectory
+    " 040000 "
+    ^ 16384.
+!
+METHOD FileMode
+isDirectory
+    ^ (modeMask bitAnd: FileMode fyleTypeMask) = FileMode isDirectory.
+!
+
+METHOD MetaFileMode
+isReadableByOwner
+    " 0400 "
+    ^ 256.
+!
+METHOD MetaFileMode
+isReadableByGroup
+    " 0400 >> 3 "
+    ^ 32.
+!
+METHOD MetaFileMode
+isReadableByOthers
+    " 0400 >> 6 "
+    ^ 4.
+!
+METHOD FileMode
+isReadableByOwner
+    ^ (modeMask bitAnd: FileMode isReadableByOwner) = FileMode isReadableByOwner.
+!
+METHOD FileMode
+isReadableByGroup
+    ^ (modeMask bitAnd: FileMode isReadableByGroup) = FileMode isReadableByGroup.
+!
+METHOD FileMode
+isReadableByOthers
+    ^ (modeMask bitAnd: FileMode isReadableByOthers) = FileMode isReadableByOthers.
+!
+
+
+METHOD MetaFileMode
+isWritableByOwner
+    " 0200 "
+    ^ 128.
+!
+METHOD MetaFileMode
+isWritableByGroup
+    " 0200 >> 3 "
+    ^ 16.
+!
+METHOD MetaFileMode
+isWritableByOthers
+    " 0200 >> 6 "
+    ^ 2.
+!
+METHOD FileMode
+isWritableByOwner
+    ^ (modeMask bitAnd: FileMode isWritableByOwner) = FileMode isWritableByOwner.
+!
+METHOD FileMode
+isWritableByGroup
+    ^ (modeMask bitAnd: FileMode isWritableByGroup) = FileMode isWritableByGroup.
+!
+METHOD FileMode
+isWritableByOthers
+    ^ (modeMask bitAnd: FileMode isWritableByOthers) = FileMode isWritableByOthers.
+!
+
+METHOD MetaFileMode
+isExecutableByOwner
+    " 0100 "
+    ^ 64.
+!
+METHOD MetaFileMode
+isExecutableByGroup
+    " 0100 >> 3 "
+    ^ 8.
+!
+METHOD MetaFileMode
+isExecutableByOthers
+    " 0100 >> 6 "
+    ^ 1.
+!
+METHOD FileMode
+isExecutableByOwner
+    ^ (modeMask bitAnd: FileMode isExecutableByOwner) = FileMode isExecutableByOwner.
+!
+METHOD FileMode
+isExecutableByGroup
+    ^ (modeMask bitAnd: FileMode isExecutableByGroup) = FileMode isExecutableByGroup.
+!
+METHOD FileMode
+isExecutableByOthers
+    ^ (modeMask bitAnd: FileMode isExecutableByOthers) = FileMode isExecutableByOthers.
+!
+
+METHOD FileMode
+asString |result|
+    result <- ''.
+    
+    self isDirectory
+        ifTrue:  [ result <- result + 'd' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    self isReadableByOwner
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByOwner
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByOwner
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    self isReadableByGroup
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByGroup
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByGroup
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    self isReadableByOthers
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByOthers
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByOthers
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    ^ result.
+!
+
+COMMENT -------------- FileStat -----------------
 
 CLASS FileStat Object size inode mode
 
@@ -3461,7 +3617,7 @@ setStatTo: array for: descriptor
 
 METHOD MetaFileStat
 new: descriptor
-    |stat array|
+    |stat array modeMask mode|
     array <- Array new: 3.
     FileStat setStatTo: array for: descriptor.
     stat <- self new.
@@ -3470,7 +3626,9 @@ new: descriptor
     " extract inode "
     self in: stat at: 2 put: (array at: 2).
     " extract mode "
-    self in: stat at: 3 put: (array at: 3).
+    modeMask <- array at: 3.
+    mode <- FileMode new: modeMask.
+    self in: stat at: 3 put: mode.
     ^ stat.
 !
 
@@ -3493,7 +3651,7 @@ COMMENT --------------file methods-----------------
 METHOD MetaFile
 test
     | file |
-    file <- File open: 'test.txt' mode: (FileMode Create bitOr: FileMode ReadWrite).
+    file <- File openWrite: 'test.txt'.
     file opened
         ifTrue: [ 'opened!' printNl ]
         ifFalse: [ 'not opened!' printNl. ^nil ].
@@ -3520,12 +3678,12 @@ stat
 METHOD MetaFile
 openRead: name
     " fopen( , r ) "
-    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileMode ReadOnly))
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileOpenFlag readOnly))
 !
 METHOD MetaFile
 openWrite: name
     " fopen( , w ) "
-    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileMode WriteOnly bitOr: FileMode Create) bitOr: FileMode Truncate))
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileOpenFlag writeOnly bitOr: FileOpenFlag create) bitOr: FileOpenFlag truncate))
 !
 METHOD MetaFile
 open: name mode: mode
@@ -3534,7 +3692,7 @@ open: name mode: mode
 METHOD MetaFile
 openUpdate: name
     " fopen( , a+ ) "
-    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileMode Append bitOr: FileMode ReadWrite) bitOr: FileMode Create))
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileOpenFlag append bitOr: FileOpenFlag readWrite) bitOr: FileOpenFlag create))
 !
 METHOD File
 do: block
