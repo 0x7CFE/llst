@@ -481,21 +481,17 @@ void BakerMemoryManager::registerExternalHeapPointer(object_ptr& pointer) {
 }
 
 void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
-//     printf("Releasing   object_ptr = %p (data %p, next %p), current m_externalPointersHead = %p, ", 
-//            &pointer, pointer.data, pointer.next);
+    if (m_externalPointersHead == &pointer) {
+        m_externalPointersHead = pointer.next;
+        return;
+    }
     
     object_ptr* currentPointer  = &pointer;
     object_ptr* previousPointer = 0;
     
     while (currentPointer != 0) {
         if (currentPointer == &pointer) {
-            if (previousPointer) {
-                previousPointer->next = currentPointer->next;
-                printf("\n!HIT!\n");
-            } else {
-                m_externalPointersHead = currentPointer->next;
-//                 printf("became %p\n\n", m_externalPointersHead);
-            }
+            previousPointer->next = currentPointer->next;
             return;
         } else { 
             previousPointer = currentPointer;
