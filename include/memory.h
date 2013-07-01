@@ -56,12 +56,14 @@ struct TMemoryManagerInfo {
     uint64_t rightCollectionDelay;
 };
 
-class object_ptr {
-public:
+struct object_ptr {
     TObject* data;
     object_ptr* next;
     object_ptr() : data(0), next(0) {}
-    object_ptr(TObject* data)  : data(data), next(0) {}
+    explicit object_ptr(TObject* data)  : data(data), next(0) {}
+    object_ptr& operator=(const object_ptr& value) { this->data = value.data; return *this; }
+private:
+    object_ptr(const object_ptr& value) {}
 };
 
 // Generic interface to a memory manager.
@@ -122,7 +124,7 @@ public:
             //mm->registerExternalPointer((TObject**) &target);
     }
     
-    hptr_base(const hptr_base<Object>& pointer) : target(pointer.target), mm(pointer.mm), isRegistered(true)
+    hptr_base(const hptr_base<Object>& pointer) : target(pointer.target.data), mm(pointer.mm), isRegistered(true)
     {
         if (mm) mm->registerExternalHeapPointer(target);
         //if (mm) { mm->registerExternalPointer((TObject**) &target); }
@@ -153,19 +155,6 @@ public:
     
 //     template<typename I>
 //     Object& operator [] (I index) const { return hptr_base<Object>::target->operator[](index); }
-    
-//     template<int N>
-//     class registry {
-//     private:
-//         TObject** targets[N];
-//         void _init(int index, va_list vl) {
-// //             Object** data = (Object**) * va_arg(vl);
-// //             targets[index] = static_cast< hptr<Object> >(vl).rawptr();
-//         }
-//     public:
-//         void init(...) { 
-//         }
-//     };
 };
 
 // Hptr specialization for TArray<> class.
@@ -180,7 +169,8 @@ public:
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
     
      template<typename I>
-     T& operator [] (I index) const { return static_cast<Object*>(hptr_base<Object>::target.data)->operator[](index); } //return hptr_base<Object>::target.data->operator[](index); }
+     T& operator [] (I index) const { return static_cast<Object*>(hptr_base<Object>::target.data)->operator[](index); } 
+     //return hptr_base<Object>::target.data->operator[](index); }
 };
 
 // Hptr specialization for TByteObject.
