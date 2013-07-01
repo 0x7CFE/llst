@@ -42,7 +42,7 @@ BakerMemoryManager::BakerMemoryManager() :
     m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
     m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0),
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
-    m_staticHeapBase(0), m_staticHeapPointer(0)
+    m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
     // Nothing to be done here
 }
@@ -139,8 +139,8 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
             // If even after collection there is too less space
             // we may try to expand the heap
-            //if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 8))
-            //    growHeap(requestedSize);
+            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 8))
+               growHeap(requestedSize);
 
             if (gcOccured)
                 *gcOccured = true;
@@ -380,10 +380,16 @@ void BakerMemoryManager::moveObjects()
         **iRoot = moveObject(**iRoot);
     }
     
-    // Updating external references. Typically these are pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
+//     // Updating external references. Typically these are pointers stored in the hptr<>
+//     TPointerIterator iExternalPointer = m_externalPointers.begin();
+//     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+//         **iExternalPointer = moveObject(**iExternalPointer);
+//     }
+    
+    volatile object_ptr* currentPointer = m_externalPointersHead;
+    while (currentPointer != 0) {
+        currentPointer->data = (TObject*) moveObject((TMovableObject*) currentPointer->data);
+        currentPointer = currentPointer->next;
     }
 }
 
@@ -462,6 +468,38 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
         if (*iPointer == (TMovableObject**) pointer) {
             m_externalPointers.erase(iPointer);
             return;
+        }
+    }
+}
+
+void BakerMemoryManager::registerExternalHeapPointer(object_ptr& pointer) {
+//     printf("Registering object_ptr = %p (data %p, next %p), current m_externalPointersHead = %p\n", 
+//            &pointer, pointer.data, pointer.next, m_externalPointersHead);
+    
+    pointer.next = const_cast<object_ptr*>(m_externalPointersHead);
+    m_externalPointersHead = &pointer;
+}
+
+void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
+//     printf("Releasing   object_ptr = %p (data %p, next %p), current m_externalPointersHead = %p, ", 
+//            &pointer, pointer.data, pointer.next);
+    
+    object_ptr* currentPointer  = &pointer;
+    object_ptr* previousPointer = 0;
+    
+    while (currentPointer != 0) {
+        if (currentPointer == &pointer) {
+            if (previousPointer) {
+                previousPointer->next = currentPointer->next;
+                printf("\n!HIT!\n");
+            } else {
+                m_externalPointersHead = currentPointer->next;
+//                 printf("became %p\n\n", m_externalPointersHead);
+            }
+            return;
+        } else { 
+            previousPointer = currentPointer;
+            currentPointer = currentPointer->next;
         }
     }
 }
