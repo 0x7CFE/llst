@@ -380,11 +380,11 @@ void BakerMemoryManager::moveObjects()
         **iRoot = moveObject(**iRoot);
     }
     
-//     // Updating external references. Typically these are pointers stored in the hptr<>
-//     TPointerIterator iExternalPointer = m_externalPointers.begin();
-//     for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-//         **iExternalPointer = moveObject(**iExternalPointer);
-//     }
+    // Updating external references. Typically these are pointers stored in the hptr<>
+    TPointerIterator iExternalPointer = m_externalPointers.begin();
+    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
+        **iExternalPointer = moveObject(**iExternalPointer);
+    }
     
     volatile object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {

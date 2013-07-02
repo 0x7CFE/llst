@@ -137,7 +137,8 @@ private:
     bool m_lastGCOccured;
     void onCollectionOccured();
 
-    std::list< hptr<TProcess> > rootStack;
+//    std::list< hptr<TProcess> > rootStack;
+    std::list< TObject* > rootStack;
 public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     // The result may be nil if the opcode execution fails (division by zero etc)
@@ -149,12 +150,13 @@ public:
     TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
 
     void pushProcess(TProcess* process) {
-        rootStack.push_back(newPointer(process));
-        //m_memoryManager->registerExternalPointer(& rootStack.back());
+        //rootStack.push_back(newPointer(process));
+        rootStack.push_back(process);
+        m_memoryManager->registerExternalPointer(& rootStack.back());
     }
 
     TProcess* popProcess() {
-        //m_memoryManager->releaseExternalPointer(& rootStack.back());
+        m_memoryManager->releaseExternalPointer(& rootStack.back());
         TProcess* process = (TProcess*) rootStack.back();
         rootStack.pop_back();
         return process;
