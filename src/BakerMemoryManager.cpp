@@ -139,7 +139,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
             // If even after collection there is too less space
             // we may try to expand the heap
-            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 8))
+            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 6))
                growHeap(requestedSize);
 
             if (gcOccured)
@@ -486,8 +486,8 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
         return;
     }
     
-    object_ptr* currentPointer  = pointer.next;
-    object_ptr* previousPointer = &pointer;
+    volatile object_ptr* currentPointer  = pointer.next;
+    volatile object_ptr* previousPointer = &pointer;
     
     while (currentPointer != 0) {
         if (currentPointer == &pointer) {

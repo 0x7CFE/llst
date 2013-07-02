@@ -112,14 +112,14 @@ int main(int argc, char **argv) {
     initContext->previousContext = (TContext*) globals.nilObject;
     
     const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
-    initContext->stack = vm.newObject<TObjectArray>(stackSize, false);
+    initContext->stack = vm.newObject<TObjectArray>(stackSize);
     initContext->stackTop = newInteger(0);
     
     initContext->method = globals.initialMethod;
     
     // FIXME image builder does not calculate temporary size
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
-    initContext->temporaries = vm.newObject<TObjectArray>(42, false);
+    initContext->temporaries = vm.newObject<TObjectArray>(42);
 
     vm.pushProcess(initProcess);
     

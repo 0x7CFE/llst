@@ -58,7 +58,7 @@ struct TMemoryManagerInfo {
 
 struct object_ptr {
     volatile TObject* data;
-    object_ptr* next;
+    volatile object_ptr* next;
     object_ptr() : data(0), next(0) {}
     explicit object_ptr(volatile TObject* data)  : data(data), next(0) {}
     object_ptr& operator=(const object_ptr& value) { this->data = value.data; return *this; }

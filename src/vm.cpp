@@ -295,7 +295,7 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     
     // Allocating block's stack
     uint32_t stackSize = getIntegerValue(ec.currentContext->method->stackSize);
-    newBlock->stack    = newObject<TObjectArray>(stackSize, false);
+    newBlock->stack    = newObject<TObjectArray>(stackSize/*, false*/);
     
     newBlock->argumentLocation = newInteger(ec.instruction.low);
     newBlock->blockBytePointer = newInteger(ec.bytePointer);
@@ -498,7 +498,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         hptr<TObject> pRightObject = newPointer(rightObject);
         hptr<TObject> pLeftObject  = newPointer(leftObject);
         
-        hptr<TObjectArray> messageArguments = newObject<TObjectArray>(2, false);
+        hptr<TObjectArray> messageArguments = newObject<TObjectArray>(2/*, false*/);
         messageArguments[1] = pRightObject;
         messageArguments[0] = pLeftObject;
         
