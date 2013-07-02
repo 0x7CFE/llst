@@ -57,10 +57,10 @@ struct TMemoryManagerInfo {
 };
 
 struct object_ptr {
-    TObject* data;
+    volatile TObject* data;
     object_ptr* next;
     object_ptr() : data(0), next(0) {}
-    explicit object_ptr(TObject* data)  : data(data), next(0) {}
+    explicit object_ptr(volatile TObject* data)  : data(data), next(0) {}
     object_ptr& operator=(const object_ptr& value) { this->data = value.data; return *this; }
 private:
     object_ptr(const object_ptr& value) {}
@@ -169,7 +169,7 @@ public:
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
     
      template<typename I>
-     T& operator [] (I index) const { return static_cast<Object*>(hptr_base<Object>::target.data)->operator[](index); } 
+     T& operator [] (I index) const { return static_cast<Object*>(const_cast<TObject*>(hptr_base<Object>::target.data))->operator[](index); } 
      //return hptr_base<Object>::target.data->operator[](index); }
 };
 
@@ -183,7 +183,7 @@ public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
     
-    uint8_t& operator [] (uint32_t index) const { return static_cast<Object*>(target.data)->operator[](index); }
+    uint8_t& operator [] (uint32_t index) const { return static_cast<Object*>(const_cast<TObject*>(target.data))->operator[](index); }
 };
 
 // Simple memory manager implementing classic baker two space algorithm.

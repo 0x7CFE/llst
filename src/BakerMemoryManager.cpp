@@ -486,8 +486,8 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
         return;
     }
     
-    object_ptr* currentPointer  = &pointer;
-    object_ptr* previousPointer = 0;
+    object_ptr* currentPointer  = pointer.next;
+    object_ptr* previousPointer = &pointer;
     
     while (currentPointer != 0) {
         if (currentPointer == &pointer) {
