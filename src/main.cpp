@@ -41,8 +41,8 @@
 #include <console.h>
 
 int main(int argc, char **argv) {
-    std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
-    memoryManager->initializeHeap(65536, 1048576 * 100);
+    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
+    memoryManager->initializeHeap(1048576, 1048576 * 100);
     
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -112,14 +112,14 @@ int main(int argc, char **argv) {
     initContext->previousContext = (TContext*) globals.nilObject;
     
     const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
-    initContext->stack = vm.newObject<TObjectArray>(stackSize, false);
+    initContext->stack = vm.newObject<TObjectArray>(stackSize);
     initContext->stackTop = newInteger(0);
     
     initContext->method = globals.initialMethod;
     
     // FIXME image builder does not calculate temporary size
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
-    initContext->temporaries = vm.newObject<TObjectArray>(42, false);
+    initContext->temporaries = vm.newObject<TObjectArray>(42);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);

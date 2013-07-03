@@ -45,7 +45,7 @@
 
 
 // Memory manager statics is held
-// in the following structue
+// in the following structure
 struct TMemoryManagerInfo {
     uint32_t collectionsCount;
     uint32_t allocationsCount;

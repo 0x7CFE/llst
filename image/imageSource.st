@@ -1361,6 +1361,14 @@ main    | command  x|
     
     " main execution loop "
     
+    nil benchmark4.
+    nil benchmark: 100.
+    nil benchmark: 100.
+    nil benchmark: 100.
+    nil benchmark: 100.
+    nil benchmark: 100.
+    "nil benchmark: 100000."
+    
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
             ifFalse: [ command doIt printNl ] ]
