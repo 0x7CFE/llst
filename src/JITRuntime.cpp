@@ -33,6 +33,7 @@
 */
 
 #include <jit.h>
+#include <primitives.h>
 
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/IRReader.h>
@@ -147,8 +148,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
 JITRuntime::~JITRuntime() {
     // Finalize stuff and dispose memory
+    m_executionEngine->removeModule(m_JITModule);
+    delete m_JITModule;
+    delete m_executionEngine;
     delete m_functionPassManager;
     delete m_modulePassManager;
+    delete m_methodCompiler;
 }
 
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
@@ -290,33 +295,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         
         // Checking whether we found a method
         if (method == 0) {
-            // Oops. Method was not found. In this case we should
-            // send #doesNotUnderstand: message to the receiver
-            
-            // Looking up the #doesNotUnderstand: method:
-            method = m_softVM->newPointer(m_softVM->lookupMethod(globals.badMethodSymbol, receiverClass));
-            if (method == 0) {
-                // Something goes really wrong.
-                // We could not continue the execution
-                errs() << "\nCould not locate #doesNotUnderstand:\n";
-                exit(1);
-            }
-            
-            // Protecting the selector pointer because it may be invalidated later
-            hptr<TSymbol> failedSelector = m_softVM->newPointer(message);
-            
-            // We're replacing the original call arguments with custom one
-            hptr<TObjectArray> errorArguments = m_softVM->newObject<TObjectArray>(2);
-            
-            // Filling in the failed call context information
-            errorArguments[0] = messageArguments[0]; // receiver object
-            errorArguments[1] = failedSelector;      // message selector that failed
-            
-            // Replacing the arguments with newly created one
-            messageArguments = errorArguments;
-            
-            // Continuing the execution just as if #doesNotUnderstand:
-            // was the actual selector that we wanted to call
+            // Oops. Method was not found. In this case we should send #doesNotUnderstand: message to the receiver
+            m_softVM->setupVarsForDoesNotUnderstand(method, messageArguments, message, receiverClass);
+            // Continuing the execution just as if #doesNotUnderstand: was the actual selector that we wanted to call
         }
         
         // Searching for the jit compiled function
@@ -356,9 +337,14 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         newContext->method            = method;
         newContext->previousContext   = previousContext;
     }
-    
-    TObject* result = compiledMethodFunction(newContext);
-    return result;
+    try {
+        TObject* result = compiledMethodFunction(newContext);
+        return result;
+    } catch( ... ) {
+        //FIXME
+        //Do not remove this try catch (you will get "terminate called after throwing an instance of 'TContext*' or 'TBlockReturn'")
+        throw;
+    }
 }
 
 void JITRuntime::initializeGlobals() {
@@ -397,114 +383,39 @@ void JITRuntime::initializePassManager() {
     // Start with registering info about how the
     // target lays out data structures.
     m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
-    
-    // Basic AliasAnslysis support for GVN.
     m_functionPassManager->add(createBasicAliasAnalysisPass());
-    
-    // Promote allocas to registers.
     m_functionPassManager->add(createPromoteMemoryToRegisterPass());
-
-    // Do simple "peephole" optimizations and bit-twiddling optzns.
     m_functionPassManager->add(createInstructionCombiningPass());
-
-    // Reassociate expressions.
     m_functionPassManager->add(createReassociatePass());
-
-    // Eliminate Common SubExpressions.
     m_functionPassManager->add(createGVNPass());
-
     m_functionPassManager->add(createAggressiveDCEPass());
-    
     m_functionPassManager->add(createTailCallEliminationPass());
-    
-    // Simplify the control flow graph (deleting unreachable blocks, etc).
     m_functionPassManager->add(createCFGSimplificationPass());
-    
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     m_functionPassManager->add(createLLSTPass());
     //If llstPass removed GC roots, we may try DCE again
-    
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     //m_functionPassManager->add(createLLSTDebuggingPass());
+    m_functionPassManager->doInitialization();
     
     m_modulePassManager->add(createFunctionInliningPass());
-    m_functionPassManager->doInitialization();
 }
 
 void JITRuntime::initializeRuntimeAPI() {
-    LLVMContext& llvmContext = getGlobalContext();
-    
-    PointerType* objectType     = m_baseTypes.object->getPointerTo();
-    PointerType* classType      = m_baseTypes.klass->getPointerTo();
-    PointerType* byteObjectType = m_baseTypes.byteObject->getPointerTo();
-    PointerType* contextType    = m_baseTypes.context->getPointerTo();
-    PointerType* blockType      = m_baseTypes.block->getPointerTo();
-    PointerType* objectSlotType = m_baseTypes.object->getPointerTo()->getPointerTo(); // TObject**
-    
-    Type* params[] = {
-        classType,                    // klass
-        Type::getInt32Ty(llvmContext) // size
-    };
-    FunctionType* newOrdinaryObjectType = FunctionType::get(objectType,     params, false);
-    FunctionType* newBinaryObjectType   = FunctionType::get(byteObjectType, params, false);
-    
-    
-    Type* sendParams[] = {
-        contextType,                    // callingContext
-        m_baseTypes.symbol->getPointerTo(),      // message selector
-        m_baseTypes.objectArray->getPointerTo(), // arguments
-        classType                       // receiverClass
-    };
-    FunctionType* sendMessageType  = FunctionType::get(objectType, sendParams, false);
-    
-    Type* createBlockParams[] = {
-        contextType,                  // callingContext
-        Type::getInt8Ty(llvmContext), // argLocation
-        Type::getInt16Ty(llvmContext) // bytePointer
-    };
-    FunctionType* createBlockType = FunctionType::get(blockType, createBlockParams, false);
-    
-    Type* invokeBlockParams[] = {
-        blockType,  // block
-        contextType // callingContext
-    };
-    FunctionType* invokeBlockType = FunctionType::get(objectType, invokeBlockParams, false);
-    
-    
-    Type* emitBlockReturnParams[] = {
-        objectType, // value
-        contextType // targetContext
-    };
-    FunctionType* emitBlockReturnType = FunctionType::get(Type::getVoidTy(llvmContext), emitBlockReturnParams, false);
-    
-    Type* checkRootParams[] = {
-        objectType,     // value
-        objectSlotType  // slot
-    };
-    FunctionType* checkRootType = FunctionType::get(Type::getVoidTy(llvmContext), checkRootParams, false);
-    
-    Type* bulkReplaceParams[] = {
-        objectType, // destination
-        objectType, // sourceStartOffset
-        objectType, // source
-        objectType, // destinationStopOffset
-        objectType  // destinationStartOffset
-    };
-    FunctionType* bulkReplaceType = FunctionType::get(Type::getInt1Ty(llvmContext), bulkReplaceParams, false);
-    
     // Creating function references
-    m_runtimeAPI.newOrdinaryObject  = Function::Create(newOrdinaryObjectType, Function::ExternalLinkage, "newOrdinaryObject", m_JITModule);
-    m_runtimeAPI.newBinaryObject    = Function::Create(newBinaryObjectType, Function::ExternalLinkage, "newBinaryObject", m_JITModule);
-    m_runtimeAPI.sendMessage        = Function::Create(sendMessageType, Function::ExternalLinkage, "sendMessage", m_JITModule);
-    m_runtimeAPI.createBlock        = Function::Create(createBlockType, Function::ExternalLinkage, "createBlock", m_JITModule);
-    m_runtimeAPI.invokeBlock        = Function::Create(invokeBlockType, Function::ExternalLinkage, "invokeBlock", m_JITModule);
-    m_runtimeAPI.emitBlockReturn    = Function::Create(emitBlockReturnType, Function::ExternalLinkage, "emitBlockReturn", m_JITModule);
-    m_runtimeAPI.checkRoot          = Function::Create(checkRootType, Function::ExternalLinkage, "checkRoot", m_JITModule );
-    m_runtimeAPI.bulkReplace        = Function::Create(bulkReplaceType, Function::ExternalLinkage, "bulkReplace", m_JITModule);
+    m_runtimeAPI.newOrdinaryObject  = m_JITModule->getFunction("newOrdinaryObject");
+    m_runtimeAPI.newBinaryObject    = m_JITModule->getFunction("newBinaryObject");
+    m_runtimeAPI.sendMessage        = m_JITModule->getFunction("sendMessage");
+    m_runtimeAPI.createBlock        = m_JITModule->getFunction("createBlock");
+    m_runtimeAPI.invokeBlock        = m_JITModule->getFunction("invokeBlock");
+    m_runtimeAPI.emitBlockReturn    = m_JITModule->getFunction("emitBlockReturn");
+    m_runtimeAPI.checkRoot          = m_JITModule->getFunction("checkRoot");
+    m_runtimeAPI.bulkReplace        = m_JITModule->getFunction("bulkReplace");
+    m_runtimeAPI.callPrimitive      = m_JITModule->getFunction("callPrimitive");
     
     // Mapping the function references to actual functions
     m_executionEngine->addGlobalMapping(m_runtimeAPI.newOrdinaryObject, reinterpret_cast<void*>(& ::newOrdinaryObject));
@@ -515,6 +426,7 @@ void JITRuntime::initializeRuntimeAPI() {
     m_executionEngine->addGlobalMapping(m_runtimeAPI.emitBlockReturn, reinterpret_cast<void*>(& ::emitBlockReturn));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.checkRoot, reinterpret_cast<void*>(& ::checkRoot));
     m_executionEngine->addGlobalMapping(m_runtimeAPI.bulkReplace, reinterpret_cast<void*>(& ::bulkReplace));
+    m_executionEngine->addGlobalMapping(m_runtimeAPI.callPrimitive, reinterpret_cast<void*>(& ::callPrimitive));
     
     //Type*  rootChainType = m_JITModule->getTypeByName("gc_stackentry")->getPointerTo();
     //GlobalValue* gRootChain    = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("llvm_gc_root_chain", rootChainType) );
@@ -523,17 +435,14 @@ void JITRuntime::initializeRuntimeAPI() {
 }
 
 void JITRuntime::initializeExceptionAPI() {
-    LLVMContext& Context = getGlobalContext();
-    Type* Int32Ty        = Type::getInt32Ty(Context);
-    Type* Int8PtrTy      = Type::getInt8PtrTy(Context);
-    Type* VoidTy         = Type::getVoidTy(Context);
-    Type* throwParams[] = { Int8PtrTy, Int8PtrTy, Int8PtrTy };
+    m_exceptionAPI.gcc_personality = m_JITModule->getFunction("__gcc_personality_v0");
+    m_exceptionAPI.cxa_begin_catch = m_JITModule->getFunction("__cxa_begin_catch");
+    m_exceptionAPI.cxa_end_catch   = m_JITModule->getFunction("__cxa_end_catch");
+    m_exceptionAPI.cxa_allocate_exception = m_JITModule->getFunction("__cxa_allocate_exception");
+    m_exceptionAPI.cxa_throw       = m_JITModule->getFunction("__cxa_throw");
     
-    m_exceptionAPI.gcc_personality = Function::Create(FunctionType::get(Int32Ty, true), Function::ExternalLinkage, "__gcc_personality_v0", m_JITModule);
-    m_exceptionAPI.cxa_begin_catch = Function::Create(FunctionType::get(Int8PtrTy, Int8PtrTy, false), Function::ExternalLinkage, "__cxa_begin_catch", m_JITModule);
-    m_exceptionAPI.cxa_end_catch   = Function::Create(FunctionType::get(VoidTy, false), Function::ExternalLinkage, "__cxa_end_catch", m_JITModule);
-    m_exceptionAPI.cxa_allocate_exception = Function::Create(FunctionType::get(Int8PtrTy, Int32Ty, false), Function::ExternalLinkage, "__cxa_allocate_exception", m_JITModule);
-    m_exceptionAPI.cxa_throw       = Function::Create(FunctionType::get(VoidTy, throwParams, false), Function::ExternalLinkage, "__cxa_throw", m_JITModule);
+    LLVMContext& Context = m_JITModule->getContext();
+    Type* Int8PtrTy      = Type::getInt8PtrTy(Context);
     
     m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Int8PtrTy));
     m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, TBlockReturn::getBlockReturnType());

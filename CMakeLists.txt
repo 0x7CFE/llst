@@ -40,7 +40,7 @@ set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
 add_custom_command(
     OUTPUT  ${IMAGE_DIR}/LittleSmalltalk.image
     COMMAND ${IMAGE_DIR}/imageBuilder
-    DEPENDS llst ${IMAGE_DIR}/imageSource.st
+    DEPENDS ${IMAGE_DIR}/imageSource.st
     WORKING_DIRECTORY ${IMAGE_DIR}
     COMMENT "Building image"
 )

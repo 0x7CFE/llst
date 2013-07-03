@@ -92,6 +92,8 @@ public:
     
     virtual uint32_t allocsBeyondCollection() = 0;
     virtual TMemoryManagerInfo getStat() = 0;
+    
+    virtual ~IMemoryManager() {};
 };
 
 // When pointer to a heap object is stored outside of the heap,

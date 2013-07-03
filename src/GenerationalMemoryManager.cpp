@@ -12,12 +12,13 @@ GenerationalMemoryManager::~GenerationalMemoryManager()
 void GenerationalMemoryManager::moveYoungObjects()
 {
     TPointerIterator iYoungPointer = m_crossGenerationalReferences.begin();
-    for (; iYoungPointer != m_crossGenerationalReferences.end(); ++iYoungPointer)
+    for (; iYoungPointer != m_crossGenerationalReferences.end(); ++iYoungPointer) {
         **iYoungPointer = moveObject(**iYoungPointer);
+    }
 
-    // Now all active young objects are moved to the old space
-    // Old space is collected using traditional algorithm, so
-    // cross generational references are no more needed.
+    // Now all active young objects are moved to the old space.
+    // The old space is collected with traditional algorithm, so
+    // cross generational references are not needed anymore.
     m_crossGenerationalReferences.clear();
     
     // Updating external references. Typically these are pointers stored in the hptr<>
@@ -101,9 +102,7 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     m_activeHeapBase    = m_heapTwo;
     m_inactiveHeapBase  = m_heapOne;
 
-    uint8_t* heapOnePointer = m_activeHeapPointer;
-    m_activeHeapPointer = m_inactiveHeapPointer; // heap two
-    m_inactiveHeapPointer = heapOnePointer;
+    std::swap(m_activeHeapPointer, m_inactiveHeapPointer);
     
     // Moving the objects from the left to the right heap
     // TODO In certain circumstances right heap may not have
@@ -114,24 +113,23 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     //      ALL objects from both spaces to a new allocated heap. 
     //      After that old space is freed and new is treated either as heap one
     //      or heap two depending on the size.
-    if (fullCollect)
+    if (fullCollect) {
         moveObjects();
-    else
+    } else {
         moveYoungObjects();
-
-    uint8_t* lastHeapTwoPointer = m_activeHeapPointer;
+    }
+    
+    m_inactiveHeapBase    = m_heapTwo;
+    m_inactiveHeapPointer = m_activeHeapPointer;
     
     // Now, all active objects are located in the space two 
     // (inactive space in terms of classic Baker).
     // Resetting the space one pointers to mark space as empty.
     m_activeHeapBase    = m_heapOne;
     m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2;
-
+    
     memset(m_heapOne, 0xAA, m_heapSize / 2);
     
-    m_inactiveHeapBase    = m_heapTwo;
-    m_inactiveHeapPointer = lastHeapTwoPointer;
-
     // After this operation active objects from space one now all
     // in space two and are treated as generation 1.
     m_leftToRightCollections++;
