@@ -1361,13 +1361,8 @@ main    | command  x|
     
     " main execution loop "
     
-    nil benchmark4.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    "nil benchmark: 100000."
+    "nil benchmark4.
+    nil benchmark: 100000."
     
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
@@ -1467,6 +1462,78 @@ or: aBlock
 METHOD False
 and: aBlock
 	^ false
+!
+
+RAWCLASS MetaScheduler Class            MetaObject  instance
+RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
+CLASS    Thread        Object                       myBlock myProcess
+METHOD MetaThread
+new: aBlock |instance|
+    instance <- super new.
+    self in: instance at: 1 put: aBlock.
+    ^instance
+!
+METHOD Thread
+run |context|
+    myProcess <- Process new.
+    context <- Context new. 
+    
+    myProcess context: context.
+    context setup: (Thread methods at: #invokeBlock) withArguments: nil.
+    
+    Scheduler addProcess: myProcess.
+!
+METHOD Thread
+invokeBlock |result|
+    result <- myBlock value.
+    Scheduler endProcess: myProcess.
+    ^result
+!
+METHOD MetaThread
+run: aBlock
+    ^(self new: aBlock) run
+!
+METHOD MetaScheduler
+new
+    instance notNil ifTrue: [ ^instance ].
+    instance <- super new.
+    self in: instance at: 1 put: List new. "tasks"
+    self in: instance at: 2 put: false.    "stop"
+    self in: instance at: 3 put: 1000.     "granularity"
+    ^instance.
+!
+METHOD MetaScheduler
+addProcess: aProcess
+    instance addProcess: aProcess
+!
+METHOD MetaScheduler
+endProcess: aProcess
+    ^instance endProcess: aProcess
+!
+METHOD Scheduler
+addProcess: aProcess
+    tasks add: aProcess.
+!
+METHOD Scheduler
+endProcess: aProcess
+    tasks remove: aProcess ifAbsent: [^false].
+    ^true.
+!
+METHOD Scheduler
+runOnce
+    tasks do: [ :task | task doExecute: granularity ]
+!
+METHOD Scheduler
+run
+    [stop] whileFalse: [ self runOnce ]
+!
+METHOD Scheduler
+stop
+    stop <- true
+!
+METHOD Scheduler
+granularity: aValue
+    granularity <- aValue
 !
 COMMENT -----------Process--------------
 METHOD Process
@@ -1953,7 +2020,7 @@ insertSort: criteria | result |
 METHOD Collection
 sort: criteria | left right mediane |
     "(self isEmpty) ifTrue: [^self]."
-    (self size < 30) 
+    (self size < 32) 
         ifTrue: [ ^ self insertSort: criteria ].
 
     mediane <- self popFirst.
