@@ -1520,8 +1520,13 @@ endProcess: aProcess
     ^true.
 !
 METHOD Scheduler
-runOnce
-    tasks do: [ :task | task doExecute: granularity ]
+runOnce |result finished|
+    finished <- List new.
+    tasks do: [ :task | 
+        result <- task doExecute: granularity.
+        (result ~= 5) ifFalse: [ finished add: task ].
+    ].
+    finished do: [ :task | tasks remove: task ]
 !
 METHOD Scheduler
 run
