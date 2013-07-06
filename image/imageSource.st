@@ -121,6 +121,10 @@ RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
 CLASS LLVM Object
 CLASS LLVMTest Object field1
 
+RAWCLASS MetaScheduler Class            MetaObject  instance
+RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
+CLASS    Thread        Object                       myBlock myProcess
+
 COMMENT ---------- method bodies ------------
 COMMENT -----------Object-------------------
 METHOD MetaObject
@@ -1364,6 +1368,11 @@ main    | command  x|
     "nil benchmark4.
     nil benchmark: 100000."
     
+    Scheduler new.
+    Thread run: [ 1 to: 10 do: [ :x | x printNl ] ].
+    Scheduler run.
+    
+    
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
             ifFalse: [ command doIt printNl ] ]
@@ -1463,10 +1472,6 @@ METHOD False
 and: aBlock
 	^ false
 !
-
-RAWCLASS MetaScheduler Class            MetaObject  instance
-RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
-CLASS    Thread        Object                       myBlock myProcess
 METHOD MetaThread
 new: aBlock |instance|
     instance <- super new.
@@ -1481,6 +1486,7 @@ run |context|
     myProcess context: context.
     context setup: (Thread methods at: #invokeBlock) withArguments: nil.
     
+    'scheduling process for execution' printNl.
     Scheduler addProcess: myProcess.
 !
 METHOD Thread
@@ -1496,7 +1502,7 @@ run: aBlock
 METHOD MetaScheduler
 new
     instance notNil ifTrue: [ ^instance ].
-    instance <- super new.
+    instance <- Scheduler basicNew.
     self in: instance at: 1 put: List new. "tasks"
     self in: instance at: 2 put: false.    "stop"
     self in: instance at: 3 put: 1000.     "granularity"
@@ -1504,14 +1510,21 @@ new
 !
 METHOD MetaScheduler
 addProcess: aProcess
-    instance addProcess: aProcess
+    'MetaScheduler: adding process' printNl.
+    instance addProcess: aProcess.
+    'done' printNl
 !
 METHOD MetaScheduler
 endProcess: aProcess
     ^instance endProcess: aProcess
 !
+METHOD MetaScheduler
+run
+    ^instance run
+!
 METHOD Scheduler
 addProcess: aProcess
+    'Scheduler: adding task' printNl.
     tasks add: aProcess.
 !
 METHOD Scheduler
