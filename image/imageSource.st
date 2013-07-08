@@ -1347,30 +1347,12 @@ main    | command  x|
     " initialize classes "
     
     Char initialize.
+
+    File fileIn: '../image/disasm.st'.
     
-    "CompareTest new runAll.
-    StringTest new runAll.
-    LoopTest new runAll.
-    SmallIntTest new runAll."
-    
-    "LLVM do: [
-        10 times: [:i|
-            CompareTest new runAll.
-            StringTest new runAll.
-            LoopTest new runAll.
-            SmallIntTest new runAll.
-            GCTest new runAll.
-        ].
-    ]."
-    
-    " main execution loop "
-    
-    "nil benchmark4.
-    nil benchmark: 100000."
-    
-    Scheduler new.
+    "Scheduler new.
     Thread run: [ 1 to: 10 do: [ :x | x printNl ] ].
-    Scheduler run.
+    Scheduler run."
     
     
     [ command <- String readline: '->'. command notNil ]
@@ -1474,7 +1456,7 @@ and: aBlock
 !
 METHOD MetaThread
 new: aBlock |instance|
-    instance <- super new.
+    instance <- self new.
     self in: instance at: 1 put: aBlock.
     ^instance
 !
@@ -1484,7 +1466,7 @@ run |context|
     context <- Context new. 
     
     myProcess context: context.
-    context setup: (Thread methods at: #invokeBlock) withArguments: nil.
+    context setup: (Thread methods at: #invokeBlock) withArguments: (Array with: self).
     
     'scheduling process for execution' printNl.
     Scheduler addProcess: myProcess.
@@ -1500,9 +1482,15 @@ run: aBlock
     ^(self new: aBlock) run
 !
 METHOD MetaScheduler
+instance
+    ^instance
+!
+METHOD MetaScheduler
 new
     instance notNil ifTrue: [ ^instance ].
-    instance <- Scheduler basicNew.
+    'initializing scheduler singleton' printNl.
+    
+    instance <- self basicNew.
     self in: instance at: 1 put: List new. "tasks"
     self in: instance at: 2 put: false.    "stop"
     self in: instance at: 3 put: 1000.     "granularity"
@@ -1511,6 +1499,7 @@ new
 METHOD MetaScheduler
 addProcess: aProcess
     'MetaScheduler: adding process' printNl.
+    instance isNil ifTrue: [ self new ].
     instance addProcess: aProcess.
     'done' printNl
 !
@@ -3917,7 +3906,7 @@ fileInDispatch: cmd | c |
 
 	" Comment enclosed in quotes... find matching quote "
 	(cmd = $") ifTrue: [
-		[ c <- self readChar. c ~= $" ] whileTrue: [
+		[ c <- self getc. c ~= $" ] whileTrue: [
 			" Consume chars until closing quote "
 			nil
 		].
@@ -3934,7 +3923,7 @@ fileInDispatch: cmd | c |
 !
 METHOD File
 fileIn		| cmd |
-	[ cmd <- self readChar. cmd notNil ] whileTrue: [
+	[ cmd <- self getc. cmd notNil ] whileTrue: [
 		self fileInDispatch: cmd
 	]
 !

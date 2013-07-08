@@ -23,7 +23,7 @@ execute_process(COMMAND ${CONFIG_COMMAND} --libs all
                 OUTPUT_VARIABLE LLVM_LIBS)
 
 set (COMPILER_FLAGS "-g -m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} -O2 -fexceptions -frtti")
-set (LINKER_FLAGS   "-O2 -m32 -L/usr/lib32 -Wall ${LLVM_LD_FLAGS}")
+set (LINKER_FLAGS   "-m32 -L/usr/lib32 -Wall ${LLVM_LD_FLAGS}")
 
 add_subdirectory(src)
 add_subdirectory(include)
