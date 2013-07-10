@@ -1350,10 +1350,10 @@ main    | command  x|
 
     File fileIn: '../image/disasm.st'.
     
-    "Scheduler new.
-    Thread run: [ 1 to: 10 do: [ :x | x printNl ] ].
-    Scheduler run."
-    
+    Scheduler initialize.
+    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
+    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
+    Scheduler run.
     
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
@@ -1474,7 +1474,6 @@ run |context|
 METHOD Thread
 invokeBlock |result|
     result <- myBlock value.
-    Scheduler endProcess: myProcess.
     ^result
 !
 METHOD MetaThread
@@ -1482,14 +1481,7 @@ run: aBlock
     ^(self new: aBlock) run
 !
 METHOD MetaScheduler
-instance
-    ^instance
-!
-METHOD MetaScheduler
-new
-    instance notNil ifTrue: [ ^instance ].
-    'initializing scheduler singleton' printNl.
-    
+initialize
     instance <- self basicNew.
     self in: instance at: 1 put: List new. "tasks"
     self in: instance at: 2 put: false.    "stop"
@@ -1497,9 +1489,16 @@ new
     ^instance.
 !
 METHOD MetaScheduler
+instance
+    ^instance
+!
+METHOD MetaScheduler
+new
+    ^instance.
+!
+METHOD MetaScheduler
 addProcess: aProcess
     'MetaScheduler: adding process' printNl.
-    instance isNil ifTrue: [ self new ].
     instance addProcess: aProcess.
     'done' printNl
 !
@@ -1526,9 +1525,10 @@ runOnce |result finished|
     finished <- List new.
     tasks do: [ :task | 
         result <- task doExecute: granularity.
-        (result ~= 5) ifFalse: [ finished add: task ].
+        ( result ~= 5 ) ifTrue: [ finished add: task ].
     ].
-    finished do: [ :task | tasks remove: task ]
+    finished do: [ :task | tasks remove: task ].
+    stop <- (tasks size = 0).
 !
 METHOD Scheduler
 run
@@ -2662,7 +2662,7 @@ METHOD List
 remove: anElement ifAbsent: exceptionBlock
 	elements isNil
 		ifTrue: [ exceptionBlock value. ^self ]
-		ifFalse: [ elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
+		ifFalse: [ elements <- elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
     size <- size - 1.
 !
 METHOD List
