@@ -16,14 +16,15 @@
 
 %start image;
 
-
-
-image : /* empty image */
+image_contents : /* empty image */
     | comment
     | class_definition
     | rawclass_definition
-    | method_definition;
+    | method_definition
+    ;
 
+image : image_contents initial_method;    
+    
 id : IDENTIFIER;
 
 arg_id : ARGUMENT;
@@ -33,14 +34,17 @@ id_list_tail : /* empty tail */
 
 id_list : id id_list_tail;
     
-class_definition : CLASS id id id_list;
+comment : COMMENT;
+    
+class_definition : CLASS id id id_list "\n";
 
-rawclass_definition : RAWCLASS id id id id_list;
+rawclass_definition : RAWCLASS id id id id_list "\n";
 
 method_definition : METHOD id method;
 
-temporaries : "|" id_list "|";
+initial_method : BEGIN method_body END;
 
+temporaries : "|" id_list "|";
 
 arg_list_tail : /* empty */
     | arg_id arg_list_tail;
@@ -49,8 +53,8 @@ arg_list : arg_id arg_list_tail;
 
 arguments : arg_list;
 
-block_body : 
-    statements
+block_body : /* empty */
+    | statements
     | arguments "|" statements
     ;
 
@@ -66,39 +70,49 @@ key_message_tail : /* empty */
 key_message : selector_value_pair key_message_tail;
 
 message : 
-      id
-    | operator expression
+      id /* simple unary message identifier */
     | key_message
     ;
 
 message_chain_tail : /* empty */
-    | message message_chain_tail;
+    | message message_chain_tail
+    | ";" message message_chain_tail /* cascade messages */
+    ;
 
 message_chain : message message_chain_tail;
+
+literals : /* empty */
+    | literal;
+
+string : STRING;
+symbol : SYMBOL;
+number : INTEGER;
+char   : CHARACTER;
+array  : "#(" literals ")";
+
+literal:
+      string  /* string literal */
+    | symbol  /* symbol literal */
+    | number  /* number literal */
+    | char    /* character literal $x */
+    | array   /* inline literal array #( ) */
+    ;
     
-inline_object : 
-    block
-    | string
-    | symbol
-    | number
-    | array /* #( ) constants */
-    | char  /* $x   constants */
+receiver : 
+    id        /* global, temporary or instance variable name identifier */
+    | literal /* inline literal object */ 
     | TRUE
     | FALSE
     | NIL
-    ;
-
-target : 
-    inline_object
-    | id
     | SELF
     | SUPER
+    | block   /* inline block */
     | "(" expression ")"
     ;
     
 expression : 
-    target
-    | target message_chain
+      receiver
+    | receiver message_chain
     | expression "+" expression
     | expression "-" expression
     | expression "*" expression
@@ -115,7 +129,8 @@ expression :
 
 assignment : id "<-" expression;
 
-primitive_params : id_list;
+primitive_params : /* empty */
+    | id_list;
 
 primitive : "<" number primitive_params ">";
 
