@@ -1532,6 +1532,7 @@ runOnce |result finished|
 !
 METHOD Scheduler
 run
+    stop <- false.
     [stop] whileFalse: [ self runOnce ]
 !
 METHOD Scheduler
@@ -2664,6 +2665,10 @@ remove: anElement ifAbsent: exceptionBlock
 		ifTrue: [ exceptionBlock value. ^self ]
 		ifFalse: [ elements <- elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
     size <- size - 1.
+!
+METHOD List
+clear
+    elements <- nil.
 !
 METHOD List
 do: aBlock | link |
