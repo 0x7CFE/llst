@@ -26,7 +26,7 @@ image : /* empty image */
 
 id : IDENTIFIER;
 
-col_id : ":" IDENTIFIER;
+arg_id : ARGUMENT;
     
 id_list_tail : /* empty tail */
     | id id_list_tail;
@@ -37,13 +37,15 @@ class_definition : CLASS id id id_list;
 
 rawclass_definition : RAWCLASS id id id id_list;
 
+method_definition : METHOD id method;
+
 temporaries : "|" id_list "|";
 
 
 arg_list_tail : /* empty */
-    | col_id arg_list_tail;
+    | arg_id arg_list_tail;
 
-arg_list : col_id arg_list_tail;
+arg_list : arg_id arg_list_tail;
 
 arguments : arg_list;
 
@@ -56,10 +58,12 @@ block : "[" block_body "]";
 
 selector : SELECTOR;    
     
-key_message_tail : /* empty */
-    | selector expression key_message_tail;
+selector_value_pair: selector expression;
 
-key_message : selector expression key_message_tail;
+key_message_tail : /* empty */
+    | selector_value_pair key_message_tail;
+
+key_message : selector_value_pair key_message_tail;
 
 message : 
       id
@@ -67,14 +71,17 @@ message :
     | key_message
     ;
 
-message_chain : message message_chain;
+message_chain_tail : /* empty */
+    | message message_chain_tail;
+
+message_chain : message message_chain_tail;
     
 inline_object : 
     block
     | string 
     | number
-    | array
-    | char
+    | array /* #( ) constants */
+    | char  /* $x   constants */
     | TRUE
     | FALSE
     | NIL
@@ -88,10 +95,9 @@ target :
     ;
     
 expression : 
-    inline_object 
-    | id
+    target
+    | target message_chain
     | "(" expression ")"
-    | expression message_chain
     | expression "+" expression
     | expression "-" expression
     | expression "*" expression
@@ -107,23 +113,32 @@ expression :
 
 assignment : id "<-" expression;
 
+primitive_params : id_list;
+
 primitive : "<" number primitive_params ">";
 
 statement : 
     block message_chain
     | expression
     | assignment
-    | "^" expression
     | primitive
+    | "^" expression
     ;
 
 statements : /* empty */    
-    | statement "." statements;
+    | statement "." statements
+    | statement /* last one in a block */
+    ;
 
+method_interface_tail : /* empty */
+    | selector id;
+    
+method_interface : selector id method_interface_tail;
+    
 method_body : statements;
 
-method_definition : 
-      method_interface method_body BANG
-    | method_interface temporaries method_body BANG
+method : 
+      method_interface method_body "!"
+    | method_interface temporaries method_body "!"
     ;
 
