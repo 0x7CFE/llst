@@ -1,8 +1,8 @@
 #define DEBUG_TYPE "llst"
 #include <llstPass.h>
 
-STATISTIC(rootLoadsRemoved, "Number of removed loads from gc.root protected pointers                                <<<<<<");
-STATISTIC(rootsRemoved,     "Number of removed roots                                                                <<<<<<");
+STATISTIC(rootLoadsRemoved, "Number of removed loads from gc.root protected pointers                       <<<<<<");
+STATISTIC(rootsRemoved,     "Number of removed roots                                                       <<<<<<");
 
 using namespace llvm;
 
@@ -15,7 +15,7 @@ namespace {
     private:
         std::set<std::string> m_GCFunctionNames;
         bool isPotentialGCFunction(std::string name);
-        bool removeRootLoads(BasicBlock* B);
+        bool removeRootLoads(BasicBlock* B); // TODO We should implement Analysis pass ( ::canInstructionRangeModify() ). The standart GVN pass will do the rest for us.
         bool removeRedundantRoots(Function& F);
         int  getNumRoots(Function& F);
     public:

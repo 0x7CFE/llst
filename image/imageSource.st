@@ -121,6 +121,10 @@ RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
 CLASS LLVM Object
 CLASS LLVMTest Object field1
 
+RAWCLASS MetaScheduler Class            MetaObject  instance
+RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
+CLASS    Thread        Object                       myBlock myProcess
+
 COMMENT ---------- method bodies ------------
 COMMENT -----------Object-------------------
 METHOD MetaObject
@@ -775,6 +779,16 @@ goto |x testBlock|
     [ testBlock value: 4. x ] assertEq: 4 withComment: '5'.
 !
 
+METHOD BranchTest
+phi |x|     
+    x <- (true ifTrue:  [ 11 ]
+               ifFalse: [ 17 ] ) +
+         (true ifTrue:  [ 13 ]
+               ifFalse: [ 15 ] ).
+    
+    [ x ] assertEq: 24.
+!
+
 COMMENT                                                                                                 --------LoopTest----------
 CLASS LoopTest Test
 
@@ -1321,36 +1335,25 @@ runSort: size | x1 list ms1 selector args1 block1 |
         'Sorted in ms: ' print. ms1 printNl.
 !
 
+COMMENT Uncomment this method if you are going to run Smalltalk
+COMMENT immediately in LLVM. Don't forget to change main.cpp (executeProcess)
+COMMENT METHOD Undefined
+COMMENT boot
+COMMENT     nil main.
+COMMENT !
+
 METHOD Undefined
 main    | command  x|
     " initialize classes "
     
     Char initialize.
-    
-    "CompareTest new runAll.
-    StringTest new runAll.
-    LoopTest new runAll.
-    SmallIntTest new runAll."
-    
-    "LLVM do: [
-        10 times: [:i|
-            CompareTest new runAll.
-            StringTest new runAll.
-            LoopTest new runAll.
-            SmallIntTest new runAll.
-            GCTest new runAll.
-        ].
-    ]."
-    
-    " main execution loop "
 
-    nil benchmark4.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    nil benchmark: 100.
-    "nil benchmark: 100000."
+    File fileIn: '../image/disasm.st'.
+    
+    Scheduler initialize.
+    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
+    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
+    Scheduler run.
     
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
@@ -1450,6 +1453,95 @@ or: aBlock
 METHOD False
 and: aBlock
 	^ false
+!
+METHOD MetaThread
+new: aBlock |instance|
+    instance <- self new.
+    self in: instance at: 1 put: aBlock.
+    ^instance
+!
+METHOD Thread
+run |context|
+    myProcess <- Process new.
+    context <- Context new. 
+    
+    myProcess context: context.
+    context setup: (Thread methods at: #invokeBlock) withArguments: (Array with: self).
+    
+    'scheduling process for execution' printNl.
+    Scheduler addProcess: myProcess.
+!
+METHOD Thread
+invokeBlock |result|
+    result <- myBlock value.
+    ^result
+!
+METHOD MetaThread
+run: aBlock
+    ^(self new: aBlock) run
+!
+METHOD MetaScheduler
+initialize
+    instance <- self basicNew.
+    self in: instance at: 1 put: List new. "tasks"
+    self in: instance at: 2 put: false.    "stop"
+    self in: instance at: 3 put: 1000.     "granularity"
+    ^instance.
+!
+METHOD MetaScheduler
+instance
+    ^instance
+!
+METHOD MetaScheduler
+new
+    ^instance.
+!
+METHOD MetaScheduler
+addProcess: aProcess
+    'MetaScheduler: adding process' printNl.
+    instance addProcess: aProcess.
+    'done' printNl
+!
+METHOD MetaScheduler
+endProcess: aProcess
+    ^instance endProcess: aProcess
+!
+METHOD MetaScheduler
+run
+    ^instance run
+!
+METHOD Scheduler
+addProcess: aProcess
+    'Scheduler: adding task' printNl.
+    tasks add: aProcess.
+!
+METHOD Scheduler
+endProcess: aProcess
+    tasks remove: aProcess ifAbsent: [^false].
+    ^true.
+!
+METHOD Scheduler
+runOnce |result finished|
+    finished <- List new.
+    tasks do: [ :task | 
+        result <- task doExecute: granularity.
+        ( result ~= 5 ) ifTrue: [ finished add: task ].
+    ].
+    finished do: [ :task | tasks remove: task ].
+    stop <- (tasks size = 0).
+!
+METHOD Scheduler
+run
+    stop <- false.
+    [stop] whileFalse: [ self runOnce ]
+!
+METHOD Scheduler
+stop
+    stop <- true
+!
+METHOD Scheduler
+granularity: aValue
+    granularity <- aValue
 !
 COMMENT -----------Process--------------
 METHOD Process
@@ -1936,7 +2028,7 @@ insertSort: criteria | result |
 METHOD Collection
 sort: criteria | left right mediane |
     "(self isEmpty) ifTrue: [^self]."
-    (self size < 30) 
+    (self size < 32) 
         ifTrue: [ ^ self insertSort: criteria ].
 
     mediane <- self popFirst.
@@ -2571,8 +2663,12 @@ METHOD List
 remove: anElement ifAbsent: exceptionBlock
 	elements isNil
 		ifTrue: [ exceptionBlock value. ^self ]
-		ifFalse: [ elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
+		ifFalse: [ elements <- elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
     size <- size - 1.
+!
+METHOD List
+clear
+    elements <- nil.
 !
 METHOD List
 do: aBlock | link |
@@ -3407,115 +3503,397 @@ METHOD Tree
 isEmpty
 	^ root isNil
 !
+
+COMMENT -------------- MetaFileOpenFlag -----------------
+
+COMMENT <fcntl.h>
+CLASS FileOpenFlag Object
+
+METHOD MetaFileOpenFlag
+readOnly
+    ^0
+!
+
+METHOD MetaFileOpenFlag
+writeOnly
+    ^1
+!
+
+METHOD MetaFileOpenFlag
+readWrite
+    ^2
+!
+
+METHOD MetaFileOpenFlag
+create
+    ^64
+!
+
+METHOD MetaFileOpenFlag
+Truncate
+    ^512
+!
+
+METHOD MetaFileOpenFlag
+Append
+    ^1024
+!
+
+COMMENT -------------- FileMode -----------------
+
+COMMENT <sys/stat.h>
+CLASS FileMode Object modeMask
+
+METHOD MetaFileMode
+new: modeMask
+    ^ self in: (self new) at: 1 put: modeMask.
+!
+
+METHOD MetaFileMode
+fyleTypeMask
+    " 0170000 "
+    ^ 61440.
+!
+
+METHOD MetaFileMode
+isDirectory
+    " 040000 "
+    ^ 16384.
+!
+METHOD FileMode
+isDirectory
+    ^ (modeMask bitAnd: FileMode fyleTypeMask) = FileMode isDirectory.
+!
+
+METHOD MetaFileMode
+isReadableByOwner
+    " 0400 "
+    ^ 256.
+!
+METHOD MetaFileMode
+isReadableByGroup
+    " 0400 >> 3 "
+    ^ 32.
+!
+METHOD MetaFileMode
+isReadableByOthers
+    " 0400 >> 6 "
+    ^ 4.
+!
+METHOD FileMode
+isReadableByOwner
+    ^ (modeMask bitAnd: FileMode isReadableByOwner) = FileMode isReadableByOwner.
+!
+METHOD FileMode
+isReadableByGroup
+    ^ (modeMask bitAnd: FileMode isReadableByGroup) = FileMode isReadableByGroup.
+!
+METHOD FileMode
+isReadableByOthers
+    ^ (modeMask bitAnd: FileMode isReadableByOthers) = FileMode isReadableByOthers.
+!
+
+
+METHOD MetaFileMode
+isWritableByOwner
+    " 0200 "
+    ^ 128.
+!
+METHOD MetaFileMode
+isWritableByGroup
+    " 0200 >> 3 "
+    ^ 16.
+!
+METHOD MetaFileMode
+isWritableByOthers
+    " 0200 >> 6 "
+    ^ 2.
+!
+METHOD FileMode
+isWritableByOwner
+    ^ (modeMask bitAnd: FileMode isWritableByOwner) = FileMode isWritableByOwner.
+!
+METHOD FileMode
+isWritableByGroup
+    ^ (modeMask bitAnd: FileMode isWritableByGroup) = FileMode isWritableByGroup.
+!
+METHOD FileMode
+isWritableByOthers
+    ^ (modeMask bitAnd: FileMode isWritableByOthers) = FileMode isWritableByOthers.
+!
+
+METHOD MetaFileMode
+isExecutableByOwner
+    " 0100 "
+    ^ 64.
+!
+METHOD MetaFileMode
+isExecutableByGroup
+    " 0100 >> 3 "
+    ^ 8.
+!
+METHOD MetaFileMode
+isExecutableByOthers
+    " 0100 >> 6 "
+    ^ 1.
+!
+METHOD FileMode
+isExecutableByOwner
+    ^ (modeMask bitAnd: FileMode isExecutableByOwner) = FileMode isExecutableByOwner.
+!
+METHOD FileMode
+isExecutableByGroup
+    ^ (modeMask bitAnd: FileMode isExecutableByGroup) = FileMode isExecutableByGroup.
+!
+METHOD FileMode
+isExecutableByOthers
+    ^ (modeMask bitAnd: FileMode isExecutableByOthers) = FileMode isExecutableByOthers.
+!
+
+METHOD FileMode
+asString |result|
+    result <- ''.
+    
+    self isDirectory
+        ifTrue:  [ result <- result + 'd' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    self isReadableByOwner
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByOwner
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByOwner
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    self isReadableByGroup
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByGroup
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByGroup
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    self isReadableByOthers
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByOthers
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByOthers
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+    
+    ^ result.
+!
+
+COMMENT -------------- FileStat -----------------
+
+CLASS FileStat Object size inode mode
+
+METHOD MetaFileStat
+setStatTo: array for: descriptor
+    " fstat(descriptor, &stat) "
+    <105 descriptor array>.
+    self primitiveFailed.
+!
+
+METHOD MetaFileStat
+new: descriptor
+    |stat array modeMask mode|
+    array <- Array new: 3.
+    FileStat setStatTo: array for: descriptor.
+    stat <- self new.
+    " extract size "
+    self in: stat at: 1 put: (array at: 1). 
+    " extract inode "
+    self in: stat at: 2 put: (array at: 2).
+    " extract mode "
+    modeMask <- array at: 3.
+    mode <- FileMode new: modeMask.
+    self in: stat at: 3 put: mode.
+    ^ stat.
+!
+
+METHOD FileStat
+size
+    ^ size
+!
+
+METHOD FileStat
+inode
+    ^ inode
+!
+
+METHOD FileStat
+mode
+    ^ mode
+!
+
 COMMENT --------------file methods-----------------
 METHOD MetaFile
 test
-  | file |
-  file <- File openWrite: 'test.txt'.
-  file opened
-    ifTrue: [ 'opened!' printNl ]
-    ifFalse: [ 'not opened!' printNl. ^nil ].
-  file write: 'foo bar'.
-  file newline.
-  file close.
-  'Done!' printNl.
+    | file |
+    file <- File openWrite: 'test.txt'.
+    file opened
+        ifTrue: [ 'opened!' printNl ]
+        ifFalse: [ 'not opened!' printNl. ^nil ].
+    file do: [:f |
+        f write: 'foo bar'.
+        f newline.
+    ].
+    'Done!' printNl.
+    file opened
+        ifTrue: [ 'opened!' printNl ]
+        ifFalse: [ 'not opened!' printNl. ^nil ].
 !
 METHOD MetaFile
-doOpen: nm mode: mode
-	<100 nm mode>
+doOpen: name mode: mode
+    <100 name mode>.
+    self primitiveFailed
+!
+
+METHOD File
+stat
+    ^FileStat new: fileID.
+!
+
+METHOD MetaFile
+openRead: name
+    " fopen( , r ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileOpenFlag readOnly))
 !
 METHOD MetaFile
-openRead: nm
-		" open new file for reading "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'r')
+openWrite: name
+    " fopen( , w ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileOpenFlag writeOnly bitOr: FileOpenFlag create) bitOr: FileOpenFlag truncate))
 !
 METHOD MetaFile
-openWrite: nm
-		" open new file for writing "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'w')
+open: name mode: mode
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: mode)
 !
 METHOD MetaFile
-open: nm mode: mode
-  ^self in: (self new) at: 1 put: (self doOpen: nm mode: mode)
+openUpdate: name
+    " fopen( , a+ ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileOpenFlag append bitOr: FileOpenFlag readWrite) bitOr: FileOpenFlag create))
 !
-METHOD MetaFile
-openUpdate: nm
-		" open new file for reading and writing "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'r+')
+METHOD File
+do: block
+    block value: self.
+    self close.
 !
-METHOD MetaFile
-fileIn: nm | file |
-	file <- self openRead: nm.
-	file opened ifFalse: [ ^ self error: 'cannot open file ' + nm ].
-	file fileIn.
-	file close.
-	^ 'file in completed'
+METHOD File
+setPosition: position
+    "return lseek(position, SEEK_SET)"
+    <108 fileID position>.
+    self primitiveFailed
 !
-METHOD MetaFile
-image: nm | file |
-		" open a file, write the image, then close "
-	file <- self openWrite: nm.
-	file opened ifFalse: [ ^ self error: 'cannot open file ' + nm ].
-	file writeImage.
-	file close
+METHOD File
+rewind
+    self setPosition: 0.
+!
+METHOD File
+write: buffer | size |
+    "return the number of bytes affected by write()"
+    size <- buffer size.
+    <107 fileID buffer size>.
+    self primitiveFailed
+!
+METHOD File
+rawRead: count into: buffer
+    "return the number of bytes affected by read()"
+    <106 fileID buffer count>.
+    self primitiveFailed
+!
+METHOD File
+read: count | buffer bytesRead |
+    buffer <- ByteArray new: count.
+    bytesRead <- self rawRead: count into: buffer.
+    (bytesRead < count) ifTrue: [
+        "truncate buffer"
+        buffer <- buffer from: 1 to: bytesRead
+    ].
+    ^buffer.
+!
+METHOD File
+at: idx put: buffer
+    self setPosition: idx.
+    ^self write: buffer.
+!
+METHOD File
+at: idx size: count | buf res |
+    self setPosition: idx.
+    ^self read: count.
+!
+METHOD File
+newline
+    ^ self write: (String newline)
 !
 METHOD File
 opened
-	^ fileID notNil
+    ^fileID notNil
 !
-METHOD File
+METHOD MetaFile
 close: id
-	<103 id>
+    <103 id>.
+    self primitiveFailed
 !
 METHOD File
 close
-		" close file, return file descriptor "
-	fileID notNil ifTrue: [
-		self close: fileID.
-		fileID <- nil
-	]
+    fileID notNil ifTrue: [
+        File close: fileID.
+        fileID <- nil
+    ]
+!
+METHOD File
+getc | buffer bytesRead |
+    buffer <- ByteArray new: 1.
+    bytesRead <- self rawRead: 1 into: buffer.
+    (bytesRead = 1)
+        ifTrue:  [ ^buffer asString at: 1. ]
+        ifFalse: [ ^nil ].
+!
+METHOD File
+putc: char
+    ^self write: (char asString)
+!
+METHOD File
+readLine	| result  c nl |
+    " read a line from input "
+    fileID isNil ifTrue: [ self error: 'cannot read from unopened file' ].
+    result <- ''.
+    nl <- Char newline.
+    [   c <- self getc.
+        c isNil ifTrue: [ ^nil ].
+        c ~= nl ] whileTrue: [
+            result <- result + c asString
+    ].
+    ^ result
+!
+METHOD MetaFile
+fileIn: name | file |
+    file <- self openRead: name.
+    file opened ifFalse: [ ^ self error: 'cannot open file ' + name ].
+    file fileIn.
+    file close.
+    ^ 'file in completed'
+!
+METHOD MetaFile
+image: name | file |
+    " open a file, write the image, then close "
+    file <- self openWrite: name.
+    file opened ifFalse: [ ^ self error: 'cannot open file ' + name ].
+    file writeImage.
+    file close
 !
 METHOD File
 writeImage
-		" save the current image in a file "
-	fileID notNil
-		ifTrue: [ <104 fileID> ]
-!
-METHOD File
-notOpened
-	self error: 'file is not open'
-!
-METHOD File
-writeCharValue: n
-	<102 fileID n>.
-	fileID isNil ifTrue: [ self notOpened ].
-	self primitiveFailed
-!
-METHOD File
-doRead
-	<101 fileID>.
-	fileID isNil ifTrue: [ self notOpened ].
-	self primitiveFailed
-!
-METHOD File
-readChar	| c |
-		" read a single character from a file "
-	c <- self doRead.
-	c notNil ifTrue: [ ^ Char new: c ].
-	^ c
-!
-METHOD File
-readLine	| value  c nl |
-	" read a line from input "
-	fileID isNil ifTrue: [ self error: 'cannot read from unopened file' ].
-	value <- ''.
-	nl <- Char newline.
-	[ c <- self doRead.
-	  c isNil ifTrue: [ ^ nil ].
-	  c <- Char new: c.
-	  c ~= nl ] whileTrue:
-		[ value <- value + c asString ].
-	^ value
+    " save the current image in a file "
+    fileID notNil ifTrue: [ <104 fileID> ]
 !
 METHOD File
 fileInDispatch: cmd | c |
@@ -3533,7 +3911,7 @@ fileInDispatch: cmd | c |
 
 	" Comment enclosed in quotes... find matching quote "
 	(cmd = $") ifTrue: [
-		[ c <- self readChar. c ~= $" ] whileTrue: [
+		[ c <- self getc. c ~= $" ] whileTrue: [
 			" Consume chars until closing quote "
 			nil
 		].
@@ -3550,7 +3928,7 @@ fileInDispatch: cmd | c |
 !
 METHOD File
 fileIn		| cmd |
-	[ cmd <- self readChar. cmd notNil ] whileTrue: [
+	[ cmd <- self getc. cmd notNil ] whileTrue: [
 		self fileInDispatch: cmd
 	]
 !
@@ -3567,42 +3945,6 @@ methodCommand: classCmd | name aClass text line |
 	classCmd
 		ifTrue: [ aClass addMethod: text ]
 		ifFalse: [ aClass class addMethod: text ]
-!
-METHOD File
-at: idx
-	<108 fileID idx>.
-	self primitiveFailed
-!
-METHOD File
-write: buf size: count
-	<107 fileID buf count>.
-	self primitiveFailed
-!
-METHOD File
-write: buf
-	^ self write: buf size: (buf size)
-!
-METHOD File
-at: idx put: buf
-	self at: idx.
-	self write: buf size: buf size
-!
-METHOD File
-at: idx get: buf | size |
-	self at: idx.
-	size <- buf size.
-	<106 fileID buf size>
-!
-METHOD File
-at: idx size: count | buf res |
-	buf <- ByteArray new: count.
-	res <- self at: idx get: buf.
-	(res < count) ifTrue: [ buf <- buf from: 1 to: res ].
-	^ buf
-!
-METHOD File
-newline
-	^ self write: (String newline)
 !
 COMMENT --------------parser methods-----------------
 METHOD Parser

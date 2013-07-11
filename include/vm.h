@@ -40,9 +40,7 @@
 #include <types.h>
 #include <memory.h>
 #include <stdlib.h>
-#include <opcodes.h>
 #include <stdio.h>
-#include <TInstruction.h>
 
 class SmalltalkVM {
 public:
@@ -136,31 +134,16 @@ private:
 
     bool m_lastGCOccured;
     void onCollectionOccured();
-
-//    std::list< hptr<TProcess> > rootStack;
-    std::list< TObject* > rootStack;
+    
 public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
-    // The result may be nil if the opcode execution fails (division by zero etc)
-    TObject* doSmallInt(primitive::SmallIntOpcode opcode, int32_t leftOperand, int32_t rightOperand);
+    //This function is used to lookup and return method for #doesNotUnderstand for a given selector of a given object with appropriate arguments.
+    void setupVarsForDoesNotUnderstand(/*out*/ hptr<TMethod>& method,/*out*/ hptr<TObjectArray>& arguments, TSymbol* selector, TClass* receiverClass);
 
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
     TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
     TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
-
-    void pushProcess(TProcess* process) {
-        //rootStack.push_back(newPointer(process));
-        rootStack.push_back(process);
-        m_memoryManager->registerExternalPointer(& rootStack.back());
-    }
-
-    TProcess* popProcess() {
-        m_memoryManager->releaseExternalPointer(& rootStack.back());
-        TProcess* process = (TProcess*) rootStack.back();
-        rootStack.pop_back();
-        return process;
-    }
 
     SmalltalkVM(Image* image, IMemoryManager* memoryManager)
         : m_cacheHits(0), m_cacheMisses(0), m_messagesSent(0), m_image(image),

@@ -49,9 +49,10 @@
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
 #include <llvm/Linker.h>
-#include "llvm/Support/raw_ostream.h"
+#include <llvm/Support/raw_ostream.h>
 #include <llvm/PassManager.h>
 #include <llvm/Intrinsics.h>
+#include <llvm/Support/ManagedStatic.h>
 
 // These functions are used in the IR code
 // as a bindings between the VM and the object world
@@ -65,7 +66,7 @@ struct TRuntimeAPI {
     llvm::Function* invokeBlock;
     llvm::Function* emitBlockReturn;
     llvm::Function* checkRoot;
-
+    llvm::Function* callPrimitive;
     llvm::Function* bulkReplace;
 };
 
@@ -270,8 +271,7 @@ public:
                 basicBlockContexts.clear();
             }
             
-            if (builder) 
-                delete builder; 
+            delete builder; 
         }
     };
     
@@ -295,12 +295,6 @@ private:
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);
-    void writeSmallIntPrimitive(TJITContext& jit,
-                                primitive::SmallIntOpcode opcode,
-                                llvm::Value* rightObject,
-                                llvm::Value* leftObject,
-                                llvm::Value*& primitiveResult,
-                                llvm::BasicBlock* primitiveFailedBB);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
@@ -315,7 +309,20 @@ private:
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
     void doSpecial(TJITContext& jit);
+    
     void doPrimitive(TJITContext& jit);
+    void compilePrimitive(TJITContext& jit,
+                            uint8_t opcode,
+                            llvm::Value*& primitiveResult, // %TObject*
+                            llvm::Value*& primitiveFailed, // i1
+                            llvm::BasicBlock* primitiveSucceededBB,
+                            llvm::BasicBlock* primitiveFailedBB);
+    void compileSmallIntPrimitive(TJITContext& jit,
+                                uint8_t /*primitive::SmallIntOpcode*/ opcode,
+                                llvm::Value* leftObject,
+                                llvm::Value* rightObject,
+                                llvm::Value*& primitiveResult,
+                                llvm::BasicBlock* primitiveFailedBB);
 
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);

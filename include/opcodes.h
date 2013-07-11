@@ -20,22 +20,22 @@ enum Opcode {
     doPrimitive,
     doSpecial = 15
 };
-};
+}
 
-namespace unaryMessage {
+namespace unaryBuiltIns {
 enum Opcode {
     isNil  = 0,
     notNil = 1
 };
-};
+}
 
-namespace binaryMessage {
+namespace binaryBuiltIns {
 enum Operator {
     operatorLess  = 0,
     operatorLessOrEq,
     operatorPlus
 };
-};
+}
 
 namespace special
 {
@@ -48,10 +48,9 @@ enum {
     branch,
     branchIfTrue,
     branchIfFalse,
-    sendToSuper = 11,
-    breakpoint = 12
+    sendToSuper = 11
 };
-};
+}
 
 namespace pushConstants
 {
@@ -60,7 +59,7 @@ enum {
     trueObject,
     falseObject
 };
-};
+}
 
 namespace primitive
 {
@@ -77,7 +76,9 @@ enum {
     cloneByteObject   = 23,
     integerNew        = 32,
     flushCache        = 34,
-    bulkReplace       = 38
+    bulkReplace       = 38,
+    LLVMsendMessage   = 252,
+    getSystemTicks    = 253
 };
 
 enum SmallIntOpcode {
@@ -102,7 +103,13 @@ enum {
 
 enum {
     ioGetChar = 9,
-    ioPutChar = 3
+    ioPutChar = 3,
+    ioFileOpen = 100,
+    ioFileClose = 103,
+    ioFileSetStatIntoArray = 105,
+    ioFileReadIntoByteArray = 106,
+    ioFileWriteFromByteArray = 107,
+    ioFileSeek = 108
 };
 
 enum IntegerOpcode {
@@ -112,8 +119,8 @@ enum IntegerOpcode {
     integerMul,
     integerSub,
     integerLess,
-    integerEqual,
+    integerEqual
 };
-};
+}
 
 #endif

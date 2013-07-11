@@ -40,6 +40,7 @@
 #include <new>
 #include <string>
 #include <string.h>
+#include <sstream>
 
 struct TClass;
 struct TObject;
@@ -359,6 +360,15 @@ struct TProcess : public TObject {
     TObject*      result;
     
     static const char* InstanceClassName() { return "Process"; }
+};
+
+// TInstruction represents one decoded Smalltalk instruction.
+// Actual meaning of parts is determined during the execution.
+struct TInstruction {
+    uint8_t low;
+    uint8_t high;
+    
+    std::string toString();
 };
 
 #endif

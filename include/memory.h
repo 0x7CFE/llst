@@ -45,7 +45,7 @@
 
 
 // Memory manager statics is held
-// in the following structue
+// in the following structure
 struct TMemoryManagerInfo {
     uint32_t collectionsCount;
     uint32_t allocationsCount;
@@ -92,6 +92,8 @@ public:
     
     virtual uint32_t allocsBeyondCollection() = 0;
     virtual TMemoryManagerInfo getStat() = 0;
+    
+    virtual ~IMemoryManager() {};
 };
 
 // When pointer to a heap object is stored outside of the heap,

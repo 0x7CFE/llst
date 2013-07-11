@@ -1,0 +1,238 @@
+Переход из софтовой ВМ в JIT версию происходит посредством вызова примитива 252, в котором
+мы вызываем функцию sendMessage, куда передаем привычный набор аргументов:
+1) Текущий контекст
+2) Селектор метода
+3) Аргументы
+4) Класс, у которого начинаем искать метод (в данном случае 0; используется для реализации sendToSuper)
+
+extern "C" TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
+{
+    JITRuntime::Instance()->m_messagesDispatched++;
+    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
+}
+
+В кратце, JITRuntime::sendMessage работает так:
+1. Создаём и наполняем контекст:
+ TContext* newContext = m_softVM->newObject<TContext>();
+ newContext->arguments         = messageArguments;
+ newContext->method            = method;
+ newContext->previousContext   = previousContext;
+ .....
+2. Ищем метод, компилируем его:
+ hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
+ Function* methodFunction = m_methodCompiler->compileMethod(method, previousContext);
+ TMethodFunction compiledMethodFunction = 0;
+ compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
+ 
+3. Вызываем скомпилируемый метод, куда передаём новосозданный контекст:
+ TObject* result = compiledMethodFunction(newContext);
+ return result;
+ 
+ 
+Во время компиляции метода создаётся функция вида "ClassName>>methodName" с аргументом TContext*,
+создаётся первый BB - preable (преамбула), в которой мы создаём 2 переменные - pContext и pSelf,
+которые являются зарученными (gc root) значениями контекста-аргумента и объекта, которому послали вызов.
+
+
+В ходе реализации JIT компиляции нами не был затронут синтаксис Little Smalltalk. Вот пример,
+как можно выполнить код внутри JIT версии:
+
+METHOD Undefined
+main
+    LLVM do: [
+        42 printNl.
+    ].
+!
+
+
+
+Реализация blockReturn.
+
+Пример кода:
+METHOD MyClass
+myMethod
+    1 to: 10 do: [:i|
+        ^i. "this is an example of blockReturn"
+    ].
+!
+При посылке сообщения myMethod объекту результатом всегда будет 1. Данный опкод является очень
+интересным и необычным, так как мы возвращаем результат посылки сообщения из других контекстов.
+В данном случае вложенность контекстов будет такова: myMethod >> (Interval) do: >> (Block) value: .
+В софтовой версии его реализация не является проблемной, мы просто изменяем текущий контекст
+выполнения с контекста блока на контекст метода, который породил данный блок (myMethod).
+Но в JIT версии всё не так просто, потому что посылка сообщений является честным вызовом С++ функции,
+и мы не можем взять и изменить текущий контекст выполнения присваиванием.
+
+Нами было принято решение реализовать данный опкод с помощью C++ исключений.
+Перед началом кодогенерации мы сканируем байткоды метода на наличие опкода blockReturn. Если
+данный опкод найден, то мы генерируем блок обработки исключений (landingpad BB), при посылке сообщений
+call заменяется на invoke с указанием данного landingpad.
+
+Когда мы встречаем опкод blockReturn, мы генерируем вызов функции emitBlockReturn, которая возбуждает
+С++ исключение типа TBlockReturn с указанием целевого контекста(контекста, который породил данный блок),
+и с указанием значения, которое необходимо вернуть из метода:
+
+extern "C" void emitBlockReturn(TObject* value, TContext* targetContext)
+{
+    throw TBlockReturn(value, targetContext);
+}
+
+Данное исключение ловится самым ближайшим landingpad BB. Если целевой контекст блока равен контексту,
+в котором было поймано исключение (currentContext == block->creatingContext), то мы возвращаем результат
+из JIT функции, иначе данное исключение пробрасывается до тех пор, пока его не поймают и не обработают.
+LLVM использует Itanium ABI zero cost exception handling http://llvm.org/docs/ExceptionHandling.html.
+
+Можно сказать, что мы оборачиваем всё тело метода в try, а в catch проверяем targetContext:
+
+TObject* 'MyClass>>myMethod'(TContext* context) {
+    try {
+        // ... the body of the whole method
+    }  catch(TBlockReturn e) {
+        if (e.targetContext != currentContext)
+            throw;
+        else
+            return e.value;
+    }
+}
+    
+Данный пример не совсем корректен с точки зрения кодогенерации LLVM IR, но хорошо иллюстрирует 
+реализацию опкода blockReturn.
+
+Данная архитектура позволяет нам корректно обработать JIT опкод blockReturn даже внутри софтовой версии:
+
+METHOD MyClass
+myMethod
+    1 to: 10 do: [:i|
+        LLVM do: [ ^i. ] "this is a blockReturn inside JIT method"
+    ].
+!
+
+
+Стек. pushValue и popValue
+
+Для хранения промежуточных вычислений используется поле stack объекта Method. Кроме того, стек защищает
+объекты от сборки мусора. Объекты попадают в стек либо путём явного вызова опкодов, содержащих в своём
+названии push(pushTemporary и другие), либо неявно, по окончанию работы некоторых опкодов, которые
+подразумевают размещение результата на стеке(к примеру, sendUnary).
+
+Небольшое отступление про LLVM. Промежуточное представление (LLVM IR) представляет из себя ориентированный
+граф инструкций. Значения результата инструкций доступны из любой вершины, до которой есть хоть один путь
+от данной инструкции.
+%sum = add i32 5, 6
+.....
+%x = add i32 %sum, 42
+В данном примере "%sum = add i32 5, 6" означает создание инструкции add и её связывание с именем sum.
+В строке "%x = add i32 %sum, 42" %sum является ссылкой на вышесозданную инструкцию. В кодогенерации
+мы так же связываем первый аргумент и ссылку на инструкцию:
+Value* sum = builder.CreateAdd(builder.getI32(5), builder.getI32(6));
+....
+Value* x   = builder.CreateAdd(sum, builder.getI32(42));
+
+Рассмотрим данные опкоды:
+pushArgument 3   // берём третий аргумент и кладём его на стек.
+assignInstance 2 // снимаем значение со стека и кладём во второе поле
+Заметили, как много работы со стеком? В JIT версии мы решили избавиться от Smalltalk стека,
+благодаря особенности LLVM IR можно превратить данный код в такой:
+instanceVariables[2] = arguments[3];
+
+Данная магия возможна благодаря отложенной кодогенерации и классам TPlainValue и TDeferredValue,
+которые реализуют интерфейс TStackValue (и метод get()).
+TPlainValue хранит уже созданные раннее LLVM значения, get() возвращает эти объекты.
+TDeferredValue реализует ленивый доступ к определённым данным. По запросу get() генерирует код LLVM
+и возвращает результат. Данные, которые может получать TDeferredValue:
+    enum TOperation {
+        loadInstance,
+        loadArgument,
+        loadTemporary,
+        loadLiteral,
+        
+        // result of message sent 
+        // or pushed block 
+        loadHolder
+    };
+
+Во время компиляции мы храним набор TStackValue, когда мы встречаем pushArgument, мы вызываем метод:
+void MethodCompiler::doPushArgument(TJITContext& jit)
+{
+    uint8_t index = jit.instruction.low;
+    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
+}
+Данный метод только кладёт TDeferredValue на стек объектов TStackValue и никоим образом не генерирует
+LLVM код.
+Когда мы встречаем опкод assignInstance, мы вызываем метод popValue(), который снимает TStackValue
+со стека, вызывает у него метод get ( как раз он и занимается генерацией кода, который получает аргумент )
+и возвращает ссылку на инструкцию LLVM. Таким образом мы можем положить данное значение во второе поле
+мимо Smalltalk стека.
+
+
+
+Условные и безусловные переходы.
+Реализуются опкодами branchIfTrue, branchIfFalse и branch.
+В софтовой версии их реализация крайне проста, но в JIT версии эта тема заслуживает отдельного разговора.
+Проблема заключается в следующем коде:
+
+METHOD Smallint
+example: arg2 andArg: arg3
+  self + (false ifTrue: [ arg2 ] ifFalse: [ arg3 ]).
+!
+
+1: pushArgument 1 // self
+2: pushLiteral false
+3: branchIfFalse 6
+4: pushArgument 2 // arg2
+5: branch 7
+6: pushArgument 3 // arg3
+7: markArguments 2
+8: sendMessage +
+
+Опкод markArguments подразумевает снятие 2 значений со стека. Мы связываем значения мимо Smalltalk стека
+напрямую, для self проблем нет, мы должны правильно связать выбор arg2 или arg3. Как же это сделать?
+
+Control flow graph(CFG) - это набор Basic Block'ов (BB). BB - набор инструкций.
+
+Для передачи управления в начало другого BB используется LLVM инструкция br:
+br i1 <cond>, label <iftrue>, label <iffalse>
+br label <dest> ; Unconditional branch
+
+LLVM инструкция phi:
+<result> = phi <ty> [ <val0>, <label0>], [ <val1>, <label1>], ...
+
+В зависимости от того, из какого BB произошёл переход управления, в результат попадает или val0(из label0),
+или val1(из label1). Количество пар (значение, BB) не ограничено.
+
+Для разрешения проблемы выбора arg2 и arg3 поможет LLVM инструкция phi. Осталось создать BB'и, данной
+задачей занимается функция scanForBranches:
+До начала компиляции мы анализируем код на наличие опкодов branch*, создаем std::map<uint32_t,BasicBlock*>,
+связь номера байткода, на который совершаем переход и целевой BB.
+
+В Smalltalk переход на другие байткоды могут быть как очевидными (branch, branchIfTrue), так и не очень.
+Как ни странно, но переход на следующую инструкцию происходит по ходу исполнения байткодов:
+    3: branchIfFalse 6 ------
+    4: pushArgument 2  <--| |
+ -- 5: branch 7             |
+|-> 6: pushArgument 3  <----     
+|-> 7: markArguments 2
+
+Два перехода от 3-го опкода (branchIfFalse 6) происходят явно: на 4 и на 6 опкод.
+От 5-го опкода (branch 7) происходит один явный переход (на 7-й) и один неявный: на 6-й.
+
+Для реализации неявного перехода время компиляции перед каждой инструкцией мы проверяем в map,
+существуют ли переходы на текущий байткод. Если это так, то мы меняем текущую точку ввода инструкций
+для IRBuilder'а на соответствующий BB.
+
+
+
+Метод TJITContext::popValue :
+Для того, чтобы в правильном порядке доставать значения, у каждого BB, сгенерированного scanForBranches,
+ведётся учёт referers (предшественников). У каждого из BB есть свой стек TStackValue.
+
+- push value делается всегда в стек текущего BB
+- pop value делается так:
+        • Если в стеке текущего BB есть значения — достается оттуда
+        • Если нет, то в начало BB добавляется φ для каждого из рефереров,
+          результат функции возвращается как попнутое значение
+        • Если в стеке одного из рефереров не хватает значения, то либо это ошибка
+          либо код реферера находится ниже по коду метода. Надо запомнить это место
+          и впоследствии добавить к фи функции еще один кейс для значения на вершине стека 
+          перед бранчем на блок с φ функцией.
+

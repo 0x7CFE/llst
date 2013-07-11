@@ -42,7 +42,7 @@
 
 int main(int argc, char **argv) {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(1048576, 1048576 * 100);
+    memoryManager->initializeHeap(1048576 * 50, 1048576 * 100);
     
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     if (argc == 2)
@@ -120,20 +120,18 @@ int main(int argc, char **argv) {
     // FIXME image builder does not calculate temporary size
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42);
-
-    vm.pushProcess(initProcess);
     
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
-    /*typedef int32_t (*TExecuteProcessFunction)(TProcess*);
+    
+    /* This code will run Smalltalk immediately in LLVM.
+     * Don't forget to uncomment 'Undefined>>boot'
+     */
+    /*
+    typedef int32_t (*TExecuteProcessFunction)(TProcess*);
     TExecuteProcessFunction executeProcess = reinterpret_cast<TExecuteProcessFunction>(runtime.getExecutionEngine()->getPointerToFunction(runtime.getModule()->getFunction("executeProcess")));
-    SmalltalkVM::TExecuteResult result;
-    try {
-        result = (SmalltalkVM::TExecuteResult) executeProcess(initProcess);
-    } catch(...) {
-        printf("error caught\n");
-        exit(1);
-    }*/
+    SmalltalkVM::TExecuteResult result = (SmalltalkVM::TExecuteResult) executeProcess(initProcess);
+    */
     // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:
@@ -166,6 +164,6 @@ int main(int argc, char **argv) {
     
     vm.printVMStat();
     runtime.printStat();
-
+    
     return 0;
 }
