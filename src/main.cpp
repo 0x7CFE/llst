@@ -41,8 +41,8 @@
 #include <console.h>
 
 int main(int argc, char **argv) {
-    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(1048576 * 50, 1048576 * 100);
+    std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
+    memoryManager->initializeHeap(1048576, 1048576 * 100);
     
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     if (argc == 2)

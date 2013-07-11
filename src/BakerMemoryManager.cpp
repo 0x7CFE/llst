@@ -474,10 +474,7 @@ void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
 }
 
 void BakerMemoryManager::registerExternalHeapPointer(object_ptr& pointer) {
-//     printf("Registering object_ptr = %p (data %p, next %p), current m_externalPointersHead = %p\n", 
-//            &pointer, pointer.data, pointer.next, m_externalPointersHead);
-    
-    pointer.next = const_cast<object_ptr*>(m_externalPointersHead);
+    pointer.next = m_externalPointersHead;
     m_externalPointersHead = &pointer;
 }
 

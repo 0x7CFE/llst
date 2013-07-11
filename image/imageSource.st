@@ -1350,10 +1350,10 @@ main    | command  x|
 
     File fileIn: '../image/disasm.st'.
     
-    Scheduler initialize.
+    "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
     Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
-    Scheduler run.
+    Scheduler run."
     
     [ command <- String readline: '->'. command notNil ]
             whileTrue: [ command isEmpty
