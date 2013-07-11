@@ -93,12 +93,12 @@ target :
     | id
     | SELF
     | SUPER
+    | "(" expression ")"
     ;
     
 expression : 
     target
     | target message_chain
-    | "(" expression ")"
     | expression "+" expression
     | expression "-" expression
     | expression "*" expression
@@ -106,6 +106,7 @@ expression :
     | expression "=" expression
     | expression "~=" expression
     | expression "==" expression
+    | expression "~~" expression
     | expression "<" expression
     | expression ">" expression
     | expression "<=" expression
