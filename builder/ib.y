@@ -78,7 +78,8 @@ message_chain : message message_chain_tail;
     
 inline_object : 
     block
-    | string 
+    | string
+    | symbol
     | number
     | array /* #( ) constants */
     | char  /* $x   constants */
