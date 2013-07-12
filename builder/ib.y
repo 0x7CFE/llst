@@ -30,11 +30,13 @@
 
 /* terminals */
 %token DOT          "."
+%token CASCADE      ";"
 %token RET          "^"
 %token PIPE         "|"
 %token BANG         "!"
 %token ARROW        "<-"
 
+%token ARRAY        "#("
 %token LPAREN       "("
 %token RPAREN       ")"
 %token LBLOCK       "["
@@ -58,6 +60,9 @@
 /* special key messages */
 %token ISNIL        "isNil"
 %token NOTNIL       "notNil"
+%token NOT          "not"
+%token AND          "and:"
+%token OR           "or:"
 %token IFTRUE       "ifTrue:"
 %token IFFALSE      "ifFalse:"
 %token WHILETRUE    "whileTrue:"
@@ -99,29 +104,43 @@ id_list : id id_list_tail;
     
 comment : COMMENT;
     
-class_definition : CLASS id id id_list "\n";
+class_definition : 
+      CLASS id id id_list "\n"
+    | error "\n"
+    ;
 
-rawclass_definition : RAWCLASS id id id id_list "\n";
+rawclass_definition : 
+      RAWCLASS id id id id_list "\n"
+    | error "\n"
+    ;
 
 method_definition : METHOD id method;
 
 initial_method : BEGIN method_body END;
 
-temporaries : "|" id_list "|";
+temporaries : 
+      "|" id_list "|"
+    | "|" error   "|" /* error recovery */
 
 arg_list_tail : /* empty */
     | arg_id arg_list_tail;
 
 arg_list : arg_id arg_list_tail;
 
-arguments : arg_list;
+arguments : 
+      arg_list "|"
+    | error    "|" /* error recovery */
+    ;
 
 block_body : /* empty */
     | statements
-    | arguments "|" statements
+    | arguments statements
     ;
 
-block : "[" block_body "]";
+block : 
+      "[" block_body "]"
+    | "[" error      "]" /* error recovery */
+    ;
 
 selector : SELECTOR;    
     
@@ -154,7 +173,10 @@ string : STRING;
 symbol : SYMBOL;
 number : INTEGER;
 char   : CHARACTER;
-array  : "#(" literals ")";
+array  : 
+      "#(" literals ")"
+    | "#(" error    ")"  /* error recovery */
+    ;
 
 literal:
       string  /* string literal */
@@ -163,17 +185,22 @@ literal:
     | char    /* character literal $x */
     | array   /* inline literal array #( ) */
     ;
+
+subexpression:
+      "(" expression ")"
+    | "(" error      ")" /* error recovery */
+    ;
     
 receiver : 
-      id      /* global, temporary or instance variable identifier */
-    | literal /* inline literal object */ 
+      id            /* global, temporary or instance variable identifier */
+    | literal       /* inline literal object */ 
     | TRUE
     | FALSE
     | NIL
     | SELF
     | SUPER
-    | block   /* inline block */
-    | "(" expression ")"
+    | block         /* inline block */
+    | subexpression /* expression in parentheses */
     ;
     
 expression : 
@@ -196,6 +223,10 @@ expression :
     
     | expression "isNil"                            %prec UNARY_MESSAGE
     | expression "notNil"                           %prec UNARY_MESSAGE
+    | expression "not"                              %prec UNARY_MESSAGE
+    
+    | expression "and:"     block                   %prec SPECIAL_MESSAGE
+    | expression "or:"      block                   %prec SPECIAL_MESSAGE
     
     | expression "ifTrue:"  block                   %prec SPECIAL_MESSAGE
     | expression "ifFalse:" block                   %prec SPECIAL_MESSAGE
@@ -212,7 +243,10 @@ assignment : id "<-" expression;
 primitive_params : /* empty */
     | receiver primitive_params;
 
-primitive : "<" number primitive_params ">" %prec PRIMITIVE;
+primitive : 
+      "<" number primitive_params ">" %prec PRIMITIVE
+    | "<" error ">" /* error recovery */
+    ;
 
 statement : 
       expression
@@ -224,6 +258,8 @@ statement :
 statements : /* empty */    
     | statement "." statements
     | statement /* last one in a block */
+    
+    | error "." /* error recovery till end of a statement */
     ;
 
 method_interface_tail : /* empty */
@@ -239,5 +275,6 @@ method_body : statements;
 method : 
       method_interface method_body "!"
     | method_interface temporaries method_body "!"
+    | error "!" /* error recovery till end of a method */
     ;
 
