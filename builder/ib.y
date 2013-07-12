@@ -99,7 +99,7 @@ literal:
     ;
     
 receiver : 
-    id        /* global, temporary or instance variable name identifier */
+      id      /* global, temporary or instance variable identifier */
     | literal /* inline literal object */ 
     | TRUE
     | FALSE
@@ -113,16 +113,16 @@ receiver :
 expression : 
       receiver
     | receiver message_chain
-    | expression "+" expression
-    | expression "-" expression
-    | expression "*" expression
-    | expression "/" expression
-    | expression "=" expression
+    | expression "+"  expression
+    | expression "-"  expression
+    | expression "*"  expression
+    | expression "/"  expression
+    | expression "="  expression
     | expression "~=" expression
     | expression "==" expression
     | expression "~~" expression
-    | expression "<" expression
-    | expression ">" expression
+    | expression "<"  expression
+    | expression ">"  expression
     | expression "<=" expression
     | expression ">=" expression
     ;
@@ -130,13 +130,12 @@ expression :
 assignment : id "<-" expression;
 
 primitive_params : /* empty */
-    | id_list;
+    | receiver primitive_params;
 
 primitive : "<" number primitive_params ">";
 
 statement : 
-    block message_chain
-    | expression
+      expression
     | assignment
     | primitive
     | "^" expression
@@ -150,7 +149,10 @@ statements : /* empty */
 method_interface_tail : /* empty */
     | selector id;
     
-method_interface : selector id method_interface_tail;
+method_interface : 
+      id /* simple unary method name */
+    | selector id method_interface_tail /* parametrized method */
+    ;
     
 method_body : statements;
 
