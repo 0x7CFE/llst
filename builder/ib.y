@@ -4,13 +4,76 @@
 
 %}
 
+/* image macros */
 %token CLASS        "CLASS"
 %token RAWCLASS     "RAWCLASS"
+%token METHOD       "METHOD"
 %token COMMENT      "COMMENT"
+%token BEGIN        "BEGIN"
+%token END          "END"
 
+/* literals */
+%token IDENTIFIER   "identifier"
+%token ARGUMENT     "argument identifier"
+%token SELECTOR     "selector identifier"
+%token INTEGER      "integer literal"
+%token STRING       "string literal"
+%token SYMBOL       "symbol literal"
+%token CHARACTER    "character literal"
+
+/* keywords */
+%token TRUE         "true"
+%token FALSE        "false"
+%token NIL          "nil"
+%token SELF         "self"
+%token SUPER        "super"
+
+/* terminals */
+%token DOT          "."
 %token RET          "^"
 %token PIPE         "|"
 %token BANG         "!"
+%token ARROW        "<-"
+
+%token LPAREN       "("
+%token RPAREN       ")"
+%token LBLOCK       "["
+%token RBLOCK       "]"
+
+%token LESS         "<"
+%token GTER         ">"
+%token LEQ          "<="
+%token GTREQ        ">="
+%token EQ           "="
+%token EQEQ         "=="
+%token NEQ          "~="
+%token NENE         "~~"
+
+/* TODO Unary minus */
+%token MINUS        "-" 
+%token PLUS         "+"
+%token MUL          "*"
+%token DIV          "/"
+
+/* special key messages */
+%token ISNIL        "isNil"
+%token NOTNIL       "notNil"
+%token IFTRUE       "ifTrue:"
+%token IFFALSE      "ifFalse:"
+%token WHILETRUE    "whileTrue:"
+%token WHILEFALSE   "whileFalse:"
+
+/* operator priorites */
+%nonassoc "^"
+%nonassoc "<-"
+%left SPECIAL_MESSAGE
+%left KEY_MESSAGE
+%left "-" "+" "*" "/" "<" ">" "<=" ">=" "=" "==" "~=" "~~"
+%left UNARY_MESSAGE
+%left "("
+
+%left UNARY_MINUS 
+%nonassoc PRIMITIVE
 
 %%
 
@@ -70,8 +133,11 @@ key_message_tail : /* empty */
 key_message : selector_value_pair key_message_tail;
 
 message : 
-      id /* simple unary message identifier */
-    | key_message
+      /* simple unary message identifier */
+      id %prec UNARY_MESSAGE 
+      
+      /* a set of selector-value pairs */
+    | key_message %prec KEY_MESSAGE
     ;
 
 message_chain_tail : /* empty */
@@ -113,6 +179,8 @@ receiver :
 expression : 
       receiver
     | receiver message_chain
+    
+    | "-" expression                                %prec UNARY_MINUS
     | expression "+"  expression
     | expression "-"  expression
     | expression "*"  expression
@@ -125,6 +193,18 @@ expression :
     | expression ">"  expression
     | expression "<=" expression
     | expression ">=" expression
+    
+    | expression "isNil"                            %prec UNARY_MESSAGE
+    | expression "notNil"                           %prec UNARY_MESSAGE
+    
+    | expression "ifTrue:"  block                   %prec SPECIAL_MESSAGE
+    | expression "ifFalse:" block                   %prec SPECIAL_MESSAGE
+    | expression "ifTrue:"  block "ifFalse:" block  %prec SPECIAL_MESSAGE
+    | expression "ifFalse:" block "ifTrue:"  block  %prec SPECIAL_MESSAGE
+    
+    /* TODO #to:do: #to:by:do: */
+    | block "whileTrue:"    block                   %prec SPECIAL_MESSAGE
+    | block "whileFalse:"   block                   %prec SPECIAL_MESSAGE
     ;
 
 assignment : id "<-" expression;
@@ -132,7 +212,7 @@ assignment : id "<-" expression;
 primitive_params : /* empty */
     | receiver primitive_params;
 
-primitive : "<" number primitive_params ">";
+primitive : "<" number primitive_params ">" %prec PRIMITIVE;
 
 statement : 
       expression
