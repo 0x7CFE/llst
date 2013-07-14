@@ -28,7 +28,7 @@
 %token SELF         "self"
 %token SUPER        "super"
 
-/* terminals */
+/* syntax terminals */
 %token DOT          "."
 %token CASCADE      ";"
 %token RET          "^"
@@ -42,6 +42,7 @@
 %token LBLOCK       "["
 %token RBLOCK       "]"
 
+/* relation operators */
 %token LESS         "<"
 %token GTER         ">"
 %token LEQ          "<="
@@ -51,7 +52,7 @@
 %token NEQ          "~="
 %token NENE         "~~"
 
-/* TODO Unary minus */
+/*  arithmetics */
 %token MINUS        "-" 
 %token PLUS         "+"
 %token MUL          "*"
@@ -114,13 +115,9 @@ rawclass_definition :
     | error "\n"
     ;
 
-method_definition : METHOD id method;
+method_definition : METHOD id "\n" method;
 
 initial_method : BEGIN method_body END;
-
-temporaries : 
-      "|" id_list "|"
-    | "|" error   "|" /* error recovery */
 
 arg_list_tail : /* empty */
     | arg_id arg_list_tail;
@@ -240,6 +237,11 @@ expression :
 
 assignment : id "<-" expression;
 
+return: 
+      "^" expression
+    | "^" primitive
+    ;
+
 primitive_params : /* empty */
     | receiver primitive_params;
 
@@ -252,7 +254,7 @@ statement :
       expression
     | assignment
     | primitive
-    | "^" expression
+    | return
     ;
 
 statements : /* empty */    
@@ -262,15 +264,20 @@ statements : /* empty */
     | error "." /* error recovery till end of a statement */
     ;
 
+method_body : statements;
+
+temporaries : 
+      "|" id_list "|"
+    | "|" error   "|" /* error recovery */
+    ;
+
 method_interface_tail : /* empty */
     | selector id;
     
 method_interface : 
-      id /* simple unary method name */
+      id                                /* simple unary method name */
     | selector id method_interface_tail /* parametrized method */
     ;
-    
-method_body : statements;
 
 method : 
       method_interface method_body "!"
