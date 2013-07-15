@@ -112,7 +112,7 @@ class_definition :
 
 rawclass_definition : 
       RAWCLASS id id id id_list "\n"
-    | error "\n"
+    /* | error "\n" */
     ;
 
 method_definition : METHOD id "\n" method;
@@ -129,8 +129,8 @@ arguments :
     | error    "|" /* error recovery */
     ;
 
-block_body : /* empty */
-    | statements
+block_body :
+      statements /* may be empty */
     | arguments statements
     ;
 
