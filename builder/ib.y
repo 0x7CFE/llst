@@ -68,6 +68,8 @@
 %token IFFALSE      "ifFalse:"
 %token WHILETRUE    "whileTrue:"
 %token WHILEFALSE   "whileFalse:"
+%token UNARY_WHILETRUE  "whileTrue"
+%token UNARY_WHILEFALSE "whileFalse"
 
 /* operator priorites */
 %nonassoc "^"
@@ -181,6 +183,8 @@ literal:
     | number  /* number literal */
     | char    /* character literal $x */
     | array   /* inline literal array #( ) */
+    
+    | "-" number %prec UNARY_MINUS
     ;
 
 subexpression:
@@ -204,7 +208,6 @@ expression :
       receiver
     | receiver message_chain
     
-    | "-" expression                                %prec UNARY_MINUS
     | expression "+"  expression
     | expression "-"  expression
     | expression "*"  expression
@@ -233,6 +236,9 @@ expression :
     /* TODO #to:do: #to:by:do: */
     | block "whileTrue:"    block                   %prec SPECIAL_MESSAGE
     | block "whileFalse:"   block                   %prec SPECIAL_MESSAGE
+    
+    | block "whileTrue"                             %prec UNARY_MESSAGE
+    | block "whileFalse"                            %prec UNARY_MESSAGE
     ;
 
 assignment : id "<-" expression;

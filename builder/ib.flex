@@ -66,6 +66,8 @@ NL    \n
 "ifFalse:"      RETURN( IFFALSE      );
 "whileTrue:"    RETURN( WHILETRUE    );
 "whileFalse:"   RETURN( WHILEFALSE   );
+"whileTrue"     RETURN( UNARY_WHILETRUE  );
+"whileFalse"    RETURN( UNARY_WHILEFALSE );
 
 true            RETURN(TRUE);         
 false           RETURN(FALSE);        
