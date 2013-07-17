@@ -1356,8 +1356,7 @@ main    | command  x|
     Scheduler run."
     
     [ command <- String readline: '->'. command notNil ]
-            whileTrue: [ command isEmpty
-            ifFalse: [ command doIt printNl ] ]
+        whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
     
     ^nil.
 !
@@ -2440,8 +2439,11 @@ asSymbol
 	^ Symbol new: self
 !
 METHOD String
-doIt	| meth |
-	meth <- Undefined parseMethod: 'doItCommand ^' + self.
+doIt	| meth command |
+    command <- 'doItCommand '.
+    ((self words at: 1) at: 1) = $| ifFalse: [ command <- command + ' ^ ' ].
+
+	meth <- Undefined parseMethod: command + self.
 	^ meth notNil
 		ifTrue: [ ^ Context new
 			  perform: meth withArguments: (Array new: 1) ]
