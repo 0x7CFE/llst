@@ -1637,6 +1637,16 @@ whileFalse: aBlock
 	self value ifFalse: [ aBlock value. ^ self whileFalse: aBlock ]
 !
 METHOD Block
+whileTrue |result|
+    result <- true.
+    [result] whileTrue: [ result <- self value ]
+!
+METHOD Block
+whileFalse |result|
+    result <- false.
+    [result] whileFalse: [ result <- self value ]
+!
+METHOD Block
 backtrace | narg |
 		" backtrace context calls "
 	'block from ' print. method name print.
