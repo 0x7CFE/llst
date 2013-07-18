@@ -1343,6 +1343,22 @@ COMMENT     nil main.
 COMMENT !
 
 METHOD Undefined
+threadTest
+    x <- Thread new: [ 
+        self on: #doSomething do: [ :n | 1 to: n do: [ :x | x printNl ] ].
+        self on: #printArgs do: [ :args | args printNl ].
+        self on: #stop do: [ self stop ].
+        
+        [ self processMessages ] whileTrue.
+    ].
+    
+    x postMessage: #doSomething withArguments: 10.
+    x postMessage: #printArgs withArguments: (Array with: 42 with: 'hello world').
+    x run.
+
+!
+
+METHOD Undefined
 main    | command  x|
     " initialize classes "
     
@@ -2588,9 +2604,19 @@ appendList: aList | element |
     ^self
 !
 METHOD List
-addAll: aCollection
-    "self appendList: aCollection asList."
-	aCollection do: [ :element | self addLast: element ]
+addAll: aCollection |link|
+    "self appendList: aCollection asList.
+    link <- self lastLink."
+    aCollection do: [ :element | self addLast: element ]
+	"aCollection do: [ :element | self addLast: element ]"
+!
+METHOD List
+lastLink |link next|
+    elements isNil ifTrue: [ ^nil ].
+    
+    link <- elements.
+    [(next <- link next) notNil] whileTrue: [link <- next].
+    ^link
 !
 METHOD List
 + aCollection
