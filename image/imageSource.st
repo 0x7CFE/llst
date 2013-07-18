@@ -1348,7 +1348,7 @@ main    | command  x|
     
     Char initialize.
 
-    File fileIn: '../image/disasm.st'.
+    "File fileIn: '../image/disasm.st'."
     
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].

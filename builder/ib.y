@@ -203,10 +203,14 @@ receiver :
     | block         /* inline block */
     | subexpression /* expression in parentheses */
     ;
+
+assignment : id "<-" expression;
     
 expression : 
       receiver
     | receiver message_chain
+    
+    | assignment
     
     | expression "+"  expression
     | expression "-"  expression
@@ -241,8 +245,6 @@ expression :
     | block "whileFalse"                            %prec UNARY_MESSAGE
     ;
 
-assignment : id "<-" expression;
-
 return: 
       "^" expression
     | "^" primitive
@@ -258,7 +260,6 @@ primitive :
 
 statement : 
       expression
-    | assignment
     | primitive
     | return
     ;
