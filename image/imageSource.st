@@ -1343,22 +1343,6 @@ COMMENT     nil main.
 COMMENT !
 
 METHOD Undefined
-threadTest
-    x <- Thread new: [ 
-        self on: #doSomething do: [ :n | 1 to: n do: [ :x | x printNl ] ].
-        self on: #printArgs do: [ :args | args printNl ].
-        self on: #stop do: [ self stop ].
-        
-        [ self processMessages ] whileTrue.
-    ].
-    
-    x postMessage: #doSomething withArguments: 10.
-    x postMessage: #printArgs withArguments: (Array with: 42 with: 'hello world').
-    x run.
-
-!
-
-METHOD Undefined
 main    | command  x|
     " initialize classes "
     
@@ -2056,16 +2040,16 @@ sort: criteria | left right mediane |
     (self size < 32) 
         ifTrue: [ ^ self insertSort: criteria ].
 
-    mediane <- self popFirst.
+    mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
     
-    left  <- List new.
+    left  <- List new. "if List is instance of MetaList then call MetaList>>new"
     right <- List new.
     self do: [ :x |
         (criteria value: x value: mediane)
             ifTrue:  [ left  add: x ]
             ifFalse: [ right add: x ] ].
 
-    left  <- left  sort: criteria.
+    left  <- left  sort: criteria. "if left is instance of List then call Collection>>sort"
     right <- right sort: criteria.
 
     "left print. $| print. mediane print. $| print. right printNl."

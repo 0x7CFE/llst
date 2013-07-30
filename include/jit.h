@@ -423,7 +423,8 @@ private:
 
     static JITRuntime* s_instance;
 
-    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
+    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset = 0);
+    
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject* invokeBlock(TBlock* block, TContext* callingContext);
 
@@ -472,6 +473,15 @@ private:
     void initializeExceptionAPI();
     void createExecuteProcessFunction();
 
+    struct TCallSite {
+        uint32_t hitCount;
+        std::map<TClass*, uint32_t> classHits;
+        TCallSite() : hitCount(0) {}
+    };
+    
+    std::map<uint32_t, TCallSite> m_callSites;
+    void updateCallSite(TContext* callingContext, TSymbol* messageSelector, TClass* receiverClass, uint32_t callSiteOffset, hptr<TMethod>& method);
+    
 public:
     static JITRuntime* Instance() { return s_instance; }
 

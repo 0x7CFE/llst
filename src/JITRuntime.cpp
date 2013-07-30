@@ -276,7 +276,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     return result;
 }
 
-TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
+TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset)
 {
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
@@ -322,6 +322,9 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             updateFunctionCache(method, compiledMethodFunction);
         }
         
+        // Updating call site statistics and scheduling method processing
+        updateCallSite(callingContext, message, receiverClass, callSiteOffset, method);
+        
         // Preparing the context objects. Because we do not call the software
         // implementation here, we do not need to allocate the stack object
         // because it is not used by JIT runtime. We also may skip the proper
@@ -345,6 +348,39 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         //Do not remove this try catch (you will get "terminate called after throwing an instance of 'TContext*' or 'TBlockReturn'")
         throw;
     }
+}
+
+void JITRuntime::updateCallSite(TContext* callingContext, TSymbol* messageSelector, TClass* receiverClass, uint32_t callSiteOffset, hptr<TMethod>& method) 
+{
+    // Hashing a particular call site within executing method in a callingContext
+    // Call site is associated with a method containing it, not the actual receiver.
+    const uint32_t siteHash = 
+        reinterpret_cast<uint32_t>(callingContext->method->klass->name) ^
+        reinterpret_cast<uint32_t>(callingContext->method->name) ^
+        reinterpret_cast<uint32_t>(messageSelector) ^ 
+        callSiteOffset;
+    
+    TCallSite& callSite = m_callSites[siteHash];
+    callSite.hitCount += 1;
+    
+    // Collecting statistics of receiver classes that involved in this message
+    callSite.classHits[receiverClass] += 1;
+    
+    // If this call site is invoked often as a fallback (current code)
+    // it means that there are unoptimized execution paths.
+    // Actual stats is collected in callSite.classHits
+    if (callSite.hitCount > 100) {
+        // Here we need to select N most frequently called classes and 
+        // patch the compiledMethodFunction in order to check them at 
+        // runtime before falling back to JITRuntime::sendMessage().
+        
+        // After that, N entries should be removed from the map. 
+        // Further message dispatching will be performed directly, 
+        // so in that case fallback will not be invoked again.
+        
+        
+    }
+    
 }
 
 void JITRuntime::initializeGlobals() {
