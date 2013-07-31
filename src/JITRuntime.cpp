@@ -90,6 +90,9 @@ void JITRuntime::printStat()
     
     std::make_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods);
     
+//     for (uint32_t i = 0; i < hottestMethods.size(); i++)
+//         printf("%p\n", hottestMethods[i].methodFunction);
+    
     printf("\nHottest methods:\n");
     printf("\tHit count\tMethod name\n");
     for (int i = 0; i < 50; i++) {
@@ -97,7 +100,16 @@ void JITRuntime::printStat()
             return;
         
         THotMethod& hotMethod = hottestMethods.front();
-        printf("\t%d\t\t%s\n", hotMethod.hitCount, hotMethod.methodFunction->getName().str().c_str());
+        if (!hotMethod.methodFunction)
+            continue;
+        
+        printf("\t%d\t\t%s (%d sites)\n", hotMethod.hitCount, hotMethod.methodFunction->getName().str().c_str(), hotMethod.callSites.size());
+        
+//         printf("\t\tCall sites (hitCount, classes):");
+//         std::map<uint32_t, TCallSite>::iterator iSite = hotMethod.callSites.begin();
+//         for (; iSite != hotMethod.callSites.end(); ++iSite) {
+//             printf("\t\t");
+//         }
         
         std::pop_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods); 
         hottestMethods.pop_back();
@@ -344,10 +356,10 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 
                 verifyModule(*m_JITModule, AbortProcessAction);
                 
-                outs() << *methodFunction << "\n";
+//                 outs() << *methodFunction << "\n";
                 optimizeFunction(methodFunction);
                 
-                outs() << *methodFunction;
+//                 outs() << *methodFunction;
             }
             
             // Calling the method and returning the result

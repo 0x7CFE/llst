@@ -486,6 +486,19 @@ public:
         llvm::Function* methodFunction;
         std::map<uint32_t, TCallSite> callSites;
         THotMethod() : processed(false), hitCount(0), methodFunction(0) {}
+        /*THotMethod(const THotMethod& method) : 
+            processed(method.processed), 
+            hitCount(method.hitCount), 
+            methodFunction(method.methodFunction),
+            callSites(method.callSites)
+            {}
+        THotMethod& operator=(const THotMethod& method) {
+            processed = method.processed;
+            hitCount = method.hitCount;
+            methodFunction = method.methodFunction;
+            callSites = method.callSites;
+            return *this;
+        }*/
     };
     
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
