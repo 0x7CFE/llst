@@ -473,12 +473,24 @@ private:
     void initializeExceptionAPI();
     void createExecuteProcessFunction();
 
+public:    
+    struct THotMethod {
+        uint32_t hitCount; 
+        //TMethodFunction jitFunction;
+        std::string functionName;
+        THotMethod() : hitCount(0) {}
+    };
+
+    
     struct TCallSite {
         uint32_t hitCount;
         std::map<TClass*, uint32_t> classHits;
         TCallSite() : hitCount(0) {}
     };
     
+    typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
+private:
+    THotMethodsMap m_hotMethods;
     std::map<uint32_t, TCallSite> m_callSites;
     void updateCallSite(TContext* callingContext, TSymbol* messageSelector, TClass* receiverClass, uint32_t callSiteOffset, hptr<TMethod>& method);
     

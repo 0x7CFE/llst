@@ -55,6 +55,11 @@ using namespace llvm;
 
 JITRuntime* JITRuntime::s_instance = 0;
 
+bool compareMethods(const JITRuntime::THotMethod& m1, const JITRuntime::THotMethod& m2) 
+{
+    return m1.hitCount < m2.hitCount;
+}
+
 void JITRuntime::printStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
@@ -74,6 +79,31 @@ void JITRuntime::printStat()
         m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
         m_cacheHits, m_cacheMisses, hitRatio
     );
+    
+    // Hottest methods
+    std::vector<THotMethod> hottestMethods;
+    
+    for (THotMethodsMap::iterator iMethod = m_hotMethods.begin(); iMethod != m_hotMethods.end(); ++iMethod) {
+        hottestMethods.push_back(iMethod->second);
+        //std::push_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods);
+    }
+    
+    std::make_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods);
+    
+    printf("\nHottest methods:\n");
+    printf("\tHit count\tMethod name\n");
+    for (int i = 0; i < 50; i++) {
+        if (hottestMethods.empty())
+            return;
+        
+        THotMethod& hotMethod = hottestMethods.front();
+        printf("\t%d\t\t%s\n", hotMethod.hitCount, hotMethod.functionName.c_str());
+        
+        std::pop_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods); 
+        hottestMethods.pop_back();
+    }
+    printf("\n");
+    
     PrintStatistics(outs());
 }
 
@@ -314,13 +344,21 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 
                 verifyModule(*m_JITModule, AbortProcessAction);
                 
+                outs() << *methodFunction << "\n";
                 optimizeFunction(methodFunction);
+                
+                outs() << *methodFunction;
             }
             
             // Calling the method and returning the result
             compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
             updateFunctionCache(method, compiledMethodFunction);
         }
+        
+        THotMethod& hotMethod = m_hotMethods[compiledMethodFunction];
+        if (hotMethod.functionName.empty())
+            hotMethod.functionName = method->klass->name->toString() + ">>" + method->name->toString();
+        hotMethod.hitCount += 1;
         
         // Updating call site statistics and scheduling method processing
         updateCallSite(callingContext, message, receiverClass, callSiteOffset, method);
