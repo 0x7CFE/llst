@@ -105,11 +105,19 @@ void JITRuntime::printStat()
         
         printf("\t%d\t\t%s (%d sites)\n", hotMethod.hitCount, hotMethod.methodFunction->getName().str().c_str(), hotMethod.callSites.size());
         
-//         printf("\t\tCall sites (hitCount, classes):");
-//         std::map<uint32_t, TCallSite>::iterator iSite = hotMethod.callSites.begin();
-//         for (; iSite != hotMethod.callSites.end(); ++iSite) {
-//             printf("\t\t");
-//         }
+        std::map<uint32_t, TCallSite>::iterator iSite = hotMethod.callSites.begin();
+        for (; iSite != hotMethod.callSites.end(); ++iSite) {
+            printf("\t\tsite %d, class hits: ", iSite->first);
+            
+            std::map<TClass*, uint32_t>::iterator iClassHit = iSite->second.classHits.begin();
+            for (; iClassHit != iSite->second.classHits.end(); ++iClassHit) {
+                if (iClassHit->first)
+                    printf("(%s %d) ", iClassHit->first->name->toString().c_str(), iClassHit->second);
+                else 
+                    printf("(? %d) ", iClassHit->second);
+            }
+            printf("\n");
+        }
         
         std::pop_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods); 
         hottestMethods.pop_back();
