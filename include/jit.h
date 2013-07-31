@@ -388,7 +388,7 @@ public:
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
+    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject*     invokeBlock(TBlock* block, TContext* callingContext);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
@@ -430,7 +430,7 @@ private:
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass);
+    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
     

@@ -403,6 +403,9 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     THotMethod& hotMethod = m_hotMethods[methodFunction];
     hotMethod.hitCount += 1;
         
+    if (!callSiteOffset)
+        return;
+    
     TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
     // TODO reload cache if callerMethodFunction was popped out
     
@@ -567,7 +570,8 @@ void JITRuntime::createExecuteProcessFunction() {
         previousContext,
         selector,
         args,
-        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) 
+        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()),
+        builder.getInt32(0)
     };
     
     builder.CreateInvoke(m_runtimeAPI.sendMessage, OK, Fail, sendMessageArgs);
@@ -607,10 +611,10 @@ TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass)
+TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset)
 {
     JITRuntime::Instance()->m_messagesDispatched++;
-    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass);
+    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass, callSiteOffset);
 }
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)

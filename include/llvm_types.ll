@@ -217,7 +217,7 @@ declare %TByteObject* @newBinaryObject(%TClass*, i32)
 ;;;;;;;;;;;;;;;;; runtime API ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass)
+declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
 declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer)
 declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)

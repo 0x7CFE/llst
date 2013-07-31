@@ -907,7 +907,8 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         argumentsArray,
         
         // default receiver class
-        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) //inttoptr 0 works fine too
+        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
+        jit.builder->getInt32(jit.bytePointer) // call site offset 
     };
     
     // Now performing a message call
@@ -956,7 +957,8 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         arguments,               // message arguments
         
         // default receiver class
-        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo())
+        ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()),
+        jit.builder->getInt32(jit.bytePointer) // call site offset 
     };
     
     Value* result = 0;
@@ -1104,7 +1106,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 jit.getCurrentContext(),     // calling context
                 messageSelector, // selector
                 arguments,       // message arguments
-                parentClass      // receiver class
+                parentClass,     // receiver class
+                jit.builder->getInt32(jit.bytePointer) // call site offset
             };
             
             Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
@@ -1479,7 +1482,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 selector,
                 args,
                 // default receiver class
-                ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) //inttoptr 0 works fine too
+                ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
+                jit.builder->getInt32(jit.bytePointer) // call site offset
             };
             
             // Now performing a message call
