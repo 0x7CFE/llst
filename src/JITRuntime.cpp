@@ -97,7 +97,7 @@ void JITRuntime::printStat()
             return;
         
         THotMethod& hotMethod = hottestMethods.front();
-        printf("\t%d\t\t%s\n", hotMethod.hitCount, hotMethod.functionName.c_str());
+        printf("\t%d\t\t%s\n", hotMethod.hitCount, hotMethod.methodFunction->getName().str().c_str());
         
         std::pop_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods); 
         hottestMethods.pop_back();
@@ -353,15 +353,13 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             // Calling the method and returning the result
             compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
             updateFunctionCache(method, compiledMethodFunction);
+            
+            THotMethod& newMethod = m_hotMethods[compiledMethodFunction];
+            newMethod.methodFunction = methodFunction;
         }
         
-        THotMethod& hotMethod = m_hotMethods[compiledMethodFunction];
-        if (hotMethod.functionName.empty())
-            hotMethod.functionName = method->klass->name->toString() + ">>" + method->name->toString();
-        hotMethod.hitCount += 1;
-        
         // Updating call site statistics and scheduling method processing
-        updateCallSite(callingContext, message, receiverClass, callSiteOffset, method);
+        updateHotSites(compiledMethodFunction, callingContext, receiverClass, callSiteOffset);
         
         // Preparing the context objects. Because we do not call the software
         // implementation here, we do not need to allocate the stack object
@@ -388,34 +386,28 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
 }
 
-void JITRuntime::updateCallSite(TContext* callingContext, TSymbol* messageSelector, TClass* receiverClass, uint32_t callSiteOffset, hptr<TMethod>& method) 
+void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset) 
 {
-    // Hashing a particular call site within executing method in a callingContext
-    // Call site is associated with a method containing it, not the actual receiver.
-    const uint32_t siteHash = 
-        reinterpret_cast<uint32_t>(callingContext->method->klass->name) ^
-        reinterpret_cast<uint32_t>(callingContext->method->name) ^
-        reinterpret_cast<uint32_t>(messageSelector) ^ 
-        callSiteOffset;
+    THotMethod& hotMethod = m_hotMethods[methodFunction];
+    hotMethod.hitCount += 1;
+        
+    TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
+    // TODO reload cache if callerMethodFunction was popped out
     
-    TCallSite& callSite = m_callSites[siteHash];
+    THotMethod& callerMethod = m_hotMethods[callerMethodFunction];
+    TCallSite& callSite = callerMethod.callSites[callSiteOffset];
+    
     callSite.hitCount += 1;
     
     // Collecting statistics of receiver classes that involved in this message
     callSite.classHits[receiverClass] += 1;
     
-    // If this call site is invoked often as a fallback (current code)
+    // If this method is invoked often as a fallback (current code)
     // it means that there are unoptimized execution paths.
-    // Actual stats is collected in callSite.classHits
-    if (callSite.hitCount > 100) {
-        // Here we need to select N most frequently called classes and 
+    if (hotMethod.hitCount > 100) {
+        // Here we need to select N most frequently called sites and 
         // patch the compiledMethodFunction in order to check them at 
         // runtime before falling back to JITRuntime::sendMessage().
-        
-        // After that, N entries should be removed from the map. 
-        // Further message dispatching will be performed directly, 
-        // so in that case fallback will not be invoked again.
-        
         
     }
     

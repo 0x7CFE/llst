@@ -474,25 +474,24 @@ private:
     void createExecuteProcessFunction();
 
 public:    
-    struct THotMethod {
-        uint32_t hitCount; 
-        //TMethodFunction jitFunction;
-        std::string functionName;
-        THotMethod() : hitCount(0) {}
-    };
-
-    
     struct TCallSite {
         uint32_t hitCount;
         std::map<TClass*, uint32_t> classHits;
         TCallSite() : hitCount(0) {}
     };
     
+    struct THotMethod {
+        bool processed;
+        uint32_t hitCount;
+        llvm::Function* methodFunction;
+        std::map<uint32_t, TCallSite> callSites;
+        THotMethod() : processed(false), hitCount(0), methodFunction(0) {}
+    };
+    
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
 private:
     THotMethodsMap m_hotMethods;
-    std::map<uint32_t, TCallSite> m_callSites;
-    void updateCallSite(TContext* callingContext, TSymbol* messageSelector, TClass* receiverClass, uint32_t callSiteOffset, hptr<TMethod>& method);
+    void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset);
     
 public:
     static JITRuntime* Instance() { return s_instance; }
