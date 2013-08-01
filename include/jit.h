@@ -481,24 +481,14 @@ public:
     };
     
     struct THotMethod {
+        typedef std::map<uint32_t, TCallSite> TCallSiteMap;
+        
         bool processed;
         uint32_t hitCount;
         llvm::Function* methodFunction;
-        std::map<uint32_t, TCallSite> callSites;
+        TCallSiteMap callSites;
+        
         THotMethod() : processed(false), hitCount(0), methodFunction(0) {}
-        /*THotMethod(const THotMethod& method) : 
-            processed(method.processed), 
-            hitCount(method.hitCount), 
-            methodFunction(method.methodFunction),
-            callSites(method.callSites)
-            {}
-        THotMethod& operator=(const THotMethod& method) {
-            processed = method.processed;
-            hitCount = method.hitCount;
-            methodFunction = method.methodFunction;
-            callSites = method.callSites;
-            return *this;
-        }*/
     };
     
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
@@ -506,6 +496,7 @@ private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset);
     void patchHotMethods();
+    void patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite);
 public:
     static JITRuntime* Instance() { return s_instance; }
 

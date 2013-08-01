@@ -55,9 +55,9 @@ using namespace llvm;
 
 JITRuntime* JITRuntime::s_instance = 0;
 
-bool compareMethods(const JITRuntime::THotMethod& m1, const JITRuntime::THotMethod& m2) 
+static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime::THotMethod* m2) 
 {
-    return m1.hitCount < m2.hitCount;
+    return m1->hitCount < m2->hitCount;
 }
 
 void JITRuntime::printStat()
@@ -80,47 +80,36 @@ void JITRuntime::printStat()
         m_cacheHits, m_cacheMisses, hitRatio
     );
     
-    // Hottest methods
-    std::vector<THotMethod> hottestMethods;
+    std::vector<THotMethod*> hotMethods;
     
-    for (THotMethodsMap::iterator iMethod = m_hotMethods.begin(); iMethod != m_hotMethods.end(); ++iMethod) {
-        hottestMethods.push_back(iMethod->second);
-        //std::push_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods);
-    }
+    for (THotMethodsMap::iterator iMethod = m_hotMethods.begin(); iMethod != m_hotMethods.end(); ++iMethod)
+        hotMethods.push_back(& iMethod->second);
     
-    std::make_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods);
+    std::sort(hotMethods.begin(), hotMethods.end(), compareByHitCount);
     
-//     for (uint32_t i = 0; i < hottestMethods.size(); i++)
-//         printf("%p\n", hottestMethods[i].methodFunction);
-    
-    printf("\nHottest methods:\n");
+    printf("\nHot methods:\n");
     printf("\tHit count\tMethod name\n");
     for (int i = 0; i < 50; i++) {
-        if (hottestMethods.empty())
-            return;
+        if (hotMethods.empty())
+            break;
         
-        THotMethod& hotMethod = hottestMethods.front();
-        if (!hotMethod.methodFunction)
+        THotMethod* hotMethod = hotMethods.back(); hotMethods.pop_back();
+        if (!hotMethod->methodFunction)
             continue;
         
-        printf("\t%d\t\t%s (%d sites)\n", hotMethod.hitCount, hotMethod.methodFunction->getName().str().c_str(), hotMethod.callSites.size());
+        printf("\t%d\t\t%s (%d sites)\n", hotMethod->hitCount, hotMethod->methodFunction->getName().str().c_str(), hotMethod->callSites.size());
         
-        std::map<uint32_t, TCallSite>::iterator iSite = hotMethod.callSites.begin();
-        for (; iSite != hotMethod.callSites.end(); ++iSite) {
+        std::map<uint32_t, TCallSite>::iterator iSite = hotMethod->callSites.begin();
+        for (; iSite != hotMethod->callSites.end(); ++iSite) {
             printf("\t\tsite %d, class hits: ", iSite->first);
             
             std::map<TClass*, uint32_t>::iterator iClassHit = iSite->second.classHits.begin();
-            for (; iClassHit != iSite->second.classHits.end(); ++iClassHit) {
-                if (iClassHit->first)
-                    printf("(%s %d) ", iClassHit->first->name->toString().c_str(), iClassHit->second);
-                else 
-                    printf("(? %d) ", iClassHit->second);
-            }
+            for (; iClassHit != iSite->second.classHits.end(); ++iClassHit)
+                printf("(%s %d) ", iClassHit->first->name->toString().c_str(), iClassHit->second);
+            
             printf("\n");
         }
         
-        std::pop_heap(hottestMethods.begin(), hottestMethods.end(), compareMethods); 
-        hottestMethods.pop_back();
     }
     printf("\n");
     
@@ -426,12 +415,48 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     callSite.classHits[receiverClass] += 1;
 }
 
-void JITRuntime::patchHotMethods() {
+void JITRuntime::patchHotMethods() 
+{
     // Selecting most active methods with call sites and patching them.
     // We collected statistics on what classes are affected when invoking
     // particular site. Now we may hard code the check into method's code
     // to take advantage of direct method call and allow LLVM to do its job.
     
+    // Allocating pointer array which will hold methods sorted by hits count
+    std::vector<THotMethod*> hotMethods;
+    THotMethodsMap::iterator iMethod = m_hotMethods.begin();
+    for (; iMethod != m_hotMethods.end(); ++iMethod)
+        hotMethods.push_back(& iMethod->second);
+    
+    // Sorting method pointers by hitCount field
+    std::sort(hotMethods.begin(), hotMethods.end(), compareByHitCount);
+    
+    // Processing 50 most active methods
+    for (uint32_t i = 0; i < 50; i++) {
+        if (hotMethods.empty())
+            return;
+        
+        // Peeking most active method (with max hitCount)
+        THotMethod* hotMethod = hotMethods.back();
+        hotMethods.pop_back();
+        
+        // We're interested only in methods with call sites
+        if (hotMethod->callSites.empty())
+            continue;
+        
+        // Iterating through call sites and inserting class checks with direct calls
+        THotMethod::TCallSiteMap::iterator iSite = hotMethod->callSites.begin();
+        while (iSite != hotMethod->callSites.end()) {
+            patchCallSite(*hotMethod, iSite->second);
+            ++iSite;
+        }
+        
+        // TODO recompile patched method
+    }
+}
+
+void JITRuntime::patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite) 
+{
     
 }
 
