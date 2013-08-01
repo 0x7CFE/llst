@@ -496,7 +496,7 @@ private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset);
     void patchHotMethods();
-    void patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite);
+    void patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite, uint32_t callSiteOffset);
 public:
     static JITRuntime* Instance() { return s_instance; }
 

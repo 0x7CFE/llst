@@ -37,6 +37,7 @@
 
 #include <llvm/Support/TargetSelect.h>
 #include <llvm/Support/IRReader.h>
+#include <llvm/Support/InstIterator.h>
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 
@@ -432,13 +433,9 @@ void JITRuntime::patchHotMethods()
     std::sort(hotMethods.begin(), hotMethods.end(), compareByHitCount);
     
     // Processing 50 most active methods
-    for (uint32_t i = 0; i < 50; i++) {
-        if (hotMethods.empty())
-            return;
-        
+    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         // Peeking most active method (with max hitCount)
-        THotMethod* hotMethod = hotMethods.back();
-        hotMethods.pop_back();
+        THotMethod* hotMethod = hotMethods[j];
         
         // We're interested only in methods with call sites
         if (hotMethod->callSites.empty())
@@ -447,7 +444,7 @@ void JITRuntime::patchHotMethods()
         // Iterating through call sites and inserting class checks with direct calls
         THotMethod::TCallSiteMap::iterator iSite = hotMethod->callSites.begin();
         while (iSite != hotMethod->callSites.end()) {
-            patchCallSite(*hotMethod, iSite->second);
+            patchCallSite(*hotMethod, iSite->second, iSite->first);
             ++iSite;
         }
         
@@ -455,9 +452,23 @@ void JITRuntime::patchHotMethods()
     }
 }
 
-void JITRuntime::patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite) 
+void JITRuntime::patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite, uint32_t callSiteOffset) 
 {
+    using namespace llvm;
     
+    Function* methodFunction = hotMethod.methodFunction;
+    
+    // Locating call site instruction
+    for (inst_iterator iInst = inst_begin(methodFunction);  iInst != inst_end(methodFunction);  ++iInst) {
+        if (CallInst* call = dyn_cast<CallInst>(&*iInst)) {
+            if (call->getCalledFunction() == m_runtimeAPI.sendMessage) {
+                // Checking if it is a call site we're searching
+                if (call->getArgOperand(4) == ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteOffset)) {
+                    // Instruction found. Now we need to patch the block
+                }
+            }
+        }
+    }
 }
 
 void JITRuntime::initializeGlobals() {
