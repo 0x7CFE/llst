@@ -424,15 +424,14 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     
     // Collecting statistics of receiver classes that involved in this message
     callSite.classHits[receiverClass] += 1;
+}
+
+void JITRuntime::patchHotMethods() {
+    // Selecting most active methods with call sites and patching them.
+    // We collected statistics on what classes are affected when invoking
+    // particular site. Now we may hard code the check into method's code
+    // to take advantage of direct method call and allow LLVM to do its job.
     
-    // If this method is invoked often as a fallback (current code)
-    // it means that there are unoptimized execution paths.
-    if (hotMethod.hitCount > 100) {
-        // Here we need to select N most frequently called sites and 
-        // patch the compiledMethodFunction in order to check them at 
-        // runtime before falling back to JITRuntime::sendMessage().
-        
-    }
     
 }
 
