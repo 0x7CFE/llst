@@ -475,8 +475,10 @@ private:
 
 public:    
     struct TCallSite {
+        typedef std::map<TClass*, uint32_t> TClassHitsMap;
+        
         uint32_t hitCount;
-        std::map<TClass*, uint32_t> classHits;
+        TClassHitsMap classHits;
         TCallSite() : hitCount(0) {}
     };
     
@@ -496,7 +498,7 @@ private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset);
     void patchHotMethods();
-    void patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite, uint32_t callSiteOffset);
+    void patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset);
 public:
     static JITRuntime* Instance() { return s_instance; }
 

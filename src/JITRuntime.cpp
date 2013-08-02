@@ -452,19 +452,36 @@ void JITRuntime::patchHotMethods()
     }
 }
 
-void JITRuntime::patchCallSite(const THotMethod& hotMethod, const TCallSite& callSite, uint32_t callSiteOffset) 
+void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset) 
 {
     using namespace llvm;
     
     Function* methodFunction = hotMethod.methodFunction;
+    Value* callOffsetValue = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteOffset);
     
-    // Locating call site instruction
-    for (inst_iterator iInst = inst_begin(methodFunction);  iInst != inst_end(methodFunction);  ++iInst) {
-        if (CallInst* call = dyn_cast<CallInst>(&*iInst)) {
-            if (call->getCalledFunction() == m_runtimeAPI.sendMessage) {
-                // Checking if it is a call site we're searching
-                if (call->getArgOperand(4) == ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteOffset)) {
+    // Locating call site instruction through all basic blocks
+    for (Function::iterator iBlock = methodFunction->begin(); iBlock != methodFunction->end(); ++iBlock) {
+        for (BasicBlock::iterator iInst = iBlock->begin(); iInst != iBlock->end(); ++iInst) {
+            if (CallInst* call = dyn_cast<CallInst>(&*iInst)) {
+                if (call->getCalledFunction() == m_runtimeAPI.sendMessage && call->getArgOperand(4) == callOffsetValue) {
                     // Instruction found. Now we need to patch the block
+                    IRBuilder<> builder(&*iBlock);
+                    
+                    TCallSite::TClassHitsMap& classHits = callSite.classHits;
+                    for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
+                        // Creating basic blocks for direct calls
+                        BasicBlock* newBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", methodFunction);
+                        builder.SetInsertPoint(newBlock);
+                        
+                        // Allocating context object and temporaries on the methodFunction's stack.
+                        // This operation does not affect garbage collector, so no pointer protection
+                        // is required. Moreover, this is operation is much faster than heap allocation.
+                        AllocaInst* contextSlot = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
+                        contextSlot->setAlignment(4);
+                        Value* newContextObject = builder.CreateBitCast(contextSlot, m_baseTypes.object);
+                        
+                        Value* newTemps   = builder.CreateAlloca(m_baseTypes.objectArray, 0, "directTemps.");
+                    }
                 }
             }
         }
