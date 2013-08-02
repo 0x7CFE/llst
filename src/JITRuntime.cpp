@@ -369,7 +369,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         }
         
         // Updating call site statistics and scheduling method processing
-        updateHotSites(compiledMethodFunction, callingContext, receiverClass, callSiteOffset);
+        updateHotSites(compiledMethodFunction, callingContext, message, receiverClass, callSiteOffset);
         
         // Preparing the context objects. Because we do not call the software
         // implementation here, we do not need to allocate the stack object
@@ -397,7 +397,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
 }
 
-void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset) 
+void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteOffset) 
 {
     THotMethod& hotMethod = m_hotMethods[methodFunction];
     hotMethod.hitCount += 1;
@@ -414,6 +414,8 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     THotMethod& callerMethod = m_hotMethods[callerMethodFunction];
     TCallSite& callSite = callerMethod.callSites[callSiteOffset];
     
+    if (!callSite.hitCount)
+        callSite.messageSelector = message;
     callSite.hitCount += 1;
     
     // Collecting statistics of receiver classes that involved in this message
@@ -473,15 +475,17 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
                     // Instruction found. Now we need to patch the block
                     IRBuilder<> builder(iBlock);
                     
-                    std::map<TClass*, BasicBlock*> directBlocks;
+                    //BasicBlock* fallbackBlock = iBlock->splitBasicBlock();
+                    
+                    std::map<TClass*, TDirectBlock> directBlocks;
                     
                     TCallSite::TClassHitsMap& classHits = callSite.classHits;                    
                     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
                         // Creating basic block for direct calls
-                        BasicBlock* newBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", methodFunction);
-                        directBlocks[iClassHit->first] = newBlock;
+                        TDirectBlock newBlock;
+                        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", methodFunction);
                         
-                        builder.SetInsertPoint(newBlock);
+                        builder.SetInsertPoint(newBlock.basicBlock);
                         
                         // Allocating context object and temporaries on the methodFunction's stack.
                         // This operation does not affect garbage collector, so no pointer protection
@@ -495,7 +499,23 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
                         tempsSlot->setAlignment(4);
                         // TODO init tempsSlot
                         
-                        // 
+                        // Creating direct version of a call
+                        std::string directFunctionName = iClassHit->first->name->toString() + ">>" + callSite.messageSelector->toString();
+                        Function* directFunction = m_JITModule->getFunction(directFunctionName);
+                        
+                        if (isa<CallInst>(iInst))
+                            newBlock.returnValue = builder.CreateCall(directFunction, newContextObject);
+                        else {
+                            InvokeInst* invokeInst = dyn_cast<InvokeInst>(iInst);
+                            newBlock.returnValue = builder.CreateInvoke(directFunction, 
+                                                                        invokeInst->getNormalDest(), 
+                                                                        invokeInst->getUnwindDest(),
+                                                                        newContextObject
+                                                                       );
+                        }
+                        newBlock.returnValue->setName("reply.");
+                        
+                        directBlocks[iClassHit->first] = newBlock;
                     }
                     
                     // Replace the original call site with 'select' instruction and 

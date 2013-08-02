@@ -478,6 +478,7 @@ public:
         typedef std::map<TClass*, uint32_t> TClassHitsMap;
         
         uint32_t hitCount;
+        TSymbol* messageSelector;
         TClassHitsMap classHits;
         TCallSite() : hitCount(0) {}
     };
@@ -493,10 +494,15 @@ public:
         THotMethod() : processed(false), hitCount(0), methodFunction(0) {}
     };
     
+    struct TDirectBlock {
+        llvm::BasicBlock* basicBlock;
+        llvm::Value* returnValue;
+    };
+    
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
 private:
     THotMethodsMap m_hotMethods;
-    void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TClass* receiverClass, uint32_t callSiteOffset);
+    void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteOffset);
     void patchHotMethods();
     void patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset);
 public:
