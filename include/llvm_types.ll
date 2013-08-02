@@ -1,87 +1,108 @@
 ; This module implements types described in types.h within LLVM.
 ; Also it implements some base functions and methods such as TObject::getClass(). 
-;  LLVM passes may optimize/inline them => we will gain more perfomance.
+; LLVM passes may optimize/inline them => we will gain more perfomance.
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;; types ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-%TSize = type { i32 ; data
-              }
-%TObject = type { %TSize, ; size
-                  %TClass*, ; class
-                  [0 x %TObject*] ; fields
-                }
+%TSize = type { 
+    i32             ; data
+}
+
+%TObject = type { 
+    %TSize,         ; size
+    %TClass*,       ; class
+    [0 x %TObject*] ; fields
+}
+
 %TByteObject = type { %TObject }
-%TSymbol = type { %TByteObject }
-%TString = type { %TByteObject }
-%TChar = type { %TObject,
-                i32 ; value
-              }
-%TArray = type { %TObject }
+%TSymbol     = type { %TByteObject }
+%TString     = type { %TByteObject }
+
+%TChar = type { 
+    %TObject,
+    i32             ; value
+}
+
+%TArray       = type { %TObject }
 %TObjectArray = type { %TObject }
 %TSymbolArray = type { %TObject }
-%TContext = type { %TObject,
-                   %TMethod*,
-                   %TObjectArray*, ; arguments
-                   %TObjectArray*, ; temporaries
-                   %TObjectArray*, ; stack
-                   i32, ; bytePointer
-                   i32, ; stackTop
-                   %TContext* ; previousContext
-                 }
-%TBlock = type { %TContext,
-                 i32, ; argumentLocation
-                 %TContext*, ; creatingContext
-                 i32 ; blockBytePointer
-               }
-%TMethod = type { %TObject,
-                  %TSymbol*, ; name
-                  %TByteObject*, ; byteCodes
-                  %TSymbolArray*, ; literals
-                  i32, ; stackSize
-                  i32, ; temporarySize
-                  %TClass*, ; class
-                  %TString*, ; text
-                  %TObject* ; package
-                }
-%TDictionary = type { %TObject,
-                      %TSymbolArray*, ; keys
-                      %TObjectArray* ; values
-                    }
-%TClass = type { %TObject,
-                 %TSymbol*, ; name
-                 %TClass*, ; parentClass
-                 %TDictionary*, ; methods
-                 i32, ; instanceSize
-                 %TSymbolArray*, ; variables
-                 %TObject* ; package
-               }
-%TProcess = type { %TObject,
-                   %TContext*, ; context
-                   %TObject*, ; state
-                   %TObject* ; result
-                 }
-%TGlobals = type { %TObject*, ; nilObject
-                   %TObject*, ; trueObject
-                   %TObject*, ; falseObject
-                   %TClass*, ; smallIntClass
-                   %TClass*, ; arrayClass
-                   %TClass*, ; blockClass
-                   %TClass*, ; contextClass
-                   %TClass*, ; stringClass
-                   %TDictionary*, ; globalsObject
-                   %TMethod*, ; initialMethod
-                   [3 x %TObject*], ; binaryMessages : [<, <=, +]
-                   %TClass*, ; integerClass
-                   %TSymbol* ; badMethodSymbol
-                 }
+
+%TContext = type { 
+    %TObject,
+    %TMethod*,
+    %TObjectArray*, ; arguments
+    %TObjectArray*, ; temporaries
+    %TObjectArray*, ; stack
+    i32,            ; bytePointer
+    i32,            ; stackTop
+    %TContext*      ; previousContext
+}
+
+%TBlock = type { 
+    %TContext,
+    i32,            ; argumentLocation
+    %TContext*,     ; creatingContext
+    i32             ; blockBytePointer
+}
+
+%TMethod = type { 
+    %TObject,
+    %TSymbol*,      ; name
+    %TByteObject*,  ; byteCodes
+    %TSymbolArray*, ; literals
+    i32,            ; stackSize
+    i32,            ; temporarySize
+    %TClass*,       ; class
+    %TString*,      ; text
+    %TObject*       ; package
+}
+
+%TDictionary = type { 
+    %TObject,
+    %TSymbolArray*, ; keys
+    %TObjectArray*  ; values
+}
+
+%TClass = type { 
+    %TObject,
+    %TSymbol*,      ; name
+    %TClass*,       ; parentClass
+    %TDictionary*,  ; methods
+    i32,            ; instanceSize
+    %TSymbolArray*, ; variables
+    %TObject*       ; package
+}
+
+%TProcess = type { 
+    %TObject,
+    %TContext*,     ; context
+    %TObject*,      ; state
+    %TObject*       ; result
+}
+
+%TGlobals = type { 
+    %TObject*,      ; nilObject
+    %TObject*,      ; trueObject
+    %TObject*,      ; falseObject
+    %TClass*,       ; smallIntClass
+    %TClass*,       ; arrayClass
+    %TClass*,       ; blockClass
+    %TClass*,       ; contextClass
+    %TClass*,       ; stringClass
+    %TDictionary*,  ; globalsObject
+    %TMethod*,      ; initialMethod
+    [3x%TObject*],  ; binaryMessages : [<, <=, +]
+    %TClass*,       ; integerClass
+    %TSymbol*       ; badMethodSymbol
+}
 
 %TBlockReturn = type {
-                       %TObject*, ; value
-                       %TContext* ; targetContext
-                     }
+    %TObject*,      ; value
+    %TContext*      ; targetContext
+}
 
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -224,6 +245,7 @@ declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
 declare void @checkRoot(%TObject* %value, %TObject** %slot)
 declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
 declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiveFailed)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
