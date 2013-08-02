@@ -386,6 +386,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         newContext->method            = method;
         newContext->previousContext   = previousContext;
     }
+    
     try {
         TObject* result = compiledMethodFunction(newContext);
         return result;
@@ -403,6 +404,9 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
         
     if (!callSiteOffset)
         return;
+    
+//     if (callingContext->getClass() == globals.blockClass)
+//         static_cast<TBlock*>(callingContext)->;
     
     TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
     // TODO reload cache if callerMethodFunction was popped out
@@ -462,15 +466,21 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     // Locating call site instruction through all basic blocks
     for (Function::iterator iBlock = methodFunction->begin(); iBlock != methodFunction->end(); ++iBlock) {
         for (BasicBlock::iterator iInst = iBlock->begin(); iInst != iBlock->end(); ++iInst) {
-            if (CallInst* call = dyn_cast<CallInst>(&*iInst)) {
-                if (call->getCalledFunction() == m_runtimeAPI.sendMessage && call->getArgOperand(4) == callOffsetValue) {
+            if (isa<CallInst>(iInst) || isa<InvokeInst>(iInst)) {
+                CallSite call(iInst);
+                
+                if (call.getCalledFunction() == m_runtimeAPI.sendMessage && call.getArgument(4) == callOffsetValue) {
                     // Instruction found. Now we need to patch the block
-                    IRBuilder<> builder(&*iBlock);
+                    IRBuilder<> builder(iBlock);
                     
-                    TCallSite::TClassHitsMap& classHits = callSite.classHits;
+                    std::map<TClass*, BasicBlock*> directBlocks;
+                    
+                    TCallSite::TClassHitsMap& classHits = callSite.classHits;                    
                     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
-                        // Creating basic blocks for direct calls
+                        // Creating basic block for direct calls
                         BasicBlock* newBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", methodFunction);
+                        directBlocks[iClassHit->first] = newBlock;
+                        
                         builder.SetInsertPoint(newBlock);
                         
                         // Allocating context object and temporaries on the methodFunction's stack.
@@ -479,9 +489,18 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
                         AllocaInst* contextSlot = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
                         contextSlot->setAlignment(4);
                         Value* newContextObject = builder.CreateBitCast(contextSlot, m_baseTypes.object);
+                        // TODO initialize object fields, class and size
                         
-                        Value* newTemps   = builder.CreateAlloca(m_baseTypes.objectArray, 0, "directTemps.");
+                        AllocaInst* tempsSlot = builder.CreateAlloca(m_baseTypes.objectArray, 0, "directTemps.");
+                        tempsSlot->setAlignment(4);
+                        // TODO init tempsSlot
+                        
+                        // 
                     }
+                    
+                    // Replace the original call site with 'select' instruction and 
+                    // perform an indirect call to the handler. Original call return value 
+                    // should be replaced with phi function agregating direct call returns
                 }
             }
         }

@@ -474,7 +474,7 @@ private:
     void createExecuteProcessFunction();
 
 public:    
-    struct TCallSite {
+    struct TCallSite {        
         typedef std::map<TClass*, uint32_t> TClassHitsMap;
         
         uint32_t hitCount;
