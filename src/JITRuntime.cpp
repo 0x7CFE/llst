@@ -530,10 +530,11 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     Function* methodFunction = hotMethod.methodFunction;
     Instruction* callInstruction = findCallInstruction(methodFunction, callSiteOffset);
-    CallSite call(callInstruction);
     
-    if (!callInstruction)
+    if (! callInstruction)
         return; // Seems that instruction was completely optimized out
+    
+    CallSite call(callInstruction);
     
     // Now, preparing a set of basic blocks with direct calls to class methods
     TDirectBlockMap directBlocks;
@@ -597,8 +598,7 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
         builder.CreateBr(nextBlock);
         
         replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
-    }
-    
+    }    
 }
 
 void JITRuntime::initializeGlobals() {
