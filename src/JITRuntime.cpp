@@ -485,7 +485,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     IRBuilder<> builder(callInstruction->getParent());
     TCallSite::TClassHitsMap& classHits = callSite.classHits;
 
-    // TODO Probably we need to select only N most active class hits
+    // FIXME Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
         TDirectBlock newBlock;
         newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.");
@@ -539,36 +539,36 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     TDirectBlockMap directBlocks;
     createDirectBlocks(callInstruction, callSite, directBlocks);
     
-    // Processing instruction and replacing it with a direct calling code
     BasicBlock* originBlock = callInstruction->getParent();
 
-    // Spliting original block to two parts. 
+    // Spliting original block into two parts. 
     // These will be intersected by our code
     BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction);
     originBlock->getInstList().pop_back(); // removing unconditional branch
     nextBlock->getInstList().remove(callInstruction); // removing original instruction
 
-    // Fallback block contains original call to default JIT sendMessage handler
-    // it is called when message is invoked with an unknown class that does not 
+    // Fallback block contains original call to default JIT sendMessage handler.
+    // It is called when message is invoked with an unknown class that does not 
     // has direct handler.
     BasicBlock* fallbackBlock = BasicBlock::Create(callInstruction->getContext(), "fallback.", methodFunction, nextBlock);
     IRBuilder<> builder(fallbackBlock);
     Value* fallbackReply = 0;
+    SmallVector<Value*, 5> fallbackArgs;
+    fallbackArgs.append(call.arg_begin(), call.arg_end());
     if (isa<CallInst>(callInstruction)) {
-        fallbackReply = builder.CreateCall(call.getCalledFunction());
+        fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs);
     } else {
         InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
         fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
                                              invokeInst->getNormalDest(), 
                                              invokeInst->getUnwindDest(),
-                                             0 // TODO arguments
+                                             fallbackArgs
                                             );
     }
-    fallbackBlock->getInstList().push_back(callInstruction);
     builder.CreateBr(nextBlock);
-
     
-    // Creating a switch instruction that will filter the block depending on the actual class of the object
+    // Creating a switch instruction that will filter the block 
+    // depending on the actual class of the receiver object
     builder.SetInsertPoint(originBlock);
     
     // Acquiring receiver's class pointer as raw int value
@@ -590,8 +590,8 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
         TClass* klass = iBlock->first;
         TDirectBlock& directBlock = iBlock->second;
         
-        ConstantInt* klassAddress = builder.getInt32(reinterpret_cast<uint32_t>(klass));
-        switchInst->addCase(klassAddress, directBlock.basicBlock);
+        ConstantInt* classAddress = builder.getInt32(reinterpret_cast<uint32_t>(klass));
+        switchInst->addCase(classAddress, directBlock.basicBlock);
         
         builder.SetInsertPoint(directBlock.basicBlock);
         builder.CreateBr(nextBlock);
