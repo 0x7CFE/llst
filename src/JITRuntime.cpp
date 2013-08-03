@@ -473,6 +473,9 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
                 if (call.getCalledFunction() == m_runtimeAPI.sendMessage && call.getArgument(4) == callOffsetValue)
                     return iInst;
             }
+    
+    // Instruction was not found (probably due to optimization)
+    return 0;
 }
 
 void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks) 
@@ -480,10 +483,10 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     using namespace llvm;
     
     IRBuilder<> builder(callInstruction->getParent());
-    
     TCallSite::TClassHitsMap& classHits = callSite.classHits;
+
+    // TODO Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
-        // Creating basic block for direct calls
         TDirectBlock newBlock;
         newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.");
         
@@ -527,6 +530,7 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     Function* methodFunction = hotMethod.methodFunction;
     Instruction* callInstruction = findCallInstruction(methodFunction, callSiteOffset);
+    CallSite call(callInstruction);
     
     if (!callInstruction)
         return; // Seems that instruction was completely optimized out
@@ -537,10 +541,63 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     // Processing instruction and replacing it with a direct calling code
     BasicBlock* originBlock = callInstruction->getParent();
-        
+
+    // Spliting original block to two parts. 
+    // These will be intersected by our code
     BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction);
-    originBlock->getInstList().pop_back(); // removing branch
-    nextBlock->getInstList().remove(callInstruction);
+    originBlock->getInstList().pop_back(); // removing unconditional branch
+    nextBlock->getInstList().remove(callInstruction); // removing original instruction
+
+    // Fallback block contains original call to default JIT sendMessage handler
+    // it is called when message is invoked with an unknown class that does not 
+    // has direct handler.
+    BasicBlock* fallbackBlock = BasicBlock::Create(callInstruction->getContext(), "fallback.", methodFunction, nextBlock);
+    IRBuilder<> builder(fallbackBlock);
+    Value* fallbackReply = 0;
+    if (isa<CallInst>(callInstruction)) {
+        fallbackReply = builder.CreateCall(call.getCalledFunction());
+    } else {
+        InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
+        fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
+                                             invokeInst->getNormalDest(), 
+                                             invokeInst->getUnwindDest(),
+                                             0 // TODO arguments
+                                            );
+    }
+    fallbackBlock->getInstList().push_back(callInstruction);
+    builder.CreateBr(nextBlock);
+
+    
+    // Creating a switch instruction that will filter the block depending on the actual class of the object
+    builder.SetInsertPoint(originBlock);
+    
+    // Acquiring receiver's class pointer as raw int value
+    Value* argumentsObject = call.getArgument(2);
+    Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object);
+    Value* receiver = 0; // TODO @getObjectFieldPtr(arguments, 0)
+    Value* receiverClass = 0; // TODO @getObjectClass(receiver)
+    Value* receiverClassPtr = builder.CreatePtrToInt(receiverClass, Type::getInt32Ty(getGlobalContext()));
+
+    // Genrating switch instruction to select basic block
+    SwitchInst* switchInst = builder.CreateSwitch(receiverClassPtr, fallbackBlock);
+    
+    // This phi function will aggregate direct block and fallback block return values
+    builder.SetInsertPoint(nextBlock, nextBlock->getInstList().begin());
+    PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object, 2, "phi.");
+    replyPhi->addIncoming(fallbackReply, fallbackBlock);
+    
+    for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
+        TClass* klass = iBlock->first;
+        TDirectBlock& directBlock = iBlock->second;
+        
+        ConstantInt* klassAddress = builder.getInt32(reinterpret_cast<uint32_t>(klass));
+        switchInst->addCase(klassAddress, directBlock.basicBlock);
+        
+        builder.SetInsertPoint(directBlock.basicBlock);
+        builder.CreateBr(nextBlock);
+        
+        replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
+    }
     
 }
 
