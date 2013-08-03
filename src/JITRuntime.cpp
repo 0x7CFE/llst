@@ -458,73 +458,90 @@ void JITRuntime::patchHotMethods()
     }
 }
 
+llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteOffset) 
+{
+    using namespace llvm;
+    
+    Value* callOffsetValue = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteOffset);
+    
+    // Locating call site instruction through all basic blocks
+    for (Function::iterator iBlock = methodFunction->begin(); iBlock != methodFunction->end(); ++iBlock)
+        for (BasicBlock::iterator iInst = iBlock->begin(); iInst != iBlock->end(); ++iInst)
+            if (isa<CallInst>(iInst) || isa<InvokeInst>(iInst)) {
+                CallSite call(iInst);
+                
+                if (call.getCalledFunction() == m_runtimeAPI.sendMessage && call.getArgument(4) == callOffsetValue)
+                    return iInst;
+            }
+}
+
+void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks) 
+{
+    using namespace llvm;
+    
+    IRBuilder<> builder(callInstruction->getParent());
+    
+    TCallSite::TClassHitsMap& classHits = callSite.classHits;
+    for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
+        // Creating basic block for direct calls
+        TDirectBlock newBlock;
+        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.");
+        
+        builder.SetInsertPoint(newBlock.basicBlock);
+        
+        // Allocating context object and temporaries on the methodFunction's stack.
+        // This operation does not affect garbage collector, so no pointer protection
+        // is required. Moreover, this is operation is much faster than heap allocation.
+        AllocaInst* contextSlot = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
+        contextSlot->setAlignment(4);
+        Value* newContextObject = builder.CreateBitCast(contextSlot, m_baseTypes.object);
+        // TODO initialize object fields, class and size
+        
+        AllocaInst* tempsSlot = builder.CreateAlloca(m_baseTypes.objectArray, 0, "directTemps.");
+        tempsSlot->setAlignment(4);
+        // TODO init tempsSlot
+        
+        // Creating direct version of a call
+        std::string directFunctionName = iClassHit->first->name->toString() + ">>" + callSite.messageSelector->toString();
+        Function* directFunction = m_JITModule->getFunction(directFunctionName);
+        
+        if (isa<CallInst>(callInstruction))
+            newBlock.returnValue = builder.CreateCall(directFunction, newContextObject);
+        else {
+            InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
+            newBlock.returnValue = builder.CreateInvoke(directFunction, 
+                                                        invokeInst->getNormalDest(), 
+                                                        invokeInst->getUnwindDest(),
+                                                        newContextObject
+            );
+        }
+        newBlock.returnValue->setName("reply.");
+        
+        directBlocks[iClassHit->first] = newBlock;
+    }
+}
+
 void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset) 
 {
     using namespace llvm;
     
     Function* methodFunction = hotMethod.methodFunction;
-    Value* callOffsetValue = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteOffset);
+    Instruction* callInstruction = findCallInstruction(methodFunction, callSiteOffset);
     
-    // Locating call site instruction through all basic blocks
-    for (Function::iterator iBlock = methodFunction->begin(); iBlock != methodFunction->end(); ++iBlock) {
-        for (BasicBlock::iterator iInst = iBlock->begin(); iInst != iBlock->end(); ++iInst) {
-            if (isa<CallInst>(iInst) || isa<InvokeInst>(iInst)) {
-                CallSite call(iInst);
-                
-                if (call.getCalledFunction() == m_runtimeAPI.sendMessage && call.getArgument(4) == callOffsetValue) {
-                    // Instruction found. Now we need to patch the block
-                    IRBuilder<> builder(iBlock);
-                    
-                    //BasicBlock* fallbackBlock = iBlock->splitBasicBlock();
-                    
-                    std::map<TClass*, TDirectBlock> directBlocks;
-                    
-                    TCallSite::TClassHitsMap& classHits = callSite.classHits;                    
-                    for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
-                        // Creating basic block for direct calls
-                        TDirectBlock newBlock;
-                        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", methodFunction);
-                        
-                        builder.SetInsertPoint(newBlock.basicBlock);
-                        
-                        // Allocating context object and temporaries on the methodFunction's stack.
-                        // This operation does not affect garbage collector, so no pointer protection
-                        // is required. Moreover, this is operation is much faster than heap allocation.
-                        AllocaInst* contextSlot = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
-                        contextSlot->setAlignment(4);
-                        Value* newContextObject = builder.CreateBitCast(contextSlot, m_baseTypes.object);
-                        // TODO initialize object fields, class and size
-                        
-                        AllocaInst* tempsSlot = builder.CreateAlloca(m_baseTypes.objectArray, 0, "directTemps.");
-                        tempsSlot->setAlignment(4);
-                        // TODO init tempsSlot
-                        
-                        // Creating direct version of a call
-                        std::string directFunctionName = iClassHit->first->name->toString() + ">>" + callSite.messageSelector->toString();
-                        Function* directFunction = m_JITModule->getFunction(directFunctionName);
-                        
-                        if (isa<CallInst>(iInst))
-                            newBlock.returnValue = builder.CreateCall(directFunction, newContextObject);
-                        else {
-                            InvokeInst* invokeInst = dyn_cast<InvokeInst>(iInst);
-                            newBlock.returnValue = builder.CreateInvoke(directFunction, 
-                                                                        invokeInst->getNormalDest(), 
-                                                                        invokeInst->getUnwindDest(),
-                                                                        newContextObject
-                                                                       );
-                        }
-                        newBlock.returnValue->setName("reply.");
-                        
-                        directBlocks[iClassHit->first] = newBlock;
-                    }
-                    
-                    // Replace the original call site with 'select' instruction and 
-                    // perform an indirect call to the handler. Original call return value 
-                    // should be replaced with phi function agregating direct call returns
-                }
-            }
-        }
-    }
+    if (!callInstruction)
+        return; // Seems that instruction was completely optimized out
+    
+    // Now, preparing a set of basic blocks with direct calls to class methods
+    TDirectBlockMap directBlocks;
+    createDirectBlocks(callInstruction, callSite, directBlocks);
+    
+    // Processing instruction and replacing it with a direct calling code
+    BasicBlock* originBlock = callInstruction->getParent();
+        
+    BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction);
+    originBlock->getInstList().pop_back(); // removing branch
+    nextBlock->getInstList().remove(callInstruction);
+    
 }
 
 void JITRuntime::initializeGlobals() {

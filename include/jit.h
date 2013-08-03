@@ -500,11 +500,15 @@ public:
     };
     
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
+    typedef std::map<TClass*, TDirectBlock> TDirectBlockMap;
+    
 private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteOffset);
     void patchHotMethods();
     void patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset);
+    llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteOffset);
+    void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks);
 public:
     static JITRuntime* Instance() { return s_instance; }
 
