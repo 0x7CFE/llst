@@ -124,7 +124,7 @@ int main(int argc, char **argv) {
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
     
-    llvm::outs() << *runtime.getModule();
+    //llvm::outs() << *runtime.getModule();
     
     /* This code will run Smalltalk immediately in LLVM.
      * Don't forget to uncomment 'Undefined>>boot'

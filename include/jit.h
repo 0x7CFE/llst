@@ -524,7 +524,7 @@ public:
         llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
         
         if (!methodFunction)
-            llvm::outs() << "Compiled method not found";
+            llvm::outs() << "Compiled method " << functionName << " is not found\n";
         else 
             llvm::outs() << *methodFunction;
     }
