@@ -535,7 +535,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         Function* setObjectSize  = m_JITModule->getFunction("@setObjectSize");
         Function* setObjectClass = m_JITModule->getFunction("@setObjectClass");
         builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
-        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(tempsSize));
+        builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsSize));
         builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
         builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
         
@@ -545,7 +545,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         Value* previousContext = callInstruction->getParent()->getParent()->getOperand(0);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArguments);
-        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), newTempsObject);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), builder.CreateBitCast(newTempsObject, m_baseTypes.objectArray));
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), previousContext);
         
         // Creating direct version of a call
@@ -615,8 +615,11 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     // Acquiring receiver's class pointer as raw int value
     Value* argumentsObject = call.getArgument(2);
     Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object);
-    Value* receiver = 0; // TODO @getObjectFieldPtr(arguments, 0)
-    Value* receiverClass = 0; // TODO @getObjectClass(receiver)
+    
+    Function* getObjectField = m_methodCompiler->getBaseFunctions().getObjectField;
+    Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectField;
+    Value* receiver = builder.CreateCall2(getObjectField, arguments, builder.getInt32(0));
+    Value* receiverClass = builder.CreateCall(getObjectClass, receiver);
     Value* receiverClassPtr = builder.CreatePtrToInt(receiverClass, Type::getInt32Ty(getGlobalContext()));
 
     // Genrating switch instruction to select basic block

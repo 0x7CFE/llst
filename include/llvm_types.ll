@@ -175,6 +175,7 @@ define i1 @isObjectBinary(%TObject* %this) {
 }
 
 define %TClass* @getObjectClass(%TObject* %this) {
+    ; TODO SmallInt case
     %addr = getelementptr %TObject* %this, i32 0, i32 1
     %class = load %TClass** %addr
     ret %TClass* %class
