@@ -514,11 +514,20 @@ public:
 private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex);
-    void patchHotMethods();
     void patchCallSite(llvm::Function* methodFunction, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
     void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments);
 public:
+    void patchHotMethods();
+    void printMethod(TMethod* method) { 
+        std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+        llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
+        
+        if (!methodFunction)
+            llvm::outs() << "Compiled method not found";
+        else 
+            llvm::outs() << *methodFunction;
+    }
     static JITRuntime* Instance() { return s_instance; }
 
     MethodCompiler* getCompiler() { return m_methodCompiler; }

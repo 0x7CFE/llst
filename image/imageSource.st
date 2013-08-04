@@ -1203,6 +1203,21 @@ do: aBlock
     self sendMessage: #value withArguments: (Array with: aBlock).
 !
 
+METHOD MetaLLVM
+printStat
+    <248>
+!
+
+METHOD MetaLLVM
+printMethod: aMethod
+    <249 aMethod>
+!
+
+METHOD MetaLLVM
+patchHotMethods
+    <250>
+!
+
 CLASS StatementsTest Test
 
 METHOD StatementsTest

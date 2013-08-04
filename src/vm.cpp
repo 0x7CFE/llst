@@ -718,7 +718,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case 254:
             m_memoryManager->collectGarbage();
             break;
-        
+                
         case primitive::LLVMsendMessage: { //252
             TObjectArray* args = (TObjectArray*) stack[--ec.stackTop];
             TSymbol*  selector = (TSymbol*) stack[--ec.stackTop];
@@ -761,6 +761,19 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             } else
                 return globals.nilObject;
         } break;
+        
+        case 250: // patchHotMethods
+            JITRuntime::Instance()->patchHotMethods();
+            break;
+            
+        case 249: { // printMethod
+            TMethod* method = (TMethod*) stack[--ec.stackTop];
+            JITRuntime::Instance()->printMethod(method);
+        } break;
+        
+        case 248:
+            JITRuntime::Instance()->printStat();
+            break;
         
         case primitive::startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>(stack[--ec.stackTop]);
