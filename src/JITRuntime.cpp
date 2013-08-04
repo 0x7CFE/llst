@@ -507,10 +507,12 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         tempsSlot->setAlignment(4);
         // TODO init tempsSlot
         
-        // Creating direct version of a call
-        std::string directFunctionName = iClassHit->first->name->toString() + ">>" + callSite.messageSelector->toString();
+        // Locating a method suitable for direct call
+        TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
+        std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
         
+        // Creating direct version of a call
         if (isa<CallInst>(callInstruction))
             newBlock.returnValue = builder.CreateCall(directFunction, newContextObject);
         else {
