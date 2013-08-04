@@ -443,7 +443,6 @@ void JITRuntime::patchHotMethods()
     
     // Processing 50 most active methods
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
-        // Peeking most active method (with max hitCount)
         THotMethod* hotMethod = hotMethods[j];
         
         // We're interested only in methods with call sites
@@ -456,9 +455,27 @@ void JITRuntime::patchHotMethods()
             patchCallSite(hotMethod->methodFunction, iSite->second, iSite->first);
             ++iSite;
         }
-        
-        // TODO recompile patched method
+    
+        verifyModule(*m_JITModule, AbortProcessAction);
     }
+
+    // Running optimization passes on functions
+    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+        THotMethod* hotMethod = hotMethods[j];
+        
+        optimizeFunction(hotMethod->methodFunction);
+        verifyModule(*m_JITModule, AbortProcessAction);
+    }
+        
+    // Compiling functions
+    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+        THotMethod* hotMethod = hotMethods[j];
+        m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
+    }
+    
+    // Invalidating caches
+    memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
+    memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
 }
 
 llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex) 
