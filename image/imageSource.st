@@ -1370,6 +1370,9 @@ main    | command  x|
     Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
     Scheduler run."
     
+    nil runSort: 100.
+    LLVM patchHotMethods.
+    
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
     

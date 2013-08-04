@@ -440,6 +440,8 @@ void JITRuntime::patchHotMethods()
     
     // Sorting method pointers by hitCount field
     std::sort(hotMethods.begin(), hotMethods.end(), compareByHitCount);
+
+    outs() << "Patching active methods that have hot call sites\n";
     
     // Processing 50 most active methods
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
@@ -449,33 +451,51 @@ void JITRuntime::patchHotMethods()
         if (hotMethod->callSites.empty())
             continue;
         
+        outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
+        
         // Iterating through call sites and inserting class checks with direct calls
         THotMethod::TCallSiteMap::iterator iSite = hotMethod->callSites.begin();
         while (iSite != hotMethod->callSites.end()) {
             patchCallSite(hotMethod->methodFunction, iSite->second, iSite->first);
             ++iSite;
         }
-    
+
+        outs() << "done. Verifying ...";
+        
         verifyModule(*m_JITModule, AbortProcessAction);
+        
+        outs() << "done.\n";
     }
 
     // Running optimization passes on functions
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
         
+        outs() << "Optimizing " << hotMethod->methodFunction->getName().str() << " ...";
         optimizeFunction(hotMethod->methodFunction);
+        
+        outs() << "done. Verifying ...";
+        
         verifyModule(*m_JITModule, AbortProcessAction);
+        
+        outs() << "done.\n";
     }
         
     // Compiling functions
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
+        
+        outs() << "Recompiling " << hotMethod->methodFunction->getName().str() << " ...";
         m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
+        
+        outs() << "done.\n";
     }
     
     // Invalidating caches
     memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
     memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
+    
+    outs() << "All is done.\n";
 }
 
 llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex) 
@@ -528,7 +548,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         tempsSlot->setAlignment(4);
         
         // Filling stack space with zeroes
-        Function* llvmMemset = m_JITModule->getFunction("@llvm.memset");
+        Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
         builder.CreateCall5(
             llvmMemset,                    // llvm.memset intrinsic
             contextSlot,                   // destination address
@@ -549,8 +569,8 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         // Initializing object fields
         Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.context);
         Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object);
-        Function* setObjectSize  = m_JITModule->getFunction("@setObjectSize");
-        Function* setObjectClass = m_JITModule->getFunction("@setObjectClass");
+        Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
+        Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
         builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
         builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsSize));
         builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
@@ -559,7 +579,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         Function* setObjectField  = m_methodCompiler->getBaseFunctions().setObjectField;
         Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
         Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.method);
-        Value* previousContext = callInstruction->getParent()->getParent()->getOperand(0);
+        Value* previousContext = &callInstruction->getParent()->getParent()->getArgumentList().front();
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArguments);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), builder.CreateBitCast(newTempsObject, m_baseTypes.objectArray));
