@@ -49,7 +49,11 @@ int main(int argc, char **argv) {
         smalltalkImage->loadImage(argv[1]);
     else
         smalltalkImage->loadImage("../image/LittleSmalltalk.image");
-
+    
+    {
+        Image::ImageWriter writer;
+        writer.setGlobals(globals).writeTo("../image/MySmalltalkImage.image");
+    }
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
     CompletionEngine* completionEngine = CompletionEngine::Instance();

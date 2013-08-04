@@ -343,48 +343,6 @@ public:
 
 extern "C" { extern LLVMMemoryManager::TStackEntry* llvm_gc_root_chain; }
 
-
-class Image {
-private:
-    int      m_imageFileFD;
-    size_t   m_imageFileSize;
-    
-    void*    m_imageMap;     // pointer to the map base
-    uint8_t* m_imagePointer; // sliding pointer
-    std::vector<TObject*> m_indirects;
-    
-    enum TImageRecordType {
-        invalidObject = 0,
-        ordinaryObject,
-        inlineInteger,  // inline 32 bit integer in network byte order
-        byteObject,     // 
-        previousObject, // link to previously loaded object
-        nilObject       // uninitialized (nil) field
-    };
-    
-    TImageRecordType getObjectType(TObject* object);
-    
-    uint32_t readWord();
-    void     writeWord(std::ofstream& os, uint32_t word);
-    TObject* readObject();
-    void     writeObject(std::ofstream& os, TObject* object);
-    bool     openImageFile(const char* fileName);
-    void     closeImageFile();
-    
-    IMemoryManager* m_memoryManager;
-public:
-    Image(IMemoryManager* manager) 
-        : m_imageFileFD(-1), m_imageFileSize(0), 
-          m_imagePointer(0), m_memoryManager(manager) 
-    { }
-    
-    bool     loadImage(const char* fileName);
-    TObject* getGlobal(const char* name);
-    TObject* getGlobal(TSymbol* name);
-    
-    // GLobal VM objects
-};
-
 struct TGlobals {
     TObject* nilObject;
     TObject* trueObject;
@@ -399,6 +357,62 @@ struct TGlobals {
     TObject* binaryMessages[3];
     TClass*  integerClass;
     TSymbol* badMethodSymbol;
+};
+
+class Image {
+private:
+    int      m_imageFileFD;
+    size_t   m_imageFileSize;
+    
+    void*    m_imageMap;     // pointer to the map base
+    uint8_t* m_imagePointer; // sliding pointer
+    std::vector<TObject*> m_indirects;
+    
+    
+    
+    enum TImageRecordType {
+        invalidObject = 0,
+        ordinaryObject,
+        inlineInteger,  // inline 32 bit integer in network byte order
+        byteObject,     // 
+        previousObject, // link to previously loaded object
+        nilObject       // uninitialized (nil) field
+    };
+    
+    uint32_t readWord();
+    TObject* readObject();
+    bool     openImageFile(const char* fileName);
+    void     closeImageFile();
+    
+    IMemoryManager* m_memoryManager;
+public:
+    Image(IMemoryManager* manager) 
+        : m_imageFileFD(-1), m_imageFileSize(0), 
+          m_imagePointer(0), m_memoryManager(manager) 
+    { }
+    
+    bool     loadImage(const char* fileName);
+    void     storeImage(const char* fileName);
+    TObject* getGlobal(const char* name);
+    TObject* getGlobal(TSymbol* name);
+    
+    class ImageWriter
+    {
+    private:
+        std::vector<TObject*> m_writtenObjects; //used to link objects together with type 'previousObject'
+        TGlobals              m_globals;
+        
+        TImageRecordType getObjectType(TObject* object);
+        int              getPreviousObjectIndex(TObject* object);
+        void             writeWord(std::ofstream& os, uint32_t word);
+        void             writeObject(std::ofstream& os, TObject* object);
+    public:
+        ImageWriter() {}
+        ImageWriter& setGlobals(TGlobals globals);
+        void writeTo(const char* fileName);
+    };
+    
+    // GLobal VM objects
 };
 
 extern TGlobals globals;

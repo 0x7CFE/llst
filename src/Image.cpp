@@ -46,6 +46,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string>
+#include <assert.h>
+#include <algorithm>
 
 // Placeholder for root objects
 TGlobals globals;
@@ -135,17 +137,6 @@ uint32_t Image::readWord()
     return value;
 }
 
-void Image::writeWord(std::ofstream& os, uint32_t word)
-{
-    while (word > 0xFF)
-    {
-        word -= 0xFF;
-        os << '\xFF';
-    }
-    uint8_t byte = word & 0xFF;
-    os << byte;
-}
-
 TObject* Image::readObject()
 {
     // TODO error checking 
@@ -221,51 +212,6 @@ TObject* Image::readObject()
     }
 }
 
-Image::TImageRecordType Image::getObjectType(TObject* object)
-{
-    if ( isSmallInteger(object))
-        return inlineInteger;
-    if ( object->isBinary() )
-        return byteObject;
-    if (object == globals.nilObject)
-        return nilObject;
-    return ordinaryObject;
-}
-
-void Image::writeObject(std::ofstream& os, TObject* object)
-{
-    TImageRecordType type = getObjectType(object);
-    writeWord(os, (uint32_t) type);
-    switch (type)
-    {
-        case inlineInteger: {
-            uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
-            os << (uint8_t) ((integer >> 0)  & 0xFF);
-            os << (uint8_t) ((integer >> 8)  & 0xFF);
-            os << (uint8_t) ((integer >> 16) & 0xFF);
-            os << (uint8_t) ((integer >> 24) & 0xFF);
-        } break;
-        case byteObject: {
-            TByteObject* byteObject = (TByteObject*) object;
-            uint32_t fieldsCount = byteObject->getSize();
-            TClass* objectClass = byteObject->getClass();
-            
-            writeWord(os, fieldsCount);
-            os.write((char*) byteObject->getBytes(), fieldsCount);
-            writeObject(os, objectClass);
-        } break;
-        case ordinaryObject: {
-            uint32_t fieldsCount = object->getSize();
-            TClass* objectClass = object->getClass();
-            
-            writeWord(os, fieldsCount);
-            writeObject(os, objectClass);
-            for (uint32_t i = 0; i < fieldsCount; i++)
-                writeObject(os, object->getField(i));
-        } break;
-    }
-}
-
 bool Image::loadImage(const char* fileName)
 {
     if (!openImageFile(fileName))
@@ -309,4 +255,138 @@ bool Image::loadImage(const char* fileName)
     closeImageFile();
     
     return true;
+}
+
+void Image::ImageWriter::writeWord(std::ofstream& os, uint32_t word)
+{
+    while (word >= 0xFF)
+    {
+        word -= 0xFF;
+        os << '\xFF';
+    }
+    uint8_t byte = word & 0xFF;
+    os << byte;
+}
+
+Image::TImageRecordType Image::ImageWriter::getObjectType(TObject* object)
+{
+    if ( isSmallInteger(object) ) {
+        return inlineInteger;
+    } else {
+        std::vector<TObject*>::iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
+        if (iter != m_writtenObjects.end())
+        { // object is found
+            int index = std::distance(m_writtenObjects.begin(), iter);
+            if (index == 0)
+                return nilObject;
+            else
+                return previousObject;
+        }
+        else if ( object->isBinary() )
+            return byteObject;
+        else
+            return ordinaryObject;
+    }
+}
+
+int Image::ImageWriter::getPreviousObjectIndex(TObject* object)
+{
+    std::vector<TObject*>::iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
+    assert(iter != m_writtenObjects.end());
+    return std::distance(m_writtenObjects.begin(), iter);
+}
+
+void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
+{
+    assert(object != 0);
+    TImageRecordType type = getObjectType(object);
+    writeWord(os, (uint32_t) type);
+    
+    switch(type)
+    {
+        case ordinaryObject:
+        case byteObject:
+        case nilObject:
+            m_writtenObjects.push_back(object);
+        default:
+            break;
+    }
+    
+    switch (type)
+    {
+        case inlineInteger: {
+            uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
+            os.write((char*) &integer, sizeof(integer));
+            /*
+            os << (uint8_t) ((integer >> 0)  & 0xFF);
+            os << (uint8_t) ((integer >> 8)  & 0xFF);
+            os << (uint8_t) ((integer >> 16) & 0xFF);
+            os << (uint8_t) ((integer >> 24) & 0xFF);
+            */
+        } break;
+        case byteObject: {
+            TByteObject* byteObject = (TByteObject*) object;
+            uint32_t fieldsCount = byteObject->getSize();
+            TClass* objectClass = byteObject->getClass();
+            assert(objectClass != 0);
+            
+            writeWord(os, fieldsCount);
+            os.write((char*) byteObject->getBytes(), fieldsCount);
+            writeObject(os, objectClass);
+        } break;
+        case ordinaryObject: {
+            uint32_t fieldsCount = object->getSize();
+            TClass* objectClass = object->getClass();
+            assert(objectClass != 0);
+            
+            writeWord(os, fieldsCount);
+            writeObject(os, objectClass);
+            for (uint32_t i = 0; i < fieldsCount; i++)
+                writeObject(os, object->getField(i));
+        } break;
+        case previousObject: {
+            int index = getPreviousObjectIndex(object);
+            writeWord(os, index);
+        } break;
+        case nilObject: {
+            // type nilObject means a link to nilObject
+            // it has already been written as the first object with type ordinaryObject
+        } break;
+        default:
+            fprintf(stderr, "unexpected type of object: %d\n", (int) type);
+            exit(1);
+    }
+}
+
+Image::ImageWriter& Image::ImageWriter::setGlobals(TGlobals globals)
+{
+    m_globals = globals;
+    return *this;
+}
+
+void Image::ImageWriter::writeTo(const char* fileName)
+{
+    std::ofstream os(fileName);
+    
+    m_writtenObjects.clear();
+    m_writtenObjects.reserve(8096);
+    
+    writeObject(os, m_globals.nilObject);
+    writeObject(os, m_globals.trueObject);
+    writeObject(os, m_globals.falseObject);
+    writeObject(os, m_globals.globalsObject);
+    writeObject(os, m_globals.smallIntClass);
+    writeObject(os, m_globals.integerClass);
+    writeObject(os, m_globals.arrayClass);
+    writeObject(os, m_globals.blockClass);
+    writeObject(os, m_globals.contextClass);
+    writeObject(os, m_globals.stringClass);
+    writeObject(os, m_globals.initialMethod);
+    
+    for (int i = 0; i < 3; i++)
+        writeObject(os, m_globals.binaryMessages[i]);
+    
+    writeObject(os, m_globals.badMethodSymbol);
+    
+    m_writtenObjects.clear();
 }
