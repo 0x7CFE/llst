@@ -362,6 +362,7 @@ private:
     };
     
     uint32_t readWord();
+    void     writeWord(uint32_t word);
     TObject* readObject();
     bool     openImageFile(const char* fileName);
     void     closeImageFile();

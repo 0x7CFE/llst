@@ -135,6 +135,26 @@ uint32_t Image::readWord()
     return value;
 }
 
+void Image::writeWord(uint32_t word)
+{
+    int ret = 0;
+    while (word > 0xFF)
+    {
+        word -= 0xFF;
+        ret = write(m_imageFileFD, "\xF\xF", 2 * sizeof(uint8_t));
+        if (ret < 0) {
+            perror( __PRETTY_FUNCTION__ );
+            exit(EXIT_FAILURE);
+        }
+    }
+    uint8_t byte = word & 0xFF;
+    ret = write(m_imageFileFD, &byte, 2 * sizeof(uint8_t));
+    if (ret < 0) {
+        perror( __PRETTY_FUNCTION__ );
+        exit(EXIT_FAILURE);
+    }
+}
+
 TObject* Image::readObject()
 {
     // TODO error checking 
