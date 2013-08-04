@@ -119,6 +119,7 @@ struct TJITGlobals {
     llvm::GlobalValue* falseObject;
     llvm::GlobalValue* smallIntClass;
     llvm::GlobalValue* arrayClass;
+    llvm::GlobalValue* contextClass;
     llvm::GlobalValue* binarySelectors[3];
 
     void initializeFromModule(llvm::Module* module) {
@@ -127,6 +128,7 @@ struct TJITGlobals {
         falseObject        = module->getGlobalVariable("falseObject");
         smallIntClass      = module->getGlobalVariable("SmallInt");
         arrayClass         = module->getGlobalVariable("Array");
+        contextClass       = module->getGlobalVariable("Context");
         binarySelectors[0] = module->getGlobalVariable("<");
         binarySelectors[1] = module->getGlobalVariable("<=");
         binarySelectors[2] = module->getGlobalVariable("+");
@@ -331,6 +333,8 @@ private:
     std::map<uint32_t, uint32_t> m_callSiteIndexToOffset;
 public:
     uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; } 
+    TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
+    TJITGlobals& getJitGlobals() { return m_globals; }
     
     llvm::Function* compileMethod(TMethod* method, TContext* callingContext);
 

@@ -495,22 +495,57 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         
         builder.SetInsertPoint(newBlock.basicBlock);
         
-        // Allocating context object and temporaries on the methodFunction's stack.
-        // This operation does not affect garbage collector, so no pointer protection
-        // is required. Moreover, this is operation is much faster than heap allocation.
-        AllocaInst* contextSlot = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
-        contextSlot->setAlignment(4);
-        Value* newContextObject = builder.CreateBitCast(contextSlot, m_baseTypes.object);
-        // TODO initialize object fields, class and size
-        
-        AllocaInst* tempsSlot = builder.CreateAlloca(m_baseTypes.objectArray, 0, "directTemps.");
-        tempsSlot->setAlignment(4);
-        // TODO init tempsSlot
-        
         // Locating a method suitable for direct call
         TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
+        
+        // Allocating context object and temporaries on the methodFunction's stack.
+        // This operation does not affect garbage collector, so no pointer protection
+        // is required. Moreover, this is operation is much faster than heap allocation.
+        AllocaInst* contextSlot    = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
+        const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
+        const uint32_t contextSize = sizeof(TContext);
+        AllocaInst* tempsSlot      = builder.CreateAlloca(Type::getInt8PtrTy(getGlobalContext()), builder.getInt32(tempsSize), "directTemps.");
+        contextSlot->setAlignment(4);
+        tempsSlot->setAlignment(4);
+        
+        // Filling stack space with zeroes
+        Function* llvmMemset = m_JITModule->getFunction("@llvm.memset");
+        builder.CreateCall5(
+            llvmMemset,                    // llvm.memset intrinsic
+            contextSlot,                   // destination address
+            builder.getInt8(0),            // fill with zeroes
+            builder.getInt32(contextSize), // size of object slot
+            builder.getInt8(0),            // no alignment
+            builder.getInt1(true)          // volatile operation
+        );
+        builder.CreateCall5(
+            llvmMemset,                    // llvm.memset intrinsic
+            tempsSlot,                     // destination address
+            builder.getInt8(0),            // fill with zeroes
+            builder.getInt32(tempsSize),   // size of object slot
+            builder.getInt8(0),            // no alignment
+            builder.getInt1(true)          // volatile operation
+        );
+        
+        // Initializing object fields
+        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.context);
+        Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object);
+        Function* setObjectSize  = m_JITModule->getFunction("@setObjectSize");
+        Function* setObjectClass = m_JITModule->getFunction("@setObjectClass");
+        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
+        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(tempsSize));
+        builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
+        builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
+        
+        // newContextObject->temporaries = newTempsObject
+        builder.CreateCall3(m_methodCompiler->getBaseFunctions().setObjectField, 
+                            newContextObject, 
+                            builder.getInt32(2), 
+                            newTempsObject
+                           );
+        
         
         // Creating direct version of a call
         if (isa<CallInst>(callInstruction))
@@ -624,6 +659,9 @@ void JITRuntime::initializeGlobals() {
     
     GlobalValue* gArrayClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("Array", m_baseTypes.klass) );
     m_executionEngine->addGlobalMapping(gArrayClass, reinterpret_cast<void*>(globals.arrayClass));
+    
+    GlobalValue* gContextClass = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("Context", m_baseTypes.klass) );
+    m_executionEngine->addGlobalMapping(gContextClass, reinterpret_cast<void*>(globals.contextClass));
     
     GlobalValue* gmessageL = cast<GlobalValue>( m_JITModule->getOrInsertGlobal("<", m_baseTypes.symbol) );
     m_executionEngine->addGlobalMapping(gmessageL, reinterpret_cast<void*>(globals.binaryMessages[0]));

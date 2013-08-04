@@ -151,6 +151,13 @@ define i32 @getObjectSize(%TObject* %this) {
     ret i32 %result
 }
 
+define %TObject* @setObjectSize(%TObject* %this, i32 %size) {
+    %addr = getelementptr %TObject* %this, i32 0, i32 0, i32 0
+    %ssize = shl i32 %size, 2
+    store i32 %ssize, i32* %addr
+    ret %TObject* %this
+}
+
 define i1 @isObjectRelocated(%TObject* %this) {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
@@ -171,6 +178,12 @@ define %TClass* @getObjectClass(%TObject* %this) {
     %addr = getelementptr %TObject* %this, i32 0, i32 1
     %class = load %TClass** %addr
     ret %TClass* %class
+}
+
+define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {
+    %addr = getelementptr %TObject* %this, i32 0, i32 1
+    store %TClass* %class, %TClass** %addr
+    ret %TObject* %this
 }
 
 define %TObject** @getObjectFields(%TObject* %this) {
@@ -256,3 +269,4 @@ declare void @__cxa_end_catch()
 declare i8* @__cxa_allocate_exception(i32)
 declare void @__cxa_throw(i8*, i8*, i8*)
 
+declare void @llvm.memset.p0i8.i32(i8* %dest, i8 %val, i32 %len, i32 %align, i1 %isvolatile)
