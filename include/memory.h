@@ -42,6 +42,7 @@
 #include <types.h>
 #include <vector>
 #include <list>
+#include <fstream>
 
 
 // Memory manager statics is held
@@ -361,9 +362,12 @@ private:
         nilObject       // uninitialized (nil) field
     };
     
+    TImageRecordType getObjectType(TObject* object);
+    
     uint32_t readWord();
-    void     writeWord(uint32_t word);
+    void     writeWord(std::ofstream& os, uint32_t word);
     TObject* readObject();
+    void     writeObject(std::ofstream& os, TObject* object);
     bool     openImageFile(const char* fileName);
     void     closeImageFile();
     

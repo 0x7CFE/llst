@@ -135,24 +135,15 @@ uint32_t Image::readWord()
     return value;
 }
 
-void Image::writeWord(uint32_t word)
+void Image::writeWord(std::ofstream& os, uint32_t word)
 {
-    int ret = 0;
     while (word > 0xFF)
     {
         word -= 0xFF;
-        ret = write(m_imageFileFD, "\xF\xF", 2 * sizeof(uint8_t));
-        if (ret < 0) {
-            perror( __PRETTY_FUNCTION__ );
-            exit(EXIT_FAILURE);
-        }
+        os << '\xFF';
     }
     uint8_t byte = word & 0xFF;
-    ret = write(m_imageFileFD, &byte, 2 * sizeof(uint8_t));
-    if (ret < 0) {
-        perror( __PRETTY_FUNCTION__ );
-        exit(EXIT_FAILURE);
-    }
+    os << byte;
 }
 
 TObject* Image::readObject()
@@ -227,6 +218,51 @@ TObject* Image::readObject()
         default:
             fprintf(stderr, "Unknown record type %d\n", type);
             exit(1); // TODO report error
+    }
+}
+
+Image::TImageRecordType Image::getObjectType(TObject* object)
+{
+    if ( isSmallInteger(object))
+        return inlineInteger;
+    if ( object->isBinary() )
+        return byteObject;
+    if (object == globals.nilObject)
+        return nilObject;
+    return ordinaryObject;
+}
+
+void Image::writeObject(std::ofstream& os, TObject* object)
+{
+    TImageRecordType type = getObjectType(object);
+    writeWord(os, (uint32_t) type);
+    switch (type)
+    {
+        case inlineInteger: {
+            uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
+            os << (uint8_t) ((integer >> 0)  & 0xFF);
+            os << (uint8_t) ((integer >> 8)  & 0xFF);
+            os << (uint8_t) ((integer >> 16) & 0xFF);
+            os << (uint8_t) ((integer >> 24) & 0xFF);
+        } break;
+        case byteObject: {
+            TByteObject* byteObject = (TByteObject*) object;
+            uint32_t fieldsCount = byteObject->getSize();
+            TClass* objectClass = byteObject->getClass();
+            
+            writeWord(os, fieldsCount);
+            os.write((char*) byteObject->getBytes(), fieldsCount);
+            writeObject(os, objectClass);
+        } break;
+        case ordinaryObject: {
+            uint32_t fieldsCount = object->getSize();
+            TClass* objectClass = object->getClass();
+            
+            writeWord(os, fieldsCount);
+            writeObject(os, objectClass);
+            for (uint32_t i = 0; i < fieldsCount; i++)
+                writeObject(os, object->getField(i));
+        } break;
     }
 }
 
