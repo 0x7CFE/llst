@@ -908,8 +908,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
-        jit.builder->getInt32(jit.bytePointer) // call site offset 
+        jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset 
     };
+    m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
     
     // Now performing a message call
     Value* sendMessageResult = 0;
@@ -958,8 +959,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()),
-        jit.builder->getInt32(jit.bytePointer) // call site offset 
+        jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset 
     };
+    m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
     
     Value* result = 0;
     if (jit.methodHasBlockReturn) {
@@ -1107,8 +1109,9 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 messageSelector, // selector
                 arguments,       // message arguments
                 parentClass,     // receiver class
-                jit.builder->getInt32(jit.bytePointer) // call site offset
+                jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset
             };
+            m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
             
             Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
             Value* resultHolder = protectPointer(jit, result);
@@ -1483,8 +1486,9 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 args,
                 // default receiver class
                 ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
-                jit.builder->getInt32(jit.bytePointer) // call site offset
+                jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset
             };
+            m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
             
             // Now performing a message call
             Value* sendMessageResult = 0;

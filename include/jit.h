@@ -326,7 +326,12 @@ private:
 
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
+    
+    uint32_t m_callSiteIndex;
+    std::map<uint32_t, uint32_t> m_callSiteIndexToOffset;
 public:
+    uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; } 
+    
     llvm::Function* compileMethod(TMethod* method, TContext* callingContext);
 
     MethodCompiler(
@@ -335,7 +340,7 @@ public:
         TExceptionAPI exceptionApi
     )
         : m_JITModule(JITModule),
-        m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi)
+        m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi), m_callSiteIndex(1)
     {
         m_baseTypes.initializeFromModule(JITModule);
         m_globals.initializeFromModule(JITModule);
@@ -388,7 +393,7 @@ public:
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset);
+    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject*     invokeBlock(TBlock* block, TContext* callingContext);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
@@ -423,14 +428,14 @@ private:
 
     static JITRuntime* s_instance;
 
-    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset = 0);
+    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex = 0);
     
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject* invokeBlock(TBlock* block, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset);
+    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
     
@@ -504,10 +509,10 @@ public:
     
 private:
     THotMethodsMap m_hotMethods;
-    void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteOffset);
+    void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex);
     void patchHotMethods();
-    void patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset);
-    llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteOffset);
+    void patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteIndex);
+    llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
     void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks);
 public:
     static JITRuntime* Instance() { return s_instance; }

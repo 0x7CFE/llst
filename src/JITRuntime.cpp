@@ -102,7 +102,7 @@ void JITRuntime::printStat()
         
         std::map<uint32_t, TCallSite>::iterator iSite = hotMethod->callSites.begin();
         for (; iSite != hotMethod->callSites.end(); ++iSite) {
-            printf("\t\tsite %d, class hits: ", iSite->first);
+            printf("\t\tsite %d (offset %d) class hits: ", iSite->first, m_methodCompiler->getCallSiteOffset(iSite->first));
             
             std::map<TClass*, uint32_t>::iterator iClassHit = iSite->second.classHits.begin();
             for (; iClassHit != iSite->second.classHits.end(); ++iClassHit)
@@ -316,7 +316,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
     return result;
 }
 
-TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset)
+TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
 {
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
@@ -369,7 +369,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         }
         
         // Updating call site statistics and scheduling method processing
-        updateHotSites(compiledMethodFunction, callingContext, message, receiverClass, callSiteOffset);
+        updateHotSites(compiledMethodFunction, callingContext, message, receiverClass, callSiteIndex);
         
         // Preparing the context objects. Because we do not call the software
         // implementation here, we do not need to allocate the stack object
@@ -397,12 +397,12 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
 }
 
-void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteOffset) 
+void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex) 
 {
     THotMethod& hotMethod = m_hotMethods[methodFunction];
     hotMethod.hitCount += 1;
         
-    if (!callSiteOffset)
+    if (!callSiteIndex)
         return;
     
 //     if (callingContext->getClass() == globals.blockClass)
@@ -412,7 +412,7 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     // TODO reload cache if callerMethodFunction was popped out
     
     THotMethod& callerMethod = m_hotMethods[callerMethodFunction];
-    TCallSite& callSite = callerMethod.callSites[callSiteOffset];
+    TCallSite& callSite = callerMethod.callSites[callSiteIndex];
     
     if (!callSite.hitCount)
         callSite.messageSelector = message;
@@ -458,11 +458,11 @@ void JITRuntime::patchHotMethods()
     }
 }
 
-llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteOffset) 
+llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex) 
 {
     using namespace llvm;
     
-    Value* callOffsetValue = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteOffset);
+    Value* callOffsetValue = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), callSiteIndex);
     
     // Locating call site instruction through all basic blocks
     for (Function::iterator iBlock = methodFunction->begin(); iBlock != methodFunction->end(); ++iBlock)
@@ -524,12 +524,12 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     }
 }
 
-void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteOffset) 
+void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteIndex) 
 {
     using namespace llvm;
     
     Function* methodFunction = hotMethod.methodFunction;
-    Instruction* callInstruction = findCallInstruction(methodFunction, callSiteOffset);
+    Instruction* callInstruction = findCallInstruction(methodFunction, callSiteIndex);
     
     if (! callInstruction)
         return; // Seems that instruction was completely optimized out
@@ -784,10 +784,10 @@ TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset)
+TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
 {
     JITRuntime::Instance()->m_messagesDispatched++;
-    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass, callSiteOffset);
+    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass, callSiteIndex);
 }
 
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
