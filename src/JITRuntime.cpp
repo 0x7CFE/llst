@@ -451,6 +451,8 @@ void JITRuntime::patchHotMethods()
         if (hotMethod->callSites.empty())
             continue;
         
+        outs() << *hotMethod->methodFunction << "\n";
+        
         outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
         
         // Iterating through call sites and inserting class checks with direct calls
@@ -461,6 +463,8 @@ void JITRuntime::patchHotMethods()
         }
 
         outs() << "done. Verifying ...";
+        
+        outs() << *hotMethod->methodFunction << "\n";
         
         verifyModule(*m_JITModule, AbortProcessAction);
         
@@ -513,7 +517,6 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
                 if (call.getCalledFunction() == m_runtimeAPI.sendMessage && call.getArgument(4) == callOffsetValue)
                     return iInst;
             }
-    
     // Instruction was not found (probably due to optimization)
     return 0;
 }
@@ -528,7 +531,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     // FIXME Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
         TDirectBlock newBlock;
-        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.");
+        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", callInstruction->getParent()->getParent());
         
         builder.SetInsertPoint(newBlock.basicBlock);
         
