@@ -634,7 +634,7 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object);
     
     Function* getObjectField = m_methodCompiler->getBaseFunctions().getObjectField;
-    Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectField;
+    Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectClass;
     Value* receiver = builder.CreateCall2(getObjectField, arguments, builder.getInt32(0));
     Value* receiverClass = builder.CreateCall(getObjectClass, receiver);
     Value* receiverClassPtr = builder.CreatePtrToInt(receiverClass, Type::getInt32Ty(getGlobalContext()));
