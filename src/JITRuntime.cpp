@@ -453,7 +453,7 @@ void JITRuntime::patchHotMethods()
         // Iterating through call sites and inserting class checks with direct calls
         THotMethod::TCallSiteMap::iterator iSite = hotMethod->callSites.begin();
         while (iSite != hotMethod->callSites.end()) {
-            patchCallSite(*hotMethod, iSite->second, iSite->first);
+            patchCallSite(hotMethod->methodFunction, iSite->second, iSite->first);
             ++iSite;
         }
         
@@ -481,7 +481,7 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
     return 0;
 }
 
-void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks) 
+void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments) 
 {
     using namespace llvm;
     
@@ -495,7 +495,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         
         builder.SetInsertPoint(newBlock.basicBlock);
         
-        // Locating a method suitable for direct call
+        // Locating a method suitable for a direct call
         TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
@@ -503,9 +503,9 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
         // is required. Moreover, this is operation is much faster than heap allocation.
-        AllocaInst* contextSlot    = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
-        const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
         const uint32_t contextSize = sizeof(TContext);
+        const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
+        AllocaInst* contextSlot    = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
         AllocaInst* tempsSlot      = builder.CreateAlloca(Type::getInt8PtrTy(getGlobalContext()), builder.getInt32(tempsSize), "directTemps.");
         contextSlot->setAlignment(4);
         tempsSlot->setAlignment(4);
@@ -539,13 +539,14 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
         builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
         
-        // newContextObject->temporaries = newTempsObject
-        builder.CreateCall3(m_methodCompiler->getBaseFunctions().setObjectField, 
-                            newContextObject, 
-                            builder.getInt32(2), 
-                            newTempsObject
-                           );
-        
+        Function* setObjectField  = m_methodCompiler->getBaseFunctions().setObjectField;
+        Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
+        Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.method);
+        Value* previousContext = callInstruction->getParent()->getParent()->getOperand(0);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArguments);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), newTempsObject);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), previousContext);
         
         // Creating direct version of a call
         if (isa<CallInst>(callInstruction))
@@ -564,11 +565,10 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     }
 }
 
-void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteIndex) 
+void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, uint32_t callSiteIndex) 
 {
     using namespace llvm;
     
-    Function* methodFunction = hotMethod.methodFunction;
     Instruction* callInstruction = findCallInstruction(methodFunction, callSiteIndex);
     
     if (! callInstruction)
@@ -578,7 +578,7 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     // Now, preparing a set of basic blocks with direct calls to class methods
     TDirectBlockMap directBlocks;
-    createDirectBlocks(callInstruction, callSite, directBlocks);
+    createDirectBlocks(callInstruction, callSite, directBlocks, call.getArgument(2));
     
     BasicBlock* originBlock = callInstruction->getParent();
 
