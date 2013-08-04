@@ -127,12 +127,11 @@ uint32_t Image::readWord()
     uint8_t  byte  = 0;
     
     // Very stupid yet simple multibyte encoding
-    // value = 255 + 255 + ... + x where x < 255
-    while ( (byte = *m_imagePointer++) == 255 ) {
-        value += byte; // adding 255 part
-    }
-    value += byte; // adding remaining part
-    
+    // value = FF + FF ... + x where x < FF
+    do {
+        byte = *m_imagePointer++;
+        value += byte;
+    } while ( byte == 0xFF );
     return value;
 }
 
