@@ -102,7 +102,10 @@ void JITRuntime::printStat()
         
         std::map<uint32_t, TCallSite>::iterator iSite = hotMethod->callSites.begin();
         for (; iSite != hotMethod->callSites.end(); ++iSite) {
-            printf("\t\tsite %d (offset %d) class hits: ", iSite->first, m_methodCompiler->getCallSiteOffset(iSite->first));
+            printf("\t\t%-20s (index %d, offset %d) class hits: ", 
+                   iSite->second.messageSelector->toString().c_str(), 
+                   iSite->first, 
+                   m_methodCompiler->getCallSiteOffset(iSite->first));
             
             std::map<TClass*, uint32_t>::iterator iClassHit = iSite->second.classHits.begin();
             for (; iClassHit != iSite->second.classHits.end(); ++iClassHit)
