@@ -545,16 +545,16 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         // is required. Moreover, this is operation is much faster than heap allocation.
         const uint32_t contextSize = sizeof(TContext);
         const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
-        AllocaInst* contextSlot    = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
-        AllocaInst* tempsSlot      = builder.CreateAlloca(Type::getInt8PtrTy(getGlobalContext()), builder.getInt32(tempsSize), "directTemps.");
-        contextSlot->setAlignment(4);
+        AllocaInst* newContextObject    = builder.CreateAlloca(m_baseTypes.context, 0, "newContext.");
+        AllocaInst* tempsSlot      = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(tempsSize), "tempSlot.");
+        newContextObject->setAlignment(4);
         tempsSlot->setAlignment(4);
         
         // Filling stack space with zeroes
         Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
         builder.CreateCall5(
             llvmMemset,                    // llvm.memset intrinsic
-            contextSlot,                   // destination address
+            newContextObject,              // destination address
             builder.getInt8(0),            // fill with zeroes
             builder.getInt32(contextSize), // size of object slot
             builder.getInt8(0),            // no alignment
@@ -570,8 +570,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         );
         
         // Initializing object fields
-        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.context->getPointerTo());
-        Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo());
+        Value*    newTempsObject = builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.");
         Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
         Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
         builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
@@ -585,7 +584,6 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         
         Function* methodFunction  = callInstruction->getParent()->getParent();
         Value* previousContext    = & methodFunction->getArgumentList().front();
-        //Value* pContext = methodFunction->getValueSymbolTable();
         
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArguments);
@@ -598,7 +596,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         else {
             InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
             newBlock.returnValue = builder.CreateInvoke(directFunction, 
-                                                        nextBlock, //invokeInst->getNormalDest(), 
+                                                        nextBlock,
                                                         invokeInst->getUnwindDest(),
                                                         newContextObject
             );
@@ -650,7 +648,7 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     } else {
         InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
         fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
-                                             nextBlock, //invokeInst->getNormalDest(), 
+                                             nextBlock,
                                              invokeInst->getUnwindDest(),
                                              fallbackArgs,
                                              "reply."
