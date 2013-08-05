@@ -545,7 +545,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         // is required. Moreover, this is operation is much faster than heap allocation.
         const uint32_t contextSize = sizeof(TContext);
         const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
-        AllocaInst* contextSlot = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(contextSize), "newContext.");
+        AllocaInst* contextSlot = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(contextSize), "contextSlot.");
         AllocaInst* tempsSlot   = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(tempsSize), "tempSlot.");
         contextSlot->setAlignment(4);
         tempsSlot->setAlignment(4);
