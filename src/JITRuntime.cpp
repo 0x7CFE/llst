@@ -570,8 +570,8 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         );
         
         // Initializing object fields
-        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.context);
-        Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object);
+        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.context->getPointerTo());
+        Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo());
         Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
         Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
         builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
@@ -581,7 +581,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         
         Function* setObjectField  = m_methodCompiler->getBaseFunctions().setObjectField;
         Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
-        Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.method);
+        Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.method->getPointerTo());
         
         Function* methodFunction  = callInstruction->getParent()->getParent();
         Value* previousContext    = & methodFunction->getArgumentList().front();
@@ -589,7 +589,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArguments);
-        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), builder.CreateBitCast(newTempsObject, m_baseTypes.objectArray));
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), builder.CreateBitCast(newTempsObject, m_baseTypes.objectArray->getPointerTo()));
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), previousContext);
         
         // Creating direct version of a call
@@ -633,7 +633,8 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     
     // Cutting original call instruction and unconditional branch between parts
     originBlock->getInstList().pop_back();
-    nextBlock->getInstList().remove(callInstruction);
+    //nextBlock->getInstList().remove(callInstruction);
+    callInstruction->removeFromParent();
 
     // Fallback block contains original call to default JIT sendMessage handler.
     // It is called when message is invoked with an unknown class that does not 
@@ -645,16 +646,16 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     fallbackArgs.append(call.arg_begin(), call.arg_end());
     if (isa<CallInst>(callInstruction)) {
         fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs, "reply.");
+        builder.CreateBr(nextBlock);
     } else {
         InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
         fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
-                                             invokeInst->getNormalDest(), 
+                                             nextBlock, //invokeInst->getNormalDest(), 
                                              invokeInst->getUnwindDest(),
                                              fallbackArgs,
                                              "reply."
                                             );
     }
-    builder.CreateBr(nextBlock);
     
     // Creating a switch instruction that will filter the block 
     // depending on the actual class of the receiver object
@@ -662,7 +663,7 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     
     // Acquiring receiver's class pointer as raw int value
     Value* argumentsObject = call.getArgument(2);
-    Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object);
+    Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object->getPointerTo());
     
     Function* getObjectField = m_methodCompiler->getBaseFunctions().getObjectField;
     Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectClass;
@@ -675,7 +676,7 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     
     // This phi function will aggregate direct block and fallback block return values
     builder.SetInsertPoint(nextBlock, nextBlock->getInstList().begin());
-    PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object, 2, "phi.");
+    PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
     replyPhi->addIncoming(fallbackReply, fallbackBlock);
     
     // Splitting original block tore execution flow. Reconnecting blocks
@@ -690,7 +691,8 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
         switchInst->addCase(classAddress, directBlock.basicBlock);
         
         builder.SetInsertPoint(directBlock.basicBlock);
-        builder.CreateBr(nextBlock);
+        if (isa<CallInst>(callInstruction))
+            builder.CreateBr(nextBlock);
         
         replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
     }    
