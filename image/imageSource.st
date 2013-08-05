@@ -1358,6 +1358,13 @@ COMMENT     nil main.
 COMMENT !
 
 METHOD Undefined
+loopBenchmark | s |
+    s <- 0.
+    1 to: 1000 do: [ :x | s <- s + 1. ].
+    ^s
+!
+
+METHOD Undefined
 main    | command  x|
     " initialize classes "
     
@@ -1370,9 +1377,17 @@ main    | command  x|
     Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
     Scheduler run."
     
-    nil runSort: 100.
-    LLVM patchHotMethods.
+    "nil runSort: 100."
+    "LLVM patchHotMethods."
     "nil runSort: 1."
+
+    Timer millisecondsToRun: [ nil loopBenchmark ].
+    Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ].
+    LLVM printStat.
+    LLVM patchHotMethods.
+    LLVM printMethod: (Undefined methods at: #loopBenchmark).
+    Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ].
+    
     
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
