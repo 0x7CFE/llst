@@ -516,7 +516,7 @@ private:
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex);
     void patchCallSite(llvm::Function* methodFunction, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
-    void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments);
+    void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments, llvm::BasicBlock* nextBlock);
 public:
     void patchHotMethods();
     void printMethod(TMethod* method) { 

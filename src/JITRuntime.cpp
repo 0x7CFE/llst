@@ -521,7 +521,7 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
     return 0;
 }
 
-void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments) 
+void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments, BasicBlock* nextBlock) 
 {
     using namespace llvm;
     
@@ -531,7 +531,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     // FIXME Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
         TDirectBlock newBlock;
-        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", callInstruction->getParent()->getParent());
+        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", callInstruction->getParent()->getParent(), nextBlock);
         
         builder.SetInsertPoint(newBlock.basicBlock);
         
@@ -582,7 +582,11 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         Function* setObjectField  = m_methodCompiler->getBaseFunctions().setObjectField;
         Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
         Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.method);
-        Value* previousContext = &callInstruction->getParent()->getParent()->getArgumentList().front();
+        
+        Function* methodFunction  = callInstruction->getParent()->getParent();
+        Value* previousContext    = & methodFunction->getArgumentList().front();
+        //Value* pContext = methodFunction->getValueSymbolTable();
+        
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArguments);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), builder.CreateBitCast(newTempsObject, m_baseTypes.objectArray));
@@ -594,7 +598,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         else {
             InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
             newBlock.returnValue = builder.CreateInvoke(directFunction, 
-                                                        invokeInst->getNormalDest(), 
+                                                        nextBlock, //invokeInst->getNormalDest(), 
                                                         invokeInst->getUnwindDest(),
                                                         newContextObject
             );
@@ -616,17 +620,20 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     
     CallSite call(callInstruction);
     
-    // Now, preparing a set of basic blocks with direct calls to class methods
-    TDirectBlockMap directBlocks;
-    createDirectBlocks(callInstruction, callSite, directBlocks, call.getArgument(2));
     
     BasicBlock* originBlock = callInstruction->getParent();
 
     // Spliting original block into two parts. 
     // These will be intersected by our code
-    BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction);
-    originBlock->getInstList().pop_back(); // removing unconditional branch
-    nextBlock->getInstList().remove(callInstruction); // removing original instruction
+    BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction, "next.");
+    
+    // Now, preparing a set of basic blocks with direct calls to class methods
+    TDirectBlockMap directBlocks;
+    createDirectBlocks(callInstruction, callSite, directBlocks, call.getArgument(2), nextBlock);
+    
+    // Cutting original call instruction and unconditional branch between parts
+    originBlock->getInstList().pop_back();
+    nextBlock->getInstList().remove(callInstruction);
 
     // Fallback block contains original call to default JIT sendMessage handler.
     // It is called when message is invoked with an unknown class that does not 
@@ -637,13 +644,14 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     SmallVector<Value*, 5> fallbackArgs;
     fallbackArgs.append(call.arg_begin(), call.arg_end());
     if (isa<CallInst>(callInstruction)) {
-        fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs);
+        fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs, "reply.");
     } else {
         InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
         fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
                                              invokeInst->getNormalDest(), 
                                              invokeInst->getUnwindDest(),
-                                             fallbackArgs
+                                             fallbackArgs,
+                                             "reply."
                                             );
     }
     builder.CreateBr(nextBlock);
@@ -670,6 +678,10 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object, 2, "phi.");
     replyPhi->addIncoming(fallbackReply, fallbackBlock);
     
+    // Splitting original block tore execution flow. Reconnecting blocks
+    if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction))
+        builder.CreateBr(invokeInst->getNormalDest());
+    
     for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
         TClass* klass = iBlock->first;
         TDirectBlock& directBlock = iBlock->second;
@@ -682,6 +694,8 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
         
         replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
     }    
+    
+    callInstruction->replaceAllUsesWith(replyPhi);
 }
 
 void JITRuntime::initializeGlobals() {
