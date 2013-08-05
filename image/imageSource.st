@@ -1372,6 +1372,7 @@ main    | command  x|
     
     nil runSort: 100.
     LLVM patchHotMethods.
+    "nil runSort: 1."
     
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]

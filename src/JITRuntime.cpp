@@ -451,13 +451,16 @@ void JITRuntime::patchHotMethods()
         
         TMethod* method = hotMethod->method;
         Function* methodFunction = hotMethod->methodFunction;
+        if (!method || !methodFunction)
+            continue;
         
         // Cleaning up the function
         methodFunction->getBasicBlockList().clear();
         
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
-        m_methodCompiler->compileMethod(method, 0, methodFunction);
+        Value* contextHolder = 0;
+        m_methodCompiler->compileMethod(method, 0, methodFunction, &contextHolder);
         
         outs() << "Freshly compiled method:\n";
         outs() << *hotMethod->methodFunction << "\n";
@@ -467,7 +470,7 @@ void JITRuntime::patchHotMethods()
         // Iterating through call sites and inserting class checks with direct calls
         THotMethod::TCallSiteMap::iterator iSite = hotMethod->callSites.begin();
         while (iSite != hotMethod->callSites.end()) {
-            patchCallSite(hotMethod->methodFunction, iSite->second, iSite->first);
+            patchCallSite(hotMethod->methodFunction, contextHolder, iSite->second, iSite->first);
             ++iSite;
         }
 
@@ -485,6 +488,9 @@ void JITRuntime::patchHotMethods()
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
         
+        if (!hotMethod->methodFunction)
+            continue;
+        
         outs() << "Optimizing " << hotMethod->methodFunction->getName().str() << " ...";
         optimizeFunction(hotMethod->methodFunction);
         
@@ -501,6 +507,9 @@ void JITRuntime::patchHotMethods()
     // Compiling functions
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
+        
+        if (!hotMethod->methodFunction)
+            continue;
         
         outs() << "Recompiling " << hotMethod->methodFunction->getName().str() << " ...";
         m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
@@ -534,17 +543,17 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
     return 0;
 }
 
-void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments, BasicBlock* nextBlock) 
+void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks) 
 {
     using namespace llvm;
     
-    IRBuilder<> builder(callInstruction->getParent());
+    IRBuilder<> builder(info.callInstruction->getParent());
     TCallSite::TClassHitsMap& classHits = callSite.classHits;
 
     // FIXME Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
         TDirectBlock newBlock;
-        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", callInstruction->getParent()->getParent(), nextBlock);
+        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", info.callInstruction->getParent()->getParent(), info.nextBlock);
         
         builder.SetInsertPoint(newBlock.basicBlock);
         
@@ -596,23 +605,25 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
         Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
         Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
         
-        Function* methodFunction  = callInstruction->getParent()->getParent();
-        Value* previousContext    = builder.CreateBitCast(& methodFunction->getArgumentList().front(), m_baseTypes.object->getPointerTo());
-        Value* messageArgumentsObject = builder.CreateBitCast(messageArguments, m_baseTypes.object->getPointerTo());
+        Function* methodFunction  = info.callInstruction->getParent()->getParent();
+        //Value* previousContext    = builder.CreateBitCast(& methodFunction->getArgumentList().front(), m_baseTypes.object->getPointerTo());
+        Value* previousContext = builder.CreateLoad(info.contextHolder);
+        Value* contextObject   = builder.CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
+        Value* messageArgumentsObject = builder.CreateBitCast(info.messageArguments, m_baseTypes.object->getPointerTo());
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArgumentsObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), newTempsObject);
-        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), previousContext);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), contextObject);
         
         Value* newContext = builder.CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
         // Creating direct version of a call
-        if (isa<CallInst>(callInstruction)) {
+        if (isa<CallInst>(info.callInstruction)) {
             newBlock.returnValue = builder.CreateCall(directFunction, newContext);
-            builder.CreateBr(nextBlock);
+            builder.CreateBr(info.nextBlock);
         } else {
-            InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
+            InvokeInst* invokeInst = dyn_cast<InvokeInst>(info.callInstruction);
             newBlock.returnValue = builder.CreateInvoke(directFunction, 
-                                                        nextBlock,
+                                                        info.nextBlock,
                                                         invokeInst->getUnwindDest(),
                                                         newContext
             );
@@ -623,7 +634,7 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     }
 }
 
-void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, uint32_t callSiteIndex) 
+void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 
 {
     using namespace llvm;
     
@@ -643,18 +654,15 @@ void JITRuntime::patchCallSite(Function* methodFunction, TCallSite& callSite, ui
     
     // Now, preparing a set of basic blocks with direct calls to class methods
     TDirectBlockMap directBlocks;
-    createDirectBlocks(callInstruction, callSite, directBlocks, call.getArgument(2), nextBlock);
+    TPatchInfo info;
+    info.callInstruction = callInstruction;
+    info.nextBlock = nextBlock;
+    info.messageArguments = call.getArgument(2);
+    info.contextHolder = contextHolder;
+    createDirectBlocks(info, callSite, directBlocks);
     
-    // Cutting original call instruction and unconditional branch between parts
+    // Cutting unconditional branch between parts
     originBlock->getInstList().pop_back();
-    /*if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction)) {
-        invokeInst->getNumUses();
-        Value::use_iterator use = invokeInst->use_begin();
-        use.getUse().;
-        
-        invokeInst->getNormalDest()->dropAllReferences();
-    }*/
-    //callInstruction->removeFromParent();
 
     // Fallback block contains original call to default JIT sendMessage handler.
     // It is called when message is invoked with an unknown class that does not 

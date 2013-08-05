@@ -336,7 +336,12 @@ public:
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
     TJITGlobals& getJitGlobals() { return m_globals; }
     
-    llvm::Function* compileMethod(TMethod* method, TContext* callingContext, llvm::Function* methodFunction = 0);
+    llvm::Function* compileMethod(
+        TMethod* method, 
+        TContext* callingContext, 
+        llvm::Function* methodFunction = 0,
+        llvm::Value** contextHolder = 0
+    );
 
     MethodCompiler(
         llvm::Module* JITModule,
@@ -509,15 +514,22 @@ public:
         llvm::Value* returnValue;
     };
     
+    struct TPatchInfo {
+        llvm::Instruction* callInstruction;
+        llvm::Value* messageArguments;
+        llvm::BasicBlock* nextBlock;
+        llvm::Value* contextHolder;
+    };
+    
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
     typedef std::map<TClass*, TDirectBlock> TDirectBlockMap;
     
 private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex);
-    void patchCallSite(llvm::Function* methodFunction, TCallSite& callSite, uint32_t callSiteIndex);
+    void patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
-    void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks, llvm::Value* messageArguments, llvm::BasicBlock* nextBlock);
+    void createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks);
 public:
     void patchHotMethods();
     void printMethod(TMethod* method) { 

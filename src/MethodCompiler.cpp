@@ -489,7 +489,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     return arrayObject;
 }
 
-Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext, llvm::Function* methodFunction /*= 0*/)
+Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
 {
     TJITContext  jit(this, method, callingContext);
     
@@ -511,6 +511,8 @@ Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContex
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
     writePreamble(jit);
+    if (contextHolder)
+        *contextHolder = jit.contextHolder;
     
     // Writing exception handlers for the
     // correct operation of block return
