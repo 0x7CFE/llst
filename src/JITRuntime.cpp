@@ -357,10 +357,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 
                 verifyModule(*m_JITModule, AbortProcessAction);
                 
-//                 outs() << *methodFunction << "\n";
                 optimizeFunction(methodFunction);
-                
-//                 outs() << *methodFunction;
             }
             
             // Calling the method and returning the result
@@ -368,6 +365,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             updateFunctionCache(method, compiledMethodFunction);
             
             THotMethod& newMethod = m_hotMethods[compiledMethodFunction];
+            newMethod.method = method;
             newMethod.methodFunction = methodFunction;
         }
         
@@ -451,6 +449,17 @@ void JITRuntime::patchHotMethods()
         if (hotMethod->callSites.empty())
             continue;
         
+        TMethod* method = hotMethod->method;
+        Function* methodFunction = hotMethod->methodFunction;
+        
+        // Cleaning up the function
+        methodFunction->getBasicBlockList().clear();
+        
+        // Compiling function from scratch
+        outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
+        m_methodCompiler->compileMethod(method, 0, methodFunction);
+        
+        outs() << "Freshly compiled method:\n";
         outs() << *hotMethod->methodFunction << "\n";
         
         outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
@@ -464,6 +473,7 @@ void JITRuntime::patchHotMethods()
 
         outs() << "done. Verifying ...";
         
+        outs() << "Patched method:\n";
         outs() << *hotMethod->methodFunction << "\n";
         
         verifyModule(*m_JITModule, AbortProcessAction);
@@ -479,6 +489,9 @@ void JITRuntime::patchHotMethods()
         optimizeFunction(hotMethod->methodFunction);
         
         outs() << "done. Verifying ...";
+        
+        outs() << "Optimized patched method:\n";
+        outs() << *hotMethod->methodFunction << "\n";
         
         verifyModule(*m_JITModule, AbortProcessAction);
         

@@ -216,7 +216,7 @@ public:
     // used during the compilation process.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
-        TContext*           callingContext;
+       // TContext*           callingContext;
         uint32_t            bytePointer;
 
         llvm::Function*     function;     // LLVM function that is created based on method
@@ -247,7 +247,7 @@ public:
         void pushValue(TStackValue* value);
         
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
-            : method(method), callingContext(context),
+            : method(method), //callingContext(context),
             bytePointer(0), function(0), builder(0), 
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
@@ -336,7 +336,7 @@ public:
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
     TJITGlobals& getJitGlobals() { return m_globals; }
     
-    llvm::Function* compileMethod(TMethod* method, TContext* callingContext);
+    llvm::Function* compileMethod(TMethod* method, TContext* callingContext, llvm::Function* methodFunction = 0);
 
     MethodCompiler(
         llvm::Module* JITModule,
@@ -497,10 +497,11 @@ public:
         
         bool processed;
         uint32_t hitCount;
+        TMethod* method;
         llvm::Function* methodFunction;
         TCallSiteMap callSites;
         
-        THotMethod() : processed(false), hitCount(0), methodFunction(0) {}
+        THotMethod() : processed(false), hitCount(0), method(0), methodFunction(0) {}
     };
     
     struct TDirectBlock {
