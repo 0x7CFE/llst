@@ -306,7 +306,6 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
     {
         case ordinaryObject:
         case byteObject:
-        case nilObject:
             m_writtenObjects.push_back(object);
         default:
             break;
@@ -331,7 +330,9 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
             assert(objectClass != 0);
             
             writeWord(os, fieldsCount);
-            os.write((char*) byteObject->getBytes(), fieldsCount);
+            for (uint32_t i = 0; i < fieldsCount; i++)
+                writeWord(os, byteObject->getByte(i));
+            
             writeObject(os, objectClass);
         } break;
         case ordinaryObject: {
