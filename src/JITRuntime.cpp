@@ -537,6 +537,47 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
     return 0;
 }
 
+
+llvm::Value* JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount) {
+    // Storing current edit location
+    BasicBlock* insertBlock = builder.GetInsertBlock();
+    BasicBlock::iterator insertPoint = builder.GetInsertPoint();
+    
+    // Switching to the preamble
+    BasicBlock* preamble = & insertBlock->getParent()->getBasicBlockList().front();
+    builder.SetInsertPoint(preamble, preamble->begin());
+    
+    // Allocating the object holder
+    const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
+    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
+    objectSlot->setAlignment(4);
+    
+    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
+
+    // Registering class pointer
+    Function* getObjectClassPtr = m_JITModule->getFunction("getObjectClassPtr");
+    Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    
+    // Protecting class pointer
+    Value* classPtrPtr = builder.CreateCall(getObjectClassPtr, newObject);
+    Value* classRawPtr = builder.CreateBitCast(classPtrPtr, builder.getInt8PtrTy()->getPointerTo());
+    builder.CreateCall2(gcrootIntrinsic, classRawPtr, ConstantPointerNull::get(builder.getInt8PtrTy()));
+    
+    // Iterating through object fields and protecting field pointers
+    for (uint32_t i = 0; i < fieldsCount; i++) {
+        Value* fieldPtr     = builder.CreateCall2(getObjectFieldPtr, newObject, builder.getInt32(i));
+        Value* fieldRawPtr  = builder.CreateBitCast(fieldPtr, builder.getInt8PtrTy()->getPointerTo());
+        builder.CreateCall2(gcrootIntrinsic, fieldRawPtr, ConstantPointerNull::get(builder.getInt8PtrTy()));
+    }
+    
+    // Returning to the original edit location
+    builder.SetInsertPoint(insertBlock, insertPoint);
+    
+    return objectSlot;
+    
+}
+
 void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks) 
 {
     using namespace llvm;
@@ -570,10 +611,19 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         // is required. Moreover, this is operation is much faster than heap allocation.
         const uint32_t contextSize = sizeof(TContext);
         const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
-        AllocaInst* contextSlot = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(contextSize), "contextSlot.");
-        AllocaInst* tempsSlot   = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(tempsSize), "tempSlot.");
-        contextSlot->setAlignment(4);
-        tempsSlot->setAlignment(4);
+//         AllocaInst* contextSlot = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(contextSize), "contextSlot.");
+//         AllocaInst* tempsSlot   = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(tempsSize), "tempSlot.");
+//         contextSlot->setAlignment(4);
+//         tempsSlot->setAlignment(4);
+        
+        Value* contextSlot = allocateStackObject(builder, sizeof(TContext), 0);
+        Value* tempsSlot   = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+        
+        // Registering allocas as stack roots
+        //Value* stackRoot = builder->CreateBitCast(contextSlot, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
+        //Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+        //builder->CreateCall2(gcrootIntrinsic, stackRoot, ConstantPointerNull::get(builder->getInt8PtrTy()));
+        
         
         // Filling stack space with zeroes
         Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");

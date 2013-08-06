@@ -530,6 +530,7 @@ private:
     void patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
     void createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks);
+    llvm::Value* allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 public:
     void patchHotMethods();
     void printMethod(TMethod* method) { 

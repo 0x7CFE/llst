@@ -188,6 +188,11 @@ is_object:
     ret %TClass* %class
 }
 
+define %TClass** @getObjectClassPtr(%TObject* %this) {
+    %pclass = getelementptr inbounds %TObject* %this, i32 0, i32 1
+    ret %TClass** %pclass
+}
+
 define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {
     %addr = getelementptr %TObject* %this, i32 0, i32 1
     store %TClass* %class, %TClass** %addr
