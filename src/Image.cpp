@@ -268,12 +268,12 @@ void Image::ImageWriter::writeWord(std::ofstream& os, uint32_t word)
     os << byte;
 }
 
-Image::TImageRecordType Image::ImageWriter::getObjectType(TObject* object)
+Image::TImageRecordType Image::ImageWriter::getObjectType(TObject* object) const
 {
     if ( isSmallInteger(object) ) {
         return inlineInteger;
     } else {
-        std::vector<TObject*>::iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
+        std::vector<TObject*>::const_iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
         if (iter != m_writtenObjects.end())
         { // object is found
             int index = std::distance(m_writtenObjects.begin(), iter);
@@ -289,9 +289,9 @@ Image::TImageRecordType Image::ImageWriter::getObjectType(TObject* object)
     }
 }
 
-int Image::ImageWriter::getPreviousObjectIndex(TObject* object)
+int Image::ImageWriter::getPreviousObjectIndex(TObject* object) const
 {
-    std::vector<TObject*>::iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
+    std::vector<TObject*>::const_iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
     assert(iter != m_writtenObjects.end());
     return std::distance(m_writtenObjects.begin(), iter);
 }
@@ -316,12 +316,6 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
         case inlineInteger: {
             uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
             os.write((char*) &integer, sizeof(integer));
-            /*
-            os << (uint8_t) ((integer >> 0)  & 0xFF);
-            os << (uint8_t) ((integer >> 8)  & 0xFF);
-            os << (uint8_t) ((integer >> 16) & 0xFF);
-            os << (uint8_t) ((integer >> 24) & 0xFF);
-            */
         } break;
         case byteObject: {
             TByteObject* byteObject = (TByteObject*) object;
@@ -359,7 +353,7 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
     }
 }
 
-Image::ImageWriter& Image::ImageWriter::setGlobals(TGlobals globals)
+Image::ImageWriter& Image::ImageWriter::setGlobals(const TGlobals& globals)
 {
     m_globals = globals;
     return *this;

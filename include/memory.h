@@ -201,7 +201,8 @@ public:
 // All objects that were not moved during the collection are said to be disposed,
 // so thier space may be reused by newly allocated ones.
 // 
-class BakerMemoryManager : public IMemoryManager {
+class BakerMemoryManager : public IMemoryManager
+{
 protected:
     uint32_t  m_collectionsCount;
     uint32_t  m_allocationsCount;
@@ -294,7 +295,8 @@ public:
     virtual TMemoryManagerInfo getStat();
 };
 
-class GenerationalMemoryManager : public BakerMemoryManager {
+class GenerationalMemoryManager : public BakerMemoryManager
+{
 protected:
     uint32_t m_leftToRightCollections;
     uint32_t m_rightToLeftCollections;
@@ -343,23 +345,8 @@ public:
 
 extern "C" { extern LLVMMemoryManager::TStackEntry* llvm_gc_root_chain; }
 
-struct TGlobals {
-    TObject* nilObject;
-    TObject* trueObject;
-    TObject* falseObject;
-    TClass*  smallIntClass;
-    TClass*  arrayClass;
-    TClass*  blockClass;
-    TClass*  contextClass;
-    TClass*  stringClass;
-    TDictionary* globalsObject;
-    TMethod* initialMethod;
-    TObject* binaryMessages[3];
-    TClass*  integerClass;
-    TSymbol* badMethodSymbol;
-};
-
-class Image {
+class Image
+{
 private:
     int      m_imageFileFD;
     size_t   m_imageFileSize;
@@ -367,8 +354,6 @@ private:
     void*    m_imageMap;     // pointer to the map base
     uint8_t* m_imagePointer; // sliding pointer
     std::vector<TObject*> m_indirects;
-    
-    
     
     enum TImageRecordType {
         invalidObject = 0,
@@ -396,25 +381,42 @@ public:
     TObject* getGlobal(const char* name);
     TObject* getGlobal(TSymbol* name);
     
-    class ImageWriter
-    {
-    private:
-        std::vector<TObject*> m_writtenObjects; //used to link objects together with type 'previousObject'
-        TGlobals              m_globals;
-        
-        TImageRecordType getObjectType(TObject* object);
-        int              getPreviousObjectIndex(TObject* object);
-        void             writeWord(std::ofstream& os, uint32_t word);
-        void             writeObject(std::ofstream& os, TObject* object);
-    public:
-        ImageWriter() {}
-        ImageWriter& setGlobals(TGlobals globals);
-        void writeTo(const char* fileName);
-    };
-    
+    class ImageWriter;
     // GLobal VM objects
 };
 
+struct TGlobals {
+    TObject* nilObject;
+    TObject* trueObject;
+    TObject* falseObject;
+    TClass*  smallIntClass;
+    TClass*  arrayClass;
+    TClass*  blockClass;
+    TClass*  contextClass;
+    TClass*  stringClass;
+    TDictionary* globalsObject;
+    TMethod* initialMethod;
+    TObject* binaryMessages[3];
+    TClass*  integerClass;
+    TSymbol* badMethodSymbol;
+};
+
 extern TGlobals globals;
+
+class Image::ImageWriter
+{
+private:
+    std::vector<TObject*> m_writtenObjects; //used to link objects together with type 'previousObject'
+    TGlobals              m_globals;
+    
+    TImageRecordType getObjectType(TObject* object) const;
+    int              getPreviousObjectIndex(TObject* object) const;
+    void             writeWord(std::ofstream& os, uint32_t word);
+    void             writeObject(std::ofstream& os, TObject* object);
+public:
+    ImageWriter() {}
+    ImageWriter& setGlobals(const TGlobals& globals);
+    void writeTo(const char* fileName);
+};
 
 #endif
