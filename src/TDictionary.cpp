@@ -34,45 +34,35 @@
 
 #include <types.h>
 #include <string.h>
+#include <algorithm>
 
-int TDictionary::compareSymbols(TSymbol* left, TSymbol* right)
+bool TDictionary::compareSymbols::operator() (TSymbol* left, TSymbol* right)
 {
     // This function compares two byte objects depending on their lenght and contents
    
-    uint32_t leftSize  = left->getSize();
-    uint32_t rightSize = right->getSize();
-    uint32_t minSize   = (leftSize < rightSize) ? leftSize : rightSize;
+    const uint8_t* leftBase = left->getBytes();
+    const uint8_t* leftEnd  = leftBase + left->getSize();
     
-    // Comparing the byte strings byte by byte
-    int result = memcmp(left->getBytes(), right->getBytes(), minSize);
+    const uint8_t* rightBase = right->getBytes();
+    const uint8_t* rightEnd  = rightBase + right->getSize();
     
-    // If bytestrings are equal, checking whichever is longer
-    if (result)
-        return result;
-    else
-        return leftSize - rightSize;
+    return std::lexicographical_compare(leftBase, leftEnd, rightBase, rightEnd);
 }
 
-int TDictionary::compareSymbols(TSymbol* left, const char* right)
+bool TDictionary::compareSymbols::operator() (TSymbol* left, const char* right)
 {
     // This function compares byte object and 
     // null terminated string depending on their lenght and contents
     
-    uint32_t leftSize   = left->getSize();
-    uint32_t rightSize  = strlen(right);
-    uint32_t minSize    = (leftSize < rightSize) ? leftSize : rightSize;
+    const uint8_t* leftBase = left->getBytes();
+    const uint8_t* leftEnd  = leftBase + left->getSize();
     
-    uint8_t* leftBytes  = left->getBytes();
-    const uint8_t* rightBytes = (const uint8_t*) right;
-    
-    // Comparing the byte strings byte by byte
-    int result = memcmp(leftBytes, rightBytes, minSize);
+    return std::lexicographical_compare(leftBase, leftEnd, right, right + strlen(right));
+}
 
-    // If bytestrings are equal, checking whichever is longer
-    if (result)
-        return result;
-    else
-        return leftSize - rightSize;
+bool TDictionary::compareSymbols::operator() (const char* left, TSymbol* right)
+{
+    return !operator()(right, left);
 }
 
 TObject* TDictionary::find(TSymbol* key)
@@ -80,28 +70,19 @@ TObject* TDictionary::find(TSymbol* key)
     TSymbolArray& keys   = * this->keys;
     TObjectArray& values = * this->values;
     
-    // keys are stored in order
-    // thus we may apply binary search
+    // Keys are stored in order
+    // Thus we may apply binary search
+    TDictionary::compareSymbols less;
+    TSymbol** keysBase = (TSymbol**) keys.getFields();
+    TSymbol** keysLast = keysBase + keys.getSize();
+    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
     
-    uint32_t low  = 0;
-    uint32_t high = keys.getSize();
-    
-    while (low < high) {
-        uint32_t mid = (low + high) / 2;
-        TSymbol* candidate = (TSymbol*) keys[mid];
-        
-        // Each symbol is unique within the whole image
-        // This allows us to compare pointers instead of contents
-        if (candidate == key)
-            return values[mid];
-        
-        if (compareSymbols(candidate, key) < 0)
-            low = mid + 1;
-        else 
-            high = mid;
-    }
-    
-    return 0;
+    if (foundKey != keysLast && !less(key, *foundKey))
+    {
+        std::ptrdiff_t index = foundKey - keysBase;
+        return values.getField(index);
+    } else
+        return 0; // key not found
 }
 
 TObject* TDictionary::find(const char* key)
@@ -111,23 +92,15 @@ TObject* TDictionary::find(const char* key)
     
     // Keys are stored in order
     // Thus we may apply binary search
+    TDictionary::compareSymbols less;
+    TSymbol** keysBase = (TSymbol**) keys.getFields();
+    TSymbol** keysLast = keysBase + keys.getSize();
+    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
     
-    uint32_t low  = 0;
-    uint32_t high = keys.getSize();
-    
-    while (low < high) {
-        uint32_t mid = (low + high) / 2;
-        TSymbol* candidate = (TSymbol*) keys[mid];
-        
-        int comparison = compareSymbols(candidate, key);
-        
-        if (comparison < 0)
-            low = mid + 1;
-        else if (comparison > 0)
-            high = mid;
-        else
-            return values[mid];
-    }
-    
-    return 0;
+    if (foundKey != keysLast && !less(key, *foundKey))
+    {
+        std::ptrdiff_t index = foundKey - keysBase;
+        return values.getField(index);
+    } else
+        return 0; // key not found
 }
