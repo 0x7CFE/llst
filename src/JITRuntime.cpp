@@ -552,12 +552,21 @@ llvm::Value* JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_
     AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
     objectSlot->setAlignment(4);
     
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    Value* metaData = builder.CreateAlloca(builder.getInt32Ty());
+    builder.CreateStore(builder.getInt32(fieldsCount), metaData);
+    
+    Value* rawPtr  = builder.CreateBitCast(objectSlot, builder.getInt8PtrTy()->getPointerTo());
+    builder.CreateCall2(gcrootIntrinsic, rawPtr, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
+    
+    /*Value* classRawPtr = builder.CreateBitCast(classPtrPtr, builder.getInt8PtrTy()->getPointerTo());
+    
+    
     Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
 
     // Registering class pointer
     Function* getObjectClassPtr = m_JITModule->getFunction("getObjectClassPtr");
     Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
     
     // Protecting class pointer
     Value* classPtrPtr = builder.CreateCall(getObjectClassPtr, newObject);
@@ -569,10 +578,10 @@ llvm::Value* JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_
         Value* fieldPtr     = builder.CreateCall2(getObjectFieldPtr, newObject, builder.getInt32(i));
         Value* fieldRawPtr  = builder.CreateBitCast(fieldPtr, builder.getInt8PtrTy()->getPointerTo());
         builder.CreateCall2(gcrootIntrinsic, fieldRawPtr, ConstantPointerNull::get(builder.getInt8PtrTy()));
-    }
+    } */
     
     // Returning to the original edit location
-    builder.SetInsertPoint(insertBlock, insertPoint);
+    builder.SetInsertPoint(insertBlock, insertPoint); 
     
     return objectSlot;
     
