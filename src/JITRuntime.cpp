@@ -463,9 +463,6 @@ void JITRuntime::patchHotMethods()
         Value* contextHolder = 0;
         m_methodCompiler->compileMethod(method, 0, methodFunction, &contextHolder);
         
-        outs() << "Freshly compiled method:\n";
-        outs() << *hotMethod->methodFunction << "\n";
-        
         outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
         
         // Iterating through call sites and inserting class checks with direct calls
@@ -476,9 +473,6 @@ void JITRuntime::patchHotMethods()
         }
 
         outs() << "done. Verifying ...";
-        
-        outs() << "Patched method:\n";
-        outs() << *hotMethod->methodFunction << "\n";
         
         verifyModule(*m_JITModule, AbortProcessAction);
         
@@ -497,10 +491,9 @@ void JITRuntime::patchHotMethods()
         
         outs() << "done. Verifying ...";
         
-        outs() << "Optimized patched method:\n";
-        outs() << *hotMethod->methodFunction << "\n";
-        
         verifyModule(*m_JITModule, AbortProcessAction);
+        
+        outs() << "Optimized code: \n" << *hotMethod->methodFunction;
         
         outs() << "done.\n";
     }
@@ -512,7 +505,7 @@ void JITRuntime::patchHotMethods()
         if (!hotMethod->methodFunction)
             continue;
         
-        outs() << "Recompiling " << hotMethod->methodFunction->getName().str() << " ...";
+        outs() << "Compiling machine code for " << hotMethod->methodFunction->getName().str() << " ...";
         m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
         
         outs() << "done.\n";
@@ -562,6 +555,15 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
+        if (!directFunction || ! m_executionEngine->getPointerToFunction(directFunction))
+            outs() << "Error! Could not acquire direct function!\n";
+        
+//         FunctionType* _printfType = FunctionType::get(builder.getInt32Ty(), builder.getInt8PtrTy(), true);
+//         Constant*     _printf     = m_JITModule->getOrInsertFunction("printf", _printfType);
+        
+        Value* debugFormat = builder.CreateGlobalStringPtr("direct method '%s' : %d\n");
+        Value* strName     = builder.CreateGlobalStringPtr(directFunctionName);
+//         builder.CreateCall3(_printf, debugFormat,  strName, builder.getInt32(0));
         
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
@@ -593,12 +595,18 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         );
         
         // Initializing object fields
-        Value* newContextObject  = builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newContext.");
+        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
         Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.");
         Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
         Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
-        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
-        builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsSize));
+        
+        // Object size stored in the TSize field of any ordinary object contains
+        // number of pointers except for the first two fields
+        const uint32_t contextFieldsCount = contextSize / sizeof(TObject*) - 2;
+        const uint32_t tempsFieldsCount   = tempsSize   / sizeof(TObject*) - 2;
+        
+        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextFieldsCount));
+        builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsFieldsCount));
         builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
         builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
         
@@ -607,7 +615,6 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
         
         Function* methodFunction  = info.callInstruction->getParent()->getParent();
-        //Value* previousContext    = builder.CreateBitCast(& methodFunction->getArgumentList().front(), m_baseTypes.object->getPointerTo());
         Value* previousContext = builder.CreateLoad(info.contextHolder);
         Value* contextObject   = builder.CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
         Value* messageArgumentsObject = builder.CreateBitCast(info.messageArguments, m_baseTypes.object->getPointerTo());
