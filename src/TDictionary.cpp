@@ -67,40 +67,34 @@ bool TDictionary::compareSymbols::operator() (const char* left, TSymbol* right)
 
 TObject* TDictionary::find(TSymbol* key)
 {
-    TSymbolArray& keys   = * this->keys;
-    TObjectArray& values = * this->values;
-    
     // Keys are stored in order
     // Thus we may apply binary search
     TDictionary::compareSymbols less;
-    TSymbol** keysBase = (TSymbol**) keys.getFields();
-    TSymbol** keysLast = keysBase + keys.getSize();
+    TSymbol** keysBase = (TSymbol**) keys->getFields();
+    TSymbol** keysLast = keysBase + keys->getSize();
     TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
     
     if (foundKey != keysLast && !less(key, *foundKey))
     {
         std::ptrdiff_t index = foundKey - keysBase;
-        return values.getField(index);
+        return values->getField(index);
     } else
         return 0; // key not found
 }
 
 TObject* TDictionary::find(const char* key)
 {
-    TSymbolArray& keys   = * this->keys;
-    TObjectArray& values = * this->values;
-    
     // Keys are stored in order
     // Thus we may apply binary search
     TDictionary::compareSymbols less;
-    TSymbol** keysBase = (TSymbol**) keys.getFields();
-    TSymbol** keysLast = keysBase + keys.getSize();
+    TSymbol** keysBase = (TSymbol**) keys->getFields();
+    TSymbol** keysLast = keysBase + keys->getSize();
     TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
     
     if (foundKey != keysLast && !less(key, *foundKey))
     {
         std::ptrdiff_t index = foundKey - keysBase;
-        return values.getField(index);
+        return values->getField(index);
     } else
         return 0; // key not found
 }
