@@ -154,7 +154,7 @@ define i32 @getObjectSize(%TObject* %this) {
 define %TObject* @setObjectSize(%TObject* %this, i32 %size) {
     %addr = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %ssize = shl i32 %size, 2
-    store volatile i32 %ssize, i32* %addr
+    store i32 %ssize, i32* %addr
     ret %TObject* %this
 }
 
@@ -190,7 +190,7 @@ is_object:
 
 define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {
     %addr = getelementptr %TObject* %this, i32 0, i32 1
-    store volatile %TClass* %class, %TClass** %addr
+    store %TClass* %class, %TClass** %addr
     ret %TObject* %this
 }
 
@@ -214,7 +214,7 @@ define %TObject* @getObjectField(%TObject* %object, i32 %index) {
 
 define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) {
     %fieldPtr  = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
-    store volatile %TObject* %value, %TObject** %fieldPtr
+    store %TObject* %value, %TObject** %fieldPtr
     ret %TObject** %fieldPtr
 }
 
