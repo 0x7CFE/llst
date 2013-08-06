@@ -46,7 +46,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string>
-#include <assert.h>
+#include <cassert>
 #include <algorithm>
 
 // Placeholder for root objects
