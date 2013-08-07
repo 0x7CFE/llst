@@ -540,7 +540,7 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
 }
 
 
-llvm::Value* JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount) {
+std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount) {
     // Storing current edit location
     BasicBlock* insertBlock = builder.GetInsertBlock();
     BasicBlock::iterator insertPoint = builder.GetInsertPoint();
@@ -579,8 +579,7 @@ llvm::Value* JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_
     Value* newObject = builder.CreateBitCast(objectHolder, m_baseTypes.object->getPointerTo());
     builder.CreateStore(newObject, objectHolder/*, true*/);
     
-    return objectSlot;
-    
+    return std::make_pair(objectSlot, objectHolder);
 }
 
 void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks) 
@@ -606,9 +605,8 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         
 //         FunctionType* _printfType = FunctionType::get(builder.getInt32Ty(), builder.getInt8PtrTy(), true);
 //         Constant*     _printf     = m_JITModule->getOrInsertFunction("printf", _printfType);
-        
-        Value* debugFormat = builder.CreateGlobalStringPtr("direct method '%s' : %d\n");
-        Value* strName     = builder.CreateGlobalStringPtr(directFunctionName);
+//         Value* debugFormat = builder.CreateGlobalStringPtr("direct method '%s' : %d\n");
+//         Value* strName     = builder.CreateGlobalStringPtr(directFunctionName);
 //         builder.CreateCall3(_printf, debugFormat,  strName, builder.getInt32(0));
         
         // Allocating context object and temporaries on the methodFunction's stack.
@@ -616,19 +614,17 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         // is required. Moreover, this is operation is much faster than heap allocation.
         const uint32_t contextSize = sizeof(TContext);
         const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
-//         AllocaInst* contextSlot = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(contextSize), "contextSlot.");
-//         AllocaInst* tempsSlot   = builder.CreateAlloca(Type::getInt8Ty(getGlobalContext()), builder.getInt32(tempsSize), "tempSlot.");
-//         contextSlot->setAlignment(4);
-//         tempsSlot->setAlignment(4);
         
-        Value* contextSlot = allocateStackObject(builder, sizeof(TContext), 0);
-        Value* tempsSlot   = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+        // Allocating stack space for objects and registering GC protection holder
+        std::pair<llvm::Value*, llvm::Value*> contextPair = allocateStackObject(builder, sizeof(TContext), 0);
+        std::pair<llvm::Value*, llvm::Value*> tempsPair   = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
         
-        // Registering allocas as stack roots
-        //Value* stackRoot = builder->CreateBitCast(contextSlot, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
-        //Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
-        //builder->CreateCall2(gcrootIntrinsic, stackRoot, ConstantPointerNull::get(builder->getInt8PtrTy()));
+        Value* contextSlot = contextPair.first;
+        Value* tempsSlot   = tempsPair.first;
         
+        // Storing holders for further cleanup
+        newBlock.contextHolder = contextPair.second;
+        newBlock.tempsHolder   = tempsPair.second;
         
         // Filling stack space with zeroes
         Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
@@ -695,6 +691,12 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         
         directBlocks[iClassHit->first] = newBlock;
     }
+}
+
+void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock) 
+{
+    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder /*, true*/);
+    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder /*, true*/);
 }
 
 void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 
@@ -771,8 +773,12 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
     replyPhi->addIncoming(fallbackReply, fallbackBlock);
     
     // Splitting original block tore execution flow. Reconnecting blocks
-    if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction))
-        builder.CreateBr(invokeInst->getNormalDest());
+    if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction)) {
+        BranchInst* branch = builder.CreateBr(invokeInst->getNormalDest());
+        
+        // Setting up builder for cleanup opertions
+        builder.SetInsertPoint(branch);
+    }
     
     for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
         TClass* klass = iBlock->first;
@@ -782,6 +788,9 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
         switchInst->addCase(classAddress, directBlock.basicBlock);
         
         replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
+        
+        // Adding cleanup code for the direct block
+        cleanupDirectHolders(builder, directBlock);
     }    
     
     callInstruction->replaceAllUsesWith(replyPhi);

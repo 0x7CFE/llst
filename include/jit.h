@@ -512,6 +512,9 @@ public:
     struct TDirectBlock {
         llvm::BasicBlock* basicBlock;
         llvm::Value* returnValue;
+        
+        llvm::Value* contextHolder;
+        llvm::Value* tempsHolder;
     };
     
     struct TPatchInfo {
@@ -530,7 +533,8 @@ private:
     void patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
     void createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks);
-    llvm::Value* allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
+    std::pair<llvm::Value*, llvm::Value*> allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
+    void cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock);
 public:
     void patchHotMethods();
     void printMethod(TMethod* method) { 
