@@ -510,6 +510,9 @@ void JITRuntime::patchHotMethods()
         outs() << "Compiling machine code for " << hotMethod->methodFunction->getName().str() << " ...";
         m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
         
+        
+//         outs() << "Final code: \n" << *hotMethod->methodFunction;
+        
         outs() << "done.\n";
     }
     
@@ -558,7 +561,7 @@ std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBu
     AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
     
     // Initializing holder with null value
-    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder/*, true*/);
+//    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder, true);
     
     Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
     

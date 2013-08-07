@@ -65,13 +65,16 @@ void LLVMMemoryManager::moveObjects()
                 // We need to process only their fields and class pointer
                 for (uint32_t fieldIndex = 0; fieldIndex < stackObject->size.getSize() + 1; fieldIndex++) {
                     printf("stackObject 2 fieldIndex = %d count = %d\n", fieldIndex, stackObject->size.getSize() + 1);
-                    TMovableObject*& field = stackObject->data[fieldIndex];
+                    
+                    TMovableObject* field = stackObject->data[fieldIndex];
                     if (field)
                         field = moveObject(field);
+                    
+                    stackObject->data[fieldIndex] = field;
                 }
             }
         }
-        printf("stackObject 3\n");
+//         printf("stackObject 3\n");
         
         // Iterating through the normal roots in the current stack frame
         for (; entryIndex < rootCount; entryIndex++) {
