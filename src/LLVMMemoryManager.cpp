@@ -58,6 +58,9 @@ void LLVMMemoryManager::moveObjects()
                 printf("stackObject 1\n");
                 TMovableObject* stackObject = (TMovableObject*) entry->roots[entryIndex];
                 
+                if (! stackObject)
+                    continue;
+                
                 // Stack objects are allocated on a stack frames of jit functions
                 // We need to process only their fields and class pointer
                 for (uint32_t fieldIndex = 0; fieldIndex < stackObject->size.getSize() + 1; fieldIndex++) {

@@ -478,7 +478,7 @@ void JITRuntime::patchHotMethods()
         
         outs() << "done.\n";
         
-        outs() << "Patched code: \n" << *hotMethod->methodFunction;
+//         outs() << "Patched code: \n" << *hotMethod->methodFunction;
     }
 
     // Running optimization passes on functions

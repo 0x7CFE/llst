@@ -1381,13 +1381,14 @@ main    | command  x|
     "LLVM patchHotMethods."
     "nil runSort: 1."
 
-    Timer millisecondsToRun: [ nil loopBenchmark ].
-    Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ].
+    (Timer millisecondsToRun: [ nil loopBenchmark ]) printNl.
+    (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
     LLVM printStat.
     LLVM patchHotMethods.
     LLVM printMethod: (Undefined methods at: #loopBenchmark).
-    Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ].
+    (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
     
+    1 to: 100 do: [ :x | LLVM do: [ nil loopBenchmark ] ].
     
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
