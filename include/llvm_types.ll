@@ -104,6 +104,11 @@
     %TContext*      ; targetContext
 }
 
+%TGCMetaData = type {
+    i1 ; isStackObject
+}
+
+@stackObjectMeta = constant %TGCMetaData { i1 true }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;

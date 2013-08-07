@@ -477,6 +477,8 @@ void JITRuntime::patchHotMethods()
         verifyModule(*m_JITModule, AbortProcessAction);
         
         outs() << "done.\n";
+        
+        outs() << "Patched code: \n" << *hotMethod->methodFunction;
     }
 
     // Running optimization passes on functions
@@ -493,7 +495,7 @@ void JITRuntime::patchHotMethods()
         
         verifyModule(*m_JITModule, AbortProcessAction);
         
-        outs() << "Optimized code: \n" << *hotMethod->methodFunction;
+//         outs() << "Optimized code: \n" << *hotMethod->methodFunction;
         
         outs() << "done.\n";
     }
@@ -543,45 +545,39 @@ llvm::Value* JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_
     BasicBlock* insertBlock = builder.GetInsertBlock();
     BasicBlock::iterator insertPoint = builder.GetInsertPoint();
     
-    // Switching to the preamble
-    BasicBlock* preamble = & insertBlock->getParent()->getBasicBlockList().front();
-    builder.SetInsertPoint(preamble, preamble->begin());
-    
-    // Allocating the object holder
+    // Allocating the object slot in the original block
     const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
     AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
     objectSlot->setAlignment(4);
     
+    // Switching to the preamble
+    BasicBlock* preamble = & insertBlock->getParent()->getBasicBlockList().front();
+    builder.SetInsertPoint(preamble, preamble->begin());
+    
+    // Allocating object holder in the preamble
+    AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
+    
+    // Initializing holder with null value
+    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder/*, true*/);
+    
     Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
-    Value* metaData = builder.CreateAlloca(builder.getInt32Ty());
-    builder.CreateStore(builder.getInt32(fieldsCount), metaData);
     
-    Value* rawPtr  = builder.CreateBitCast(objectSlot, builder.getInt8PtrTy()->getPointerTo());
-    builder.CreateCall2(gcrootIntrinsic, rawPtr, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
+    //Value* structData = { ConstantInt::get(builder.getInt1Ty(), 1) };
     
-    /*Value* classRawPtr = builder.CreateBitCast(classPtrPtr, builder.getInt8PtrTy()->getPointerTo());
-    
-    
-    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
-
-    // Registering class pointer
-    Function* getObjectClassPtr = m_JITModule->getFunction("getObjectClassPtr");
-    Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-    
-    // Protecting class pointer
-    Value* classPtrPtr = builder.CreateCall(getObjectClassPtr, newObject);
-    Value* classRawPtr = builder.CreateBitCast(classPtrPtr, builder.getInt8PtrTy()->getPointerTo());
-    builder.CreateCall2(gcrootIntrinsic, classRawPtr, ConstantPointerNull::get(builder.getInt8PtrTy()));
-    
-    // Iterating through object fields and protecting field pointers
-    for (uint32_t i = 0; i < fieldsCount; i++) {
-        Value* fieldPtr     = builder.CreateCall2(getObjectFieldPtr, newObject, builder.getInt32(i));
-        Value* fieldRawPtr  = builder.CreateBitCast(fieldPtr, builder.getInt8PtrTy()->getPointerTo());
-        builder.CreateCall2(gcrootIntrinsic, fieldRawPtr, ConstantPointerNull::get(builder.getInt8PtrTy()));
-    } */
+    // Registering holder in GC and supplying metadata that tells GC to treat this particular root
+    // as a pointer to a stack object. Stack objects are not moved by GC. Instead, only their fields 
+    // and class pointer are updated.
+    //Value* metaData = ConstantStruct::get(m_JITModule->getTypeByName("TGCMetaData"), ConstantInt::get(builder.getInt1Ty(), 1));
+    Value* metaData = m_JITModule->getGlobalVariable("stackObjectMeta");
+    Value* stackRoot = builder.CreateBitCast(objectHolder, builder.getInt8PtrTy()->getPointerTo());
+    builder.CreateCall2(gcrootIntrinsic, stackRoot, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
     
     // Returning to the original edit location
     builder.SetInsertPoint(insertBlock, insertPoint); 
+    
+    // Storing the address of stack object to the holder
+    Value* newObject = builder.CreateBitCast(objectHolder, m_baseTypes.object->getPointerTo());
+    builder.CreateStore(newObject, objectHolder/*, true*/);
     
     return objectSlot;
     
