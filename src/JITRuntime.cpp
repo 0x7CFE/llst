@@ -472,13 +472,14 @@ void JITRuntime::patchHotMethods()
             ++iSite;
         }
 
+        outs() << "Patched code: \n" << *hotMethod->methodFunction << "\n";
+        
         outs() << "done. Verifying ...";
         
         verifyModule(*m_JITModule, AbortProcessAction);
         
         outs() << "done.\n";
         
-//         outs() << "Patched code: \n" << *hotMethod->methodFunction;
     }
 
     // Running optimization passes on functions
@@ -580,7 +581,7 @@ std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBu
     
     // Storing the address of stack object to the holder
     Value* newObject = builder.CreateBitCast(objectHolder, m_baseTypes.object->getPointerTo());
-    builder.CreateStore(newObject, objectHolder/*, true*/);
+    builder.CreateStore(newObject, objectHolder, true);
     
     return std::make_pair(objectSlot, objectHolder);
 }
@@ -615,19 +616,22 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
         // is required. Moreover, this is operation is much faster than heap allocation.
+        const bool hasTemporaries  = getIntegerValue(directMethod->temporarySize) > 0;
         const uint32_t contextSize = sizeof(TContext);
-        const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
+        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize) : 0;
         
         // Allocating stack space for objects and registering GC protection holder
         std::pair<llvm::Value*, llvm::Value*> contextPair = allocateStackObject(builder, sizeof(TContext), 0);
-        std::pair<llvm::Value*, llvm::Value*> tempsPair   = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
-        
         Value* contextSlot = contextPair.first;
-        Value* tempsSlot   = tempsPair.first;
-        
-        // Storing holders for further cleanup
         newBlock.contextHolder = contextPair.second;
-        newBlock.tempsHolder   = tempsPair.second;
+        
+        Value* tempsSlot = 0;
+        if (hasTemporaries) {
+            std::pair<llvm::Value*, llvm::Value*> tempsPair = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            tempsSlot = tempsPair.first;
+            newBlock.tempsHolder = tempsPair.second;
+        } else
+            newBlock.tempsHolder = 0;
         
         // Filling stack space with zeroes
         Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
@@ -639,42 +643,50 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
             builder.getInt32(0),           // no alignment
             builder.getInt1(true)          // volatile operation
         );
-        builder.CreateCall5(
-            llvmMemset,                    // llvm.memset intrinsic
-            tempsSlot,                     // destination address
-            builder.getInt8(0),            // fill with zeroes
-            builder.getInt32(tempsSize),   // size of object slot
-            builder.getInt32(0),           // no alignment
-            builder.getInt1(true)          // volatile operation
-        );
+        
+        if (hasTemporaries)
+            builder.CreateCall5(
+                llvmMemset,                    // llvm.memset intrinsic
+                tempsSlot,                     // destination address
+                builder.getInt8(0),            // fill with zeroes
+                builder.getInt32(tempsSize),   // size of object slot
+                builder.getInt32(0),           // no alignment
+                builder.getInt1(true)          // volatile operation
+            );
         
         // Initializing object fields
         Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
-        Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.");
+        Value* newTempsObject    = hasTemporaries ? builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
         Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
         Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
         
         // Object size stored in the TSize field of any ordinary object contains
         // number of pointers except for the first two fields
         const uint32_t contextFieldsCount = contextSize / sizeof(TObject*) - 2;
-        const uint32_t tempsFieldsCount   = tempsSize   / sizeof(TObject*) - 2;
         
         builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextFieldsCount));
-        builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsFieldsCount));
         builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
-        builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
+        
+        if (hasTemporaries) {
+            const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
+            builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsFieldsCount));
+            builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
+        }
         
         Function* setObjectField  = m_methodCompiler->getBaseFunctions().setObjectField;
         Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
         Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
         
-        Function* methodFunction  = info.callInstruction->getParent()->getParent();
         Value* previousContext = builder.CreateLoad(info.contextHolder);
         Value* contextObject   = builder.CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
         Value* messageArgumentsObject = builder.CreateBitCast(info.messageArguments, m_baseTypes.object->getPointerTo());
+        
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArgumentsObject);
-        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), newTempsObject);
+        if (hasTemporaries)
+            builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), newTempsObject);
+        else
+            builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), m_methodCompiler->getJitGlobals().nilObject);
         builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), contextObject);
         
         Value* newContext = builder.CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
@@ -698,8 +710,9 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
 
 void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock) 
 {
-    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder /*, true*/);
-    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder /*, true*/);
+    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder, true);
+    if (directBlock.tempsHolder)
+        builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder, true);
 }
 
 void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 

@@ -50,9 +50,10 @@ void LLVMMemoryManager::moveObjects()
         const uint32_t rootCount = entry->map->numRoots;
         uint32_t entryIndex = 0;
         
+        printf("stackObject 0 metaCount = %d, rootCount = %d\n", metaCount, rootCount);
+        
         // Processing stack objects
         for (; entryIndex < metaCount; entryIndex++) {
-            printf("stackObject 0\n");
             TMetaInfo* metaInfo = (TMetaInfo*) entry->map->meta[entryIndex];
             if (metaInfo && metaInfo->isStackObject) {
                 printf("stackObject 1\n");
@@ -85,7 +86,11 @@ void LLVMMemoryManager::moveObjects()
 
             entry->roots[entryIndex] = object;
         }
+        
+        printf("stackObject 4\n");
     }
+    
+    printf("gc done\n");
 }
 
 LLVMMemoryManager::LLVMMemoryManager()
