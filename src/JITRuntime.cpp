@@ -472,7 +472,7 @@ void JITRuntime::patchHotMethods()
             ++iSite;
         }
 
-        outs() << "Patched code: \n" << *hotMethod->methodFunction << "\n";
+//         outs() << "Patched code: \n" << *hotMethod->methodFunction << "\n";
         
         outs() << "done. Verifying ...";
         
@@ -486,7 +486,13 @@ void JITRuntime::patchHotMethods()
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
         
-        if (!hotMethod->methodFunction)
+        // We're interested only in methods with call sites
+        if (hotMethod->callSites.empty())
+            continue;
+        
+        TMethod* method = hotMethod->method;
+        Function* methodFunction = hotMethod->methodFunction;
+        if (!method || !methodFunction)
             continue;
         
         outs() << "Optimizing " << hotMethod->methodFunction->getName().str() << " ...";
@@ -505,7 +511,13 @@ void JITRuntime::patchHotMethods()
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
         
-        if (!hotMethod->methodFunction)
+        // We're interested only in methods with call sites
+        if (hotMethod->callSites.empty())
+            continue;
+        
+        TMethod* method = hotMethod->method;
+        Function* methodFunction = hotMethod->methodFunction;
+        if (!method || !methodFunction)
             continue;
         
         outs() << "Compiling machine code for " << hotMethod->methodFunction->getName().str() << " ...";
@@ -580,7 +592,7 @@ std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBu
     builder.SetInsertPoint(insertBlock, insertPoint); 
     
     // Storing the address of stack object to the holder
-    Value* newObject = builder.CreateBitCast(objectHolder, m_baseTypes.object->getPointerTo());
+    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
     builder.CreateStore(newObject, objectHolder, true);
     
     return std::make_pair(objectSlot, objectHolder);
