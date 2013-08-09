@@ -617,8 +617,7 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
         
-        outs() << "Acquiring function for name " << directFunctionName << "\n";
-        if (!directFunction || ! m_executionEngine->getPointerToFunction(directFunction)) {
+        if (!directFunction) {
             outs() << "Error! Could not acquire direct function for name " << directFunctionName << "\n";
             abort();
         }

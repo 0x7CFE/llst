@@ -1365,37 +1365,34 @@ loopBenchmark | s |
 !
 
 METHOD Undefined
-main    | command  x|
+sortBenchmark: data 
+    ^data sort
+!
+
+METHOD Undefined
+runSortBenchmarkFor: data
+    ^Timer millisecondsToRun: [ nil sortBenchmark: data ]
+!
+
+METHOD Undefined
+main    | command  data |
     " initialize classes "
     
     Char initialize.
 
-    "File fileIn: '../image/disasm.st'."
+    'Preparing test data ...' print. 
+    data <- List new.
+    1 to: 50000 do: [ :x | data add: 100000 atRandom ].
+    'done' printNl.
     
-    "Scheduler initialize.
-    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
-    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
-    Scheduler run."
+    'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
+    'Cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    'Hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
     
-    "nil runSort: 100."
-    "LLVM patchHotMethods."
-    "nil runSort: 1."
-
-    "'Soft run: ' print. (Timer millisecondsToRun: [ nil loopBenchmark ]) printNl.
-    'Cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
-    'Hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
-    LLVM printStat.
     LLVM patchHotMethods.
-    LLVM printMethod: (Undefined methods at: #loopBenchmark).
     
-    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl."
-    "LLVM printStat."
-    
-    nil runSort: 1000.
-    nil runSort: 1000.
-    LLVM patchHotMethods.
-    nil runSort: 1000.
+    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
     
     "1 to: 100 do: [ :x | LLVM do: [ nil loopBenchmark ] ]."
     
