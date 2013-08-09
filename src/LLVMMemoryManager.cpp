@@ -50,13 +50,10 @@ void LLVMMemoryManager::moveObjects()
         const uint32_t rootCount = entry->map->numRoots;
         uint32_t entryIndex = 0;
         
-        printf("stackObject 0 metaCount = %d, rootCount = %d\n", metaCount, rootCount);
-        
         // Processing stack objects
         for (; entryIndex < metaCount; entryIndex++) {
             TMetaInfo* metaInfo = (TMetaInfo*) entry->map->meta[entryIndex];
             if (metaInfo && metaInfo->isStackObject) {
-                printf("stackObject 1\n");
                 TMovableObject* stackObject = (TMovableObject*) entry->roots[entryIndex];
                 
                 if (! stackObject)
@@ -65,7 +62,6 @@ void LLVMMemoryManager::moveObjects()
                 // Stack objects are allocated on a stack frames of jit functions
                 // We need to process only their fields and class pointer
                 for (uint32_t fieldIndex = 0; fieldIndex < stackObject->size.getSize() + 1; fieldIndex++) {
-                    printf("stackObject 2 fieldIndex = %d count = %d\n", fieldIndex, stackObject->size.getSize() + 1);
                     
                     TMovableObject* field = stackObject->data[fieldIndex];
                     if (field)
@@ -75,7 +71,6 @@ void LLVMMemoryManager::moveObjects()
                 }
             }
         }
-//         printf("stackObject 3\n");
         
         // Iterating through the normal roots in the current stack frame
         for (; entryIndex < rootCount; entryIndex++) {
@@ -86,11 +81,7 @@ void LLVMMemoryManager::moveObjects()
 
             entry->roots[entryIndex] = object;
         }
-        
-        printf("stackObject 4\n");
     }
-    
-    printf("gc done\n");
 }
 
 LLVMMemoryManager::LLVMMemoryManager()
