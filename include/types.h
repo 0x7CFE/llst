@@ -300,9 +300,6 @@ struct TMethod : public TObject {
     TClass*       klass;
     TString*      text;
     TObject*      package;
-
-    // LLVM Extension
-    TByteArray*   llvmBitcode;
     
     static const char* InstanceClassName() { return "Method"; }
 };
