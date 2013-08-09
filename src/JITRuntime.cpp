@@ -616,8 +616,12 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
-        if (!directFunction || ! m_executionEngine->getPointerToFunction(directFunction))
-            outs() << "Error! Could not acquire direct function!\n";
+        
+        outs() << "Acquiring function for name " << directFunctionName << "\n";
+        if (!directFunction || ! m_executionEngine->getPointerToFunction(directFunction)) {
+            outs() << "Error! Could not acquire direct function for name " << directFunctionName << "\n";
+            abort();
+        }
         
 //         FunctionType* _printfType = FunctionType::get(builder.getInt32Ty(), builder.getInt8PtrTy(), true);
 //         Constant*     _printf     = m_JITModule->getOrInsertFunction("printf", _printfType);

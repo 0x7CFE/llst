@@ -1381,7 +1381,7 @@ main    | command  x|
     "LLVM patchHotMethods."
     "nil runSort: 1."
 
-    'Soft run: ' print. (Timer millisecondsToRun: [ nil loopBenchmark ]) printNl.
+    "'Soft run: ' print. (Timer millisecondsToRun: [ nil loopBenchmark ]) printNl.
     'Cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
     'Hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
     LLVM printStat.
@@ -1389,9 +1389,13 @@ main    | command  x|
     LLVM printMethod: (Undefined methods at: #loopBenchmark).
     
     'Patched cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl."
     "LLVM printStat."
     
+    nil runSort: 1000.
+    nil runSort: 1000.
+    LLVM patchHotMethods.
+    nil runSort: 1000.
     
     "1 to: 100 do: [ :x | LLVM do: [ nil loopBenchmark ] ]."
     
