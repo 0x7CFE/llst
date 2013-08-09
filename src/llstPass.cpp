@@ -153,6 +153,9 @@ bool LLSTPass::removeRedundantRoots(Function& F)
         {
             if(createRootCall->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot)
             {
+                if (! isa<ConstantPointerNull>(createRootCall->getArgOperand(1)))
+                    continue; // this is a special case of stack objects that should be preserved
+                    
                 Value* holder = cast<Instruction>( createRootCall->getArgOperand(0)->stripPointerCasts() );
                 bool onlyStoresToRoot = true;
                 for(Value::use_iterator U = holder->use_begin(); U != holder->use_end() ; U++) {

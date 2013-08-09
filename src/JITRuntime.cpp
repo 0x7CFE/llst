@@ -561,14 +561,14 @@ std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBu
     BasicBlock* insertBlock = builder.GetInsertBlock();
     BasicBlock::iterator insertPoint = builder.GetInsertPoint();
     
-    // Allocating the object slot in the original block
-    const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
-    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
-    objectSlot->setAlignment(4);
-    
     // Switching to the preamble
     BasicBlock* preamble = & insertBlock->getParent()->getBasicBlockList().front();
     builder.SetInsertPoint(preamble, preamble->begin());
+    
+    // Allocating the object slot
+    const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
+    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
+    objectSlot->setAlignment(4);
     
     // Allocating object holder in the preamble
     AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
@@ -593,7 +593,7 @@ std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBu
     
     // Storing the address of stack object to the holder
     Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
-    builder.CreateStore(newObject, objectHolder, true);
+    builder.CreateStore(newObject, objectHolder/*, true*/);
     
     return std::make_pair(objectSlot, objectHolder);
 }
@@ -653,7 +653,7 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
             builder.getInt8(0),            // fill with zeroes
             builder.getInt32(contextSize), // size of object slot
             builder.getInt32(0),           // no alignment
-            builder.getInt1(true)          // volatile operation
+            builder.getInt1(false)          // volatile operation
         );
         
         if (hasTemporaries)
@@ -663,10 +663,11 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
                 builder.getInt8(0),            // fill with zeroes
                 builder.getInt32(tempsSize),   // size of object slot
                 builder.getInt32(0),           // no alignment
-                builder.getInt1(true)          // volatile operation
+                builder.getInt1(false)          // volatile operation
             );
         
         // Initializing object fields
+        // TODO Move the init sequence out of the direct block or check that it is correctly optimized in loops
         Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
         Value* newTempsObject    = hasTemporaries ? builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
         Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
@@ -722,9 +723,9 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
 
 void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock) 
 {
-    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder, true);
+    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder/*, true*/);
     if (directBlock.tempsHolder)
-        builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder, true);
+        builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder/*, true*/);
 }
 
 void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 
@@ -864,6 +865,9 @@ void JITRuntime::initializePassManager() {
     // Start with registering info about how the
     // target lays out data structures.
     m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
+    
+    m_modulePassManager->add(createFunctionInliningPass());
+    
     m_functionPassManager->add(createBasicAliasAnalysisPass());
     m_functionPassManager->add(createPromoteMemoryToRegisterPass());
     m_functionPassManager->add(createInstructionCombiningPass());
@@ -881,9 +885,8 @@ void JITRuntime::initializePassManager() {
 //     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     //m_functionPassManager->add(createLLSTDebuggingPass());
-    m_functionPassManager->doInitialization();
-    
     m_modulePassManager->add(createFunctionInliningPass());
+    m_functionPassManager->doInitialization();
 }
 
 void JITRuntime::initializeRuntimeAPI() {

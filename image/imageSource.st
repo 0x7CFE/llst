@@ -1360,7 +1360,7 @@ COMMENT !
 METHOD Undefined
 loopBenchmark | s |
     s <- 0.
-    1 to: 100000 do: [ :x | s <- s + 1. ].
+    1 to: 1000000 do: [ :x | s <- s + 1. ].
     ^s
 !
 
@@ -1386,11 +1386,12 @@ main    | command  x|
     'Hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
     LLVM printStat.
     LLVM patchHotMethods.
-    "LLVM printMethod: (Undefined methods at: #loopBenchmark)."
+    LLVM printMethod: (Undefined methods at: #loopBenchmark).
     
-    'Patched cold jit run: ' printNl. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
-    'Patched hot jit run: ' printNl. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
-    LLVM printStat.
+    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ nil loopBenchmark ] ]) printNl.
+    "LLVM printStat."
+    
     
     "1 to: 100 do: [ :x | LLVM do: [ nil loopBenchmark ] ]."
     

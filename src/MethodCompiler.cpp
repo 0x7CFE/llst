@@ -268,6 +268,8 @@ Function* MethodCompiler::createFunction(TMethod* method)
     Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
+    function->addFnAttr(Attributes(Attribute::InlineHint));
+//     function->addFnAttr(Attributes(Attribute::AlwaysInline));
     return function;
 }
 
