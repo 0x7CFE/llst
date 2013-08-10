@@ -328,8 +328,11 @@ private:
     // (or it's string representation). Returns an integer less than, equal to,
     // or greater than zero if 'left' is found, respectively, to be less than,
     // to match, or be greater than 'right'.
-    static int compareSymbols(TSymbol* left, TSymbol* right);
-    static int compareSymbols(TSymbol* left, const char* right);
+    struct compareSymbols {
+        bool operator() (TSymbol* left, TSymbol* right);
+        bool operator() (TSymbol* left, const char* right);
+        bool operator() (const char* left, TSymbol* right);
+    };
 };
 
 struct TClass : public TObject {

@@ -42,6 +42,7 @@
 #include <types.h>
 #include <vector>
 #include <list>
+#include <fstream>
 
 
 // Memory manager statics is held
@@ -200,7 +201,8 @@ public:
 // All objects that were not moved during the collection are said to be disposed,
 // so thier space may be reused by newly allocated ones.
 // 
-class BakerMemoryManager : public IMemoryManager {
+class BakerMemoryManager : public IMemoryManager
+{
 protected:
     uint32_t  m_collectionsCount;
     uint32_t  m_allocationsCount;
@@ -293,7 +295,8 @@ public:
     virtual TMemoryManagerInfo getStat();
 };
 
-class GenerationalMemoryManager : public BakerMemoryManager {
+class GenerationalMemoryManager : public BakerMemoryManager
+{
 protected:
     uint32_t m_leftToRightCollections;
     uint32_t m_rightToLeftCollections;
@@ -346,8 +349,8 @@ public:
 
 extern "C" { extern LLVMMemoryManager::TStackEntry* llvm_gc_root_chain; }
 
-
-class Image {
+class Image
+{
 private:
     int      m_imageFileFD;
     size_t   m_imageFileSize;
@@ -378,9 +381,11 @@ public:
     { }
     
     bool     loadImage(const char* fileName);
+    void     storeImage(const char* fileName);
     TObject* getGlobal(const char* name);
     TObject* getGlobal(TSymbol* name);
     
+    class ImageWriter;
     // GLobal VM objects
 };
 
@@ -401,5 +406,21 @@ struct TGlobals {
 };
 
 extern TGlobals globals;
+
+class Image::ImageWriter
+{
+private:
+    std::vector<TObject*> m_writtenObjects; //used to link objects together with type 'previousObject'
+    TGlobals              m_globals;
+    
+    TImageRecordType getObjectType(TObject* object) const;
+    int              getPreviousObjectIndex(TObject* object) const;
+    void             writeWord(std::ofstream& os, uint32_t word);
+    void             writeObject(std::ofstream& os, TObject* object);
+public:
+    ImageWriter() {}
+    ImageWriter& setGlobals(const TGlobals& globals);
+    void writeTo(const char* fileName);
+};
 
 #endif
