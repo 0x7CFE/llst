@@ -882,10 +882,10 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-//     m_functionPassManager->add(createLLSTPass()); // FIXME direct calls break the logic
+    m_functionPassManager->add(createLLSTPass()); // FIXME direct calls break the logic
 //     //If llstPass removed GC roots, we may try DCE again
-//     m_functionPassManager->add(createDeadCodeEliminationPass());
-//     m_functionPassManager->add(createDeadStoreEliminationPass());
+    m_functionPassManager->add(createDeadCodeEliminationPass());
+    m_functionPassManager->add(createDeadStoreEliminationPass());
     
     //m_functionPassManager->add(createLLSTDebuggingPass());
     m_modulePassManager->add(createFunctionInliningPass());
