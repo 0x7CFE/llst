@@ -1203,6 +1203,21 @@ do: aBlock
     self sendMessage: #value withArguments: (Array with: aBlock).
 !
 
+METHOD MetaLLVM
+printStat
+    <248>
+!
+
+METHOD MetaLLVM
+printMethod: aMethod
+    <249 aMethod>
+!
+
+METHOD MetaLLVM
+patchHotMethods
+    <250>
+!
+
 CLASS StatementsTest Test
 
 METHOD StatementsTest
@@ -1343,17 +1358,43 @@ COMMENT     nil main.
 COMMENT !
 
 METHOD Undefined
-main    | command  x|
+loopBenchmark | s |
+    s <- 0.
+    1 to: 1000000 do: [ :x | s <- s + 1. ].
+    ^s
+!
+
+METHOD Undefined
+sortBenchmark: data 
+    ^data sort
+!
+
+METHOD Undefined
+runSortBenchmarkFor: data
+    ^Timer millisecondsToRun: [ nil sortBenchmark: data ]
+!
+
+METHOD Undefined
+main    | command  data |
     " initialize classes "
     
     Char initialize.
 
-    "File fileIn: '../image/disasm.st'."
+    'Preparing test data ...' print. 
+    data <- List new.
+    1 to: 50000 do: [ :x | data add: 100000 atRandom ].
+    'done' printNl.
     
-    "Scheduler initialize.
-    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
-    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
-    Scheduler run."
+    'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
+    'Cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    'Hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    
+    LLVM patchHotMethods.
+    
+    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    
+    "1 to: 100 do: [ :x | LLVM do: [ nil loopBenchmark ] ]."
     
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]

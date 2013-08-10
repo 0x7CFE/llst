@@ -104,6 +104,11 @@
     %TContext*      ; targetContext
 }
 
+%TGCMetaData = type {
+    i1 ; isStackObject
+}
+
+@stackObjectMeta = constant %TGCMetaData { i1 true }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;
@@ -174,10 +179,23 @@ define i1 @isObjectBinary(%TObject* %this) {
     ret i1 %result
 }
 
+@SmallInt = external global %TClass
+
 define %TClass* @getObjectClass(%TObject* %this) {
+    ; TODO SmallInt case
+    %test = call i1 @isSmallInteger(%TObject* %this)
+    br i1 %test, label %is_smallint, label %is_object    
+is_smallint:    
+    ret %TClass* @SmallInt
+is_object:
     %addr = getelementptr %TObject* %this, i32 0, i32 1
     %class = load %TClass** %addr
     ret %TClass* %class
+}
+
+define %TClass** @getObjectClassPtr(%TObject* %this) {
+    %pclass = getelementptr inbounds %TObject* %this, i32 0, i32 1
+    ret %TClass** %pclass
 }
 
 define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {

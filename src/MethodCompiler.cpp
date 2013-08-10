@@ -268,6 +268,8 @@ Function* MethodCompiler::createFunction(TMethod* method)
     Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
+    function->addFnAttr(Attributes(Attribute::InlineHint));
+//     function->addFnAttr(Attributes(Attribute::AlwaysInline));
     return function;
 }
 
@@ -489,12 +491,12 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     return arrayObject;
 }
 
-Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext)
+Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
 {
     TJITContext  jit(this, method, callingContext);
     
-    // Creating the function named as "Class>>method"
-    jit.function = createFunction(method);
+    // Creating the function named as "Class>>method" or using provided one
+    jit.function = methodFunction ? methodFunction : createFunction(method);
     
     // Creating the preamble basic block and inserting it into the function
     // It will contain basic initialization code (args, temps and so on)
@@ -511,6 +513,8 @@ Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContex
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
     writePreamble(jit);
+    if (contextHolder)
+        *contextHolder = jit.contextHolder;
     
     // Writing exception handlers for the
     // correct operation of block return
@@ -708,7 +712,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
     jit.bytePointer += 2;
     
-    TJITContext blockContext(this, jit.method, jit.callingContext);
+    TJITContext blockContext(this, jit.method, 0/*jit.callingContext*/);
     blockContext.bytePointer = jit.bytePointer;
     
     // Creating block function named Class>>method@offset
@@ -725,22 +729,30 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
         blockParams,               // parameters
         false                      // we're not dealing with vararg
     );
-    blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
-    blockContext.function->setGC("shadow-stack");
-    m_blockFunctions[blockFunctionName] = blockContext.function;
     
-    // Creating the basic block and inserting it into the function
-    blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
-    blockContext.builder = new IRBuilder<>(blockContext.preamble);
-    writePreamble(blockContext, /*isBlock*/ true);
-    scanForBranches(blockContext, newBytePointer - jit.bytePointer);
+    blockContext.function = m_JITModule->getFunction(blockFunctionName);
+    if (! blockContext.function) { // Checking if not already created
+        blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
     
-    BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
-    blockContext.builder->CreateBr(blockBody);
-    blockContext.builder->SetInsertPoint(blockBody);
+        blockContext.function->setGC("shadow-stack");
+        m_blockFunctions[blockFunctionName] = blockContext.function;
+        
+        // Creating the basic block and inserting it into the function
+        blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
+        blockContext.builder = new IRBuilder<>(blockContext.preamble);
+        writePreamble(blockContext, /*isBlock*/ true);
+        scanForBranches(blockContext, newBytePointer - jit.bytePointer);
+        
+        BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
+        blockContext.builder->CreateBr(blockBody);
+        blockContext.builder->SetInsertPoint(blockBody);
+        
+        writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
+        
+        // Running optimization passes on a block function
+        JITRuntime::Instance()->optimizeFunction(blockContext.function);
+    } 
     
-    writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
-
     // Create block object and fill it with context information
     Value* args[] = {
         jit.getCurrentContext(),                   // creatingContext
@@ -754,9 +766,6 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     
     Value* blockHolder = protectPointer(jit, blockObject);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
-    
-    // Running optimization passes on a block function
-    JITRuntime::Instance()->optimizeFunction(blockContext.function);
 }
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
@@ -908,7 +917,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
-        jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset 
+        /*jit.builder->getInt32(m_callSiteIndex) // */jit.builder->getInt32(jit.bytePointer) // call site offset 
     };
     m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
     
@@ -959,7 +968,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()),
-        jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset 
+        /*jit.builder->getInt32(m_callSiteIndex) //*/ jit.builder->getInt32(jit.bytePointer) // call site offset 
     };
     m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
     
@@ -1109,7 +1118,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 messageSelector, // selector
                 arguments,       // message arguments
                 parentClass,     // receiver class
-                jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset
+                /*jit.builder->getInt32(m_callSiteIndex) //*/ jit.builder->getInt32(jit.bytePointer) // call site offset
             };
             m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
             
@@ -1486,7 +1495,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 args,
                 // default receiver class
                 ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
-                jit.builder->getInt32(m_callSiteIndex) // jit.builder->getInt32(jit.bytePointer) // call site offset
+                /*jit.builder->getInt32(m_callSiteIndex) //*/ jit.builder->getInt32(jit.bytePointer) // call site offset
             };
             m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
             

@@ -339,6 +339,10 @@ public:
         void* roots[0];
     };
 
+    struct TMetaInfo {
+        bool isStackObject : 1;
+    };
+    
     LLVMMemoryManager();
     virtual ~LLVMMemoryManager();
 };

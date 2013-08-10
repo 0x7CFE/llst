@@ -216,7 +216,7 @@ public:
     // used during the compilation process.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
-        TContext*           callingContext;
+       // TContext*           callingContext;
         uint32_t            bytePointer;
 
         llvm::Function*     function;     // LLVM function that is created based on method
@@ -247,7 +247,7 @@ public:
         void pushValue(TStackValue* value);
         
         TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
-            : method(method), callingContext(context),
+            : method(method), //callingContext(context),
             bytePointer(0), function(0), builder(0), 
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
@@ -336,7 +336,12 @@ public:
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
     TJITGlobals& getJitGlobals() { return m_globals; }
     
-    llvm::Function* compileMethod(TMethod* method, TContext* callingContext);
+    llvm::Function* compileMethod(
+        TMethod* method, 
+        TContext* callingContext, 
+        llvm::Function* methodFunction = 0,
+        llvm::Value** contextHolder = 0
+    );
 
     MethodCompiler(
         llvm::Module* JITModule,
@@ -497,15 +502,26 @@ public:
         
         bool processed;
         uint32_t hitCount;
+        TMethod* method;
         llvm::Function* methodFunction;
         TCallSiteMap callSites;
         
-        THotMethod() : processed(false), hitCount(0), methodFunction(0) {}
+        THotMethod() : processed(false), hitCount(0), method(0), methodFunction(0) {}
     };
     
     struct TDirectBlock {
         llvm::BasicBlock* basicBlock;
         llvm::Value* returnValue;
+        
+        llvm::Value* contextHolder;
+        llvm::Value* tempsHolder;
+    };
+    
+    struct TPatchInfo {
+        llvm::Instruction* callInstruction;
+        llvm::Value* messageArguments;
+        llvm::BasicBlock* nextBlock;
+        llvm::Value* contextHolder;
     };
     
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
@@ -514,11 +530,22 @@ public:
 private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex);
-    void patchHotMethods();
-    void patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteIndex);
+    void patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
-    void createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks);
+    void createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks);
+    std::pair<llvm::Value*, llvm::Value*> allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
+    void cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock);
 public:
+    void patchHotMethods();
+    void printMethod(TMethod* method) { 
+        std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+        llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
+        
+        if (!methodFunction)
+            llvm::outs() << "Compiled method " << functionName << " is not found\n";
+        else 
+            llvm::outs() << *methodFunction;
+    }
     static JITRuntime* Instance() { return s_instance; }
 
     MethodCompiler* getCompiler() { return m_methodCompiler; }

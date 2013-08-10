@@ -357,10 +357,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 
                 verifyModule(*m_JITModule, AbortProcessAction);
                 
-//                 outs() << *methodFunction << "\n";
                 optimizeFunction(methodFunction);
-                
-//                 outs() << *methodFunction;
             }
             
             // Calling the method and returning the result
@@ -368,6 +365,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             updateFunctionCache(method, compiledMethodFunction);
             
             THotMethod& newMethod = m_hotMethods[compiledMethodFunction];
+            newMethod.method = method;
             newMethod.methodFunction = methodFunction;
         }
         
@@ -440,25 +438,102 @@ void JITRuntime::patchHotMethods()
     
     // Sorting method pointers by hitCount field
     std::sort(hotMethods.begin(), hotMethods.end(), compareByHitCount);
+
+    outs() << "Patching active methods that have hot call sites\n";
     
     // Processing 50 most active methods
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
-        // Peeking most active method (with max hitCount)
         THotMethod* hotMethod = hotMethods[j];
         
         // We're interested only in methods with call sites
         if (hotMethod->callSites.empty())
             continue;
         
+        TMethod* method = hotMethod->method;
+        Function* methodFunction = hotMethod->methodFunction;
+        if (!method || !methodFunction)
+            continue;
+        
+        // Cleaning up the function
+        m_executionEngine->freeMachineCodeForFunction(methodFunction);
+        methodFunction->getBasicBlockList().clear();
+        
+        // Compiling function from scratch
+        outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
+        Value* contextHolder = 0;
+        m_methodCompiler->compileMethod(method, 0, methodFunction, &contextHolder);
+        
+        outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
+        
         // Iterating through call sites and inserting class checks with direct calls
         THotMethod::TCallSiteMap::iterator iSite = hotMethod->callSites.begin();
         while (iSite != hotMethod->callSites.end()) {
-            patchCallSite(*hotMethod, iSite->second, iSite->first);
+            patchCallSite(hotMethod->methodFunction, contextHolder, iSite->second, iSite->first);
             ++iSite;
         }
+
+//         outs() << "Patched code: \n" << *hotMethod->methodFunction << "\n";
         
-        // TODO recompile patched method
+        outs() << "done. Verifying ...";
+        
+        verifyModule(*m_JITModule, AbortProcessAction);
+        
+        outs() << "done.\n";
+        
     }
+
+    // Running optimization passes on functions
+    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+        THotMethod* hotMethod = hotMethods[j];
+        
+        // We're interested only in methods with call sites
+        if (hotMethod->callSites.empty())
+            continue;
+        
+        TMethod* method = hotMethod->method;
+        Function* methodFunction = hotMethod->methodFunction;
+        if (!method || !methodFunction)
+            continue;
+        
+        outs() << "Optimizing " << hotMethod->methodFunction->getName().str() << " ...";
+        optimizeFunction(hotMethod->methodFunction);
+        
+        outs() << "done. Verifying ...";
+        
+        verifyModule(*m_JITModule, AbortProcessAction);
+        
+//         outs() << "Optimized code: \n" << *hotMethod->methodFunction;
+        
+        outs() << "done.\n";
+    }
+        
+    // Compiling functions
+    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+        THotMethod* hotMethod = hotMethods[j];
+        
+        // We're interested only in methods with call sites
+        if (hotMethod->callSites.empty())
+            continue;
+        
+        TMethod* method = hotMethod->method;
+        Function* methodFunction = hotMethod->methodFunction;
+        if (!method || !methodFunction)
+            continue;
+        
+        outs() << "Compiling machine code for " << hotMethod->methodFunction->getName().str() << " ...";
+        m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
+        
+        
+//         outs() << "Final code: \n" << *hotMethod->methodFunction;
+        
+        outs() << "done.\n";
+    }
+    
+    // Invalidating caches
+    memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
+    memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
+    
+    outs() << "All is done.\n";
 }
 
 llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex) 
@@ -476,86 +551,171 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
                 if (call.getCalledFunction() == m_runtimeAPI.sendMessage && call.getArgument(4) == callOffsetValue)
                     return iInst;
             }
-    
     // Instruction was not found (probably due to optimization)
     return 0;
 }
 
-void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSite& callSite, TDirectBlockMap& directBlocks) 
+
+std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount) {
+    // Storing current edit location
+    BasicBlock* insertBlock = builder.GetInsertBlock();
+    BasicBlock::iterator insertPoint = builder.GetInsertPoint();
+    
+    // Switching to the preamble
+    BasicBlock* preamble = & insertBlock->getParent()->getBasicBlockList().front();
+    builder.SetInsertPoint(preamble, preamble->begin());
+    
+    // Allocating the object slot
+    const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
+    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
+    objectSlot->setAlignment(4);
+    
+    // Allocating object holder in the preamble
+    AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
+    
+    // Initializing holder with null value
+//    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder, true);
+    
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    
+    //Value* structData = { ConstantInt::get(builder.getInt1Ty(), 1) };
+    
+    // Registering holder in GC and supplying metadata that tells GC to treat this particular root
+    // as a pointer to a stack object. Stack objects are not moved by GC. Instead, only their fields 
+    // and class pointer are updated.
+    //Value* metaData = ConstantStruct::get(m_JITModule->getTypeByName("TGCMetaData"), ConstantInt::get(builder.getInt1Ty(), 1));
+    Value* metaData = m_JITModule->getGlobalVariable("stackObjectMeta");
+    Value* stackRoot = builder.CreateBitCast(objectHolder, builder.getInt8PtrTy()->getPointerTo());
+    builder.CreateCall2(gcrootIntrinsic, stackRoot, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
+    
+    // Returning to the original edit location
+    builder.SetInsertPoint(insertBlock, insertPoint); 
+    
+    // Storing the address of stack object to the holder
+    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
+    builder.CreateStore(newObject, objectHolder/*, true*/);
+    
+    return std::make_pair(objectSlot, objectHolder);
+}
+
+void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks) 
 {
     using namespace llvm;
     
-    IRBuilder<> builder(callInstruction->getParent());
+    IRBuilder<> builder(info.callInstruction->getParent());
     TCallSite::TClassHitsMap& classHits = callSite.classHits;
 
     // FIXME Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
         TDirectBlock newBlock;
-        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.");
+        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", info.callInstruction->getParent()->getParent(), info.nextBlock);
         
         builder.SetInsertPoint(newBlock.basicBlock);
         
-        // Locating a method suitable for direct call
+        // Locating a method suitable for a direct call
         TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
         
+        if (!directFunction) {
+            outs() << "Error! Could not acquire direct function for name " << directFunctionName << "\n";
+            abort();
+        }
+        
+//         FunctionType* _printfType = FunctionType::get(builder.getInt32Ty(), builder.getInt8PtrTy(), true);
+//         Constant*     _printf     = m_JITModule->getOrInsertFunction("printf", _printfType);
+//         Value* debugFormat = builder.CreateGlobalStringPtr("direct method '%s' : %d\n");
+//         Value* strName     = builder.CreateGlobalStringPtr(directFunctionName);
+//         builder.CreateCall3(_printf, debugFormat,  strName, builder.getInt32(0));
+        
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
         // is required. Moreover, this is operation is much faster than heap allocation.
-        AllocaInst* contextSlot    = builder.CreateAlloca(m_baseTypes.context, 0, "directContext.");
-        const uint32_t tempsSize   = sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize);
+        const bool hasTemporaries  = getIntegerValue(directMethod->temporarySize) > 0;
         const uint32_t contextSize = sizeof(TContext);
-        AllocaInst* tempsSlot      = builder.CreateAlloca(Type::getInt8PtrTy(getGlobalContext()), builder.getInt32(tempsSize), "directTemps.");
-        contextSlot->setAlignment(4);
-        tempsSlot->setAlignment(4);
+        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize) : 0;
+        
+        // Allocating stack space for objects and registering GC protection holder
+        std::pair<llvm::Value*, llvm::Value*> contextPair = allocateStackObject(builder, sizeof(TContext), 0);
+        Value* contextSlot = contextPair.first;
+        newBlock.contextHolder = contextPair.second;
+        
+        Value* tempsSlot = 0;
+        if (hasTemporaries) {
+            std::pair<llvm::Value*, llvm::Value*> tempsPair = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            tempsSlot = tempsPair.first;
+            newBlock.tempsHolder = tempsPair.second;
+        } else
+            newBlock.tempsHolder = 0;
         
         // Filling stack space with zeroes
-        Function* llvmMemset = m_JITModule->getFunction("@llvm.memset");
+        Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
         builder.CreateCall5(
             llvmMemset,                    // llvm.memset intrinsic
             contextSlot,                   // destination address
             builder.getInt8(0),            // fill with zeroes
             builder.getInt32(contextSize), // size of object slot
-            builder.getInt8(0),            // no alignment
-            builder.getInt1(true)          // volatile operation
+            builder.getInt32(0),           // no alignment
+            builder.getInt1(false)          // volatile operation
         );
-        builder.CreateCall5(
-            llvmMemset,                    // llvm.memset intrinsic
-            tempsSlot,                     // destination address
-            builder.getInt8(0),            // fill with zeroes
-            builder.getInt32(tempsSize),   // size of object slot
-            builder.getInt8(0),            // no alignment
-            builder.getInt1(true)          // volatile operation
-        );
+        
+        if (hasTemporaries)
+            builder.CreateCall5(
+                llvmMemset,                    // llvm.memset intrinsic
+                tempsSlot,                     // destination address
+                builder.getInt8(0),            // fill with zeroes
+                builder.getInt32(tempsSize),   // size of object slot
+                builder.getInt32(0),           // no alignment
+                builder.getInt1(false)          // volatile operation
+            );
         
         // Initializing object fields
-        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.context);
-        Value* newTempsObject    = builder.CreateBitCast(tempsSlot, m_baseTypes.object);
-        Function* setObjectSize  = m_JITModule->getFunction("@setObjectSize");
-        Function* setObjectClass = m_JITModule->getFunction("@setObjectClass");
-        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextSize));
-        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(tempsSize));
+        // TODO Move the init sequence out of the direct block or check that it is correctly optimized in loops
+        Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
+        Value* newTempsObject    = hasTemporaries ? builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
+        Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
+        Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
+        
+        // Object size stored in the TSize field of any ordinary object contains
+        // number of pointers except for the first two fields
+        const uint32_t contextFieldsCount = contextSize / sizeof(TObject*) - 2;
+        
+        builder.CreateCall2(setObjectSize, newContextObject, builder.getInt32(contextFieldsCount));
         builder.CreateCall2(setObjectClass, newContextObject, m_methodCompiler->getJitGlobals().contextClass);
-        builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
         
-        // newContextObject->temporaries = newTempsObject
-        builder.CreateCall3(m_methodCompiler->getBaseFunctions().setObjectField, 
-                            newContextObject, 
-                            builder.getInt32(2), 
-                            newTempsObject
-                           );
+        if (hasTemporaries) {
+            const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
+            builder.CreateCall2(setObjectSize, newTempsObject, builder.getInt32(tempsFieldsCount));
+            builder.CreateCall2(setObjectClass, newTempsObject, m_methodCompiler->getJitGlobals().arrayClass);
+        }
         
+        Function* setObjectField  = m_methodCompiler->getBaseFunctions().setObjectField;
+        Value* methodRawPointer   = builder.getInt32(reinterpret_cast<uint32_t>(directMethod));
+        Value* directMethodObject = builder.CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
         
+        Value* previousContext = builder.CreateLoad(info.contextHolder);
+        Value* contextObject   = builder.CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
+        Value* messageArgumentsObject = builder.CreateBitCast(info.messageArguments, m_baseTypes.object->getPointerTo());
+        
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(0), directMethodObject);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(1), messageArgumentsObject);
+        if (hasTemporaries)
+            builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), newTempsObject);
+        else
+            builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(2), m_methodCompiler->getJitGlobals().nilObject);
+        builder.CreateCall3(setObjectField, newContextObject, builder.getInt32(3), contextObject);
+        
+        Value* newContext = builder.CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
         // Creating direct version of a call
-        if (isa<CallInst>(callInstruction))
-            newBlock.returnValue = builder.CreateCall(directFunction, newContextObject);
-        else {
-            InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
+        if (isa<CallInst>(info.callInstruction)) {
+            newBlock.returnValue = builder.CreateCall(directFunction, newContext);
+            builder.CreateBr(info.nextBlock);
+        } else {
+            InvokeInst* invokeInst = dyn_cast<InvokeInst>(info.callInstruction);
             newBlock.returnValue = builder.CreateInvoke(directFunction, 
-                                                        invokeInst->getNormalDest(), 
+                                                        info.nextBlock,
                                                         invokeInst->getUnwindDest(),
-                                                        newContextObject
+                                                        newContext
             );
         }
         newBlock.returnValue->setName("reply.");
@@ -564,11 +724,17 @@ void JITRuntime::createDirectBlocks(llvm::Instruction* callInstruction, TCallSit
     }
 }
 
-void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite, uint32_t callSiteIndex) 
+void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock) 
+{
+    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder/*, true*/);
+    if (directBlock.tempsHolder)
+        builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder/*, true*/);
+}
+
+void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 
 {
     using namespace llvm;
     
-    Function* methodFunction = hotMethod.methodFunction;
     Instruction* callInstruction = findCallInstruction(methodFunction, callSiteIndex);
     
     if (! callInstruction)
@@ -576,17 +742,24 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     CallSite call(callInstruction);
     
-    // Now, preparing a set of basic blocks with direct calls to class methods
-    TDirectBlockMap directBlocks;
-    createDirectBlocks(callInstruction, callSite, directBlocks);
     
     BasicBlock* originBlock = callInstruction->getParent();
 
     // Spliting original block into two parts. 
     // These will be intersected by our code
-    BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction);
-    originBlock->getInstList().pop_back(); // removing unconditional branch
-    nextBlock->getInstList().remove(callInstruction); // removing original instruction
+    BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction, "next.");
+    
+    // Now, preparing a set of basic blocks with direct calls to class methods
+    TDirectBlockMap directBlocks;
+    TPatchInfo info;
+    info.callInstruction = callInstruction;
+    info.nextBlock = nextBlock;
+    info.messageArguments = call.getArgument(2);
+    info.contextHolder = contextHolder;
+    createDirectBlocks(info, callSite, directBlocks);
+    
+    // Cutting unconditional branch between parts
+    originBlock->getInstList().pop_back();
 
     // Fallback block contains original call to default JIT sendMessage handler.
     // It is called when message is invoked with an unknown class that does not 
@@ -597,16 +770,17 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     SmallVector<Value*, 5> fallbackArgs;
     fallbackArgs.append(call.arg_begin(), call.arg_end());
     if (isa<CallInst>(callInstruction)) {
-        fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs);
+        fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs, "reply.");
+        builder.CreateBr(nextBlock);
     } else {
         InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
         fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
-                                             invokeInst->getNormalDest(), 
+                                             nextBlock,
                                              invokeInst->getUnwindDest(),
-                                             fallbackArgs
+                                             fallbackArgs,
+                                             "reply."
                                             );
     }
-    builder.CreateBr(nextBlock);
     
     // Creating a switch instruction that will filter the block 
     // depending on the actual class of the receiver object
@@ -614,9 +788,12 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     // Acquiring receiver's class pointer as raw int value
     Value* argumentsObject = call.getArgument(2);
-    Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object);
-    Value* receiver = 0; // TODO @getObjectFieldPtr(arguments, 0)
-    Value* receiverClass = 0; // TODO @getObjectClass(receiver)
+    Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object->getPointerTo());
+    
+    Function* getObjectField = m_methodCompiler->getBaseFunctions().getObjectField;
+    Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectClass;
+    Value* receiver = builder.CreateCall2(getObjectField, arguments, builder.getInt32(0));
+    Value* receiverClass = builder.CreateCall(getObjectClass, receiver);
     Value* receiverClassPtr = builder.CreatePtrToInt(receiverClass, Type::getInt32Ty(getGlobalContext()));
 
     // Genrating switch instruction to select basic block
@@ -624,8 +801,16 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
     
     // This phi function will aggregate direct block and fallback block return values
     builder.SetInsertPoint(nextBlock, nextBlock->getInstList().begin());
-    PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object, 2, "phi.");
+    PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
     replyPhi->addIncoming(fallbackReply, fallbackBlock);
+    
+    // Splitting original block tore execution flow. Reconnecting blocks
+    if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction)) {
+        BranchInst* branch = builder.CreateBr(invokeInst->getNormalDest());
+        
+        // Setting up builder for cleanup opertions
+        builder.SetInsertPoint(branch);
+    }
     
     for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
         TClass* klass = iBlock->first;
@@ -634,11 +819,14 @@ void JITRuntime::patchCallSite(const THotMethod& hotMethod, TCallSite& callSite,
         ConstantInt* classAddress = builder.getInt32(reinterpret_cast<uint32_t>(klass));
         switchInst->addCase(classAddress, directBlock.basicBlock);
         
-        builder.SetInsertPoint(directBlock.basicBlock);
-        builder.CreateBr(nextBlock);
-        
         replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
+        
+        // Adding cleanup code for the direct block
+        cleanupDirectHolders(builder, directBlock);
     }    
+    
+    callInstruction->replaceAllUsesWith(replyPhi);
+    callInstruction->eraseFromParent();
 }
 
 void JITRuntime::initializeGlobals() {
@@ -680,6 +868,9 @@ void JITRuntime::initializePassManager() {
     // Start with registering info about how the
     // target lays out data structures.
     m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
+    
+    m_modulePassManager->add(createFunctionInliningPass());
+    
     m_functionPassManager->add(createBasicAliasAnalysisPass());
     m_functionPassManager->add(createPromoteMemoryToRegisterPass());
     m_functionPassManager->add(createInstructionCombiningPass());
@@ -691,15 +882,14 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-    m_functionPassManager->add(createLLSTPass());
-    //If llstPass removed GC roots, we may try DCE again
-    m_functionPassManager->add(createDeadCodeEliminationPass());
-    m_functionPassManager->add(createDeadStoreEliminationPass());
+//     m_functionPassManager->add(createLLSTPass()); // FIXME direct calls break the logic
+//     //If llstPass removed GC roots, we may try DCE again
+//     m_functionPassManager->add(createDeadCodeEliminationPass());
+//     m_functionPassManager->add(createDeadStoreEliminationPass());
     
     //m_functionPassManager->add(createLLSTDebuggingPass());
-    m_functionPassManager->doInitialization();
-    
     m_modulePassManager->add(createFunctionInliningPass());
+    m_functionPassManager->doInitialization();
 }
 
 void JITRuntime::initializeRuntimeAPI() {

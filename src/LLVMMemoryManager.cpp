@@ -46,16 +46,40 @@ void LLVMMemoryManager::moveObjects()
 
     // Then, traversing the call stack pointers
     for (TStackEntry* entry = llvm_gc_root_chain; entry != 0; entry = entry->next) {
-        // NOTE We do not using the meta info
-
-        // Iterating through the roots in the current stack frame
-        for (int32_t index = 0, count = entry->map->numRoots; index < count; index++) {
-            TMovableObject* object = (TMovableObject*) entry->roots[index];
+        const uint32_t metaCount = entry->map->numMeta;
+        const uint32_t rootCount = entry->map->numRoots;
+        uint32_t entryIndex = 0;
+        
+        // Processing stack objects
+        for (; entryIndex < metaCount; entryIndex++) {
+            TMetaInfo* metaInfo = (TMetaInfo*) entry->map->meta[entryIndex];
+            if (metaInfo && metaInfo->isStackObject) {
+                TMovableObject* stackObject = (TMovableObject*) entry->roots[entryIndex];
+                
+                if (! stackObject)
+                    continue;
+                
+                // Stack objects are allocated on a stack frames of jit functions
+                // We need to process only their fields and class pointer
+                for (uint32_t fieldIndex = 0; fieldIndex < stackObject->size.getSize() + 1; fieldIndex++) {
+                    
+                    TMovableObject* field = stackObject->data[fieldIndex];
+                    if (field)
+                        field = moveObject(field);
+                    
+                    stackObject->data[fieldIndex] = field;
+                }
+            }
+        }
+        
+        // Iterating through the normal roots in the current stack frame
+        for (; entryIndex < rootCount; entryIndex++) {
+            TMovableObject* object = (TMovableObject*) entry->roots[entryIndex];
 
             if (object != 0)
                 object = moveObject(object);
 
-            entry->roots[index] = object;
+            entry->roots[entryIndex] = object;
         }
     }
 }
