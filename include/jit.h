@@ -335,6 +335,7 @@ public:
     uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; } 
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
     TJITGlobals& getJitGlobals() { return m_globals; }
+    TObjectTypes& getBaseTypes() { return m_baseTypes; }
     
     llvm::Function* compileMethod(
         TMethod* method, 
@@ -535,6 +536,7 @@ private:
     void createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks);
     std::pair<llvm::Value*, llvm::Value*> allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
     void cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock);
+    bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
     void patchHotMethods();
     void printMethod(TMethod* method) { 

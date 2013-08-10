@@ -731,6 +731,12 @@ void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& 
         builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.tempsHolder/*, true*/);
 }
 
+bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
+{
+    // Searching for store instruction 
+    return false;
+}
+
 void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 
 {
     using namespace llvm;
@@ -744,7 +750,8 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
     
     
     BasicBlock* originBlock = callInstruction->getParent();
-
+    IRBuilder<> builder(originBlock);
+    
     // Spliting original block into two parts. 
     // These will be intersected by our code
     BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction, "next.");
@@ -761,71 +768,93 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
     // Cutting unconditional branch between parts
     originBlock->getInstList().pop_back();
 
-    // Fallback block contains original call to default JIT sendMessage handler.
-    // It is called when message is invoked with an unknown class that does not 
-    // has direct handler.
-    BasicBlock* fallbackBlock = BasicBlock::Create(callInstruction->getContext(), "fallback.", methodFunction, nextBlock);
-    IRBuilder<> builder(fallbackBlock);
-    Value* fallbackReply = 0;
-    SmallVector<Value*, 5> fallbackArgs;
-    fallbackArgs.append(call.arg_begin(), call.arg_end());
-    if (isa<CallInst>(callInstruction)) {
-        fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs, "reply.");
-        builder.CreateBr(nextBlock);
-    } else {
-        InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
-        fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
-                                             nextBlock,
-                                             invokeInst->getUnwindDest(),
-                                             fallbackArgs,
-                                             "reply."
-                                            );
-    }
+    // Checking whether we may perform constant class propagation
+    bool isLiteralReceiver = detectLiteralReceiver(info.messageArguments) && (directBlocks.size() == 1);
     
-    // Creating a switch instruction that will filter the block 
-    // depending on the actual class of the receiver object
-    builder.SetInsertPoint(originBlock);
+    if (! isLiteralReceiver) {
+        // Fallback block contains original call to default JIT sendMessage handler.
+        // It is called when message is invoked with an unknown class that does not 
+        // has direct handler.
+        BasicBlock* fallbackBlock = BasicBlock::Create(callInstruction->getContext(), "fallback.", methodFunction, nextBlock);
+        Value* fallbackReply = 0;
+        
+        builder.SetInsertPoint(fallbackBlock);
+        
+        SmallVector<Value*, 5> fallbackArgs;
+        fallbackArgs.append(call.arg_begin(), call.arg_end());
+        if (isa<CallInst>(callInstruction)) {
+            fallbackReply = builder.CreateCall(call.getCalledFunction(), fallbackArgs, "reply.");
+            builder.CreateBr(nextBlock);
+        } else {
+            InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
+            fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
+                                                 nextBlock,
+                                                 invokeInst->getUnwindDest(),
+                                                 fallbackArgs,
+                                                 "reply."
+            );
+        }
     
-    // Acquiring receiver's class pointer as raw int value
-    Value* argumentsObject = call.getArgument(2);
-    Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object->getPointerTo());
-    
-    Function* getObjectField = m_methodCompiler->getBaseFunctions().getObjectField;
-    Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectClass;
-    Value* receiver = builder.CreateCall2(getObjectField, arguments, builder.getInt32(0));
-    Value* receiverClass = builder.CreateCall(getObjectClass, receiver);
-    Value* receiverClassPtr = builder.CreatePtrToInt(receiverClass, Type::getInt32Ty(getGlobalContext()));
+        // Creating a switch instruction that will filter the block 
+        // depending on the actual class of the receiver object
+        builder.SetInsertPoint(originBlock);
+        
+        // Acquiring receiver's class pointer as raw int value
+        Value* argumentsObject = call.getArgument(2);
+        Value* arguments = builder.CreateBitCast(argumentsObject, m_baseTypes.object->getPointerTo());
+        
+        Function* getObjectField = m_methodCompiler->getBaseFunctions().getObjectField;
+        Function* getObjectClass = m_methodCompiler->getBaseFunctions().getObjectClass;
+        Value* receiver = builder.CreateCall2(getObjectField, arguments, builder.getInt32(0));
+        Value* receiverClass = builder.CreateCall(getObjectClass, receiver);
+        Value* receiverClassPtr = builder.CreatePtrToInt(receiverClass, Type::getInt32Ty(getGlobalContext()));
 
-    // Genrating switch instruction to select basic block
-    SwitchInst* switchInst = builder.CreateSwitch(receiverClassPtr, fallbackBlock);
-    
-    // This phi function will aggregate direct block and fallback block return values
-    builder.SetInsertPoint(nextBlock, nextBlock->getInstList().begin());
-    PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
-    replyPhi->addIncoming(fallbackReply, fallbackBlock);
-    
-    // Splitting original block tore execution flow. Reconnecting blocks
-    if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction)) {
-        BranchInst* branch = builder.CreateBr(invokeInst->getNormalDest());
+        // Genrating switch instruction to select basic block
+        SwitchInst* switchInst = builder.CreateSwitch(receiverClassPtr, fallbackBlock);
         
-        // Setting up builder for cleanup opertions
-        builder.SetInsertPoint(branch);
+        // This phi function will aggregate direct block and fallback block return values
+        builder.SetInsertPoint(nextBlock, nextBlock->getInstList().begin());
+        PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
+        replyPhi->addIncoming(fallbackReply, fallbackBlock);
+        
+        // Splitting original block tore execution flow. Reconnecting blocks
+        if (InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction)) {
+            BranchInst* branch = builder.CreateBr(invokeInst->getNormalDest());
+            
+            // Setting up builder for cleanup opertions
+            builder.SetInsertPoint(branch);
+        }
+        
+        for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
+            TClass* klass = iBlock->first;
+            TDirectBlock& directBlock = iBlock->second;
+            
+            ConstantInt* classAddress = builder.getInt32(reinterpret_cast<uint32_t>(klass));
+            switchInst->addCase(classAddress, directBlock.basicBlock);
+            
+            replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
+            
+            // Adding cleanup code for the direct block
+            cleanupDirectHolders(builder, directBlock);
+        }    
+        
+        callInstruction->replaceAllUsesWith(replyPhi);
+    } else {
+        // Literal receivers are constants that are written 
+        // at method compilation time and do not change.
+        
+        // We may take advantage of this fact and optimize call 
+        // of method with literal object as a receiver. Because 
+        // literal object is a constant, it's class is constant too.
+        // Therefore, we do not need to check it every time we call a method.
+        
+        TDirectBlock& directBlock = (*directBlocks.begin()).second;
+        
+        builder.SetInsertPoint(originBlock);
+        builder.CreateBr(directBlock.basicBlock);
+        callInstruction->replaceAllUsesWith(directBlock.returnValue);
     }
     
-    for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
-        TClass* klass = iBlock->first;
-        TDirectBlock& directBlock = iBlock->second;
-        
-        ConstantInt* classAddress = builder.getInt32(reinterpret_cast<uint32_t>(klass));
-        switchInst->addCase(classAddress, directBlock.basicBlock);
-        
-        replyPhi->addIncoming(directBlock.returnValue, directBlock.basicBlock);
-        
-        // Adding cleanup code for the direct block
-        cleanupDirectHolders(builder, directBlock);
-    }    
-    
-    callInstruction->replaceAllUsesWith(replyPhi);
     callInstruction->eraseFromParent();
 }
 

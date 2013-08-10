@@ -89,7 +89,20 @@ Value* TDeferredValue::get()
         } break;
         
         case loadLiteral: {
-            return m_jit->getLiteral(m_index);
+            TMethod* method  = m_jit->method;
+            TObject* literal = method->literals->getField(m_index);
+            
+            Value* literalValue = builder.CreateIntToPtr(
+                builder.getInt32( reinterpret_cast<uint32_t>(literal)), 
+                m_jit->compiler->getBaseTypes().object->getPointerTo()
+            );
+            
+            std::ostringstream ss;
+            ss << "lit" << (uint32_t) m_index << ".";
+            literalValue->setName(ss.str()); 
+            
+            return literalValue;
+//             return m_jit->getLiteral(m_index);
         } break;
         
         default:
@@ -104,11 +117,11 @@ Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
     Function* getLiteralFromContext = jitModule->getFunction("getLiteralFromContext");
     
     Value* context = getCurrentContext();
-    Value* literal = builder->CreateCall2(getLiteralFromContext, context, builder->getInt32(index));
+    CallInst* literal = builder->CreateCall2(getLiteralFromContext, context, builder->getInt32(index));
     
     std::ostringstream ss;
     ss << "lit" << (uint32_t) index << ".";
-    literal->setName(ss.str());
+    literal->setName(ss.str()); 
     
     return literal;
 }

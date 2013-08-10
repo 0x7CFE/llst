@@ -1382,7 +1382,7 @@ main    | command  data |
 
     'Preparing test data ...' print. 
     data <- List new.
-    1 to: 50000 do: [ :x | data add: 100000 atRandom ].
+    1 to: 1000 do: [ :x | data add: 100000 atRandom ].
     'done' printNl.
     
     'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
