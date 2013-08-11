@@ -214,8 +214,7 @@ TObject* Image::readObject()
 
 bool Image::loadImage(const char* fileName)
 {
-    if (!openImageFile(fileName))
-    {
+    if ( !openImageFile(fileName) ) {
         fprintf(stderr, "could not open image file %s\n", fileName);
         return false;
     }
@@ -223,8 +222,7 @@ bool Image::loadImage(const char* fileName)
     // TODO Check whether heap is already initialized
     
     // Multiplier of 1.5 of imageFileSize should be a good estimation for static heap size
-    if (!m_memoryManager->initializeStaticHeap(m_imageFileSize + m_imageFileSize / 2) )
-    {
+    if ( !m_memoryManager->initializeStaticHeap(m_imageFileSize + m_imageFileSize / 2) ) {
         closeImageFile();
         return false;
     }
@@ -259,8 +257,7 @@ bool Image::loadImage(const char* fileName)
 
 void Image::ImageWriter::writeWord(std::ofstream& os, uint32_t word)
 {
-    while (word >= 0xFF)
-    {
+    while (word >= 0xFF) {
         word -= 0xFF;
         os << '\xFF';
     }
@@ -274,8 +271,8 @@ Image::TImageRecordType Image::ImageWriter::getObjectType(TObject* object) const
         return inlineInteger;
     } else {
         std::vector<TObject*>::const_iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
-        if (iter != m_writtenObjects.end())
-        { // object is found
+        if (iter != m_writtenObjects.end()) {
+            // object is found
             int index = std::distance(m_writtenObjects.begin(), iter);
             if (index == 0)
                 return nilObject;
@@ -302,17 +299,10 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
     TImageRecordType type = getObjectType(object);
     writeWord(os, (uint32_t) type);
     
-    switch(type)
-    {
-        case ordinaryObject:
-        case byteObject:
-            m_writtenObjects.push_back(object);
-        default:
-            break;
-    }
+    if (type == ordinaryObject || type == byteObject)
+        m_writtenObjects.push_back(object);
     
-    switch (type)
-    {
+    switch (type) {
         case inlineInteger: {
             uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
             os.write((char*) &integer, sizeof(integer));
