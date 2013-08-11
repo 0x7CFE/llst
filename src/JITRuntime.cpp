@@ -759,27 +759,38 @@ bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
     if (!createArgsCall)
         return false;
     
-    Function* setObjectField = m_methodCompiler->getBaseFunctions().setObjectField;
-    Function* getLiteral     = m_methodCompiler->getBaseFunctions().getLiteral;
+    Value* receiver = 0; // receiver == args[0]
     
-    for(Value::use_iterator use = setObjectField->use_begin(); use != setObjectField->use_end(); ++use) {
+    Function* setObjectField = m_methodCompiler->getBaseFunctions().setObjectField;
+    for(Value::use_iterator use = createArgsCall->use_begin(); use != createArgsCall->use_end(); ++use) {
         if (CallInst* call = dyn_cast<CallInst>(*use)) {
-            Value* object = call->getArgOperand(0);
+            if (call->getCalledFunction() != setObjectField)
+                continue;
+            
+            Value* arg0 = call->getArgOperand(0);
             ConstantInt* zeroIndex = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0);
-            if (createArgsCall->isIdenticalTo(cast<CallInst>(object)) && call->getArgOperand(1) == zeroIndex)
+            if ( createArgsCall->isIdenticalTo(cast<CallInst>(arg0)) && call->getArgOperand(1) == zeroIndex )
             {
-                Value* receiver = call->getArgOperand(2); // receiver == args[0]
-                if (isa<IntToPtrInst>(receiver)) {
-                    // inlined SmallInt
-                    return true;
-                }
-                
-                if (CallInst* call = dyn_cast<CallInst>(receiver)) {
-                    if (call->getCalledFunction() == getLiteral)
-                        return true;
-                }
+                receiver = call->getArgOperand(2);
+                break;
             }
         }
+    }
+    
+    if (!receiver) {
+        //TODO try to find receiver in GEPs
+        return false;
+    }
+    
+    
+    if (isa<ConstantExpr>(receiver)) {
+        // inlined SmallInt
+        return true;
+    }
+    
+    if (CallInst* call = dyn_cast<CallInst>(receiver)) {
+        if (call->getCalledFunction() == m_methodCompiler->getBaseFunctions().getLiteral)
+            return true;
     }
     
     return false;
