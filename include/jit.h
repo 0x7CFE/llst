@@ -147,6 +147,7 @@ struct TBaseFunctions {
     llvm::Function* getObjectField;
     llvm::Function* setObjectField;
     llvm::Function* getSlotSize;
+    llvm::Function* getLiteral;
 
     void initializeFromModule(llvm::Module* module) {
         isSmallInteger   = module->getFunction("isSmallInteger");
@@ -158,6 +159,7 @@ struct TBaseFunctions {
         getObjectField   = module->getFunction("getObjectField");
         setObjectField   = module->getFunction("setObjectField");
         getSlotSize      = module->getFunction("getSlotSize");
+        getLiteral       = module->getFunction("getLiteralFromContext");
     }
 };
 
@@ -334,6 +336,7 @@ private:
 public:
     uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; } 
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
+    TRuntimeAPI& getRuntimeAPI() { return m_runtimeAPI; }
     TJITGlobals& getJitGlobals() { return m_globals; }
     TObjectTypes& getBaseTypes() { return m_baseTypes; }
     

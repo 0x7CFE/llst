@@ -46,6 +46,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string>
+#include <cassert>
+#include <algorithm>
 
 // Placeholder for root objects
 TGlobals globals;
@@ -127,12 +129,11 @@ uint32_t Image::readWord()
     uint8_t  byte  = 0;
     
     // Very stupid yet simple multibyte encoding
-    // value = 255 + 255 + ... + x where x < 255
-    while ( (byte = *m_imagePointer++) == 255 ) {
-        value += byte; // adding 255 part
-    }
-    value += byte; // adding remaining part
-    
+    // value = FF + FF ... + x where x < FF
+    do {
+        byte = *m_imagePointer++;
+        value += byte;
+    } while ( byte == 0xFF );
     return value;
 }
 
@@ -254,4 +255,133 @@ bool Image::loadImage(const char* fileName)
     closeImageFile();
     
     return true;
+}
+
+void Image::ImageWriter::writeWord(std::ofstream& os, uint32_t word)
+{
+    while (word >= 0xFF)
+    {
+        word -= 0xFF;
+        os << '\xFF';
+    }
+    uint8_t byte = word & 0xFF;
+    os << byte;
+}
+
+Image::TImageRecordType Image::ImageWriter::getObjectType(TObject* object) const
+{
+    if ( isSmallInteger(object) ) {
+        return inlineInteger;
+    } else {
+        std::vector<TObject*>::const_iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
+        if (iter != m_writtenObjects.end())
+        { // object is found
+            int index = std::distance(m_writtenObjects.begin(), iter);
+            if (index == 0)
+                return nilObject;
+            else
+                return previousObject;
+        }
+        else if ( object->isBinary() )
+            return byteObject;
+        else
+            return ordinaryObject;
+    }
+}
+
+int Image::ImageWriter::getPreviousObjectIndex(TObject* object) const
+{
+    std::vector<TObject*>::const_iterator iter = std::find(m_writtenObjects.begin(), m_writtenObjects.end(), object);
+    assert(iter != m_writtenObjects.end());
+    return std::distance(m_writtenObjects.begin(), iter);
+}
+
+void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
+{
+    assert(object != 0);
+    TImageRecordType type = getObjectType(object);
+    writeWord(os, (uint32_t) type);
+    
+    switch(type)
+    {
+        case ordinaryObject:
+        case byteObject:
+            m_writtenObjects.push_back(object);
+        default:
+            break;
+    }
+    
+    switch (type)
+    {
+        case inlineInteger: {
+            uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
+            os.write((char*) &integer, sizeof(integer));
+        } break;
+        case byteObject: {
+            TByteObject* byteObject = (TByteObject*) object;
+            uint32_t fieldsCount = byteObject->getSize();
+            TClass* objectClass = byteObject->getClass();
+            assert(objectClass != 0);
+            
+            writeWord(os, fieldsCount);
+            for (uint32_t i = 0; i < fieldsCount; i++)
+                writeWord(os, byteObject->getByte(i));
+            
+            writeObject(os, objectClass);
+        } break;
+        case ordinaryObject: {
+            uint32_t fieldsCount = object->getSize();
+            TClass* objectClass = object->getClass();
+            assert(objectClass != 0);
+            
+            writeWord(os, fieldsCount);
+            writeObject(os, objectClass);
+            for (uint32_t i = 0; i < fieldsCount; i++)
+                writeObject(os, object->getField(i));
+        } break;
+        case previousObject: {
+            int index = getPreviousObjectIndex(object);
+            writeWord(os, index);
+        } break;
+        case nilObject: {
+            // type nilObject means a link to nilObject
+            // it has already been written as the first object with type ordinaryObject
+        } break;
+        default:
+            fprintf(stderr, "unexpected type of object: %d\n", (int) type);
+            exit(1);
+    }
+}
+
+Image::ImageWriter& Image::ImageWriter::setGlobals(const TGlobals& globals)
+{
+    m_globals = globals;
+    return *this;
+}
+
+void Image::ImageWriter::writeTo(const char* fileName)
+{
+    std::ofstream os(fileName);
+    
+    m_writtenObjects.clear();
+    m_writtenObjects.reserve(8096);
+    
+    writeObject(os, m_globals.nilObject);
+    writeObject(os, m_globals.trueObject);
+    writeObject(os, m_globals.falseObject);
+    writeObject(os, m_globals.globalsObject);
+    writeObject(os, m_globals.smallIntClass);
+    writeObject(os, m_globals.integerClass);
+    writeObject(os, m_globals.arrayClass);
+    writeObject(os, m_globals.blockClass);
+    writeObject(os, m_globals.contextClass);
+    writeObject(os, m_globals.stringClass);
+    writeObject(os, m_globals.initialMethod);
+    
+    for (int i = 0; i < 3; i++)
+        writeObject(os, m_globals.binaryMessages[i]);
+    
+    writeObject(os, m_globals.badMethodSymbol);
+    
+    m_writtenObjects.clear();
 }

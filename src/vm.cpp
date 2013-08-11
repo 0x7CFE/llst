@@ -38,9 +38,10 @@
 #include <stdio.h>
 #include <readline/readline.h>
 #include <readline/history.h>
+#include <cassert>
+
 #include <opcodes.h>
 #include <primitives.h>
-
 #include <jit.h>
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
@@ -166,6 +167,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     // Well, maybe we'll be luckier next time. For now we need to do the full search.
     // Scanning through the class hierarchy from the klass up to the Object
     for (TClass* currentClass = klass; currentClass != globals.nilObject; currentClass = currentClass->parentClass) {
+        assert(currentClass != 0);
         TDictionary* methods = currentClass->methods;
         method = (TMethod*) methods->find(selector);
         if (method) {
@@ -189,12 +191,23 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
     // Protecting the process pointer
     hptr<TProcess> currentProcess = newPointer(p);
     
+    assert(currentProcess->context != 0);
+    assert(currentProcess->context->method != 0);
+    
     // Initializing an execution context
     TVMExecutionContext ec(m_memoryManager);
     ec.currentContext = currentProcess->context;
     ec.loadPointers(); // Loads bytePointer & stackTop
     
-    while (true) {
+    while (true)
+    {
+        assert(ec.currentContext != 0);
+        assert(ec.currentContext->method != 0);
+        assert(ec.currentContext->stack != 0);
+        assert(ec.bytePointer <= ec.currentContext->method->byteCodes->getSize());
+        assert(ec.stackTop <= ec.currentContext->stack->getSize());
+        assert(ec.currentContext->arguments->getField(0) != 0);
+        
         // Initializing helper references
         TByteObject&  byteCodes = * ec.currentContext->method->byteCodes;
         TObjectArray& stack     = * ec.currentContext->stack;

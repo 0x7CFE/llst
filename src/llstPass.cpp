@@ -14,7 +14,7 @@ namespace {
     struct LLSTPass : public FunctionPass {
     private:
         std::set<std::string> m_GCFunctionNames;
-        bool isPotentialGCFunction(std::string name);
+        bool isPotentialGCFunction(Function* F);
         bool removeRootLoads(BasicBlock* B); // TODO We should implement Analysis pass ( ::canInstructionRangeModify() ). The standart GVN pass will do the rest for us.
         bool removeRedundantRoots(Function& F);
         int  getNumRoots(Function& F);
@@ -69,9 +69,18 @@ bool isLoadFromRoot(LoadInst* Load) {
     return false;
 }
 
-bool LLSTPass::isPotentialGCFunction(std::string name)
+bool LLSTPass::isPotentialGCFunction(Function* F)
 {
-    return m_GCFunctionNames.find(name) != m_GCFunctionNames.end();
+    std::string name = F->getName();
+    if (m_GCFunctionNames.find(name) != m_GCFunctionNames.end())
+        return true;
+    
+    if (F->isIntrinsic())
+        return false;
+    
+    if ( F->getGC() )
+        return true;
+    return false;
 }
 
 
@@ -88,21 +97,20 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
         }
         if ( CallInst* call = dyn_cast<CallInst>(Instr) ) {
             //Is it a call that might collect garbage?
-            std::string name = call->getCalledFunction()->getName();
-            if ( isPotentialGCFunction(name) ) {
+            if ( isPotentialGCFunction(call->getCalledFunction()) ) {
                 LoadNCall.push_back(call);
             }
         }
     }
     
-    for(size_t i = 0; i < LoadNCall.size(); i++)
+    for(std::size_t i = 0; i < LoadNCall.size(); i++)
     {
         if( isa<CallInst>(LoadNCall[i]) )
             continue;
         
         LoadInst* CurrentLoad = dyn_cast<LoadInst>(LoadNCall[i]);
         
-        for(size_t j = i+1; j < LoadNCall.size(); j++)
+        for(std::size_t j = i+1; j < LoadNCall.size(); j++)
         {
             if( isa<CallInst>(LoadNCall[j]) )
                 break; // we have faced a call that might collect garbage

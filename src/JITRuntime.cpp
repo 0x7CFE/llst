@@ -733,7 +733,67 @@ void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& 
 
 bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
 {
-    // Searching for store instruction 
+    Value* args = messageArguments->stripPointerCasts();
+    
+    CallInst* createArgsCall = 0;
+    if (isa<CallInst>(args))
+    {
+        createArgsCall = cast<CallInst>(args);
+        if (createArgsCall->getCalledFunction() != m_methodCompiler->getRuntimeAPI().newOrdinaryObject)
+            createArgsCall = 0;
+    } else if (isa<LoadInst>(args))
+    {
+        LoadInst* loadArgsFromHolder = cast<LoadInst>(args);
+        if (!loadArgsFromHolder)
+            return false;
+        
+        Value* argsHolder = loadArgsFromHolder->getPointerOperand();
+        
+        for(Value::use_iterator use = argsHolder->use_begin(); use != argsHolder->use_end(); ++use)
+        {
+            if (StoreInst* storeToArgsHolder = dyn_cast<StoreInst>(*use))
+            {
+                Value* createArgs = storeToArgsHolder->getValueOperand()->stripPointerCasts();
+                createArgsCall = dyn_cast<CallInst>(createArgs);
+                if (createArgsCall != 0)
+                    break;
+            }
+        }
+    }
+    if (!createArgsCall)
+        return false;
+    
+    Function* F = createArgsCall->getParent()->getParent();
+    if (F->getName() == "Undefined>>doNothing")
+        errs() << *F;
+    
+    
+    Function* setObjectField = m_methodCompiler->getBaseFunctions().setObjectField;
+    Function* getLiteral     = m_methodCompiler->getBaseFunctions().getLiteral;
+    
+    for(Value::use_iterator use = setObjectField->use_begin(); use != setObjectField->use_end(); ++use)
+    {
+        if (CallInst* call = dyn_cast<CallInst>(*use))
+        {
+            Value* object = call->getArgOperand(0);
+            ConstantInt* zeroIndex = ConstantInt::get(Type::getInt32Ty(getGlobalContext()), 0);
+            if (createArgsCall->isIdenticalTo(cast<CallInst>(object)) && call->getArgOperand(1) == zeroIndex)
+            {
+                Value* maybeLiteral = call->getArgOperand(2);
+                if(isa<IntToPtrInst>(maybeLiteral))
+                {
+                    // inlined SmallInt
+                    return true;
+                }
+                if(CallInst* call = dyn_cast<CallInst>(maybeLiteral))
+                {
+                    if (call->getCalledFunction() == getLiteral)
+                        return true;
+                }
+            }
+        }
+    }
+    
     return false;
 }
 
@@ -911,10 +971,10 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
     
-//     m_functionPassManager->add(createLLSTPass()); // FIXME direct calls break the logic
+    m_functionPassManager->add(createLLSTPass()); // FIXME direct calls break the logic
 //     //If llstPass removed GC roots, we may try DCE again
-//     m_functionPassManager->add(createDeadCodeEliminationPass());
-//     m_functionPassManager->add(createDeadStoreEliminationPass());
+    m_functionPassManager->add(createDeadCodeEliminationPass());
+    m_functionPassManager->add(createDeadStoreEliminationPass());
     
     //m_functionPassManager->add(createLLSTDebuggingPass());
     m_modulePassManager->add(createFunctionInliningPass());
