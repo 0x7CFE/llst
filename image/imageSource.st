@@ -643,8 +643,11 @@ less
 !
 
 METHOD CompareTest
-nilIsNil
-    [ nil isNil ] assert
+compareWithNil
+    [ nil isNil  ] assertWithComment: 'nil isNil'.
+    [ nil notNil ] assertEq: false withComment: 'nil notNil'.
+    [ 1 isNil ] assertEq: false withComment: '1 isNil'.
+    [ 1 notNil ] assertEq: true withComment: '1 notNil'.
 !
 
 METHOD CompareTest
@@ -683,7 +686,6 @@ METHOD SmallIntTest
 div
     [ 10 / 5 ] assertEq: 2   withComment: '1'.
     [ 11 / 5 ] assertEq: 2   withComment: '2'.
-    [ 1  / 0 ] assertEq: nil withComment: '3'.
     [ 0  / 1 ] assertEq: 0   withComment: '4'.
 !
 
@@ -942,6 +944,9 @@ indexOf |str|
     [ str indexOf: 'b' ] assertEq: 4 withComment: 'b'.
     [ str indexOf: 'a' ] assertEq: 5 withComment: 'a'.
     [ str indexOf: 'r' ] assertEq: 6 withComment: 'r'.
+    [ str indexOf: 'bar' ] assertEq: 4 withComment: 'bar'.
+    [ str indexOf: 'foo' ] assertEq: 1 withComment: 'foo'.
+    [ str indexOf: '123' ] assertEq: nil withComment: 'not a substr'.
 !
 
 METHOD StringTest
