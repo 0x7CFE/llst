@@ -1228,22 +1228,19 @@ remove |list array|
 METHOD ListTest
 firstLink |list|
     list <- List new.
-    list add: 2.
-    list add: 'qwe123'.
-    list add: nil.
-    list add: (Array new: 42).
+    list add: 'head'.
+    list add: 'second head'.
+    list add: 'middle'.
+    list add: 'unknown'.
+    list add: 'last'.
     
     list <- list reverse.
     
-    [ list firstLink value ] assertEq: 2 withComment: '1'.
-    list removeFirst.
-    [ list firstLink value ] assertEq: 'qwe123' withComment: '2'.
-    list removeFirst.
-    [ list firstLink value ] assertEq: nil withComment: '3'.
-    list removeFirst.
-    [ list firstLink value ] assertEq: (Array new: 42) withComment: '4'.
-    list removeFirst.
-    [ list ] assertEq: (List new) withComment: '5'.
+    [ list firstLink value ] assertEq: 'head' withComment: 'just constructed'.
+    [ list remove: 'middle'. list firstLink value ] assertEq: 'head' withComment: 'middle removed'.
+    [ list removeFirst. list firstLink value ] assertEq: 'second head' withComment: 'head removed'.
+    [ list remove: 'last'. list firstLink value ] assertEq: 'second head' withComment: 'last removed'.
+    [ list clear. list firstLink] assertEq: nil withComment: 'cleared'.
 !
 
 METHOD ListTest
