@@ -647,8 +647,11 @@ less
 !
 
 METHOD CompareTest
-nilIsNil
-    [ nil isNil ] assert
+compareWithNil
+    [ nil isNil  ] assertWithComment: 'nil isNil'.
+    [ nil notNil ] assertEq: false withComment: 'nil notNil'.
+    [ 1 isNil ] assertEq: false withComment: '1 isNil'.
+    [ 1 notNil ] assertEq: true withComment: '1 notNil'.
 !
 
 METHOD CompareTest
@@ -687,7 +690,6 @@ METHOD SmallIntTest
 div
     [ 10 / 5 ] assertEq: 2   withComment: '1'.
     [ 11 / 5 ] assertEq: 2   withComment: '2'.
-    [ 1  / 0 ] assertEq: nil withComment: '3'.
     [ 0  / 1 ] assertEq: 0   withComment: '4'.
 !
 
@@ -902,6 +904,14 @@ METHOD StringTest
 lowerCase
     [ 'FoXBar' lowerCase ] assertEq: 'foxbar' withComment: 'non-empty'.
     [ '' lowerCase ] assertEq: '' withComment: 'empty'.
+    [ '123' lowerCase ] assertEq: '123' withComment: 'numbers'.
+!
+
+METHOD StringTest
+upperCase
+    [ 'FoXBar' upperCase ] assertEq: 'FOXBAR' withComment: 'non-empty'.
+    [ '' upperCase ] assertEq: '' withComment: 'empty'.
+    [ '123' upperCase ] assertEq: '123' withComment: 'numbers'.
 !
 
 METHOD StringTest
@@ -938,6 +948,9 @@ indexOf |str|
     [ str indexOf: 'b' ] assertEq: 4 withComment: 'b'.
     [ str indexOf: 'a' ] assertEq: 5 withComment: 'a'.
     [ str indexOf: 'r' ] assertEq: 6 withComment: 'r'.
+    [ str indexOf: 'bar' ] assertEq: 4 withComment: 'bar'.
+    [ str indexOf: 'foo' ] assertEq: 1 withComment: 'foo'.
+    [ str indexOf: '123' ] assertEq: nil withComment: 'not a substr'.
 !
 
 METHOD StringTest
@@ -2455,8 +2468,8 @@ reverse
 	^ self asList reverse asString
 !
 METHOD String
-select: testBlock
-	^ (super select: testBlock) asString
+select: filterBlock
+    ^ (super select: filterBlock) asString
 !
 METHOD String
 printString
@@ -2464,7 +2477,7 @@ printString
 !
 METHOD String
 asString
-  ^self
+    ^self
 !
 METHOD String
 printWidth: width | ret |
@@ -2546,14 +2559,12 @@ hash | sz |
 	^ (self at: 1) value + (self at: sz) value
 !
 METHOD String
-lowerCase | ret c |
-	ret <- String new: (self size).
-	1 to: self size do: [:x|
-		c <- self at: x.
-		c isUpperCase ifTrue: [c <- c lowerCase].
-		ret at: x put: c
-	].
-	^ ret
+lowerCase
+    ^ self collect: [:c| c lowerCase]
+!
+METHOD String
+upperCase
+    ^ self collect: [:c| c upperCase]
 !
 METHOD String
 indexOf: val | c s |
