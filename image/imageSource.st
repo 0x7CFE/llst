@@ -1107,6 +1107,42 @@ bulkReplace
     [ <38 1 7 'Hello W' 1 'hello world!'> ] assertEq: 'Hello World!'.
 !
 
+COMMENT                                                                                                 -------ListTest----------
+CLASS ListTest Test
+
+METHOD ListTest
+add |list array|
+    array <- Array new: 3.
+    
+    array at: 1 put: 2.
+    array at: 2 put: 42.
+    array at: 3 put: true.
+    
+    list <- List new.
+    list add: 2.
+    list add: 42.
+    list add: true.
+    
+    [ list reverse asArray ] assertEq: array.
+!
+
+METHOD ListTest
+addLast |list array|
+    array <- Array new: 4.
+    
+    array at: 1 put: 2.
+    array at: 2 put: -34.
+    array at: 3 put: 42.
+    array at: 4 put: 'qwe123'. "That's my password. Don't tell anyone!"
+    
+    list <- List new.
+    list addLast: 2.
+    list addLast: -34.
+    list addLast: 42.
+    list addLast: 'qwe123'.
+    
+    [ list asArray ] assertEq: array.
+!
 
 
 METHOD Undefined
