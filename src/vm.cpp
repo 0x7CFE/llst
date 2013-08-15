@@ -654,7 +654,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
     // If primitive succeeds then stop execution of the current method
     //   and push the result onto the stack of the previous context
     //
-    // If primitive fails, execution flow resumes in the current method after the primitive call.
+    // If primitive call fails, the execution flow continues in the current method after the primitive call.
     //
     // NOTE: Some primitives do not affect the execution
     //       context. These are handled separately in the
