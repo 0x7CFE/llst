@@ -118,8 +118,8 @@ COMMENT --- Package: GUI
 RAWCLASS MetaGuiPrimitives Class MetaObject theInstance
 RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
 
-CLASS LLVM Object
-CLASS LLVMTest Object field1
+CLASS Jit     Object
+CLASS JitTest Object field1
 
 RAWCLASS MetaScheduler Class            MetaObject  instance
 RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
@@ -1192,28 +1192,28 @@ primes: n | cand count |
         Char newline print
 !
 
-METHOD MetaLLVM
+METHOD MetaJit
 sendMessage: aSelector withArguments: arguments
     "calling context will be taken from VM"
     <252 aSelector arguments>
 !
 
-METHOD MetaLLVM
+METHOD MetaJit
 do: aBlock
     self sendMessage: #value withArguments: (Array with: aBlock).
 !
 
-METHOD MetaLLVM
+METHOD MetaJit
 printStat
     <248>
 !
 
-METHOD MetaLLVM
+METHOD MetaJit
 printMethod: aMethod
     <249 aMethod>
 !
 
-METHOD MetaLLVM
+METHOD MetaJit
 patchHotMethods
     <250>
 !
@@ -1245,13 +1245,14 @@ doBlockReturn: x |block|
 
 METHOD StatementsTest
 doRethrow: blockSurelyThrows |blockThatCanThrow|
-    "In LLVM blockReturn opcode is implemented as an exception with 2 fields: the creatin context and the value that we need to return from the block.
-    While compiling methods we scan blocks on blockReturn opcode.
-    If we find it, we replace each 'call @sendMessage' with invoke instruction
-    When we catch exception we check whether the context of exception and the context of current method are equal.
-    If they are, we do 'ret' from current function, if not, we rethrow exception"
+    "In LLVM blockReturn opcode is implemented as an exception with 2 fields: 
+     the creatin context and the value that we need to return from the block.
+     While compiling methods we scan blocks on blockReturn opcode.
+     If we find it, we replace each 'call @sendMessage' with invoke instruction
+     When we catch exception we check whether the context of exception and the context of current method are equal.
+     If they are, we do 'ret' from current function, if not, we rethrow exception"
     
-    "That line forces JIT to create 'invoke' instead of 'call' :" 
+    "That line forces LLVM to create 'invoke' instead of 'call' :" 
     blockThatCanThrow <- [ ^1234567 ].
     
     "We are invoking block that has a blockReturn opcode. The exception must be rethrown because 'blockSurelyThrows' is not created in the current method"
@@ -1330,10 +1331,10 @@ name
     ^name.
 !
 
-METHOD MetaLLVMTest
+METHOD MetaJitTest
 runAllFrom: testSuite | suite |
     suite <- testSuite new.
-    LLVM sendMessage: #runAll withArguments: (Array with: suite).
+    Jit sendMessage: #runAll withArguments: (Array with: suite).
 !
 
 METHOD Undefined
@@ -1345,13 +1346,13 @@ runSort: size | x1 list ms1 selector args1 block1 |
         args1 <- Array with: nil with: list.
 
         System collectGarbage.
-        ms1 <- Timer millisecondsToRun: [ LLVM sendMessage: selector withArguments: args1 ].
+        ms1 <- Timer millisecondsToRun: [ Jit sendMessage: selector withArguments: args1 ].
 
         'Sorted in ms: ' print. ms1 printNl.
 !
 
 COMMENT Uncomment this method if you are going to run Smalltalk
-COMMENT immediately in LLVM. Don't forget to change main.cpp (executeProcess)
+COMMENT immediately in Jit. Don't forget to change main.cpp (executeProcess)
 COMMENT METHOD Undefined
 COMMENT boot
 COMMENT     nil main.
@@ -1386,15 +1387,15 @@ main    | command  data |
     'done' printNl.
     
     'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
-    'Cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
-    'Hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
     
-    LLVM patchHotMethods.
+    Jit patchHotMethods.
     
-    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ LLVM do: [ data sort ] ]) printNl.
+    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
     
-    "1 to: 100 do: [ :x | LLVM do: [ nil loopBenchmark ] ]."
+    "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
     
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
