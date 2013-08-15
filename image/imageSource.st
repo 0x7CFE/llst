@@ -1246,6 +1246,22 @@ firstLink |list|
     [ list ] assertEq: (List new) withComment: '5'.
 !
 
+METHOD ListTest
+atPut |list|
+    list <- List new.
+    list add: nil.
+    list at: 1 put: 42.
+    
+    [ list at: 1 ] assertEq: 42 withComment: '1'.
+!
+
+
+
+
+
+
+
+
 METHOD Undefined
 printHierarchy: aClass | class |
     class <- aClass.
