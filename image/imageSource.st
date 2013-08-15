@@ -1256,8 +1256,23 @@ atPut |list|
     [ list at: 2 ] assertEq: 'qwerty' withComment: '1'.
 !
 
-
-
+METHOD ListTest
+lastLink |list|
+    list <- List new.
+    list add: 'head'.
+    list add: 'second head'.
+    list add: 'middle'.
+    list add: 'secont last'.
+    list add: 'last'.
+    
+    list <- list reverse.
+    
+    [ list lastLink value ] assertEq: 'last' withComment: 'just constructed'.
+    [ list remove: 'middle'. list lastLink value ] assertEq: 'last' withComment: 'middle removed'.
+    [ list removeFirst. list lastLink value ] assertEq: 'last' withComment: 'head removed'.
+    [ list remove: 'last'. list lastLink value ] assertEq: 'second last' withComment: 'last removed'.
+    [ list clear. list lastLink] assertEq: nil withComment: 'cleared'.
+!
 
 
 
