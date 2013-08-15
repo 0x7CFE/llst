@@ -1137,6 +1137,7 @@ benchmark: size | list ms |
     list <- List new.
     1 to: size do: [ :x | list add: 1000 atRandom ].
     ms <- Timer millisecondsToRun: [ list <- list sort. ].
+    "list do: [ :e | e printNl ]."
     'Sorted in ms: ' print. ms printNl.
     list printNl.
 !
@@ -2082,9 +2083,9 @@ insertSort: criteria | result |
 
 METHOD Collection
 sort: criteria | left right mediane |
-    "(self isEmpty) ifTrue: [^self]."
-    (self size < 32) 
-        ifTrue: [ ^ self insertSort: criteria ].
+    (self size < 2) ifTrue: [^self].
+    "(self size < 32) 
+        ifTrue: [ ^ self insertSort: criteria ]."
 
     mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
     
@@ -2092,8 +2093,8 @@ sort: criteria | left right mediane |
     right <- List new.
     self do: [ :x |
         (criteria value: x value: mediane)
-            ifTrue:  [ left  add: x ]
-            ifFalse: [ right add: x ] ].
+            ifTrue:  [ left  addLast: x ]
+            ifFalse: [ right addLast: x ] ].
 
     left  <- left  sort: criteria. "if left is instance of List then call Collection>>sort"
     right <- right sort: criteria.
@@ -2611,9 +2612,10 @@ add: anElement
 METHOD List
 addLast: anElement
 	head isNil
-		ifTrue: [ self add: anElement. tail <- head. ^anElement ].
+		ifTrue: [ self add: anElement. ^anElement ].
 	
-	tail <- Link value: anElement next: tail.
+	tail next: (Link value: anElement).
+	tail <- tail next.
 	size <- size + 1.
 	
 	^ anElement
@@ -2631,14 +2633,16 @@ appendList: aList | oldTail |
         ^self 
     ].
 
-    aList firstLink next: tail.
+    tail next: aList firstLink.
     tail <- aList lastLink.
     size <- size + aList size.
     ^self
 !
 METHOD List
 addAll: aCollection |link|
-    aCollection do: [ :element | self addLast: element ]
+    (aCollection isKindOf: List) 
+        ifTrue:  [ self appendList: aCollection ]
+        ifFalse: [ aCollection do: [ :element | self addLast: element ] ]
 !
 METHOD List
 lastLink
@@ -2691,6 +2695,12 @@ at: index put: value | link |
 METHOD List
 first
 	^ self at: 1
+!
+METHOD List
+last
+    head isNil 
+        ifTrue:  [ self emptyCollection ]
+        ifFalse: [ ^tail value ]
 !
 METHOD List
 isEmpty
@@ -3557,7 +3567,7 @@ reverseDo: aBlock
 !
 METHOD Tree
 removeFirst
-	root isNIl ifTrue: [ self emptyCollection ].
+	root isNil ifTrue: [ self emptyCollection ].
 	root <- root removeFirst
 !
 METHOD Tree
