@@ -647,8 +647,11 @@ less
 !
 
 METHOD CompareTest
-nilIsNil
-    [ nil isNil ] assert
+compareWithNil
+    [ nil isNil  ] assertWithComment: 'nil isNil'.
+    [ nil notNil ] assertEq: false withComment: 'nil notNil'.
+    [ 1 isNil ] assertEq: false withComment: '1 isNil'.
+    [ 1 notNil ] assertEq: true withComment: '1 notNil'.
 !
 
 METHOD CompareTest
@@ -687,7 +690,6 @@ METHOD SmallIntTest
 div
     [ 10 / 5 ] assertEq: 2   withComment: '1'.
     [ 11 / 5 ] assertEq: 2   withComment: '2'.
-    [ 1  / 0 ] assertEq: nil withComment: '3'.
     [ 0  / 1 ] assertEq: 0   withComment: '4'.
 !
 
@@ -902,6 +904,14 @@ METHOD StringTest
 lowerCase
     [ 'FoXBar' lowerCase ] assertEq: 'foxbar' withComment: 'non-empty'.
     [ '' lowerCase ] assertEq: '' withComment: 'empty'.
+    [ '123' lowerCase ] assertEq: '123' withComment: 'numbers'.
+!
+
+METHOD StringTest
+upperCase
+    [ 'FoXBar' upperCase ] assertEq: 'FOXBAR' withComment: 'non-empty'.
+    [ '' upperCase ] assertEq: '' withComment: 'empty'.
+    [ '123' upperCase ] assertEq: '123' withComment: 'numbers'.
 !
 
 METHOD StringTest
@@ -938,6 +948,9 @@ indexOf |str|
     [ str indexOf: 'b' ] assertEq: 4 withComment: 'b'.
     [ str indexOf: 'a' ] assertEq: 5 withComment: 'a'.
     [ str indexOf: 'r' ] assertEq: 6 withComment: 'r'.
+    [ str indexOf: 'bar' ] assertEq: 4 withComment: 'bar'.
+    [ str indexOf: 'foo' ] assertEq: 1 withComment: 'foo'.
+    [ str indexOf: '123' ] assertEq: nil withComment: 'not a substr'.
 !
 
 METHOD StringTest
@@ -1093,6 +1106,159 @@ METHOD PrimitiveTest
 bulkReplace
     [ <38 1 7 'Hello W' 1 'hello world!'> ] assertEq: 'Hello World!'.
 !
+
+COMMENT                                                                                                 -------ListTest----------
+CLASS ListTest Test
+
+METHOD ListTest
+add |list array|
+    array <- Array new: 3.
+    
+    array at: 1 put: 2.
+    array at: 2 put: 42.
+    array at: 3 put: true.
+    
+    list <- List new.
+    list add: 2.
+    list add: 42.
+    list add: true.
+    
+    list <- list reverse.
+    
+    [ list asArray ] assertEq: array.
+!
+
+METHOD ListTest
+addLast |list array|
+    array <- Array new: 4.
+    
+    array at: 1 put: 2.
+    array at: 2 put: -34.
+    array at: 3 put: 42.
+    array at: 4 put: 'qwe123'. "That's my password. Don't tell anyone!"
+    
+    list <- List new.
+    list addLast: 2.
+    list addLast: -34.
+    list addLast: 42.
+    list addLast: 'qwe123'.
+    
+    [ list asArray ] assertEq: array.
+!
+
+METHOD ListTest
+at |list|
+    list <- List new.
+    list add: 2.
+    list add: 42.
+    list add: true.
+    list add: '124'.
+    
+    list <- list reverse.
+    
+    [ list at: 1 ] assertEq: 2 withComment: '1'.
+    [ list at: 2 ] assertEq: 42 withComment: '2'.
+    [ list at: 3 ] assertEq: true withComment: '3'.
+    [ list at: 4 ] assertEq: '124' withComment: '4'.
+!
+
+METHOD ListTest
+do |list idx standardArray array|
+    list <- List new.
+    list add: nil.
+    list add: false.
+    list add: true.
+    list add: 42.
+    
+    list <- list reverse.
+    
+    standardArray <- Array new: 4.
+    1 to: (list size) do: [:i| standardArray at: i put: (list at: i). ].
+    
+    array <- Array new: 4.
+    idx <- 1.
+    list do: [:val |
+        array at: idx put: val.
+        idx <- idx + 1.
+    ].
+    
+    [ array ] assertEq: standardArray.
+!
+
+METHOD ListTest
+removeFirst |list array|
+    list <- List new.
+    list add: nil.
+    list add: false.
+    list add: true.
+    list add: 42.
+    
+    array <- Array with: nil with: false with: true.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '1'.
+    
+    array <- Array with: nil with: false.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '2'.
+    
+    array <- Array with: nil.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '3'.
+    
+    [ list removeFirst. list ] assertEq: (List new) withComment: '4'.
+!
+
+METHOD ListTest
+remove |list array|
+    list <- List new.
+    list add: 'qwerty'.
+    list add: false.
+    list add: 42.
+    list add: true.
+    
+    array <- Array with: 'qwerty' with: false with: true.
+    [ list remove: 42. list reverse asArray ] assertEq: array withComment: '1'.
+    
+    array <- Array with: 'qwerty' with: false.
+    [ list remove: true. list reverse asArray ] assertEq: array withComment: '2'.
+    
+    array <- Array with: 'qwerty'.
+    [ list remove: false. list reverse asArray ] assertEq: array withComment: '3'.
+    
+    [ list remove: 'qwerty'. list ] assertEq: (List new) withComment: '4'.
+!
+
+METHOD ListTest
+firstLink |list|
+    list <- List new.
+    list add: 2.
+    list add: 'qwe123'.
+    list add: nil.
+    list add: (Array new: 42).
+    
+    list <- list reverse.
+    
+    [ list firstLink value ] assertEq: 2 withComment: '1'.
+    list removeFirst.
+    [ list firstLink value ] assertEq: 'qwe123' withComment: '2'.
+    list removeFirst.
+    [ list firstLink value ] assertEq: nil withComment: '3'.
+    list removeFirst.
+    [ list firstLink value ] assertEq: (Array new: 42) withComment: '4'.
+    list removeFirst.
+    [ list ] assertEq: (List new) withComment: '5'.
+!
+
+METHOD ListTest
+atPut |list|
+    list <- List new.
+    list add: nil.
+    list at: 1 put: 42.
+    
+    [ list at: 1 ] assertEq: 42 withComment: '1'.
+!
+
+
+
+
+
 
 
 
@@ -2456,8 +2622,8 @@ reverse
 	^ self asList reverse asString
 !
 METHOD String
-select: testBlock
-	^ (super select: testBlock) asString
+select: filterBlock
+    ^ (super select: filterBlock) asString
 !
 METHOD String
 printString
@@ -2465,7 +2631,7 @@ printString
 !
 METHOD String
 asString
-  ^self
+    ^self
 !
 METHOD String
 printWidth: width | ret |
@@ -2547,14 +2713,12 @@ hash | sz |
 	^ (self at: 1) value + (self at: sz) value
 !
 METHOD String
-lowerCase | ret c |
-	ret <- String new: (self size).
-	1 to: self size do: [:x|
-		c <- self at: x.
-		c isUpperCase ifTrue: [c <- c lowerCase].
-		ret at: x put: c
-	].
-	^ ret
+lowerCase
+    ^ self collect: [:c| c lowerCase]
+!
+METHOD String
+upperCase
+    ^ self collect: [:c| c upperCase]
 !
 METHOD String
 indexOf: val | c s |
