@@ -1160,6 +1160,30 @@ at |list|
     [ list at: 4 ] assertEq: '124' withComment: '4'.
 !
 
+METHOD ListTest
+do |list idx standardArray array|
+    list <- List new.
+    list add: nil.
+    list add: false.
+    list add: true.
+    list add: 42.
+    
+    list <- list reverse.
+    
+    standardArray <- Array new: 4.
+    1 to: (list size) do: [:i| standardArray at: i put: (list at: i). ].
+    
+    array <- Array new: 4.
+    idx <- 1.
+    list do: [:val |
+        array at: idx put: val.
+        idx <- idx + 1.
+    ].
+    
+    [ array ] assertEq: standardArray.
+!
+
+
 
 METHOD Undefined
 printHierarchy: aClass | class |
