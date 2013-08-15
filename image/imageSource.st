@@ -1205,6 +1205,26 @@ removeFirst |list array|
     [ list removeFirst. list ] assertEq: (List new) withComment: '4'.
 !
 
+METHOD ListTest
+remove |list array|
+    list <- List new.
+    list add: 'qwerty'.
+    list add: false.
+    list add: 42.
+    list add: true.
+    
+    array <- Array with: 'qwerty' with: false with: true.
+    [ list remove: 42. list reverse asArray ] assertEq: array withComment: '1'.
+    
+    array <- Array with: 'qwerty' with: false.
+    [ list remove: true. list reverse asArray ] assertEq: array withComment: '2'.
+    
+    array <- Array with: 'qwerty'.
+    [ list remove: false. list reverse asArray ] assertEq: array withComment: '3'.
+    
+    [ list remove: 'qwerty'. list ] assertEq: (List new) withComment: '4'.
+!
+
 
 METHOD Undefined
 printHierarchy: aClass | class |
