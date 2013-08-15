@@ -2847,13 +2847,13 @@ at: index | link |
 !
 METHOD List
 at: index ifAbsent: aBlock | link |
-	link <- self findLink: index ifAbsent: [nil].
+	link <- self findLink: index ifAbsent: [ ^ aBlock value].
 	link isNil ifTrue: [ ^ aBlock value ].
 	^ link value
 !
 METHOD List
 at: index put: value | link |
-	link <- self findLink: index.
+	link <- self findLink: index ifAbsent: [ self badIndex: index ].
 	link value: value
 !
 METHOD List
