@@ -2611,8 +2611,11 @@ add: anElement
 METHOD List
 addLast: anElement
 	head isNil
-		ifTrue: [ self add: anElement ]
-		ifFalse: [ tail <- tail next: (Link value: anElement). size <- size + 1. ].
+		ifTrue: [ self add: anElement. tail <- head. ^anElement ].
+	
+	tail <- Link value: anElement next: tail.
+	size <- size + 1.
+	
 	^ anElement
 !
 METHOD List
@@ -2620,14 +2623,16 @@ firstLink
     ^head
 !
 METHOD List
-appendList: aList | element |
+appendList: aList | oldTail |
     (head isNil) ifTrue: [ 
-        head <- aList firstLink. 
+        head <- aList firstLink.
+        tail <- aList lastLink.
         size <- aList size.
         ^self 
     ].
 
-    tail next: aList firstLink.
+    aList firstLink next: tail.
+    tail <- aList lastLink.
     size <- size + aList size.
     ^self
 !
