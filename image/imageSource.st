@@ -1123,7 +1123,9 @@ add |list array|
     list add: 42.
     list add: true.
     
-    [ list reverse asArray ] assertEq: array.
+    list <- list reverse.
+    
+    [ list asArray ] assertEq: array.
 !
 
 METHOD ListTest
@@ -1183,6 +1185,25 @@ do |list idx standardArray array|
     [ array ] assertEq: standardArray.
 !
 
+METHOD ListTest
+removeFirst |list array|
+    list <- List new.
+    list add: nil.
+    list add: false.
+    list add: true.
+    list add: 42.
+    
+    array <- Array with: nil with: false with: true.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '1'.
+    
+    array <- Array with: nil with: false.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '2'.
+    
+    array <- Array with: nil.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '3'.
+    
+    [ list removeFirst. list ] assertEq: (List new) withComment: '4'.
+!
 
 
 METHOD Undefined
