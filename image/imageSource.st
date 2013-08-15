@@ -1240,6 +1240,7 @@ firstLink |list|
     [ list remove: 'middle'. list firstLink value ] assertEq: 'head' withComment: 'middle removed'.
     [ list removeFirst. list firstLink value ] assertEq: 'second head' withComment: 'head removed'.
     [ list remove: 'last'. list firstLink value ] assertEq: 'second head' withComment: 'last removed'.
+    [ list add: 'head'. list firstLink value] assertEq: 'head' withComment: 'appended with add:'.
     [ list clear. list firstLink] assertEq: nil withComment: 'cleared'.
 !
 
@@ -1271,6 +1272,7 @@ lastLink |list|
     [ list remove: 'middle'. list lastLink value ] assertEq: 'last' withComment: 'middle removed'.
     [ list removeFirst. list lastLink value ] assertEq: 'last' withComment: 'head removed'.
     [ list remove: 'last'. list lastLink value ] assertEq: 'second last' withComment: 'last removed'.
+    [ list addLast: 'last'. list lastLink value ] assertEq: 'last' withComment: 'appended with addLast:'.
     [ list clear. list lastLink] assertEq: nil withComment: 'cleared'.
 !
 
