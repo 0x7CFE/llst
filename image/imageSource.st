@@ -2083,9 +2083,9 @@ insertSort: criteria | result |
 
 METHOD Collection
 sort: criteria | left right mediane |
-    (self size < 2) ifTrue: [^self].
-    "(self size < 32) 
-        ifTrue: [ ^ self insertSort: criteria ]."
+    "(self size < 2) ifTrue: [^self]."
+    (self size < 32) 
+        ifTrue: [ ^ self insertSort: criteria ].
 
     mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
     
@@ -2093,8 +2093,8 @@ sort: criteria | left right mediane |
     right <- List new.
     self do: [ :x |
         (criteria value: x value: mediane)
-            ifTrue:  [ left  addLast: x ]
-            ifFalse: [ right addLast: x ] ].
+            ifTrue:  [ left  add: x ]
+            ifFalse: [ right add: x ] ].
 
     left  <- left  sort: criteria. "if left is instance of List then call Collection>>sort"
     right <- right sort: criteria.
