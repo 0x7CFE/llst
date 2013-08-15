@@ -1225,6 +1225,26 @@ remove |list array|
     [ list remove: 'qwerty'. list ] assertEq: (List new) withComment: '4'.
 !
 
+METHOD ListTest
+firstLink |list|
+    list <- List new.
+    list add: 2.
+    list add: 'qwe123'.
+    list add: nil.
+    list add: (Array new: 42).
+    
+    list <- list reverse.
+    
+    [ list firstLink value ] assertEq: 2 withComment: '1'.
+    list removeFirst.
+    [ list firstLink value ] assertEq: 'qwe123' withComment: '2'.
+    list removeFirst.
+    [ list firstLink value ] assertEq: nil withComment: '3'.
+    list removeFirst.
+    [ list firstLink value ] assertEq: (Array new: 42) withComment: '4'.
+    list removeFirst.
+    [ list ] assertEq: (List new) withComment: '5'.
+!
 
 METHOD Undefined
 printHierarchy: aClass | class |
