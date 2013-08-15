@@ -898,6 +898,14 @@ METHOD StringTest
 lowerCase
     [ 'FoXBar' lowerCase ] assertEq: 'foxbar' withComment: 'non-empty'.
     [ '' lowerCase ] assertEq: '' withComment: 'empty'.
+    [ '123' lowerCase ] assertEq: '123' withComment: 'numbers'.
+!
+
+METHOD StringTest
+upperCase
+    [ 'FoXBar' upperCase ] assertEq: 'FOXBAR' withComment: 'non-empty'.
+    [ '' upperCase ] assertEq: '' withComment: 'empty'.
+    [ '123' upperCase ] assertEq: '123' withComment: 'numbers'.
 !
 
 METHOD StringTest
@@ -2450,8 +2458,8 @@ reverse
 	^ self asList reverse asString
 !
 METHOD String
-select: testBlock
-	^ (super select: testBlock) asString
+select: filterBlock
+    ^ (super select: filterBlock) asString
 !
 METHOD String
 printString
@@ -2459,7 +2467,7 @@ printString
 !
 METHOD String
 asString
-  ^self
+    ^self
 !
 METHOD String
 printWidth: width | ret |
@@ -2541,14 +2549,12 @@ hash | sz |
 	^ (self at: 1) value + (self at: sz) value
 !
 METHOD String
-lowerCase | ret c |
-	ret <- String new: (self size).
-	1 to: self size do: [:x|
-		c <- self at: x.
-		c isUpperCase ifTrue: [c <- c lowerCase].
-		ret at: x put: c
-	].
-	^ ret
+lowerCase
+    ^ self collect: [:c| c lowerCase]
+!
+METHOD String
+upperCase
+    ^ self collect: [:c| c upperCase]
 !
 METHOD String
 indexOf: val | c s |
