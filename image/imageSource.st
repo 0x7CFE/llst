@@ -1214,15 +1214,15 @@ remove |list array|
     list add: true.
     
     array <- Array with: 'qwerty' with: false with: true.
-    [ list remove: 42. list reverse asArray ] assertEq: array withComment: '1'.
+    [ list remove: 42. list reverse asArray ] assertEq: array withComment: 'in the middle'.
     
     array <- Array with: 'qwerty' with: false.
-    [ list remove: true. list reverse asArray ] assertEq: array withComment: '2'.
+    [ list remove: true. list reverse asArray ] assertEq: array withComment: 'the last'.
     
-    array <- Array with: 'qwerty'.
-    [ list remove: false. list reverse asArray ] assertEq: array withComment: '3'.
+    array <- Array with: false.
+    [ list remove: 'qwerty'. list reverse asArray ] assertEq: array withComment: 'the first'.
     
-    [ list remove: 'qwerty'. list ] assertEq: (List new) withComment: '4'.
+    [ list remove: false. list ] assertEq: (List new) withComment: 'the only one'.
 !
 
 METHOD ListTest
