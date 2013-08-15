@@ -69,7 +69,7 @@ RAWCLASS Symbol        MetaSymbol    Magnitude
 RAWCLASS MetaChar      Class         MetaMagnitude     chars
 RAWCLASS Char          MetaChar      Magnitude         value
 CLASS Collection    Magnitude
-CLASS List          Collection         elements size
+CLASS List          Collection        head tail size
 CLASS Dictionary    Collection        keys values
 CLASS Array         Collection
 CLASS OrderedArray  Array
@@ -118,8 +118,12 @@ COMMENT --- Package: GUI
 RAWCLASS MetaGuiPrimitives Class MetaObject theInstance
 RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
 
-CLASS Jit     Object
-CLASS JitTest Object field1
+CLASS MetaJit          Class            MetaObject  hotMethods
+CLASS Jit              MetaJit          Object
+CLASS JitTest          Object                       field1
+
+CLASS CallSite         Object                       hitCount selector classHits
+CLASS HotMethod        Object                       hitCount method callSites
 
 RAWCLASS MetaScheduler Class            MetaObject  instance
 RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
@@ -1193,9 +1197,9 @@ primes: n | cand count |
 !
 
 METHOD MetaJit
-sendMessage: aSelector withArguments: arguments
+sendMessage: aSelector withArguments: anArguments
     "calling context will be taken from VM"
-    <252 aSelector arguments>
+    <252 aSelector anArguments>
 !
 
 METHOD MetaJit
@@ -1204,7 +1208,7 @@ do: aBlock
 !
 
 METHOD MetaJit
-printStat
+printStatistics
     <248>
 !
 
@@ -1381,7 +1385,7 @@ main    | command  data |
     
     Char initialize.
 
-    'Preparing test data ...' print. 
+    "'Preparing test data ...' print. 
     data <- List new.
     1 to: 1000 do: [ :x | data add: 100000 atRandom ].
     'done' printNl.
@@ -1393,7 +1397,7 @@ main    | command  data |
     Jit patchHotMethods.
     
     'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
     
     "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
     
@@ -2046,7 +2050,7 @@ insert: aValue onCondition: aBlock
     
     (self isEmpty) ifTrue: [ ^self add: aValue ].
     
-    link <- elements.
+    link <- head.
     [link notNil] whileTrue: [ 
         current <- link value.
         (aBlock value: aValue value: current)
@@ -2572,7 +2576,7 @@ COMMENT --------- List -----------
 METHOD MetaList
 new | instance |
     instance <- super new.
-    self in: instance at: 2 put: 0. "set size to 0"
+    self in: instance at: 3 put: 0. "set size to 0"
     ^instance
 !
 METHOD MetaList
@@ -2599,50 +2603,41 @@ size
 !
 METHOD List
 add: anElement
-	elements <- Link value: anElement next: elements.
+	head <- Link value: anElement next: head.
+	tail isNil ifTrue: [ tail <- head ].
 	size <- size + 1.
 	^ anElement
 !
 METHOD List
 addLast: anElement
-	elements isNil
-		ifTrue: [ self add: anElement]
-		ifFalse: [ elements addLast: anElement. size <- size + 1 ].
+	head isNil
+		ifTrue: [ self add: anElement ]
+		ifFalse: [ tail <- tail next: (Link value: anElement). size <- size + 1. ].
 	^ anElement
 !
 METHOD List
 firstLink
-    ^elements
+    ^head
 !
 METHOD List
 appendList: aList | element |
-    (elements isNil) ifTrue: [ 
-        elements <- aList firstLink. 
+    (head isNil) ifTrue: [ 
+        head <- aList firstLink. 
         size <- aList size.
         ^self 
     ].
 
-    element <- elements.
-    [element next isNil]
-        whileFalse: [element <- element next].
-    element next: aList firstLink.
+    tail next: aList firstLink.
     size <- size + aList size.
     ^self
 !
 METHOD List
 addAll: aCollection |link|
-    "self appendList: aCollection asList.
-    link <- self lastLink."
     aCollection do: [ :element | self addLast: element ]
-	"aCollection do: [ :element | self addLast: element ]"
 !
 METHOD List
-lastLink |link next|
-    elements isNil ifTrue: [ ^nil ].
-    
-    link <- elements.
-    [(next <- link next) notNil] whileTrue: [link <- next].
-    ^link
+lastLink
+    ^tail
 !
 METHOD List
 + aCollection
@@ -2662,7 +2657,7 @@ badIndex: index
 !
 METHOD List
 findLink: index ifAbsent: aBlock | idx link |
-	link <- elements.
+	link <- head.
 	idx <- index.
 	link isNil ifTrue: [ ^ aBlock value ].
 	[ link notNil ] whileTrue: [
@@ -2694,21 +2689,26 @@ first
 !
 METHOD List
 isEmpty
-	^ elements isNil
+	^ head isNil
 !
 METHOD List
 removeFirst
-	elements isNil
-		ifTrue: [ self emptyCollection ]
-		ifFalse: [ elements <- elements next. size <- size - 1. ]
+    head isNil
+        ifTrue: [ self emptyCollection ]
+        ifFalse: [ 
+            head <- head next.
+            head isNil ifTrue: [ tail <- nil ].
+            size <- size - 1.
+        ]
 !
 METHOD List
 popFirst | value |
-    elements isNil
-        ifTrue: [ ^nil ]
+    head isNil
+        ifTrue: [ self emptyCollection ]
         ifFalse: [
-            value <- elements value.
-            elements <- elements next.
+            value <- head value.
+            head <- head next.
+            head isNil ifTrue: [ tail <- nil ].
             size <- size - 1.
             ^value ]
 !
@@ -2725,28 +2725,32 @@ reverse | newList |
 !
 METHOD List
 remove: anElement ifAbsent: exceptionBlock
-	elements isNil
+	head isNil
 		ifTrue: [ exceptionBlock value. ^self ]
-		ifFalse: [ elements <- elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
+		ifFalse: [ head <- head remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
     size <- size - 1.
 !
 METHOD List
 clear
-    elements <- nil.
+    head <- nil.
+    tail <- nil.
+    size <- 0.
 !
 METHOD List
 do: aBlock | link |
-	^ elements notNil ifTrue: [ elements do: aBlock ]
+	^ head notNil ifTrue: [ head do: aBlock ]
 !
 METHOD List
 reverseDo: aBlock
-	^ elements notNil ifTrue: [ elements reverseDo: aBlock ]
+	^ head notNil ifTrue: [ head reverseDo: aBlock ]
 !
 METHOD List
 select: testBlock | newList |
 	newList <- List new.
-	self reverseDo: [:element | (testBlock value: element)
-		ifTrue: [ newList add: element ] ].
+	"self reverseDo: [:element | (testBlock value: element)
+		ifTrue: [ newList add: element ] ]."
+    self do: [:element | (testBlock value: element)
+        ifTrue: [ newList addLast: element ] ].
 	^ newList
 !
 COMMENT ---------- Dictionary ------------

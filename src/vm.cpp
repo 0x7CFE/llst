@@ -418,7 +418,7 @@ void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObj
         // Something goes really wrong.
         // We could not continue the execution
         fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
-        exit(1);
+        //exit(1);
     }
     
     // Protecting the selector pointer because it may be invalidated later
