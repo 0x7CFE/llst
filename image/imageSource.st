@@ -1250,9 +1250,13 @@ METHOD ListTest
 atPut |list|
     list <- List new.
     list add: nil.
+    list add: nil.
+    
     list at: 1 put: 42.
+    list at: 2 put: 'qwerty'.
     
     [ list at: 1 ] assertEq: 42 withComment: '1'.
+    [ list at: 2 ] assertEq: 'qwerty' withComment: '1'.
 !
 
 
