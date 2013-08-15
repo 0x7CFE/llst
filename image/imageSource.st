@@ -1144,6 +1144,22 @@ addLast |list array|
     [ list asArray ] assertEq: array.
 !
 
+METHOD ListTest
+at |list|
+    list <- List new.
+    list add: 2.
+    list add: 42.
+    list add: true.
+    list add: '124'.
+    
+    list <- list reverse.
+    
+    [ list at: 1 ] assertEq: 2 withComment: '1'.
+    [ list at: 2 ] assertEq: 42 withComment: '2'.
+    [ list at: 3 ] assertEq: true withComment: '3'.
+    [ list at: 4 ] assertEq: '124' withComment: '4'.
+!
+
 
 METHOD Undefined
 printHierarchy: aClass | class |
