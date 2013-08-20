@@ -738,14 +738,8 @@ bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
     CallInst* createArgsCall = 0;
     if (isa<CallInst>(args)) {
         createArgsCall = cast<CallInst>(args);
-        if (createArgsCall->getCalledFunction() != m_methodCompiler->getRuntimeAPI().newOrdinaryObject)
-            createArgsCall = 0;
     } else if (isa<LoadInst>(args)) {
-        LoadInst* loadArgsFromHolder = cast<LoadInst>(args);
-        if (!loadArgsFromHolder)
-            return false;
-        
-        Value* argsHolder = loadArgsFromHolder->getPointerOperand();
+        Value* argsHolder = cast<LoadInst>(args)->getPointerOperand();
         
         for(Value::use_iterator use = argsHolder->use_begin(); use != argsHolder->use_end(); ++use) {
             if (StoreInst* storeToArgsHolder = dyn_cast<StoreInst>(*use)) {
@@ -756,7 +750,11 @@ bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
             }
         }
     }
+    
     if (!createArgsCall)
+        return false;
+    
+    if (createArgsCall->getCalledFunction() != m_methodCompiler->getRuntimeAPI().newOrdinaryObject)
         return false;
     
     Value* receiver = 0; // receiver == args[0]
@@ -780,8 +778,7 @@ bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
     if (!receiver) {
         //TODO try to find receiver in GEPs
         return false;
-    }
-    
+    } 
     
     if (isa<ConstantExpr>(receiver)) {
         // inlined SmallInt
