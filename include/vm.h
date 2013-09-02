@@ -77,6 +77,22 @@ private:
             currentContext->bytePointer = newInteger(bytePointer);
             currentContext->stackTop    = newInteger(stackTop);
         }
+        
+        void stackPush(TObject* object) {
+            TObjectArray& stack = * currentContext->stack;
+            stack[stackTop++] = object;
+        }
+        
+        TObject* stackLast() {
+            TObjectArray& stack = * currentContext->stack;
+            return stack[stackTop - 1];
+        }
+        
+        TObject* stackPop() {
+            TObjectArray& stack = * currentContext->stack;
+            TObject* top = stack[--stackTop];
+            return top;
+        }
 
         TVMExecutionContext(IMemoryManager* mm) :
             memoryManager(mm),
