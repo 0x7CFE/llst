@@ -179,6 +179,11 @@ define i1 @isObjectBinary(%TObject* %this) {
     ret i1 %result
 }
 
+define %TClass** @getObjectClassPtr(%TObject* %this) {
+    %pclass = getelementptr inbounds %TObject* %this, i32 0, i32 1
+    ret %TClass** %pclass
+}
+
 @SmallInt = external global %TClass
 
 define %TClass* @getObjectClass(%TObject* %this) {
@@ -188,18 +193,14 @@ define %TClass* @getObjectClass(%TObject* %this) {
 is_smallint:    
     ret %TClass* @SmallInt
 is_object:
-    %addr = getelementptr %TObject* %this, i32 0, i32 1
+    %addr = call %TClass** @getObjectClassPtr(%TObject* %this)
     %class = load %TClass** %addr
     ret %TClass* %class
 }
 
-define %TClass** @getObjectClassPtr(%TObject* %this) {
-    %pclass = getelementptr inbounds %TObject* %this, i32 0, i32 1
-    ret %TClass** %pclass
-}
 
 define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {
-    %addr = getelementptr %TObject* %this, i32 0, i32 1
+    %addr = call %TClass** @getObjectClassPtr(%TObject* %this)
     store %TClass* %class, %TClass** %addr
     ret %TObject* %this
 }
@@ -253,9 +254,9 @@ define %TObject* @getTempsFromContext(%TContext* %context) {
     ret %TObject* %tempsObj
 }
 
-define %TObject* @dummy() gc "shadow-stack" {
+define void @dummy() gc "shadow-stack" {
     ; enabling shadow stack init on this module
-    ret %TObject* null
+    ret void
 }
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
