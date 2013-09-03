@@ -57,8 +57,7 @@ private:
     struct TVMExecutionContext {
     private:
         // TODO Think about proper memory organization
-        // TODO Implement stackPush / stackPop / reloadContextData etc ?
-        IMemoryManager* memoryManager;
+        // TODO Implement reloadContextData etc ?
     public:
         hptr<TContext> currentContext;
 
@@ -95,7 +94,6 @@ private:
         }
 
         TVMExecutionContext(IMemoryManager* mm) :
-            memoryManager(mm),
             currentContext((TContext*) globals.nilObject, mm),
             returnedValue(globals.nilObject, mm)
         { }

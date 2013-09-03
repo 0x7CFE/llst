@@ -64,7 +64,7 @@ struct object_ptr {
     explicit object_ptr(volatile TObject* data)  : data(data), next(0) {}
     object_ptr& operator=(const object_ptr& value) { this->data = value.data; return *this; }
 private:
-    object_ptr(const object_ptr& value) {}
+    object_ptr(const object_ptr& value);
 };
 
 // Generic interface to a memory manager.
