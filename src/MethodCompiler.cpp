@@ -849,7 +849,7 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
     // 0, 1 or 2 for '<', '<=' or '+' respectively
-    uint8_t opcode = jit.instruction.low;
+    binaryBuiltIns::Operator opcode = (binaryBuiltIns::Operator) jit.instruction.low;
     
     Value* rightValue = jit.popValue();
     Value* leftValue  = jit.popValue();
@@ -866,7 +866,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // Linking pop-chain within the current logical block
     jit.basicBlockContexts[resultBlock].referers.insert(jit.builder->GetInsertBlock());
     
-    // Dpending on the contents we may either do the integer operations
+    // Depending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
     jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
     
@@ -877,7 +877,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     Value* intResult       = 0;  // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
-    switch ((binaryBuiltIns::Operator) opcode) {
+    switch (opcode) {
         case binaryBuiltIns::operatorLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
         case binaryBuiltIns::operatorLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break;
         case binaryBuiltIns::operatorPlus    : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
@@ -887,7 +887,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     
     // Checking which operation was performed and
     // processing the intResult object in the proper way
-    if (opcode == 2) {
+    if (opcode == binaryBuiltIns::operatorPlus) {
         // Result of + operation will be number.
         // We need to create TInteger value and cast it to the pointer
         
