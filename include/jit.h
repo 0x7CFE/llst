@@ -498,7 +498,7 @@ public:
         uint32_t hitCount;
         TSymbol* messageSelector;
         TClassHitsMap classHits;
-        TCallSite() : hitCount(0) {}
+        TCallSite() : hitCount(0), messageSelector(0) {}
     };
     
     struct THotMethod {

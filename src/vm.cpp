@@ -52,7 +52,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot) {
-        fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
+        fprintf(stderr, "VM: memory manager failed to allocate %u bytes\n", slotSize);
         return globals.nilObject;
     }
 
@@ -724,7 +724,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TSymbol*  selector = (TSymbol*) ec.stackPop();
             try {
                 return sendMessage(ec.currentContext, selector, args, 0);
-            } catch(TBlockReturn blockReturn) {
+            } catch(TBlockReturn& blockReturn) {
                 //When we catch blockReturn we change the current context to block.creatingContext.
                 //The post processing code will change 'block.creatingContext' to the previous one
                 // and the result of blockReturn will be injected on the stack

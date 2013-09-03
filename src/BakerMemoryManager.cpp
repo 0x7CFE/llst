@@ -158,7 +158,7 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
     // TODO Grow the heap if object still not fits
 
-    fprintf(stderr, "Could not allocate %d bytes in heap\n", requestedSize);
+    fprintf(stderr, "Could not allocate %u bytes in heap\n", requestedSize);
     return 0;
 }
 
@@ -167,7 +167,7 @@ void* BakerMemoryManager::staticAllocate(size_t requestedSize)
     uint8_t* newPointer = m_staticHeapPointer - requestedSize;
     if (newPointer < m_staticHeapBase)
     {
-        fprintf(stderr, "Could not allocate %d bytes in static heaps\n", requestedSize);
+        fprintf(stderr, "Could not allocate %u bytes in static heaps\n", requestedSize);
         return 0; // TODO Report memory allocation error
     }
     m_staticHeapPointer = newPointer;

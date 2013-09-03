@@ -174,7 +174,7 @@ bool MethodCompiler::TJITContext::hasValue()
         return true;
     
     // If not, checking the possible referers
-    if (blockContext.referers.size() == 0)
+    if (blockContext.referers.empty())
         return false; // no referers == no value
     
     // FIXME This is not correct in a case of dummy transitive block with an only simple branch
