@@ -1214,7 +1214,11 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             primitiveResult = m_globals.nilObject;
         } break;
         
-        case primitive::getClass:
+        case primitive::getClass: {
+            Value* object = jit.popValue();
+            Value* klass  = jit.builder->CreateCall(m_baseFunctions.getObjectClass, object, "class");
+            primitiveResult = jit.builder->CreateBitCast(klass, m_baseTypes.object->getPointerTo());
+        } break;
         case primitive::getSize: {
             Value* object           = jit.popValue();
             Value* objectIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, object, "isSmallInt");
@@ -1224,22 +1228,12 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             jit.builder->CreateCondBr(objectIsSmallInt, asSmallInt, asObject);
             
             jit.builder->SetInsertPoint(asSmallInt);
-            Value* result = 0;
-            if (opcode == primitive::getSize) {
-                result = jit.builder->CreateCall(m_baseFunctions.newInteger, jit.builder->getInt32(0));
-            } else {
-                result = jit.builder->CreateBitCast(m_globals.smallIntClass, m_baseTypes.object->getPointerTo());
-            }
+            Value* result = jit.builder->CreateCall(m_baseFunctions.newInteger, jit.builder->getInt32(0));
             jit.builder->CreateRet(result);
             
             jit.builder->SetInsertPoint(asObject);
-            if (opcode == primitive::getSize) {
-                Value* size     = jit.builder->CreateCall(m_baseFunctions.getObjectSize, object, "size");
-                primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, size);
-            } else {
-                Value* klass = jit.builder->CreateCall(m_baseFunctions.getObjectClass, object, "class");
-                primitiveResult = jit.builder->CreateBitCast(klass, m_baseTypes.object->getPointerTo());
-            }
+            Value* size     = jit.builder->CreateCall(m_baseFunctions.getObjectSize, object, "size");
+            primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, size);
         } break;
         
         case primitive::startNewProcess: { // 6
