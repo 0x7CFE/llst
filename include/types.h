@@ -172,7 +172,12 @@ public:
     }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }
-    uint8_t  getByte(uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
+    const uint8_t* getBytes() const {
+        return reinterpret_cast<const uint8_t*>(fields);
+    }
+    const uint8_t getByte(uint32_t index) const {
+        return reinterpret_cast<const uint8_t*>(fields)[index];
+    }
     uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
     
     void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(fields)[index] = value; }
@@ -207,7 +212,7 @@ struct TByteArray : public TByteObject {
 // 
 struct TSymbol : public TByteObject { 
     static const char* InstanceClassName() { return "Symbol"; }
-    std::string toString() { return std::string((const char*)fields, getSize()); }
+    std::string toString() const { return std::string((const char*)fields, getSize()); }
 };
 
 // TString represents the Smalltalk's String class. 
@@ -234,9 +239,6 @@ struct TChar : public TObject {
 // typedefs instead of bare TArray<TObject*>. This will help to eliminate
 // various errors in VM code where object of specific type is expected but
 // incorrect array is used to get it.
-// 
-// NOTE: Unlike C languages, indexing in Smalltalk is started from the 1. 
-//       So the first element will have index 1, the second 2 and so on.
 template <typename Element>
 struct TArray : public TObject { 
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
@@ -244,6 +246,8 @@ struct TArray : public TObject {
     
     Element getField(uint32_t index) { return (Element) fields[index]; }
     
+// NOTE: Unlike C languages, indexing in Smalltalk is started from the 1. 
+//       So the first element will have index 1, the second 2 and so on.
     template<typename I>
     Element& operator [] (I index) { return (Element&) fields[index]; }
 };
@@ -311,8 +315,8 @@ struct TDictionary : public TObject {
     
     // Find a value associated with a key
     // Returns NULL if nothing was found
-    TObject*      find(TSymbol* key);
-    TObject*      find(const char* key);
+    TObject* find(const TSymbol* key) const;
+    TObject* find(const char* key) const;
     
     static const char* InstanceClassName() { return "Dictionary"; }
 private:
@@ -321,9 +325,12 @@ private:
     // or greater than zero if 'left' is found, respectively, to be less than,
     // to match, or be greater than 'right'.
     struct compareSymbols {
-        bool operator() (TSymbol* left, TSymbol* right);
-        bool operator() (TSymbol* left, const char* right);
-        bool operator() (const char* left, TSymbol* right);
+        // This function compares two byte objects depending on their lenght and contents
+        bool operator() (const TSymbol* left, const TSymbol* right) const;
+        // This function compares byte object and 
+        // null terminated string depending on their lenght and contents
+        bool operator() (const TSymbol* left, const char* right) const;
+        bool operator() (const char* left, const TSymbol* right) const;
     };
 };
 

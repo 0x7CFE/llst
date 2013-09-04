@@ -36,10 +36,8 @@
 #include <string.h>
 #include <algorithm>
 
-bool TDictionary::compareSymbols::operator() (TSymbol* left, TSymbol* right)
+bool TDictionary::compareSymbols::operator() (const TSymbol* left, const TSymbol* right) const
 {
-    // This function compares two byte objects depending on their lenght and contents
-   
     const uint8_t* leftBase = left->getBytes();
     const uint8_t* leftEnd  = leftBase + left->getSize();
     
@@ -49,27 +47,24 @@ bool TDictionary::compareSymbols::operator() (TSymbol* left, TSymbol* right)
     return std::lexicographical_compare(leftBase, leftEnd, rightBase, rightEnd);
 }
 
-bool TDictionary::compareSymbols::operator() (TSymbol* left, const char* right)
+bool TDictionary::compareSymbols::operator() (const TSymbol* left, const char* right) const
 {
-    // This function compares byte object and 
-    // null terminated string depending on their lenght and contents
-    
     const uint8_t* leftBase = left->getBytes();
     const uint8_t* leftEnd  = leftBase + left->getSize();
     
     return std::lexicographical_compare(leftBase, leftEnd, right, right + strlen(right));
 }
 
-bool TDictionary::compareSymbols::operator() (const char* left, TSymbol* right)
+bool TDictionary::compareSymbols::operator() (const char* left, const TSymbol* right) const
 {
     return !operator()(right, left);
 }
 
-TObject* TDictionary::find(TSymbol* key)
+TObject* TDictionary::find(const TSymbol* key) const
 {
     // Keys are stored in order
     // Thus we may apply binary search
-    TDictionary::compareSymbols less;
+    const TDictionary::compareSymbols less;
     TSymbol** keysBase = (TSymbol**) keys->getFields();
     TSymbol** keysLast = keysBase + keys->getSize();
     TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
@@ -82,11 +77,11 @@ TObject* TDictionary::find(TSymbol* key)
         return 0; // key not found
 }
 
-TObject* TDictionary::find(const char* key)
+TObject* TDictionary::find(const char* key) const
 {
     // Keys are stored in order
     // Thus we may apply binary search
-    TDictionary::compareSymbols less;
+    const TDictionary::compareSymbols less;
     TSymbol** keysBase = (TSymbol**) keys->getFields();
     TSymbol** keysLast = keysBase + keys->getSize();
     TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
