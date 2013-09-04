@@ -418,7 +418,7 @@ private:
     void             writeWord(std::ofstream& os, uint32_t word);
     void             writeObject(std::ofstream& os, TObject* object);
 public:
-    ImageWriter() {}
+    ImageWriter();
     ImageWriter& setGlobals(const TGlobals& globals);
     void writeTo(const char* fileName);
 };

@@ -343,6 +343,10 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
     }
 }
 
+Image::ImageWriter::ImageWriter() {
+    memset(&m_globals, 0, sizeof(m_globals));
+}
+
 Image::ImageWriter& Image::ImageWriter::setGlobals(const TGlobals& globals)
 {
     m_globals = globals;
