@@ -207,14 +207,6 @@ struct TByteArray : public TByteObject {
 // 
 struct TSymbol : public TByteObject { 
     static const char* InstanceClassName() { return "Symbol"; }
-    bool equalsTo(const char* value) { 
-        if (!value)
-            return false;
-        size_t len = strlen(value);
-        if (len != getSize()) 
-            return false;
-        return (memcmp(getBytes(), value, getSize()) == 0);
-    }
     std::string toString() { return std::string((const char*)fields, getSize()); }
 };
 
