@@ -58,6 +58,7 @@ private:
     private:
         // TODO Think about proper memory organization
         // TODO Implement reloadContextData etc ?
+        SmalltalkVM* m_vm;
     public:
         hptr<TContext> currentContext;
 
@@ -77,9 +78,7 @@ private:
             currentContext->stackTop    = newInteger(stackTop);
         }
         
-        void stackPush(TObject* object) {
-            currentContext->stack->putField(stackTop++, object);
-        }
+        void stackPush(TObject* object);
         
         TObject* stackLast() {
             return currentContext->stack->getField(stackTop - 1);
@@ -90,7 +89,8 @@ private:
             return top;
         }
 
-        TVMExecutionContext(IMemoryManager* mm) :
+        TVMExecutionContext(IMemoryManager* mm, SmalltalkVM* vm) :
+            m_vm(vm),
             currentContext((TContext*) globals.nilObject, mm),
             returnedValue(globals.nilObject, mm)
         { }
@@ -191,6 +191,5 @@ template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSi
 template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(size_t dataSize, bool registerPointer);
 template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize, bool registerPointer);
 template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool registerPointer);
-
 
 #endif
