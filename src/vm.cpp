@@ -182,6 +182,7 @@ void SmalltalkVM::updateMethodCache(TSymbol* selector, TClass* klass, TMethod* m
 TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 {
     assert(selector != 0);
+    assert(klass != 0);
     // First of all checking the method cache
     // Frequently called methods most likely will be there
     TMethod* method = lookupMethodInCache(selector, klass);
@@ -375,7 +376,9 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
     
     if (!receiverClass) {
         TObject* receiver = messageArguments[0];
+        assert(receiver != 0);
         receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
+        assert(receiverClass != 0);
     }
     
     hptr<TMethod> receiverMethod = newPointer(lookupMethod(selector, receiverClass));
