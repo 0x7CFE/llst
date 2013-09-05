@@ -58,10 +58,10 @@ struct TMemoryManagerInfo {
 };
 
 struct object_ptr {
-    volatile TObject* data;
-    volatile object_ptr* next;
+    TObject* data;
+    object_ptr* next;
     object_ptr() : data(0), next(0) {}
-    explicit object_ptr(volatile TObject* data)  : data(data), next(0) {}
+    explicit object_ptr(TObject* data)  : data(data), next(0) {}
     object_ptr& operator=(const object_ptr& value) { this->data = value.data; return *this; }
 private:
     object_ptr(const object_ptr& value);
@@ -265,7 +265,7 @@ protected:
     typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_externalPointers;
     
-    volatile object_ptr* m_externalPointersHead; 
+    object_ptr* m_externalPointersHead; 
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
