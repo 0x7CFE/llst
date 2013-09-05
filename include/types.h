@@ -77,11 +77,11 @@ private:
     static const int FLAG_BINARY    = 2;
     static const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
 public:
-    TSize(uint32_t size, bool isBinary = false, bool isRelocated = false) 
+    TSize(uint32_t size, bool binary = false, bool relocated = false) 
     { 
         data  = (size << 2);
-        data |= isBinary    ? FLAG_BINARY : 0; 
-        data |= isRelocated ? FLAG_RELOCATED : 0; 
+        data |= binary    ? FLAG_BINARY : 0; 
+        data |= relocated ? FLAG_RELOCATED : 0; 
     }
     
     TSize(const TSize& size) : data(size.data) { }
@@ -275,7 +275,7 @@ struct TContext : public TObject {
 // In Smalltalk, a block is a piece of code that may be executed by sending
 // a #value or #value: message to it. From the VM's point of view blocks are
 // nested contexts that are linked to the wrapping method. Block has direct access to 
-// the lexical context of the wrapping method and it's variables. This is needed to
+// the lexical context of the wrapping method and its variables. This is needed to
 // implement the closure mechanism.
 
 // TBlock is a direct descendant of TContext class which adds fields specific to blocks
@@ -301,12 +301,12 @@ struct TMethod : public TObject {
 };
 
 // Dictionary is a simple associative container which holds pairs
-// of keys and associated values. Keys are represented by symbols,
+// of keys and associated values. Keys are represented with symbols,
 // whereas values may be instances of any class.
 // 
 // Technically, Dictionary is implemented as two parallel arrays:
-// keys[] and values[]. keys[] stores sorted symbols. values[] holds 
-// objects corresponding to the key in the same position.
+// keys[] and values[]. keys[] store sorted symbols. values[] hold
+// objects corresponding to the key at the same position.
 // 
 // Because keys are sorted, we may perform a search as a binary search.
 struct TDictionary : public TObject {
@@ -321,9 +321,8 @@ struct TDictionary : public TObject {
     static const char* InstanceClassName() { return "Dictionary"; }
 private:
     // Helper comparison functions. Compares the two symbols 'left' and 'right' 
-    // (or it's string representation). Returns an integer less than, equal to,
-    // or greater than zero if 'left' is found, respectively, to be less than,
-    // to match, or be greater than 'right'.
+    // (or it's string representation). Returns true when 'left' is found to be
+    // less than 'right'.
     struct compareSymbols {
         // This function compares two byte objects depending on their lenght and contents
         bool operator() (const TSymbol* left, const TSymbol* right) const;

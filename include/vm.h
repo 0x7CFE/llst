@@ -78,18 +78,15 @@ private:
         }
         
         void stackPush(TObject* object) {
-            TObjectArray& stack = * currentContext->stack;
-            stack[stackTop++] = object;
+            currentContext->stack->putField(stackTop++, object);
         }
         
         TObject* stackLast() {
-            TObjectArray& stack = * currentContext->stack;
-            return stack[stackTop - 1];
+            return currentContext->stack->getField(stackTop - 1);
         }
         
         TObject* stackPop() {
-            TObjectArray& stack = * currentContext->stack;
-            TObject* top = stack[--stackTop];
+            TObject* top = currentContext->stack->getField(--stackTop);
             return top;
         }
 
