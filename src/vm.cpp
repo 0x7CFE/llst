@@ -39,6 +39,7 @@
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <cassert>
+#include <iostream>
 
 #include <opcodes.h>
 #include <primitives.h>
@@ -142,7 +143,7 @@ void SmalltalkVM::TVMExecutionContext::stackPush(TObject* object)
                 newStack->putField(i, value);
             }
             currentContext->stack = newStack;
-            // TODO report about broken bytecode
+            std::cerr << std::endl << "VM: Stack overflow in '" << currentContext->method->name->toString() << "'" << std::endl;
         }
     }
     currentContext->stack->putField(stackTop++, object);
