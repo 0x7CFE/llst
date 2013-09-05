@@ -1569,7 +1569,16 @@ main    | command  data |
     " initialize classes "
     
     Char initialize.
-
+    
+    SmallIntTest new runAll.
+    ArrayTest new runAll.
+    PrimitiveTest new runAll.
+    
+    "Scheduler initialize.
+    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
+    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
+    Scheduler run."
+    
     "'Preparing test data ...' print. 
     data <- List new.
     1 to: 1000 do: [ :x | data add: 100000 atRandom ].
