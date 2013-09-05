@@ -130,6 +130,7 @@ template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool reg
 
 void SmalltalkVM::TVMExecutionContext::stackPush(TObject* object)
 {
+    assert(object != 0);
     //NOTE: boundary check
     //      The Timothy A. Budd's version of compiler produces
     //      bytecode which can overflow the stack of the context
@@ -180,6 +181,7 @@ void SmalltalkVM::updateMethodCache(TSymbol* selector, TClass* klass, TMethod* m
 
 TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 {
+    assert(selector != 0);
     // First of all checking the method cache
     // Frequently called methods most likely will be there
     TMethod* method = lookupMethodInCache(selector, klass);
@@ -227,6 +229,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
         assert(ec.currentContext->method != 0);
         assert(ec.currentContext->stack != 0);
         assert(ec.bytePointer <= ec.currentContext->method->byteCodes->getSize());
+        assert(ec.currentContext->arguments->getSize() >= 1);
         assert(ec.currentContext->arguments->getField(0) != 0);
         
         // Initializing helper references
