@@ -3,8 +3,9 @@
 #include <memory.h>
 #include <opcodes.h>
 #include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
 #include <sys/time.h>
+#include <time.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>

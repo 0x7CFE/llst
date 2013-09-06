@@ -39,8 +39,6 @@
 
 #include <types.h>
 #include <memory.h>
-#include <stdlib.h>
-#include <stdio.h>
 
 class SmalltalkVM {
 public:
@@ -177,7 +175,6 @@ template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool r
     if (!klass)
         return hptr<T>((T*) globals.nilObject, m_memoryManager);
     
-
     if (T::InstancesAreBinary()) {
         return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, registerPointer);
     } else {
