@@ -140,7 +140,8 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
             // If even after collection there is too less space
             // we may try to expand the heap
-            if ((m_heapSize < m_maxHeapSize) && (m_activeHeapPointer - m_activeHeapBase < m_heapSize / 6))
+            const uintptr_t distance = m_activeHeapPointer - m_activeHeapBase;
+            if ((m_heapSize < m_maxHeapSize) && (distance < m_heapSize / 6))
                growHeap(requestedSize);
 
             if (gcOccured)

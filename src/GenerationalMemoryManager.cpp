@@ -175,7 +175,8 @@ void GenerationalMemoryManager::collectRightToLeft()
 
 bool GenerationalMemoryManager::checkThreshold()
 {
-    return (m_inactiveHeapPointer - m_inactiveHeapBase < m_heapSize / 8);
+    const uintptr_t distance = m_inactiveHeapPointer - m_inactiveHeapBase;
+    return (distance < m_heapSize / 8);
 }
 
 TMemoryManagerInfo GenerationalMemoryManager::getStat() {
