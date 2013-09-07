@@ -110,18 +110,34 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
     
     // Reallocating space and zeroing it
-    *inactiveHeapBase = (uint8_t*) realloc(*inactiveHeapBase, newMediane);
-    memset(*inactiveHeapBase, 0, newMediane);
-
+    {
+        void* newInactiveHeap = realloc(*inactiveHeapBase, newMediane);
+        if (!newInactiveHeap)
+        {
+            printf("MM: Cannot reallocate %d bytes for inactive heap\n", newMediane);
+            abort();
+        } else {
+            *inactiveHeapBase = (uint8_t*) newInactiveHeap;
+            memset(*inactiveHeapBase, 0, newMediane);
+        }
+    }
     // Stage 2. Collecting garbage so that 
     // active objects will be moved to a new home
     collectGarbage();
 
     // Now pointers are swapped and previously active heap is now inactive
     // We need to reallocate it too
-    *activeHeapBase = (uint8_t*) realloc(*activeHeapBase, newMediane);
-    memset(*activeHeapBase, 0, newMediane);
-    
+    {
+        void* newActiveHeap = (uint8_t*) realloc(*activeHeapBase, newMediane);
+        if (!newActiveHeap)
+        {
+            printf("MM: Cannot reallocate %d bytes for active heap\n", newMediane);
+            abort();
+        } else {
+            *activeHeapBase = (uint8_t*) newActiveHeap;
+            memset(*activeHeapBase, 0, newMediane);
+        }
+    }
     collectGarbage();
     
     m_heapSize = newHeapSize;
