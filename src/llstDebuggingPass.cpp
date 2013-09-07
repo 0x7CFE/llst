@@ -12,7 +12,12 @@ namespace {
     public:
         virtual bool runOnFunction(Function &F) ;
         static char ID;
-        LLSTDebuggingPass(): FunctionPass(ID) { }
+        LLSTDebuggingPass():
+            FunctionPass(ID), m_module(0), _printf(0), m_builder(0),
+            isSmallInteger(0), getObjectField(0), getObjectClass(0)
+        {
+            memset(&m_baseTypes, 0, sizeof(m_baseTypes));
+        }
         bool belongsToSmalltalkType(Type* type);
         ~LLSTDebuggingPass() {
             delete m_builder;
@@ -25,8 +30,6 @@ namespace {
         Function* isSmallInteger;
         Function* getObjectField;
         Function* getObjectClass;
-        
-        
         
         void initFromFunction(Function& F);
         void insertSelfInSendMessageCheck(Function& F);
@@ -78,9 +81,9 @@ void LLSTDebuggingPass::insertLoadInstCheck(Function& F)
     Value* BrokenPointerMessage = m_builder->CreateGlobalStringPtr("\npointer is broken\n");
     
     InstructionVector Loads;
-    for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
+    for (Function::iterator BB = F.begin(); BB != F.end(); ++BB)
     {
-        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
+        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); ++II)
         {
             if (LoadInst* Load = dyn_cast<LoadInst>(II)) {
                 Loads.push_back(Load);
@@ -128,9 +131,9 @@ void LLSTDebuggingPass::insertSelfInSendMessageCheck(Function& F)
     Value* BrokenSelfMessage = m_builder->CreateGlobalStringPtr("\nself is broken\n");
     
     InstructionVector Calls;
-    for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
+    for (Function::iterator BB = F.begin(); BB != F.end(); ++BB)
     {
-        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
+        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); ++II)
         {
             if (CallInst* Call = dyn_cast<CallInst>(II)) {
                 if (Call->getCalledFunction()->getName() == "sendMessage")

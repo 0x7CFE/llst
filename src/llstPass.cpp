@@ -56,7 +56,7 @@ bool isLoadFromRoot(LoadInst* Load) {
     Function* F = Load->getParent()->getParent();
     BasicBlock& entryBB = F->getEntryBlock();
     
-    for (BasicBlock::iterator I = entryBB.begin(); I != entryBB.end(); I++ ) {
+    for (BasicBlock::iterator I = entryBB.begin(); I != entryBB.end(); ++I) {
         if (IntrinsicInst* createRootCall = dyn_cast<IntrinsicInst>(I)) {
             if(createRootCall->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot) {
                 Value* holder = createRootCall->getArgOperand(0)->stripPointerCasts();
@@ -89,7 +89,7 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
     InstructionVector LoadNCall;
     InstructionSet toDelete;
     
-    for (BasicBlock::iterator Instr = B->begin(); Instr != B->end(); Instr++ )
+    for (BasicBlock::iterator Instr = B->begin(); Instr != B->end(); ++Instr)
     {
         if ( LoadInst* load = dyn_cast<LoadInst>(Instr) ) {
             if (isLoadFromRoot(load))
@@ -128,7 +128,7 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
     rootLoadsRemoved += toDelete.size();
     
     bool BBChanged = !toDelete.empty();
-    for(InstructionSI I = toDelete.begin(); I != toDelete.end(); I++) {
+    for(InstructionSI I = toDelete.begin(); I != toDelete.end(); ++I) {
         (*I)->eraseFromParent();
     }
     
@@ -137,9 +137,9 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
 
 int LLSTPass::getNumRoots(Function& F) {
     int result = 0;
-    for (Function::iterator BB = F.begin(); BB != F.end(); BB++)
+    for (Function::iterator BB = F.begin(); BB != F.end(); ++BB)
     {
-        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); II++)
+        for(BasicBlock::iterator II = BB->begin(); II != BB->end(); ++II)
         {
             if (IntrinsicInst* Intr = dyn_cast<IntrinsicInst>(II)) {
                 if (Intr->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot) {
@@ -155,7 +155,7 @@ bool LLSTPass::removeRedundantRoots(Function& F)
 {
     InstructionSet toDelete;
     BasicBlock& entryBB = F.getEntryBlock();
-    for (BasicBlock::iterator Instr = entryBB.begin(); Instr != entryBB.end(); Instr++ )
+    for (BasicBlock::iterator Instr = entryBB.begin(); Instr != entryBB.end(); ++Instr)
     {
         if (IntrinsicInst* createRootCall = dyn_cast<IntrinsicInst>(Instr))
         {
@@ -166,7 +166,7 @@ bool LLSTPass::removeRedundantRoots(Function& F)
                     
                 Value* holder = cast<Instruction>( createRootCall->getArgOperand(0)->stripPointerCasts() );
                 bool onlyStoresToRoot = true;
-                for(Value::use_iterator U = holder->use_begin(); U != holder->use_end() ; U++) {
+                for(Value::use_iterator U = holder->use_begin(); U != holder->use_end() ; ++U) {
                     Instruction* I = cast<Instruction>(*U);
                     switch( I->getOpcode() ) {
                         case Instruction::Load: {
@@ -185,7 +185,7 @@ bool LLSTPass::removeRedundantRoots(Function& F)
     }
     bool CFGChanged = !toDelete.empty();
     rootsRemoved += toDelete.size();
-    for(InstructionSI I = toDelete.begin(); I != toDelete.end(); I++) {
+    for(InstructionSI I = toDelete.begin(); I != toDelete.end(); ++I) {
         (*I)->eraseFromParent();
     }
     
