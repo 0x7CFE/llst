@@ -32,8 +32,7 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <memory.h>
-#include <stdio.h>
+#include "memory.h"
 #include <stdlib.h>
 #include <sys/time.h>
 
