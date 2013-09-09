@@ -32,7 +32,7 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "memory.h"
+#include <memory.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -128,7 +128,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     // Now pointers are swapped and previously active heap is now inactive
     // We need to reallocate it too
     {
-        void* newActiveHeap = (uint8_t*) realloc(*activeHeapBase, newMediane);
+        void* newActiveHeap = realloc(*activeHeapBase, newMediane);
         if (!newActiveHeap)
         {
             printf("MM: Cannot reallocate %d bytes for active heap\n", newMediane);
