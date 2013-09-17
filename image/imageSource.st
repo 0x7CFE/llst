@@ -1277,6 +1277,72 @@ lastLink |list|
 !
 
 
+COMMENT                                                                                           -------MagnitudeTest----------
+CLASS MagnitudeTest Test
+
+METHOD MagnitudeTest
+L
+    [1 < 2] assertEq: true withComment: '1'.
+    [1 < 1] assertEq: false withComment: '2'.
+    [1 < 0] assertEq: false withComment: '3'.
+!
+
+METHOD MagnitudeTest
+GEQ
+    [1 >= 2] assertEq: false withComment: '1'.
+    [1 >= 1] assertEq: true withComment: '2'.
+    [1 >= 0] assertEq: true withComment: '3'.
+!
+
+METHOD MagnitudeTest
+EQ
+    [1 = 2] assertEq: false withComment: '1'.
+    [1 = 1] assertEq: true withComment: '2'.
+    [1 = 0] assertEq: false withComment: '3'.
+!
+
+METHOD MagnitudeTest
+LEQ
+    [1 <= 2] assertEq: true withComment: '1'.
+    [1 <= 1] assertEq: true withComment: '2'.
+    [1 <= 0] assertEq: false withComment: '3'.
+!
+
+METHOD MagnitudeTest
+G
+    [1 > 2] assertEq: false withComment: '1'.
+    [1 > 1] assertEq: false withComment: '2'.
+    [1 > 0] assertEq: true withComment: '3'.
+!
+
+METHOD MagnitudeTest
+min
+    [1 min: 2] assertEq: 1 withComment: '1'.
+    [1 min: 1] assertEq: 1 withComment: '2'.
+    [1 min: 0] assertEq: 0 withComment: '3'.
+!
+
+METHOD MagnitudeTest
+max
+    [1 max: 2] assertEq: 2 withComment: '1'.
+    [1 max: 1] assertEq: 1 withComment: '2'.
+    [1 max: 0] assertEq: 1 withComment: '3'.
+!
+
+METHOD MagnitudeTest
+between
+    [1 between: 0 and: 0] assertEq: false withComment: '1'.
+    [1 between: 0 and: 1] assertEq: true withComment: '2'.
+    [1 between: 0 and: 2] assertEq: true withComment: '3'.
+
+    [1 between: 1 and: 0] assertEq: false withComment: '4'.
+    [1 between: 1 and: 1] assertEq: true withComment: '5'.
+    [1 between: 1 and: 2] assertEq: true withComment: '6'.
+    
+    [1 between: 2 and: 0] assertEq: false withComment: '7'.
+    [1 between: 2 and: 1] assertEq: false withComment: '8'.
+    [1 between: 2 and: 2] assertEq: false withComment: '9'.
+!
 
 
 
@@ -1573,6 +1639,7 @@ main    | command  data |
     SmallIntTest new runAll.
     ArrayTest new runAll.
     PrimitiveTest new runAll.
+    MagnitudeTest new runAll.
     
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
