@@ -57,7 +57,10 @@ bool TDictionary::compareSymbols::operator() (const TSymbol* left, const char* r
 
 bool TDictionary::compareSymbols::operator() (const char* left, const TSymbol* right) const
 {
-    return !operator()(right, left);
+    const uint8_t* rightBase = right->getBytes();
+    const uint8_t* rightEnd  = rightBase + right->getSize();
+    
+    return std::lexicographical_compare(left, left + strlen(left), rightBase, rightEnd);
 }
 
 TObject* TDictionary::find(const TSymbol* key) const
