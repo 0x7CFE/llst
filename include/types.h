@@ -129,13 +129,7 @@ public:
     
     // By default objects subject to non binary specification
     explicit TObject(uint32_t fieldsCount, TClass* klass, bool isObjectBinary = false) 
-        : size(fieldsCount, isObjectBinary), klass(klass) 
-    {
-        // Zeroing the fields space
-        // Binary objects should manage this on their own
-        if (!isObjectBinary)
-            memset(fields, 0, fieldsCount * sizeof(TObject*));
-    }
+        : size(fieldsCount, isObjectBinary), klass(klass) { }
     
     uint32_t getSize() const { return size.getSize(); }
     TClass*  getClass() const { return klass; }
@@ -165,11 +159,7 @@ private:
     static const char* InstanceClassName() { return ""; } 
 public:
     // Byte objects are said to be binary
-    explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) 
-    {
-        // Zeroing byte object data
-        memset((void*)fields, 0, dataSize);
-    }
+    explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
     
     uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }
     const uint8_t* getBytes() const {
