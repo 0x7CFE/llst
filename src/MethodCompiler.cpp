@@ -1642,3 +1642,49 @@ void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
         } break;
     }
 }
+
+MethodCompiler::StackAlloca MethodCompiler::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount)
+{
+    // Storing current edit location
+    BasicBlock* insertBlock = builder.GetInsertBlock();
+    BasicBlock::iterator insertPoint = builder.GetInsertPoint();
+    
+    // Switching to the preamble
+    BasicBlock* preamble = insertBlock->getParent()->begin();
+    builder.SetInsertPoint(preamble, preamble->begin());
+    
+    // Allocating the object slot
+    const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
+    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize));
+    objectSlot->setAlignment(4);
+    
+    // Allocating object holder in the preamble
+    AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
+    
+    // Initializing holder with null value
+//    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder, true);
+    
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    
+    //Value* structData = { ConstantInt::get(builder.getInt1Ty(), 1) };
+    
+    // Registering holder in GC and supplying metadata that tells GC to treat this particular root
+    // as a pointer to a stack object. Stack objects are not moved by GC. Instead, only their fields 
+    // and class pointer are updated.
+    //Value* metaData = ConstantStruct::get(m_JITModule->getTypeByName("TGCMetaData"), ConstantInt::get(builder.getInt1Ty(), 1));
+    Value* metaData = m_JITModule->getGlobalVariable("stackObjectMeta");
+    Value* stackRoot = builder.CreateBitCast(objectHolder, builder.getInt8PtrTy()->getPointerTo());
+    builder.CreateCall2(gcrootIntrinsic, stackRoot, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
+    
+    // Returning to the original edit location
+    builder.SetInsertPoint(insertBlock, insertPoint); 
+    
+    // Storing the address of stack object to the holder
+    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
+    builder.CreateStore(newObject, objectHolder/*, true*/);
+    
+    StackAlloca result;
+    result.objectHolder = objectHolder;
+    result.objectSlot = objectSlot;
+    return result;
+}
