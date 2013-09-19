@@ -497,10 +497,25 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
 Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
+    StackAlloca array = allocateStackObject(*jit.builder, sizeof(TObjectArray), elementsCount);
     // Instantinating new array object
-    uint32_t slotSize = sizeof(TObject) + elementsCount * sizeof(TObject*);
-    Value* args[] = { m_globals.arrayClass, jit.builder->getInt32(slotSize) };
-    Value* arrayObject = jit.builder->CreateCall(m_runtimeAPI.newOrdinaryObject, args);
+    const uint32_t arraySize = sizeof(TObjectArray) + sizeof(TObject*) * elementsCount;
+    Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
+    
+    jit.builder->CreateCall5(
+        llvmMemset,                         // llvm.memset intrinsic
+        array.objectSlot,                   // destination address
+        jit.builder->getInt8(0),            // fill with zeroes
+        jit.builder->getInt32(arraySize),   // size of object slot
+        jit.builder->getInt32(0),           // no alignment
+        jit.builder->getInt1(false)         // volatile operation
+    );
+    
+    Value* arrayObject = jit.builder->CreateBitCast(array.objectSlot, m_baseTypes.object->getPointerTo());
+    
+    jit.builder->CreateCall2(m_baseFunctions.setObjectSize, arrayObject, jit.builder->getInt32(elementsCount));
+    jit.builder->CreateCall2(m_baseFunctions.setObjectClass, arrayObject, m_globals.arrayClass);
+    
     return arrayObject;
 }
 
