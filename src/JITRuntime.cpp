@@ -607,24 +607,21 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
             newBlock.tempsHolder = 0;
         
         // Filling stack space with zeroes
-        Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
-        builder.CreateCall5(
-            llvmMemset,                    // llvm.memset intrinsic
-            contextSlot,                   // destination address
-            builder.getInt8(0),            // fill with zeroes
-            builder.getInt32(contextSize), // size of object slot
-            builder.getInt32(0),           // no alignment
-            builder.getInt1(false)          // volatile operation
+        builder.CreateMemSet(
+            contextSlot,            // destination address
+            builder.getInt8(0),     // fill with zeroes
+            contextSize,            // size of object slot
+            0,                      // no alignment
+            false                   // volatile operation
         );
         
         if (hasTemporaries)
-            builder.CreateCall5(
-                llvmMemset,                    // llvm.memset intrinsic
-                tempsSlot,                     // destination address
-                builder.getInt8(0),            // fill with zeroes
-                builder.getInt32(tempsSize),   // size of object slot
-                builder.getInt32(0),           // no alignment
-                builder.getInt1(false)          // volatile operation
+            builder.CreateMemSet(
+                tempsSlot,           // destination address
+                builder.getInt8(0),  // fill with zeroes
+                tempsSize,           // size of object slot
+                0,                   // no alignment
+                false                // volatile operation
             );
         
         // Initializing object fields

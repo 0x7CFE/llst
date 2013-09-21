@@ -500,15 +500,12 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     StackAlloca array = allocateStackObject(*jit.builder, sizeof(TObjectArray), elementsCount);
     // Instantinating new array object
     const uint32_t arraySize = sizeof(TObjectArray) + sizeof(TObject*) * elementsCount;
-    Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
-    
-    jit.builder->CreateCall5(
-        llvmMemset,                         // llvm.memset intrinsic
-        array.objectSlot,                   // destination address
-        jit.builder->getInt8(0),            // fill with zeroes
-        jit.builder->getInt32(arraySize),   // size of object slot
-        jit.builder->getInt32(0),           // no alignment
-        jit.builder->getInt1(false)         // volatile operation
+    jit.builder->CreateMemSet(
+        array.objectSlot,           // destination address
+        jit.builder->getInt8(0),    // fill with zeroes
+        arraySize,                  // size of object slot
+        0,                          // no alignment
+        false                       // volatile operation
     );
     
     Value* arrayObject = jit.builder->CreateBitCast(array.objectSlot, m_baseTypes.object->getPointerTo());
