@@ -1636,34 +1636,10 @@ main    | command  data |
     
     Char initialize.
     
-    SmallIntTest new runAll.
-    ArrayTest new runAll.
-    PrimitiveTest new runAll.
-    MagnitudeTest new runAll.
-    
-    "Scheduler initialize.
+    Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
     Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
-    Scheduler run."
-    
-    "'Preparing test data ...' print. 
-    data <- List new.
-    1 to: 1000 do: [ :x | data add: 100000 atRandom ].
-    'done' printNl.
-    
-    'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
-    'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    
-    Jit patchHotMethods.
-    
-    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
-    
-    "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
-    
-    [ command <- String readline: '->'. command notNil ]
-        whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
+    Scheduler run.
     
     ^nil.
 !

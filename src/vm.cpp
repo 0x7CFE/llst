@@ -262,13 +262,20 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
         switch (ec.instruction.high) {
             case opcode::pushInstance:    ec.stackPush(instanceVariables[ec.instruction.low]); break;
             case opcode::pushArgument:    ec.stackPush(arguments[ec.instruction.low]);         break;
-            case opcode::pushTemporary:   ec.stackPush(temporaries[ec.instruction.low]);       break;
+            case opcode::pushTemporary:
+                assert(ec.instruction.low < temporaries.getSize());
+                ec.stackPush(temporaries[ec.instruction.low]);
+                break;
             case opcode::pushLiteral:     ec.stackPush(literals[ec.instruction.low]);          break;
             case opcode::pushConstant:    doPushConstant(ec);                                  break;
             case opcode::pushBlock:       doPushBlock(ec);                                     break;
             
-            case opcode::assignTemporary: temporaries[ec.instruction.low] = ec.stackLast();    break;
+            case opcode::assignTemporary:
+                assert(ec.instruction.low < temporaries.getSize());
+                temporaries[ec.instruction.low] = ec.stackLast();
+                break;
             case opcode::assignInstance: {
+                assert(ec.instruction.low < instanceVariables.getSize());
                 TObject*  newValue   =   ec.stackLast();
                 TObject** objectSlot = & instanceVariables[ec.instruction.low];
                 
