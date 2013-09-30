@@ -555,49 +555,6 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
     return 0;
 }
 
-
-std::pair<llvm::Value*, llvm::Value*> JITRuntime::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount) {
-    // Storing current edit location
-    BasicBlock* insertBlock = builder.GetInsertBlock();
-    BasicBlock::iterator insertPoint = builder.GetInsertPoint();
-    
-    // Switching to the preamble
-    BasicBlock* preamble = & insertBlock->getParent()->getBasicBlockList().front();
-    builder.SetInsertPoint(preamble, preamble->begin());
-    
-    // Allocating the object slot
-    const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
-    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize), "objectSlot.");
-    objectSlot->setAlignment(4);
-    
-    // Allocating object holder in the preamble
-    AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
-    
-    // Initializing holder with null value
-//    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder, true);
-    
-    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
-    
-    //Value* structData = { ConstantInt::get(builder.getInt1Ty(), 1) };
-    
-    // Registering holder in GC and supplying metadata that tells GC to treat this particular root
-    // as a pointer to a stack object. Stack objects are not moved by GC. Instead, only their fields 
-    // and class pointer are updated.
-    //Value* metaData = ConstantStruct::get(m_JITModule->getTypeByName("TGCMetaData"), ConstantInt::get(builder.getInt1Ty(), 1));
-    Value* metaData = m_JITModule->getGlobalVariable("stackObjectMeta");
-    Value* stackRoot = builder.CreateBitCast(objectHolder, builder.getInt8PtrTy()->getPointerTo());
-    builder.CreateCall2(gcrootIntrinsic, stackRoot, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
-    
-    // Returning to the original edit location
-    builder.SetInsertPoint(insertBlock, insertPoint); 
-    
-    // Storing the address of stack object to the holder
-    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
-    builder.CreateStore(newObject, objectHolder/*, true*/);
-    
-    return std::make_pair(objectSlot, objectHolder);
-}
-
 void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks) 
 {
     using namespace llvm;
@@ -636,45 +593,43 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize) : 0;
         
         // Allocating stack space for objects and registering GC protection holder
-        std::pair<llvm::Value*, llvm::Value*> contextPair = allocateStackObject(builder, sizeof(TContext), 0);
-        Value* contextSlot = contextPair.first;
-        newBlock.contextHolder = contextPair.second;
+        
+        MethodCompiler::StackAlloca contextPair = m_methodCompiler->allocateStackObject(builder, sizeof(TContext), 0);
+        Value* contextSlot = contextPair.objectSlot;
+        newBlock.contextHolder = contextPair.objectHolder;
         
         Value* tempsSlot = 0;
         if (hasTemporaries) {
-            std::pair<llvm::Value*, llvm::Value*> tempsPair = allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
-            tempsSlot = tempsPair.first;
-            newBlock.tempsHolder = tempsPair.second;
+            MethodCompiler::StackAlloca tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            tempsSlot = tempsPair.objectSlot;
+            newBlock.tempsHolder = tempsPair.objectHolder;
         } else
             newBlock.tempsHolder = 0;
         
         // Filling stack space with zeroes
-        Function* llvmMemset = m_JITModule->getFunction("llvm.memset.p0i8.i32");
-        builder.CreateCall5(
-            llvmMemset,                    // llvm.memset intrinsic
-            contextSlot,                   // destination address
-            builder.getInt8(0),            // fill with zeroes
-            builder.getInt32(contextSize), // size of object slot
-            builder.getInt32(0),           // no alignment
-            builder.getInt1(false)          // volatile operation
+        builder.CreateMemSet(
+            contextSlot,            // destination address
+            builder.getInt8(0),     // fill with zeroes
+            contextSize,            // size of object slot
+            0,                      // no alignment
+            false                   // volatile operation
         );
         
         if (hasTemporaries)
-            builder.CreateCall5(
-                llvmMemset,                    // llvm.memset intrinsic
-                tempsSlot,                     // destination address
-                builder.getInt8(0),            // fill with zeroes
-                builder.getInt32(tempsSize),   // size of object slot
-                builder.getInt32(0),           // no alignment
-                builder.getInt1(false)          // volatile operation
+            builder.CreateMemSet(
+                tempsSlot,           // destination address
+                builder.getInt8(0),  // fill with zeroes
+                tempsSize,           // size of object slot
+                0,                   // no alignment
+                false                // volatile operation
             );
         
         // Initializing object fields
         // TODO Move the init sequence out of the direct block or check that it is correctly optimized in loops
         Value* newContextObject  = builder.CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
         Value* newTempsObject    = hasTemporaries ? builder.CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
-        Function* setObjectSize  = m_JITModule->getFunction("setObjectSize");
-        Function* setObjectClass = m_JITModule->getFunction("setObjectClass");
+        Function* setObjectSize  = m_methodCompiler->getBaseFunctions().setObjectSize;
+        Function* setObjectClass = m_methodCompiler->getBaseFunctions().setObjectClass;
         
         // Object size stored in the TSize field of any ordinary object contains
         // number of pointers except for the first two fields

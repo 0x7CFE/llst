@@ -69,7 +69,7 @@ RAWCLASS Symbol        MetaSymbol    Magnitude
 RAWCLASS MetaChar      Class         MetaMagnitude     chars
 RAWCLASS Char          MetaChar      Magnitude         value
 CLASS Collection    Magnitude
-CLASS List          Collection        head tail size
+CLASS List          Collection        elements size
 CLASS Dictionary    Collection        keys values
 CLASS Array         Collection
 CLASS OrderedArray  Array
@@ -1263,7 +1263,7 @@ lastLink |list|
     list add: 'head'.
     list add: 'second head'.
     list add: 'middle'.
-    list add: 'secont last'.
+    list add: 'second last'.
     list add: 'last'.
     
     list <- list reverse.
@@ -1275,7 +1275,6 @@ lastLink |list|
     [ list addLast: 'last'. list lastLink value ] assertEq: 'last' withComment: 'appended with addLast:'.
     [ list clear. list lastLink] assertEq: nil withComment: 'cleared'.
 !
-
 
 COMMENT                                                                                           -------MagnitudeTest----------
 CLASS MagnitudeTest Test
@@ -1635,11 +1634,11 @@ main    | command  data |
     " initialize classes "
     
     Char initialize.
-    
     SmallIntTest new runAll.
     ArrayTest new runAll.
     PrimitiveTest new runAll.
     MagnitudeTest new runAll.
+    ListTest new runAll.
     
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
@@ -2315,7 +2314,7 @@ insert: aValue onCondition: aBlock
     
     (self isEmpty) ifTrue: [ ^self add: aValue ].
     
-    link <- head.
+    link <- elements.
     [link notNil] whileTrue: [ 
         current <- link value.
         (aBlock value: aValue value: current)
@@ -2839,7 +2838,7 @@ COMMENT --------- List -----------
 METHOD MetaList
 new | instance |
     instance <- super new.
-    self in: instance at: 3 put: 0. "set size to 0"
+    self in: instance at: 2 put: 0. "set size to 0"
     ^instance
 !
 METHOD MetaList
@@ -2866,49 +2865,47 @@ size
 !
 METHOD List
 add: anElement
-	head <- Link value: anElement next: head.
-	tail isNil ifTrue: [ tail <- head ].
+	elements <- Link value: anElement next: elements.
 	size <- size + 1.
 	^ anElement
 !
 METHOD List
 addLast: anElement
-	head isNil
-		ifTrue: [ self add: anElement. ^anElement ].
-	
-	tail next: (Link value: anElement).
-	tail <- tail next.
-	size <- size + 1.
-	
-	^ anElement
+    elements isNil
+       ifTrue: [ self add: anElement]
+       ifFalse: [ elements addLast: anElement. size <- size + 1. ].
+    ^ anElement
 !
 METHOD List
 firstLink
-    ^head
+    ^elements
 !
 METHOD List
-appendList: aList | oldTail |
-    (head isNil) ifTrue: [ 
-        head <- aList firstLink.
-        tail <- aList lastLink.
+appendList: aList
+    (elements isNil) ifTrue: [ 
+        elements <- aList firstLink.
         size <- aList size.
         ^self 
     ].
-
-    tail next: aList firstLink.
-    tail <- aList lastLink.
+    
+    elements <- elements.
+    [elements next isNil]
+        whileFalse: [elements <- elements next].
+    elements next: aList firstLink.
     size <- size + aList size.
     ^self
 !
 METHOD List
-addAll: aCollection |link|
-    (aCollection isKindOf: List) 
-        ifTrue:  [ self appendList: aCollection ]
-        ifFalse: [ aCollection do: [ :element | self addLast: element ] ]
+addAll: aCollection
+    aCollection do: [ :element | self addLast: element ]
 !
 METHOD List
-lastLink
-    ^tail
+lastLink |link next|
+    elements isNil ifTrue: [ ^nil ].
+    
+    link <- elements.
+    [(next <- link next) notNil] whileTrue: [link <- next].
+    ^link
 !
 METHOD List
 + aCollection
@@ -2928,7 +2925,7 @@ badIndex: index
 !
 METHOD List
 findLink: index ifAbsent: aBlock | idx link |
-	link <- head.
+	link <- elements.
 	idx <- index.
 	link isNil ifTrue: [ ^ aBlock value ].
 	[ link notNil ] whileTrue: [
@@ -2959,33 +2956,22 @@ first
 	^ self at: 1
 !
 METHOD List
-last
-    head isNil 
-        ifTrue:  [ self emptyCollection ]
-        ifFalse: [ ^tail value ]
-!
-METHOD List
 isEmpty
-	^ head isNil
+	^ size = 0
 !
 METHOD List
 removeFirst
-    head isNil
+    elements isNil
         ifTrue: [ self emptyCollection ]
-        ifFalse: [ 
-            head <- head next.
-            head isNil ifTrue: [ tail <- nil ].
-            size <- size - 1.
-        ]
+        ifFalse: [ elements <- elements next. size <- size - 1 ]
 !
 METHOD List
 popFirst | value |
-    head isNil
+    elements isNil
         ifTrue: [ self emptyCollection ]
         ifFalse: [
-            value <- head value.
-            head <- head next.
-            head isNil ifTrue: [ tail <- nil ].
+            value <- elements value.
+            elements <- elements next.
             size <- size - 1.
             ^value ]
 !
@@ -3002,24 +2988,22 @@ reverse | newList |
 !
 METHOD List
 remove: anElement ifAbsent: exceptionBlock
-	head isNil
+	elements isNil
 		ifTrue: [ exceptionBlock value. ^self ]
-		ifFalse: [ head <- head remove: anElement ifAbsent: [ exceptionBlock value. ^self ] ]
-    size <- size - 1.
+		ifFalse: [ elements <- elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ]. size <- size - 1. ]
 !
 METHOD List
 clear
-    head <- nil.
-    tail <- nil.
-    size <- 0.
+    elements <- nil.
+    size <- 0
 !
 METHOD List
-do: aBlock | link |
-	^ head notNil ifTrue: [ head do: aBlock ]
+do: aBlock
+	^ elements notNil ifTrue: [ elements do: aBlock ]
 !
 METHOD List
 reverseDo: aBlock
-	^ head notNil ifTrue: [ head reverseDo: aBlock ]
+	^ elements notNil ifTrue: [ elements reverseDo: aBlock ]
 !
 METHOD List
 select: testBlock | newList |

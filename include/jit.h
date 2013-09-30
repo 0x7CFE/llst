@@ -142,7 +142,9 @@ struct TBaseFunctions {
     llvm::Function* getIntegerValue;
     llvm::Function* newInteger;
     llvm::Function* getObjectSize;
+    llvm::Function* setObjectSize;
     llvm::Function* getObjectClass;
+    llvm::Function* setObjectClass;
     llvm::Function* getObjectFields;
     llvm::Function* getObjectField;
     llvm::Function* setObjectField;
@@ -154,7 +156,9 @@ struct TBaseFunctions {
         getIntegerValue  = module->getFunction("getIntegerValue");
         newInteger       = module->getFunction("newInteger");
         getObjectSize    = module->getFunction("getObjectSize");
+        setObjectSize    = module->getFunction("setObjectSize");
         getObjectClass   = module->getFunction("getObjectClass");
+        setObjectClass   = module->getFunction("setObjectClass");
         getObjectFields  = module->getFunction("getObjectFields");
         getObjectField   = module->getFunction("getObjectField");
         setObjectField   = module->getFunction("setObjectField");
@@ -346,6 +350,13 @@ public:
         llvm::Function* methodFunction = 0,
         llvm::Value** contextHolder = 0
     );
+    
+    struct StackAlloca {
+        llvm::AllocaInst* objectSlot;
+        llvm::AllocaInst* objectHolder;
+    };
+    
+    StackAlloca allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
     MethodCompiler(
         llvm::Module* JITModule,
@@ -537,7 +548,6 @@ private:
     void patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex);
     llvm::Instruction* findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex);
     void createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks);
-    std::pair<llvm::Value*, llvm::Value*> allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
     void cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock);
     bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
