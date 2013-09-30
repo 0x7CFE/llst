@@ -272,9 +272,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 
                 // Checking whether we need to register current object slot in the GC
                 checkRoot(newValue, objectSlot);
-
-                // Performing an assignment
-                instanceVariables[ec.instruction.low] = newValue;
+                
+                // Performing the assignment
+                *objectSlot = newValue;
             } break;
             
             case opcode::markArguments: doMarkArguments(ec); break;
