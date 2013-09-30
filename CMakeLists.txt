@@ -22,7 +22,7 @@ execute_process(COMMAND ${CONFIG_COMMAND} --libs all
                 OUTPUT_STRIP_TRAILING_WHITESPACE
                 OUTPUT_VARIABLE LLVM_LIBS)
 
-set (COMPILER_FLAGS "-g -ggdb -m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} -O3 -fexceptions -frtti -Wno-cast-qual -UNDEBUG")
+set (COMPILER_FLAGS "-g -ggdb -m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} -O3 -fexceptions -frtti -Wno-cast-qual")
 set (LINKER_FLAGS   "-g -m32 -L/usr/lib32 -Wall ${LLVM_LD_FLAGS}")
 
 add_subdirectory(src)
