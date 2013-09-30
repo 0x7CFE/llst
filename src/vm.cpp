@@ -224,8 +224,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
     
     while (true)
     {
-        m_memoryManager->collectGarbage(); //FIXME for tests only
-        
         assert(ec.currentContext != 0);
         assert(ec.currentContext->method != 0);
         assert(ec.currentContext->stack != 0);
