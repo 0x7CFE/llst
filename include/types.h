@@ -203,6 +203,16 @@ struct TByteArray : public TByteObject {
 struct TSymbol : public TByteObject { 
     static const char* InstanceClassName() { return "Symbol"; }
     std::string toString() const { return std::string((const char*)fields, getSize()); }
+    
+    // Helper comparison function functional object. Compares two symbols (or it's string representation).
+    // Returns true when 'left' is found to be less than 'right'.
+    struct TCompareFunctor {
+        // This function compares two byte objects depending on their lenght and contents
+        bool operator() (const TSymbol* left, const TSymbol* right) const;
+        // This function compares byte object and null terminated string depending on their lenght and contents
+        bool operator() (const TSymbol* left, const char* right) const;
+        bool operator() (const char* left, const TSymbol* right) const;
+    };
 };
 
 // TString represents the Smalltalk's String class. 
@@ -309,18 +319,6 @@ struct TDictionary : public TObject {
     TObject* find(const char* key) const;
     
     static const char* InstanceClassName() { return "Dictionary"; }
-private:
-    // Helper comparison functions. Compares the two symbols 'left' and 'right' 
-    // (or it's string representation). Returns true when 'left' is found to be
-    // less than 'right'.
-    struct compareSymbols {
-        // This function compares two byte objects depending on their lenght and contents
-        bool operator() (const TSymbol* left, const TSymbol* right) const;
-        // This function compares byte object and 
-        // null terminated string depending on their lenght and contents
-        bool operator() (const TSymbol* left, const char* right) const;
-        bool operator() (const char* left, const TSymbol* right) const;
-    };
 };
 
 struct TClass : public TObject {

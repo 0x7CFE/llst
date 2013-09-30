@@ -36,43 +36,16 @@
 #include <string.h>
 #include <algorithm>
 
-bool TDictionary::compareSymbols::operator() (const TSymbol* left, const TSymbol* right) const
-{
-    const uint8_t* leftBase = left->getBytes();
-    const uint8_t* leftEnd  = leftBase + left->getSize();
-    
-    const uint8_t* rightBase = right->getBytes();
-    const uint8_t* rightEnd  = rightBase + right->getSize();
-    
-    return std::lexicographical_compare(leftBase, leftEnd, rightBase, rightEnd);
-}
-
-bool TDictionary::compareSymbols::operator() (const TSymbol* left, const char* right) const
-{
-    const uint8_t* leftBase = left->getBytes();
-    const uint8_t* leftEnd  = leftBase + left->getSize();
-    
-    return std::lexicographical_compare(leftBase, leftEnd, right, right + strlen(right));
-}
-
-bool TDictionary::compareSymbols::operator() (const char* left, const TSymbol* right) const
-{
-    const uint8_t* rightBase = right->getBytes();
-    const uint8_t* rightEnd  = rightBase + right->getSize();
-    
-    return std::lexicographical_compare(left, left + strlen(left), rightBase, rightEnd);
-}
-
 TObject* TDictionary::find(const TSymbol* key) const
 {
     // Keys are stored in order
     // Thus we may apply binary search
-    const TDictionary::compareSymbols less;
+    const TSymbol::TCompareFunctor compare;
     TSymbol** keysBase = (TSymbol**) keys->getFields();
     TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
+    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
     
-    if (foundKey != keysLast && !less(key, *foundKey))
+    if (foundKey != keysLast && !compare(key, *foundKey))
     {
         std::ptrdiff_t index = foundKey - keysBase;
         return values->getField(index);
@@ -84,12 +57,12 @@ TObject* TDictionary::find(const char* key) const
 {
     // Keys are stored in order
     // Thus we may apply binary search
-    const TDictionary::compareSymbols less;
+    const TSymbol::TCompareFunctor compare;
     TSymbol** keysBase = (TSymbol**) keys->getFields();
     TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, less);
+    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
     
-    if (foundKey != keysLast && !less(key, *foundKey))
+    if (foundKey != keysLast && !compare(key, *foundKey))
     {
         std::ptrdiff_t index = foundKey - keysBase;
         return values->getField(index);
