@@ -585,4 +585,3 @@ struct TBlockReturn {
         return const_cast<void*>(reinterpret_cast<const void*>( &typeid(TBlockReturn) ));
     }
 };
-
