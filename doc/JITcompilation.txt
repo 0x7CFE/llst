@@ -39,7 +39,7 @@ extern "C" TObject* sendMessage(TContext* callingContext, TSymbol* message, TObj
 
 METHOD Undefined
 main
-    LLVM do: [
+    Jit do: [
         42 printNl.
     ].
 !
@@ -103,7 +103,7 @@ TObject* 'MyClass>>myMethod'(TContext* context) {
 METHOD MyClass
 myMethod
     1 to: 10 do: [:i|
-        LLVM do: [ ^i. ] "this is a blockReturn inside JIT method"
+        Jit do: [ ^i. ] "this is a blockReturn inside JIT method"
     ].
 !
 
