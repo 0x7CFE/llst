@@ -315,8 +315,11 @@ struct TDictionary : public TObject {
     
     // Find a value associated with a key
     // Returns NULL if nothing was found
-    TObject* find(const TSymbol* key) const;
-    TObject* find(const char* key) const;
+    // Explicit instantination of:
+    // find(const TSymbol* key)
+    // find(const char* key)
+    template<typename K>
+    TObject* find(const K* key) const;
     
     static const char* InstanceClassName() { return "Dictionary"; }
 };

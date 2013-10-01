@@ -36,7 +36,8 @@
 #include <string.h>
 #include <algorithm>
 
-TObject* TDictionary::find(const TSymbol* key) const
+template<typename K>
+TObject* TDictionary::find(const K* key) const
 {
     // Keys are stored in order
     // Thus we may apply binary search
@@ -45,27 +46,14 @@ TObject* TDictionary::find(const TSymbol* key) const
     TSymbol** keysLast = keysBase + keys->getSize();
     TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
     
-    if (foundKey != keysLast && !compare(key, *foundKey))
-    {
-        std::ptrdiff_t index = foundKey - keysBase;
+    // std::lower_bound returns an element which is >= key,
+    // we have to check whether the found element is not > key.
+    if (foundKey != keysLast && !compare(key, *foundKey)) {
+        std::ptrdiff_t index = std::distance(keysBase, foundKey);
         return values->getField(index);
     } else
         return 0; // key not found
 }
 
-TObject* TDictionary::find(const char* key) const
-{
-    // Keys are stored in order
-    // Thus we may apply binary search
-    const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = (TSymbol**) keys->getFields();
-    TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
-    
-    if (foundKey != keysLast && !compare(key, *foundKey))
-    {
-        std::ptrdiff_t index = foundKey - keysBase;
-        return values->getField(index);
-    } else
-        return 0; // key not found
-}
+template TObject* TDictionary::find<char>(const char* key) const;
+template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
