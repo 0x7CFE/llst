@@ -182,15 +182,14 @@ struct TBaseFunctions {
 //       a code generation. This should be done in a known context.
 //       
 // See also: TPlainValue and TDeferredValue
-class TStackValue {
-public:
+struct TStackValue {
     virtual ~TStackValue() { }
     virtual llvm::Value* get() = 0;
 };
 
 // TPlainValue represents simple llvm::Value* holder which does not 
 // perform any additional actions when get() is called. Only stored value is returned.
-class TPlainValue : public TStackValue {
+struct TPlainValue : public TStackValue {
 private:
     llvm::Value* m_value;
 public:
@@ -375,8 +374,7 @@ public:
 // TDeferredValue is used in cases when some particular actions should be done 
 // when get() method is invoked. Typically this is used to pass an llvm Value*
 // to the later code ensuring that it will not be broken by a garbage collection.
-class TDeferredValue : public TStackValue {
-public:
+struct TDeferredValue : public TStackValue {
     enum TOperation {
         loadInstance,
         loadArgument,
