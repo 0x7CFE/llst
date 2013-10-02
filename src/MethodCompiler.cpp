@@ -497,7 +497,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
 Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
-    StackAlloca array = allocateStackObject(*jit.builder, sizeof(TObjectArray), elementsCount);
+    TStackObject array = allocateStackObject(*jit.builder, sizeof(TObjectArray), elementsCount);
     // Instantinating new array object
     const uint32_t arraySize = sizeof(TObjectArray) + sizeof(TObject*) * elementsCount;
     jit.builder->CreateMemSet(
@@ -1655,7 +1655,7 @@ void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
     }
 }
 
-MethodCompiler::StackAlloca MethodCompiler::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount)
+MethodCompiler::TStackObject MethodCompiler::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount)
 {
     // Storing current edit location
     BasicBlock* insertBlock = builder.GetInsertBlock();
@@ -1695,7 +1695,7 @@ MethodCompiler::StackAlloca MethodCompiler::allocateStackObject(llvm::IRBuilder<
     Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
     builder.CreateStore(newObject, objectHolder/*, true*/);
     
-    StackAlloca result;
+    TStackObject result;
     result.objectHolder = objectHolder;
     result.objectSlot = objectSlot;
     return result;

@@ -594,13 +594,13 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         
         // Allocating stack space for objects and registering GC protection holder
         
-        MethodCompiler::StackAlloca contextPair = m_methodCompiler->allocateStackObject(builder, sizeof(TContext), 0);
+        MethodCompiler::TStackObject contextPair = m_methodCompiler->allocateStackObject(builder, sizeof(TContext), 0);
         Value* contextSlot = contextPair.objectSlot;
         newBlock.contextHolder = contextPair.objectHolder;
         
         Value* tempsSlot = 0;
         if (hasTemporaries) {
-            MethodCompiler::StackAlloca tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            MethodCompiler::TStackObject tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
             tempsSlot = tempsPair.objectSlot;
             newBlock.tempsHolder = tempsPair.objectHolder;
         } else

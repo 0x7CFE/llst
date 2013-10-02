@@ -350,12 +350,16 @@ public:
         llvm::Value** contextHolder = 0
     );
     
-    struct StackAlloca {
+    // TStackObject is a pair of entities allocated on a thread stack space
+    // objectSlot is a container for actual object's data
+    // objectHolder is a pointer to the objectSlot which is registered in GC roots
+    // thus allowing GC to update the fields in object when collection takes place
+    struct TStackObject {
         llvm::AllocaInst* objectSlot;
         llvm::AllocaInst* objectHolder;
     };
     
-    StackAlloca allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
+    TStackObject allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
     MethodCompiler(
         llvm::Module* JITModule,
