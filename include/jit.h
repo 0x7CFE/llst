@@ -221,7 +221,6 @@ public:
     // used during the compilation process.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
-       // TContext*           callingContext;
         uint32_t            bytePointer;
 
         llvm::Function*     function;     // LLVM function that is created based on method
@@ -251,9 +250,8 @@ public:
         
         void pushValue(TStackValue* value);
         
-        TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
-            : method(method), //callingContext(context),
-            bytePointer(0), function(0), builder(0), 
+        TJITContext(MethodCompiler* compiler, TMethod* method)
+            : method(method), bytePointer(0), function(0), builder(0),
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
@@ -344,8 +342,7 @@ public:
     TObjectTypes& getBaseTypes() { return m_baseTypes; }
     
     llvm::Function* compileMethod(
-        TMethod* method, 
-        TContext* callingContext, 
+        TMethod* method,
         llvm::Function* methodFunction = 0,
         llvm::Value** contextHolder = 0
     );

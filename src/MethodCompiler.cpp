@@ -516,9 +516,9 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     return arrayObject;
 }
 
-Function* MethodCompiler::compileMethod(TMethod* method, TContext* callingContext, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
+Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
 {
-    TJITContext  jit(this, method, callingContext);
+    TJITContext  jit(this, method);
     
     // Creating the function named as "Class>>method" or using provided one
     jit.function = methodFunction ? methodFunction : createFunction(method);
@@ -737,7 +737,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
     jit.bytePointer += 2;
     
-    TJITContext blockContext(this, jit.method, 0/*jit.callingContext*/);
+    TJITContext blockContext(this, jit.method);
     blockContext.bytePointer = jit.bytePointer;
     
     // Creating block function named Class>>method@offset
