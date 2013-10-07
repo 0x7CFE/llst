@@ -2,10 +2,9 @@
 
 #include <memory.h>
 #include <opcodes.h>
-#include <stdio.h>
 #include <cstdlib>
 #include <sys/time.h>
-#include <time.h>
+#include <ctime>
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/stat.h>

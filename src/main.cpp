@@ -33,7 +33,7 @@
  */
 
 #include <iostream>
-#include <stdio.h>
+#include <cstdio>
 #include <memory>
 
 #include <vm.h>

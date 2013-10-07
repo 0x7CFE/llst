@@ -33,7 +33,6 @@
  */
 
 #include <types.h>
-#include <string.h>
 #include <algorithm>
 
 TObject* TDictionary::find(const TSymbol* key) const

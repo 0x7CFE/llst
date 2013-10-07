@@ -39,7 +39,6 @@
 #include <sys/types.h>
 #include <new>
 #include <string>
-#include <string.h>
 #include <sstream>
 
 struct TClass;

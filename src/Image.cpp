@@ -40,11 +40,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <sys/mman.h>
-#include <stdio.h>
 #include <netinet/in.h>
 
-#include <errno.h>
-#include <stdlib.h>
+#include <cerrno>
+#include <cstring>
+#include <cstdlib>
 #include <string>
 #include <cassert>
 #include <algorithm>

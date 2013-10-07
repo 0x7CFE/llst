@@ -1,7 +1,7 @@
 #include <memory.h>
 
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstdlib>
+#include <cstring>
 #include <sys/time.h>
 
 GenerationalMemoryManager::~GenerationalMemoryManager()

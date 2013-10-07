@@ -34,7 +34,6 @@
  */
 
 #include <memory.h>
-#include <stdio.h>
 
 // This will be used by llvm functions to store frame stack info
 extern "C" { LLVMMemoryManager::TStackEntry* llvm_gc_root_chain = 0; }

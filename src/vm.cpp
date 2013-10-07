@@ -32,16 +32,17 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <vm.h>
-#include <string.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <cassert>
 #include <iostream>
+#include <cstdlib>
 
 #include <opcodes.h>
 #include <primitives.h>
 #include <jit.h>
+#include <vm.h>
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
