@@ -51,6 +51,7 @@
 
 #include <iostream>
 #include <sstream>
+#include <cstring>
 
 using namespace llvm;
 
@@ -66,7 +67,7 @@ void JITRuntime::printStat()
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
     float blockHitRatio = (float) 100 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
     
-    printf(
+    std::printf(
         "JIT Runtime stat:\n"
         "\tMessages dispatched: %12d\n"
         "\tObjects  allocated:  %12d\n"
@@ -88,8 +89,8 @@ void JITRuntime::printStat()
     
     std::sort(hotMethods.begin(), hotMethods.end(), compareByHitCount);
     
-    printf("\nHot methods:\n");
-    printf("\tHit count\tMethod name\n");
+    std::printf("\nHot methods:\n");
+    std::printf("\tHit count\tMethod name\n");
     for (int i = 0; i < 50; i++) {
         if (hotMethods.empty())
             break;
@@ -98,24 +99,24 @@ void JITRuntime::printStat()
         if (!hotMethod->methodFunction)
             continue;
         
-        printf("\t%d\t\t%s (%d sites)\n", hotMethod->hitCount, hotMethod->methodFunction->getName().str().c_str(), hotMethod->callSites.size());
+        std::printf("\t%d\t\t%s (%d sites)\n", hotMethod->hitCount, hotMethod->methodFunction->getName().str().c_str(), hotMethod->callSites.size());
         
         std::map<uint32_t, TCallSite>::iterator iSite = hotMethod->callSites.begin();
         for (; iSite != hotMethod->callSites.end(); ++iSite) {
-            printf("\t\t%-20s (index %d, offset %d) class hits: ", 
+            std::printf("\t\t%-20s (index %d, offset %d) class hits: ", 
                    iSite->second.messageSelector->toString().c_str(), 
                    iSite->first, 
                    m_methodCompiler->getCallSiteOffset(iSite->first));
             
             std::map<TClass*, uint32_t>::iterator iClassHit = iSite->second.classHits.begin();
             for (; iClassHit != iSite->second.classHits.end(); ++iClassHit)
-                printf("(%s %d) ", iClassHit->first->name->toString().c_str(), iClassHit->second);
+                std::printf("(%s %d) ", iClassHit->first->name->toString().c_str(), iClassHit->second);
             
-            printf("\n");
+            std::printf("\n");
         }
         
     }
-    printf("\n");
+    std::printf("\n");
     
     PrintStatistics(outs());
 }
@@ -139,7 +140,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_JITModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
     if (!m_JITModule) {
         Err.print("JITRuntime.cpp", errs());
-        exit(1);
+        std::exit(1);
     }
     
     // Providing the memory management interface to the JIT module
@@ -162,7 +163,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     
     if (!m_executionEngine) {
         errs() << error;
-        exit(1);
+        std::exit(1);
     }
     
     m_baseTypes.initializeFromModule(m_JITModule);
@@ -178,8 +179,8 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_methodCompiler = new MethodCompiler(m_JITModule, m_runtimeAPI, m_exceptionAPI);
     
     // Initializing caches
-    memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
-    memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
+    std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
+    std::memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
     m_blockCacheHits = 0;
     m_blockCacheMisses = 0;
     m_cacheHits = 0;
@@ -301,7 +302,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             if (!methodFunction || !blockFunction) {
                 // Something is really wrong!
                 outs() << "JIT: Fatal error in invokeBlock for " << blockFunctionName << "\n";
-                exit(1);
+                std::exit(1);
             }
             
             verifyModule(*m_JITModule, AbortProcessAction);
@@ -530,8 +531,8 @@ void JITRuntime::patchHotMethods()
     }
     
     // Invalidating caches
-    memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
-    memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
+    std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
+    std::memset(&m_functionLookupCache, 0, sizeof(m_functionLookupCache));
     
     outs() << "All is done.\n";
 }

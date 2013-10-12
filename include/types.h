@@ -48,7 +48,7 @@ struct TMethod;
 // All our objects needed to be aligned by the 4 bytes at least.
 // This function helps to calculate the buffer size enough to fit the data,
 // yet being a multiple of 4 (or 8 depending on the pointer size)
-inline size_t correctPadding(size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
+inline std::size_t correctPadding(std::size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
 //inline size_t correctPadding(size_t size) { return (size + 3) & ~3; }
 
 // This is a special interpretation of Smalltalk's SmallInteger

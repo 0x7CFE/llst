@@ -44,7 +44,7 @@
 #include <jit.h>
 #include <vm.h>
 
-TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
+TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, std::size_t slotSize)
 {
     // Class may be moved during GC in allocation,
     // so we need to protect the pointer
@@ -52,7 +52,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot) {
-        fprintf(stderr, "VM: memory manager failed to allocate %u bytes\n", slotSize);
+        std::fprintf(stderr, "VM: memory manager failed to allocate %u bytes\n", slotSize);
         return globals.nilObject;
     }
 
@@ -63,7 +63,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 
     // Object size stored in the TSize field of any ordinary object contains
     // number of pointers except for the first two fields
-    size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
+    std::size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
 
     TObject* instance = new (objectSlot) TObject(fieldsCount, pClass);
 
@@ -73,7 +73,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
     return instance;
 }
 
-TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
+TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
 {
     // Class may be moved during GC in allocation,
     // so we need to protect the pointer
@@ -85,7 +85,7 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
 
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot) {
-        fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
+        std::fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
         return (TByteObject*) globals.nilObject;
     }
 
@@ -99,28 +99,28 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, size_t dataSize)
     return instance;
 }
 
-template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize, bool registerPointer)
+template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
     TObjectArray* instance = (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
     return hptr<TObjectArray>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(size_t dataSize, bool registerPointer)
+template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
     TSymbolArray* instance = (TSymbolArray*) newOrdinaryObject(klass, sizeof(TSymbolArray) + dataSize * sizeof(TObject*));
     return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize, bool registerPointer)
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
     TContext* instance = (TContext*) newOrdinaryObject(klass, sizeof(TContext));
     return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool registerPointer)
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
     TBlock* instance = (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
@@ -206,7 +206,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 
 void SmalltalkVM::flushMethodCache()
 {
-    for (size_t i = 0; i < LOOKUP_CACHE_SIZE; i++)
+    for (std::size_t i = 0; i < LOOKUP_CACHE_SIZE; i++)
         m_lookupCache[i].methodName = 0;
 }
 
@@ -297,9 +297,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
             } break;
             
             default:
-                fprintf(stderr, "VM: Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
-                fprintf(stderr, "'%s'\n", ec.currentContext->method->name->toString().c_str() );
-                exit(1);
+                std::fprintf(stderr, "VM: Invalid opcode %d at offset %d in method ", ec.instruction.high, ec.bytePointer);
+                std::fprintf(stderr, "'%s'\n", ec.currentContext->method->name->toString().c_str() );
+                std::exit(1);
         }
     }
 }
@@ -440,7 +440,7 @@ void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObj
     if (method == 0) {
         // Something goes really wrong.
         // We could not continue the execution
-        fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
+        std::fprintf(stderr, "Could not locate #doesNotUnderstand:\n");
         //exit(1);
     }
     
@@ -478,8 +478,8 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
         case unaryBuiltIns::notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         
         default:
-            fprintf(stderr, "VM: Invalid opcode %d passed to sendUnary\n", ec.instruction.low);
-            exit(1);
+            std::fprintf(stderr, "VM: Invalid opcode %d passed to sendUnary\n", ec.instruction.low);
+            std::exit(1);
     }
     
     ec.stackPush( ec.returnedValue );
@@ -515,8 +515,8 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
                 break;
             
             default:
-                fprintf(stderr, "VM: Invalid opcode %d passed to sendBinary\n", ec.instruction.low);
-                exit(1);
+                std::fprintf(stderr, "VM: Invalid opcode %d passed to sendBinary\n", ec.instruction.low);
+                std::exit(1);
         }
         
         ec.stackPush( ec.returnedValue );
@@ -657,8 +657,8 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case pushConstants::trueObject:  ec.stackPush( globals.trueObject );  break;
         case pushConstants::falseObject: ec.stackPush( globals.falseObject ); break;
         default:
-            fprintf(stderr, "VM: unknown push constant %d\n", constant);
-            exit(1);
+            std::fprintf(stderr, "VM: unknown push constant %d\n", constant);
+            std::exit(1);
     }
 }
 
@@ -739,7 +739,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         // FIXME opcodes 253-255 are not standard
         case 255:
             // Debug trap
-            printf("Debug trap\n");
+            std::printf("Debug trap\n");
             break;
         
         case 254:
@@ -775,15 +775,15 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             
             char* input = readline(strPrompt.c_str());
             if (input) {
-                uint32_t inputSize = strlen(input);
+                uint32_t inputSize = std::strlen(input);
                 
                 if (inputSize > 0)
                     add_history(input);
                     
                 TString* result = (TString*) newBinaryObject(globals.stringClass, inputSize);
-                memcpy(result->getBytes(), input, inputSize);
+                std::memcpy(result->getBytes(), input, inputSize);
                 
-                free(input);
+                std::free(input);
                 return result;
             } else
                 return globals.nilObject;
@@ -920,7 +920,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TByteObject* clone = (TByteObject*) newBinaryObject(klass, dataSize);
             
             // Cloning data
-            memcpy(clone->getBytes(), original->getBytes(), dataSize);
+            std::memcpy(clone->getBytes(), original->getBytes(), dataSize);
             return (TObject*) clone;
         } break;
         
@@ -1072,7 +1072,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         // Primitive may be called on the same object, so memory overlapping may occur.
         // memmove() works much like the ordinary memcpy() except that it correctly
         // handles the case with overlapping memory areas
-        memmove( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
+        std::memmove( & destinationBytes[iDestinationStartOffset], & sourceBytes[iSourceStartOffset], iCount );
         return true;
     }
     
@@ -1090,7 +1090,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         // Primitive may be called on the same object, so memory overlapping may occur.
         // memmove() works much like the ordinary memcpy() except that it correctly
         // handles the case with overlapping memory areas
-        memmove( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*) );
+        std::memmove( & destinationFields[iDestinationStartOffset], & sourceFields[iSourceStartOffset], iCount * sizeof(TObject*) );
         return true;
     }
     
@@ -1100,6 +1100,6 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 void SmalltalkVM::printVMStat()
 {
     float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n",
+    std::printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n",
         m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }

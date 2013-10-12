@@ -128,7 +128,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
         
         default: {
             primitiveFailed = true;
-            fprintf(stderr, "Unimplemented or invalid primitive %d\n", opcode);
+            std::fprintf(stderr, "Unimplemented or invalid primitive %d\n", opcode);
             //exit(1);
         }
     }
@@ -199,8 +199,8 @@ TObject* callSmallIntPrimitive(uint8_t opcode, int32_t leftOperand, int32_t righ
         }
         
         default:
-            fprintf(stderr, "Invalid SmallInt opcode %d\n", opcode);
-            exit(1);
+            std::fprintf(stderr, "Invalid SmallInt opcode %d\n", opcode);
+            std::exit(1);
     }
 }
 
@@ -208,7 +208,7 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
     switch (opcode) {
         
         case primitive::ioGetChar: { // 9
-            int32_t input = getchar();
+            int32_t input = std::getchar();
             
             if (input == EOF)
                 return globals.nilObject;
@@ -220,7 +220,7 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
             TInteger charObject = reinterpret_cast<TInteger>(args[0]);
             int8_t   charValue  = getIntegerValue(charObject);
 
-            putchar(charValue);
+            std::putchar(charValue);
         } break;
         
         case primitive::ioFileOpen: { // 100
@@ -305,8 +305,8 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
         } break;
         
         default:
-            fprintf(stderr, "Invalid IO opcode %d\n", opcode);
-            exit(1);
+            std::fprintf(stderr, "Invalid IO opcode %d\n", opcode);
+            std::exit(1);
             
     }
     return globals.nilObject;

@@ -128,7 +128,7 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     m_activeHeapBase    = m_heapOne;
     m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2;
     
-    memset(m_heapOne, 0xAA, m_heapSize / 2);
+    std::memset(m_heapOne, 0xAA, m_heapSize / 2);
     
     // After this operation active objects from space one now all
     // in space two and are treated as generation 1.
@@ -156,7 +156,7 @@ void GenerationalMemoryManager::collectRightToLeft()
     m_inactiveHeapPointer = m_heapTwo + m_heapSize / 2;
     // m_activeHeapPointer = ?
 
-    memset(m_heapTwo, 0xBB, m_heapSize / 2);
+    std::memset(m_heapTwo, 0xBB, m_heapSize / 2);
         
     // Moving objects back to the right heap
     collectLeftToRight(true);

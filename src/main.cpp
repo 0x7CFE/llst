@@ -141,31 +141,31 @@ int main(int argc, char **argv) {
     // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:
-            printf("User defined return\n");
+            std::printf("User defined return\n");
             break;
             
         case SmalltalkVM::returnBadMethod:
-            printf("Could not lookup method\n");
+            std::printf("Could not lookup method\n");
             break;
             
         case SmalltalkVM::returnReturned:
             // normal return
-            printf("Exited normally\n");
+            std::printf("Exited normally\n");
             break;
             
         case SmalltalkVM::returnTimeExpired: 
-            printf("Execution time expired\n");
+            std::printf("Execution time expired\n");
             break;
             
         default:
-            printf("Unknown return code: %d\n", result);
+            std::printf("Unknown return code: %d\n", result);
             
     }
     
     TMemoryManagerInfo info = memoryManager->getStat();
     
     int averageAllocs = info.collectionsCount ? (int) info.allocationsCount / info.collectionsCount : info.allocationsCount;
-    printf("\nGC count: %d (%d/%d), average allocations per gc: %d, microseconds spent in GC: %d\n", 
+    std::printf("\nGC count: %d (%d/%d), average allocations per gc: %d, microseconds spent in GC: %d\n", 
            info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, (uint32_t) info.totalCollectionDelay);
     
     vm.printVMStat();

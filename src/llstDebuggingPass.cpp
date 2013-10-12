@@ -16,7 +16,7 @@ namespace {
             FunctionPass(ID), m_module(0), _printf(0), m_builder(0),
             isSmallInteger(0), getObjectField(0), getObjectClass(0)
         {
-            memset(&m_baseTypes, 0, sizeof(m_baseTypes));
+            std::memset(&m_baseTypes, 0, sizeof(m_baseTypes));
         }
         bool belongsToSmalltalkType(Type* type);
         ~LLSTDebuggingPass() {
@@ -91,7 +91,7 @@ void LLSTDebuggingPass::insertLoadInstCheck(Function& F)
         }
     }
     
-    for(size_t i = 0; i < Loads.size(); i++)
+    for(std::size_t i = 0; i < Loads.size(); i++)
     {
         LoadInst* Load = dyn_cast<LoadInst>(Loads[i]);
         if (belongsToSmalltalkType( Load->getType() )) {
@@ -142,7 +142,7 @@ void LLSTDebuggingPass::insertSelfInSendMessageCheck(Function& F)
         }
     }
     
-    for(size_t i = 0; i < Calls.size(); i++)
+    for(std::size_t i = 0; i < Calls.size(); i++)
     {
         CallInst* Call = dyn_cast<CallInst>(Calls[i]);
         
