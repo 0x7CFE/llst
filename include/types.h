@@ -117,7 +117,10 @@ protected:
     // it contains pointers to other objects. For raw binary objects 
     // it is accessed directly as a raw byte array.
     // Actual size is stored in the TSize field and accessed using getSize()
-    TObject* fields[0];
+    union {
+        TObject* fields[0];
+        uint8_t  bytes[0];
+    };
     
 private:    
     // This class should not be instantinated explicitly
@@ -161,16 +164,12 @@ public:
     // Byte objects are said to be binary
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
     
-    uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }
-    const uint8_t* getBytes() const {
-        return reinterpret_cast<const uint8_t*>(fields);
-    }
-    const uint8_t getByte(uint32_t index) const {
-        return reinterpret_cast<const uint8_t*>(fields)[index];
-    }
-    uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
+    uint8_t* getBytes() { return bytes; }
+    const uint8_t* getBytes() const { return bytes; }
+    const uint8_t getByte(uint32_t index) const { return bytes[index]; }
+    uint8_t& operator [] (uint32_t index) { return bytes[index]; }
     
-    void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(fields)[index] = value; }
+    void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
     
     // Helper function for template instantination
     static bool InstancesAreBinary() { return true; } 
