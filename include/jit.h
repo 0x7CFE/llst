@@ -182,15 +182,14 @@ struct TBaseFunctions {
 //       a code generation. This should be done in a known context.
 //       
 // See also: TPlainValue and TDeferredValue
-class TStackValue {
-public:
+struct TStackValue {
     virtual ~TStackValue() { }
     virtual llvm::Value* get() = 0;
 };
 
 // TPlainValue represents simple llvm::Value* holder which does not 
 // perform any additional actions when get() is called. Only stored value is returned.
-class TPlainValue : public TStackValue {
+struct TPlainValue : public TStackValue {
 private:
     llvm::Value* m_value;
 public:
@@ -222,7 +221,6 @@ public:
     // used during the compilation process.
     struct TJITContext {
         TMethod*            method;       // Smalltalk method we're currently processing
-       // TContext*           callingContext;
         uint32_t            bytePointer;
 
         llvm::Function*     function;     // LLVM function that is created based on method
@@ -252,9 +250,8 @@ public:
         
         void pushValue(TStackValue* value);
         
-        TJITContext(MethodCompiler* compiler, TMethod* method, TContext* context)
-            : method(method), //callingContext(context),
-            bytePointer(0), function(0), builder(0), 
+        TJITContext(MethodCompiler* compiler, TMethod* method)
+            : method(method), bytePointer(0), function(0), builder(0),
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
@@ -345,18 +342,21 @@ public:
     TObjectTypes& getBaseTypes() { return m_baseTypes; }
     
     llvm::Function* compileMethod(
-        TMethod* method, 
-        TContext* callingContext, 
+        TMethod* method,
         llvm::Function* methodFunction = 0,
         llvm::Value** contextHolder = 0
     );
     
-    struct StackAlloca {
+    // TStackObject is a pair of entities allocated on a thread stack space
+    // objectSlot is a container for actual object's data
+    // objectHolder is a pointer to the objectSlot which is registered in GC roots
+    // thus allowing GC to update the fields in object when collection takes place
+    struct TStackObject {
         llvm::AllocaInst* objectSlot;
         llvm::AllocaInst* objectHolder;
     };
     
-    StackAlloca allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
+    TStackObject allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
     MethodCompiler(
         llvm::Module* JITModule,
@@ -375,8 +375,7 @@ public:
 // TDeferredValue is used in cases when some particular actions should be done 
 // when get() method is invoked. Typically this is used to pass an llvm Value*
 // to the later code ensuring that it will not be broken by a garbage collection.
-class TDeferredValue : public TStackValue {
-public:
+struct TDeferredValue : public TStackValue {
     enum TOperation {
         loadInstance,
         loadArgument,
@@ -585,4 +584,3 @@ struct TBlockReturn {
         return const_cast<void*>(reinterpret_cast<const void*>( &typeid(TBlockReturn) ));
     }
 };
-

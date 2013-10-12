@@ -296,7 +296,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
             // If function was not found then the whole method needs compilation.
             
             // Compiling function and storing it to the table for further use
-            Function* methodFunction = m_methodCompiler->compileMethod(block->method, callingContext);
+            Function* methodFunction = m_methodCompiler->compileMethod(block->method);
             blockFunction = m_JITModule->getFunction(blockFunctionName);
             if (!methodFunction || !blockFunction) {
                 // Something is really wrong!
@@ -353,7 +353,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
             
             if (! methodFunction) {
                 // Compiling function and storing it to the table for further use
-                methodFunction = m_methodCompiler->compileMethod(method, previousContext);
+                methodFunction = m_methodCompiler->compileMethod(method);
                 
                 verifyModule(*m_JITModule, AbortProcessAction);
                 
@@ -461,7 +461,7 @@ void JITRuntime::patchHotMethods()
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
         Value* contextHolder = 0;
-        m_methodCompiler->compileMethod(method, 0, methodFunction, &contextHolder);
+        m_methodCompiler->compileMethod(method, methodFunction, &contextHolder);
         
         outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
         
@@ -594,13 +594,13 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         
         // Allocating stack space for objects and registering GC protection holder
         
-        MethodCompiler::StackAlloca contextPair = m_methodCompiler->allocateStackObject(builder, sizeof(TContext), 0);
+        MethodCompiler::TStackObject contextPair = m_methodCompiler->allocateStackObject(builder, sizeof(TContext), 0);
         Value* contextSlot = contextPair.objectSlot;
         newBlock.contextHolder = contextPair.objectHolder;
         
         Value* tempsSlot = 0;
         if (hasTemporaries) {
-            MethodCompiler::StackAlloca tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            MethodCompiler::TStackObject tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
             tempsSlot = tempsPair.objectSlot;
             newBlock.tempsHolder = tempsPair.objectHolder;
         } else

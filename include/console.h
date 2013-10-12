@@ -35,7 +35,7 @@
 #include <readline/readline.h>
 #include <trie.h>
 #include <string>
-#include <auto_ptr.h>
+#include <memory>
 
 class CompletionEngine {
 private:

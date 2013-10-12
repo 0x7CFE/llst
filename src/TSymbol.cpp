@@ -1,5 +1,5 @@
 #include <types.h>
-#include <string.h>
+#include <cstring>
 #include <algorithm>
 
 bool TSymbol::TCompareFunctor::operator() (const TSymbol* left, const TSymbol* right) const

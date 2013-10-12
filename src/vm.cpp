@@ -32,16 +32,17 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <vm.h>
-#include <string.h>
+
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <cassert>
 #include <iostream>
+#include <cstdlib>
 
 #include <opcodes.h>
 #include <primitives.h>
 #include <jit.h>
+#include <vm.h>
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, size_t slotSize)
 {
@@ -272,9 +273,9 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
                 
                 // Checking whether we need to register current object slot in the GC
                 checkRoot(newValue, objectSlot);
-
-                // Performing an assignment
-                instanceVariables[ec.instruction.low] = newValue;
+                
+                // Performing the assignment
+                *objectSlot = newValue;
             } break;
             
             case opcode::markArguments: doMarkArguments(ec); break;

@@ -33,7 +33,8 @@
  */
 
 #include <memory.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include <sys/time.h>
 
 BakerMemoryManager::BakerMemoryManager() :
