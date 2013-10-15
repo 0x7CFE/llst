@@ -316,6 +316,42 @@ public:
     virtual TMemoryManagerInfo getStat();
 };
 
+class NonCollectMemoryManager : public IMemoryManager
+{
+protected:
+    size_t    m_heapSize;
+    uint8_t*  m_heapBase;
+    uint8_t*  m_heapPointer;
+    
+    std::vector<void*> m_usedHeaps;
+    
+    size_t    m_staticHeapSize;
+    uint8_t*  m_staticHeapBase;
+    uint8_t*  m_staticHeapPointer;
+    
+    void growHeap();
+public:
+    NonCollectMemoryManager();
+    virtual ~NonCollectMemoryManager();
+    
+    virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
+    virtual bool  initializeStaticHeap(size_t staticHeapSize);
+    virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
+    virtual void* staticAllocate(size_t requestedSize);
+    virtual bool  isInStaticHeap(void* location);
+    
+    virtual void  collectGarbage() {}
+    virtual void  addStaticRoot(TObject** pointer) {}
+    virtual void  removeStaticRoot(TObject** pointer) {}
+    virtual void  registerExternalPointer(TObject** pointer) {}
+    virtual void  releaseExternalPointer(TObject** pointer) {}
+    virtual void  registerExternalHeapPointer(object_ptr& pointer) {}
+    virtual void  releaseExternalHeapPointer(object_ptr& pointer) {}
+    virtual bool  checkRoot(TObject* value, TObject** objectSlot) { return false; }
+    virtual uint32_t allocsBeyondCollection() { return 0; }
+    virtual TMemoryManagerInfo getStat() { return TMemoryManagerInfo(); }
+};
+
 class LLVMMemoryManager : public BakerMemoryManager {
 protected:
     virtual void moveObjects();
