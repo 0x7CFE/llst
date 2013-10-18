@@ -68,7 +68,7 @@ int main(int argc, char **argv) {
         
         std::string keyString = key->toString();
         char firstLetter = keyString[0];
-        if ( (keyString != "Smalltalk") && (firstLetter >= 'A') && (firstLetter <= 'Z') ) {
+        if ( keyString != "Smalltalk" && std::isupper(firstLetter) ) {
             TClass* currentClass = (TClass*) value;
 
             // Adding class name
