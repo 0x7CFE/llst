@@ -399,7 +399,7 @@ void BakerMemoryManager::moveObjects()
     }
     
     // Updating external references. Typically these are pointers stored in the hptr<>
-    volatile object_ptr* currentPointer = m_externalPointersHead;
+    object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {
         currentPointer->data = (TObject*) moveObject((TMovableObject*) currentPointer->data);
         currentPointer = currentPointer->next;
@@ -484,7 +484,7 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
     //  we replace the given pointer whith the next one
     if(pointer.next)
     {
-        volatile object_ptr* next_object = pointer.next;
+        object_ptr* next_object = pointer.next;
         pointer.data = next_object->data;
         pointer.next = next_object->next;
     }
@@ -492,8 +492,8 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
     {
         // This is the last element, we have to find the previous
         //  element in the list and unlink the given pointer
-        volatile object_ptr* previousPointer = m_externalPointersHead;
-        volatile object_ptr* currentPointer  = previousPointer->next;
+        object_ptr* previousPointer = m_externalPointersHead;
+        object_ptr* currentPointer  = previousPointer->next;
         
         while ( currentPointer != 0 ) {
             if (currentPointer == &pointer) {
