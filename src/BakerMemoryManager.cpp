@@ -481,29 +481,20 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
     }
     
     // If it is not the last element of the list
-    //  we replace the given pointer whith the next one
-    if(pointer.next)
-    {
+    //  we replace the given pointer with the next one
+    if (pointer.next) {
         object_ptr* next_object = pointer.next;
         pointer.data = next_object->data;
         pointer.next = next_object->next;
-    }
-    else
-    {
+    } else {
         // This is the last element, we have to find the previous
-        //  element in the list and unlink the given pointer
+        // element in the list and unlink the given pointer
         object_ptr* previousPointer = m_externalPointersHead;
-        object_ptr* currentPointer  = previousPointer->next;
+        while (previousPointer->next != &pointer)
+            previousPointer = previousPointer->next;
         
-        while ( currentPointer != 0 ) {
-            if (currentPointer == &pointer) {
-                previousPointer->next = 0;
-                return;
-            } else {
-                previousPointer = currentPointer;
-                currentPointer = previousPointer->next;
-            }
-        }
+        previousPointer->next = 0;
+        return;
     }
 }
 
