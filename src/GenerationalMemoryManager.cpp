@@ -22,15 +22,16 @@ void GenerationalMemoryManager::moveYoungObjects()
     m_crossGenerationalReferences.clear();
     
     // Updating external references. Typically these are pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        TMovableObject* currentObject = **iExternalPointer;
+    object_ptr* currentPointer = m_externalPointersHead;
+    while (currentPointer != 0) {
+        TMovableObject* currentObject = (TMovableObject*) currentPointer->data;
 
         if ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) &&
             ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
         {
-            **iExternalPointer = moveObject(**iExternalPointer);
+            currentObject = moveObject(currentObject);
         }
+        currentPointer = currentPointer->next;
     }
     
     TStaticRootsIterator iRoot = m_staticRoots.begin();

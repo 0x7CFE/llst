@@ -399,11 +399,6 @@ void BakerMemoryManager::moveObjects()
     }
     
     // Updating external references. Typically these are pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
-    }
-    
     volatile object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {
         currentPointer->data = (TObject*) moveObject((TMovableObject*) currentPointer->data);
@@ -469,22 +464,6 @@ void BakerMemoryManager::removeStaticRoot(TObject** pointer)
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
         if (*iRoot == (TMovableObject**) pointer) {
             m_staticRoots.erase(iRoot);
-            return;
-        }
-    }
-}
-
-void BakerMemoryManager::registerExternalPointer(TObject** pointer)
-{
-    m_externalPointers.push_front((TMovableObject**) pointer);
-}
-
-void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
-{
-    TPointerIterator iPointer = m_externalPointers.begin();
-    for (; iPointer != m_externalPointers.end(); ++iPointer) {
-        if (*iPointer == (TMovableObject**) pointer) {
-            m_externalPointers.erase(iPointer);
             return;
         }
     }

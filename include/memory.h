@@ -85,9 +85,6 @@ public:
     virtual bool  isInStaticHeap(void* location) = 0;
     
     // External pointer handling
-    virtual void  registerExternalPointer(TObject** pointer) = 0;
-    virtual void  releaseExternalPointer(TObject** pointer) = 0;
-    
     virtual void  registerExternalHeapPointer(object_ptr& pointer) = 0;
     virtual void  releaseExternalHeapPointer(object_ptr& pointer) = 0;
     
@@ -258,14 +255,9 @@ protected:
     // When pointer to a heap object is stored outside of the heap,
     // specific actions need to be taken in order to prevent pointer
     // invalidation. GC uses this information to correct external
-    // pointers so they will point to correct location even after garbage
-    // collection. Usual operating pattern is very similar to the stack,
-    // so list container seems to be a good choice.
-    typedef std::list<TMovableObject**> TPointerList;
-    typedef std::list<TMovableObject**>::iterator TPointerIterator;
-    TPointerList m_externalPointers;
-    
-    object_ptr* m_externalPointersHead; 
+    // pointers so they will point to correct location even after
+    // garbage collection.
+    object_ptr* m_externalPointersHead;
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
@@ -282,9 +274,6 @@ public:
     virtual bool  isInStaticHeap(void* location);
     
     // External pointer handling
-    virtual void  registerExternalPointer(TObject** pointer);
-    virtual void  releaseExternalPointer(TObject** pointer);
-    
     virtual void  registerExternalHeapPointer(object_ptr& pointer);
     virtual void  releaseExternalHeapPointer(object_ptr& pointer);
     
@@ -311,6 +300,8 @@ protected:
     void addCrossgenReference(TObject** pointer);
     void removeCrossgenReference(TObject** pointer);
     
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_crossGenerationalReferences;
 public:
     GenerationalMemoryManager() : BakerMemoryManager(), 
