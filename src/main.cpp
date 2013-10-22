@@ -39,16 +39,22 @@
 #include <vm.h>
 #include <jit.h>
 #include <console.h>
+#include <args.h>
 
 int main(int argc, char **argv) {
+    args llstArgs;
+    
+    llstArgs.heapSize = 1048576;
+    llstArgs.maxHeapSize = 1048576 * 100;
+    llstArgs.imagePath = "../image/LittleSmalltalk.image";
+    
+    llstArgs.parse(argc, argv);
+    
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
-    memoryManager->initializeHeap(1048576, 1048576 * 100);
+    memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
     
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
-    if (argc == 2)
-        smalltalkImage->loadImage(argv[1]);
-    else
-        smalltalkImage->loadImage("../image/LittleSmalltalk.image");
+    smalltalkImage->loadImage(llstArgs.imagePath.c_str());
     
     {
         Image::ImageWriter writer;
