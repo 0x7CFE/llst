@@ -810,6 +810,35 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             break;
 #endif
 
+        case 247: {
+            // Extracting current method info
+            TMethod* currentMethod   = ec.currentContext->method;
+            TSymbol* currentSelector = currentMethod->name;
+            TClass*  currentClass    = currentMethod->klass;
+
+            // Searching for native methods of currentClass
+            TNativeMethodMap::iterator iMethods = m_nativeMethods.find(currentClass);
+            if (iMethods == m_nativeMethods.end()) {
+                failed = true;
+                return globals.nilObject;
+            }
+
+            // Searching for actual native method by selector
+            TSymbolToNativeMethodMap& methodMap = iMethods->second;
+            TSymbolToNativeMethodMap::iterator iNativeMethod = methodMap.find(currentSelector);
+            if (iNativeMethod == methodMap.end()) {
+                failed = true;
+                return globals.nilObject;
+            }
+
+            // Initializing call info
+            TNativeMethod* nativeMethod = iNativeMethod->second;
+            nativeMethod->setArguments(ec.currentContext->arguments);
+
+            // Executing native method
+            return nativeMethod->run();
+        } break;
+
         case primitive::startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>( ec.stackPop() );
             uint32_t  ticks = getIntegerValue(value);
