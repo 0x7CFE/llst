@@ -3061,10 +3061,8 @@ reverseDo: aBlock
 METHOD List
 select: testBlock | newList |
 	newList <- List new.
-	"self reverseDo: [:element | (testBlock value: element)
-		ifTrue: [ newList add: element ] ]."
-    self do: [:element | (testBlock value: element)
-        ifTrue: [ newList addLast: element ] ].
+	self reverseDo: [:element | (testBlock value: element)
+		ifTrue: [ newList add: element ] ].
 	^ newList
 !
 COMMENT ---------- Dictionary ------------
