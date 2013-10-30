@@ -2934,17 +2934,17 @@ firstLink
     ^elements
 !
 METHOD List
-appendList: aList
+appendList: aList | element |
     (elements isNil) ifTrue: [ 
         elements <- aList firstLink.
         size <- aList size.
         ^self 
     ].
     
-    elements <- elements.
-    [elements next isNil]
-        whileFalse: [elements <- elements next].
-    elements next: aList firstLink.
+    element <- elements.
+    [element next isNil]
+        whileFalse: [element <- element next].
+    element next: aList firstLink.
     size <- size + aList size.
     ^self
 !
