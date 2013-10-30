@@ -1276,6 +1276,59 @@ lastLink |list|
     [ list clear. list lastLink] assertEq: nil withComment: 'cleared'.
 !
 
+METHOD ListTest
+equal |left right|
+    [
+        left <- List new.
+        right <- List new.
+        [ left = right ] assertWithComment: 'empty'.
+    ] value.
+    [
+        left <- List new.
+        left add: 0.
+        right <- List new.
+        right add: 0
+        [ left = right ] assertWithComment: 'non empty'.
+    ] value.
+!
+
+METHOD ListTest
+appendList |left right result standardContent standardSize|
+    [ "non empty + non empty"
+        left <- (Array with: 1 with: 2) asList.
+        right <- (Array with: 3 with: 4) asList.
+        
+        standardSize <- left size + (right size).
+        
+        standardContent <- List new.
+        standardContent add: 4.
+        standardContent add: 3.
+        standardContent add: 2.
+        standardContent add: 1.
+        
+        result <- left appendList: right.
+        
+        [result size ] assertEq: standardSize withComment: 'size: both non empty'.
+        [result] assertEq: standardContent withComment: 'content: both non empty'.
+    ] value.
+    [ "empty + non empty"
+        left <- List new.
+        right <- (Array with: 3 with: 4) asList.
+        
+        standardSize <- left size + (right size).
+        
+        standardContent <- List new.
+        standardContent add: 4.
+        standardContent add: 3.
+        
+        result <- left appendList: right.
+        
+        [result size ] assertEq: standardSize withComment: 'size: empty + non empty'.
+        [result] assertEq: standardContent withComment: 'content: empty + non empty'.
+    ] value.
+!
+
+
 COMMENT                                                                                           -------MagnitudeTest----------
 CLASS MagnitudeTest Test
 
