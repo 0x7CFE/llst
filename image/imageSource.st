@@ -1246,9 +1246,7 @@ firstLink |list|
 
 METHOD ListTest
 atPut |list|
-    list <- List new.
-    list add: nil.
-    list add: nil.
+    list <- List with: nil with: nil.
     
     list at: 1 put: 42.
     list at: 2 put: 'qwerty'.
@@ -1284,19 +1282,22 @@ equal |left right|
         [ left = right ] assertWithComment: 'empty'.
     ] value.
     [
-        left <- List new.
-        left add: 0.
-        right <- List new.
-        right add: 0
-        [ left = right ] assertWithComment: 'non empty'.
+        left <- List with: 0 with: 42.
+        right <- List with: 0 with: 42.
+        [ left = right ] assertWithComment: 'non empty: numbers'.
+    ] value.
+    [
+        left <- List with: 'qwe' with: ''.
+        right <- List with: 'qwe' with: ''.
+        [ left = right ] assertWithComment: 'non empty: strings'.
     ] value.
 !
 
 METHOD ListTest
 appendList |left right result standardContent standardSize|
     [ "non empty + non empty"
-        left <- (Array with: 1 with: 2) asList.
-        right <- (Array with: 3 with: 4) asList.
+        left <- List with: 1 with: 2.
+        right <- List with: 3 with: 4.
         
         standardSize <- left size + (right size).
         
@@ -1326,6 +1327,16 @@ appendList |left right result standardContent standardSize|
         [result size ] assertEq: standardSize withComment: 'size: empty + non empty'.
         [result] assertEq: standardContent withComment: 'content: empty + non empty'.
     ] value.
+!
+
+METHOD ListTest
+includes |list|
+    list <- List new.
+    [ list includes: 42 ] assertEq: false withComment: 'empty list'.
+    list <- List with: 0 with: 1.
+    [ list includes: 0 ] assertWithComment: 'non empty list: 0'.
+    [ list includes: 1 ] assertWithComment: 'non empty list: 1'.
+    [ list includes: 42 ] assertEq: false withComment: 'non empty list: 42'.
 !
 
 
@@ -2282,9 +2293,9 @@ at: value
 	^ self at: value ifAbsent: [ self noElement ]
 !
 METHOD Collection
-includes: value
-	self at: value ifAbsent: [ ^ false ].
-	^ true
+includes: aValue
+    self do: [ :element | element = aValue ifTrue: [ ^ true ]].
+    ^ false
 !
 METHOD Collection
 asArray		| newArray index |
@@ -2502,11 +2513,6 @@ METHOD Array
 at: index ifAbsent: exceptionBlock
 	<24 self index>.
 	exceptionBlock value
-!
-METHOD Array
-includes: aValue
-	self do: [ :element | element = aValue ifTrue: [ ^ true ]].
-	^ false
 !
 METHOD Array
 indexOf: aValue
