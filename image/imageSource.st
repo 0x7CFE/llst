@@ -1703,6 +1703,7 @@ main    | command  data |
     PrimitiveTest new runAll.
     MagnitudeTest new runAll.
     ListTest new runAll.
+    MethodLookupTest new runAll.
     
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
@@ -3162,6 +3163,10 @@ printString | count res |
 METHOD Dictionary
 add: anAssoc
 	self at: anAssoc key put: anAssoc value
+!
+METHOD Dictionary
+includes: aKey
+    ^keys includes: aKey.
 !
 COMMENT ---------- Set ------------
 METHOD MetaSet
