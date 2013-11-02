@@ -22,15 +22,16 @@ void GenerationalMemoryManager::moveYoungObjects()
     m_crossGenerationalReferences.clear();
     
     // Updating external references. Typically these are pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        TMovableObject* currentObject = **iExternalPointer;
+    object_ptr* currentPointer = m_externalPointersHead;
+    while (currentPointer != 0) {
+        TMovableObject* currentObject = (TMovableObject*) currentPointer->data;
 
         if ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) &&
             ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
         {
-            **iExternalPointer = moveObject(**iExternalPointer);
+            currentObject = moveObject(currentObject);
         }
+        currentPointer = currentPointer->next;
     }
     
     TStaticRootsIterator iRoot = m_staticRoots.begin();
@@ -128,7 +129,7 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     m_activeHeapBase    = m_heapOne;
     m_activeHeapPointer = m_activeHeapBase + m_heapSize / 2;
     
-    memset(m_heapOne, 0xAA, m_heapSize / 2);
+    std::memset(m_heapOne, 0xAA, m_heapSize / 2);
     
     // After this operation active objects from space one now all
     // in space two and are treated as generation 1.
@@ -156,7 +157,7 @@ void GenerationalMemoryManager::collectRightToLeft()
     m_inactiveHeapPointer = m_heapTwo + m_heapSize / 2;
     // m_activeHeapPointer = ?
 
-    memset(m_heapTwo, 0xBB, m_heapSize / 2);
+    std::memset(m_heapTwo, 0xBB, m_heapSize / 2);
         
     // Moving objects back to the right heap
     collectLeftToRight(true);

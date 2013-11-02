@@ -151,8 +151,8 @@ public:
 
     // NOTE For typical operation these should not be used directly.
     //      Use the template newObject<T>() instead
-    TByteObject* newBinaryObject  (TClass* klass, size_t dataSize);
-    TObject*     newOrdinaryObject(TClass* klass, size_t slotSize);
+    TByteObject* newBinaryObject  (TClass* klass, std::size_t dataSize);
+    TObject*     newOrdinaryObject(TClass* klass, std::size_t slotSize);
 
     SmalltalkVM(Image* image, IMemoryManager* memoryManager)
         : m_cacheHits(0), m_cacheMisses(0), m_messagesSent(0), m_image(image),
@@ -162,13 +162,13 @@ public:
     }
 
     TExecuteResult execute(TProcess* p, uint32_t ticks);
-    template<class T> hptr<T> newObject(size_t dataSize = 0, bool registerPointer = true);
+    template<class T> hptr<T> newObject(std::size_t dataSize = 0, bool registerPointer = true);
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
 
     void printVMStat();
 };
 
-template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
+template<class T> hptr<T> SmalltalkVM::newObject(std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
 {
     // TODO fast access to common classes
     TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
@@ -178,15 +178,15 @@ template<class T> hptr<T> SmalltalkVM::newObject(size_t dataSize /*= 0*/, bool r
     if (T::InstancesAreBinary()) {
         return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, registerPointer);
     } else {
-        size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
+        std::size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
         return hptr<T>((T*) newOrdinaryObject(klass, slotSize), m_memoryManager, registerPointer);
     }
 }
 
 // Specializations of newObject for known types
-template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(size_t dataSize, bool registerPointer);
-template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(size_t dataSize, bool registerPointer);
-template<> hptr<TContext> SmalltalkVM::newObject<TContext>(size_t dataSize, bool registerPointer);
-template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(size_t dataSize, bool registerPointer);
+template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(std::size_t dataSize, bool registerPointer);
+template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t dataSize, bool registerPointer);
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer);
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer);
 
 #endif

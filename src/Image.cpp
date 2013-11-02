@@ -73,7 +73,7 @@ bool Image::openImageFile(const char* fileName)
     m_imageFileFD = open(fileName, O_RDONLY);
     if (m_imageFileFD < 0)
     {
-        fprintf(stderr, "Failed to open file %s : %s\n", fileName, strerror(errno));
+        std::fprintf(stderr, "Failed to open file %s : %s\n", fileName, strerror(errno));
         return false;
     }
     
@@ -82,7 +82,7 @@ bool Image::openImageFile(const char* fileName)
     if (fstat(m_imageFileFD, &st) < 0) {
         close(m_imageFileFD);
         m_imageFileFD = -1;
-        fprintf(stderr, "Failed to get file size : %s\n", strerror(errno));
+        std::fprintf(stderr, "Failed to get file size : %s\n", strerror(errno));
         return false;
     }
     m_imageFileSize = st.st_size;
@@ -97,7 +97,7 @@ bool Image::openImageFile(const char* fileName)
         0);               // from the very beginning (zero offset)
         
     if (!m_imageMap) {
-        fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
+        std::fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
         
         // Something goes wrong
         close(m_imageFileFD);
@@ -144,14 +144,14 @@ TObject* Image::readObject()
     TImageRecordType type = (TImageRecordType) readWord();
     switch (type) {
         case invalidObject: 
-            fprintf(stderr, "Invalid object at offset %p\n", (void*) (m_imagePointer - (uint8_t*)m_imageMap));
-            exit(1); 
+            std::fprintf(stderr, "Invalid object at offset %p\n", (void*) (m_imagePointer - (uint8_t*)m_imageMap));
+            std::exit(1); 
             break;
         
         case ordinaryObject: {
             uint32_t fieldsCount = readWord();
             
-            size_t slotSize   = sizeof(TObject) + fieldsCount * sizeof(TObject*);
+            std::size_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
             void*  objectSlot = m_memoryManager->staticAllocate(slotSize);
             
             TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
@@ -178,7 +178,7 @@ TObject* Image::readObject()
         case byteObject: {
             uint32_t dataSize = readWord();
             
-            size_t slotSize   = sizeof(TByteObject) + dataSize;
+            std::size_t slotSize = sizeof(TByteObject) + dataSize;
             
             // We need to align memory by even addresses so that 
             // normal pointers will always have the lowest bit 0
@@ -207,15 +207,15 @@ TObject* Image::readObject()
             return m_indirects[0]; // nilObject is always the first in the image
         
         default:
-            fprintf(stderr, "Unknown record type %d\n", type);
-            exit(1); // TODO report error
+            std::fprintf(stderr, "Unknown record type %d\n", type);
+            std::exit(1); // TODO report error
     }
 }
 
 bool Image::loadImage(const char* fileName)
 {
     if ( !openImageFile(fileName) ) {
-        fprintf(stderr, "could not open image file %s\n", fileName);
+        std::fprintf(stderr, "could not open image file %s\n", fileName);
         return false;
     }
     
@@ -247,7 +247,7 @@ bool Image::loadImage(const char* fileName)
     
     globals.badMethodSymbol = (TSymbol*) readObject();
     
-    fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
+    std::fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
     m_indirects.clear();
     
     closeImageFile();
@@ -338,13 +338,13 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
             // it has already been written as the first object with type ordinaryObject
         } break;
         default:
-            fprintf(stderr, "unexpected type of object: %d\n", (int) type);
-            exit(1);
+            std::fprintf(stderr, "unexpected type of object: %d\n", (int) type);
+            std::exit(1);
     }
 }
 
 Image::ImageWriter::ImageWriter() {
-    memset(&m_globals, 0, sizeof(m_globals));
+   std::memset(&m_globals, 0, sizeof(m_globals));
 }
 
 Image::ImageWriter& Image::ImageWriter::setGlobals(const TGlobals& globals)

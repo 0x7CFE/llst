@@ -49,7 +49,7 @@ static char* smalltalk_generator(const char* text, int state) {
 }
 
 static char** smalltalk_completion(const char* text, int start, int end) {
-    return rl_completion_matches(text, smalltalk_generator);;
+    return rl_completion_matches(text, smalltalk_generator);
 }
 
 void initializeCompletion() {

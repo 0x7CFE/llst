@@ -50,20 +50,20 @@ BakerMemoryManager::BakerMemoryManager() :
 BakerMemoryManager::~BakerMemoryManager()
 {
     // TODO Reset the external pointers to catch the null pointers if something goes wrong
-    free(m_staticHeapBase);
-    free(m_heapOne);
-    free(m_heapTwo);
+    std::free(m_staticHeapBase);
+    std::free(m_heapOne);
+    std::free(m_heapTwo);
 }
 
-bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
+bool BakerMemoryManager::initializeStaticHeap(std::size_t heapSize)
 {
     heapSize = correctPadding(heapSize);
 
-    void* heap = malloc(heapSize);
+    void* heap = std::malloc(heapSize);
     if (!heap)
         return false;
 
-    memset(heap, 0, heapSize);
+    std::memset(heap, 0, heapSize);
 
     m_staticHeapBase = (uint8_t*) heap;
     m_staticHeapPointer = (uint8_t*) heap + heapSize;
@@ -72,7 +72,7 @@ bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
     return true;
 }
 
-bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
+bool BakerMemoryManager::initializeHeap(std::size_t heapSize, std::size_t maxHeapSize /* = 0 */)
 {
     // To initialize properly we need a heap with an even size
     heapSize = correctPadding(heapSize);
@@ -81,12 +81,12 @@ bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* =
     m_heapSize = heapSize;
     m_maxHeapSize = maxHeapSize;
 
-    m_heapOne = (uint8_t*) malloc(mediane);
-    m_heapTwo = (uint8_t*) malloc(mediane);
+    m_heapOne = (uint8_t*) std::malloc(mediane);
+    m_heapTwo = (uint8_t*) std::malloc(mediane);
     // TODO check for allocation errors
 
-    memset(m_heapOne, 0, mediane);
-    memset(m_heapTwo, 0, mediane);
+    std::memset(m_heapOne, 0, mediane);
+    std::memset(m_heapTwo, 0, mediane);
     
     m_activeHeapOne = true;
     
@@ -104,7 +104,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     // Stage1. Growing inactive heap
     uint32_t newHeapSize = correctPadding(requestedSize + m_heapSize + m_heapSize / 2);
 
-    printf("MM: Growing heap to %d\n", newHeapSize);
+    std::printf("MM: Growing heap to %d\n", newHeapSize);
     
     uint32_t newMediane = newHeapSize / 2;
     uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
@@ -112,14 +112,14 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     
     // Reallocating space and zeroing it
     {
-        void* newInactiveHeap = realloc(*inactiveHeapBase, newMediane);
+        void* newInactiveHeap = std::realloc(*inactiveHeapBase, newMediane);
         if (!newInactiveHeap)
         {
-            printf("MM: Cannot reallocate %d bytes for inactive heap\n", newMediane);
-            abort();
+            std::printf("MM: Cannot reallocate %d bytes for inactive heap\n", newMediane);
+            std::abort();
         } else {
             *inactiveHeapBase = (uint8_t*) newInactiveHeap;
-            memset(*inactiveHeapBase, 0, newMediane);
+            std::memset(*inactiveHeapBase, 0, newMediane);
         }
     }
     // Stage 2. Collecting garbage so that 
@@ -129,14 +129,14 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     // Now pointers are swapped and previously active heap is now inactive
     // We need to reallocate it too
     {
-        void* newActiveHeap = realloc(*activeHeapBase, newMediane);
+        void* newActiveHeap = std::realloc(*activeHeapBase, newMediane);
         if (!newActiveHeap)
         {
-            printf("MM: Cannot reallocate %d bytes for active heap\n", newMediane);
-            abort();
+            std::printf("MM: Cannot reallocate %d bytes for active heap\n", newMediane);
+            std::abort();
         } else {
             *activeHeapBase = (uint8_t*) newActiveHeap;
-            memset(*activeHeapBase, 0, newMediane);
+            std::memset(*activeHeapBase, 0, newMediane);
         }
     }
     collectGarbage();
@@ -144,12 +144,12 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
     m_heapSize = newHeapSize;
 }
 
-void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
+void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
     if (gcOccured)
         *gcOccured = false;
 
-    size_t attempts = 2;
+    std::size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
@@ -175,16 +175,16 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
     // TODO Grow the heap if object still not fits
 
-    fprintf(stderr, "Could not allocate %u bytes in heap\n", requestedSize);
+    std::fprintf(stderr, "Could not allocate %u bytes in heap\n", requestedSize);
     return 0;
 }
 
-void* BakerMemoryManager::staticAllocate(size_t requestedSize)
+void* BakerMemoryManager::staticAllocate(std::size_t requestedSize)
 {
     uint8_t* newPointer = m_staticHeapPointer - requestedSize;
     if (newPointer < m_staticHeapBase)
     {
-        fprintf(stderr, "Could not allocate %u bytes in static heaps\n", requestedSize);
+        std::fprintf(stderr, "Could not allocate %u bytes in static heaps\n", requestedSize);
         return 0; // TODO Report memory allocation error
     }
     m_staticHeapPointer = newPointer;
@@ -260,7 +260,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 // actual binary data starts from the data[1]
                 uint8_t* source      = reinterpret_cast<uint8_t*>( & currentObject->data[1] );
                 uint8_t* destination = reinterpret_cast<uint8_t*>( & objectCopy->data[1] );
-                memcpy(destination, source, dataSize);
+                std::memcpy(destination, source, dataSize);
 
                 // Marking original copy of object as relocated so it would not be processed again
                 currentObject->size.setRelocated();
@@ -384,7 +384,7 @@ void BakerMemoryManager::collectGarbage()
     timeval tv2;
     gettimeofday(&tv2, NULL);
     
-    memset(m_inactiveHeapBase, 0, m_heapSize / 2);
+    std::memset(m_inactiveHeapBase, 0, m_heapSize / 2);
     
     // Calculating total microseconds spent in the garbage collection procedure
     m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
@@ -399,12 +399,7 @@ void BakerMemoryManager::moveObjects()
     }
     
     // Updating external references. Typically these are pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
-    }
-    
-    volatile object_ptr* currentPointer = m_externalPointersHead;
+    object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {
         currentPointer->data = (TObject*) moveObject((TMovableObject*) currentPointer->data);
         currentPointer = currentPointer->next;
@@ -474,22 +469,6 @@ void BakerMemoryManager::removeStaticRoot(TObject** pointer)
     }
 }
 
-void BakerMemoryManager::registerExternalPointer(TObject** pointer)
-{
-    m_externalPointers.push_front((TMovableObject**) pointer);
-}
-
-void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
-{
-    TPointerIterator iPointer = m_externalPointers.begin();
-    for (; iPointer != m_externalPointers.end(); ++iPointer) {
-        if (*iPointer == (TMovableObject**) pointer) {
-            m_externalPointers.erase(iPointer);
-            return;
-        }
-    }
-}
-
 void BakerMemoryManager::registerExternalHeapPointer(object_ptr& pointer) {
     pointer.next = m_externalPointersHead;
     m_externalPointersHead = &pointer;
@@ -502,36 +481,27 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
     }
     
     // If it is not the last element of the list
-    //  we replace the given pointer whith the next one
-    if(pointer.next)
-    {
-        volatile object_ptr* next_object = pointer.next;
+    //  we replace the given pointer with the next one
+    if (pointer.next) {
+        object_ptr* next_object = pointer.next;
         pointer.data = next_object->data;
         pointer.next = next_object->next;
-    }
-    else
-    {
+    } else {
         // This is the last element, we have to find the previous
-        //  element in the list and unlink the given pointer
-        volatile object_ptr* previousPointer = m_externalPointersHead;
-        volatile object_ptr* currentPointer  = previousPointer->next;
+        // element in the list and unlink the given pointer
+        object_ptr* previousPointer = m_externalPointersHead;
+        while (previousPointer->next != &pointer)
+            previousPointer = previousPointer->next;
         
-        while ( currentPointer != 0 ) {
-            if (currentPointer == &pointer) {
-                previousPointer->next = 0;
-                return;
-            } else {
-                previousPointer = currentPointer;
-                currentPointer = previousPointer->next;
-            }
-        }
+        previousPointer->next = 0;
+        return;
     }
 }
 
 TMemoryManagerInfo BakerMemoryManager::getStat() 
 {
     TMemoryManagerInfo info;
-    memset(&info, 0, sizeof(info));
+    std::memset(&info, 0, sizeof(info));
     
     info.allocationsCount     = m_allocationsCount;
     info.collectionsCount     = m_collectionsCount;

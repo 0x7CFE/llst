@@ -37,7 +37,7 @@
 
 // #include <stdarg.h>
 
-#include <stddef.h>
+#include <cstddef>
 #include <stdint.h>
 #include <types.h>
 #include <vector>
@@ -72,11 +72,11 @@ private:
 // implement this interface.
 class IMemoryManager {
 public:
-    virtual bool initializeHeap(size_t heapSize, size_t maxSize = 0) = 0;
-    virtual bool initializeStaticHeap(size_t staticHeapSize) = 0;
+    virtual bool initializeHeap(std::size_t heapSize, std::size_t maxSize = 0) = 0;
+    virtual bool initializeStaticHeap(std::size_t staticHeapSize) = 0;
     
-    virtual void* allocate(size_t size, bool* collectionOccured = 0) = 0;
-    virtual void* staticAllocate(size_t size) = 0;
+    virtual void* allocate(std::size_t size, bool* collectionOccured = 0) = 0;
+    virtual void* staticAllocate(std::size_t size) = 0;
     virtual void  collectGarbage() = 0;
     
     virtual bool  checkRoot(TObject* value, TObject** objectSlot) = 0;
@@ -85,9 +85,6 @@ public:
     virtual bool  isInStaticHeap(void* location) = 0;
     
     // External pointer handling
-    virtual void  registerExternalPointer(TObject** pointer) = 0;
-    virtual void  releaseExternalPointer(TObject** pointer) = 0;
-    
     virtual void  registerExternalHeapPointer(object_ptr& pointer) = 0;
     virtual void  releaseExternalHeapPointer(object_ptr& pointer) = 0;
     
@@ -208,8 +205,8 @@ protected:
     uint32_t  m_allocationsCount;
     uint64_t  m_totalCollectionDelay;
     
-    size_t    m_heapSize;
-    size_t    m_maxHeapSize;
+    std::size_t m_heapSize;
+    std::size_t m_maxHeapSize;
     
     uint8_t*  m_heapOne;
     uint8_t*  m_heapTwo;
@@ -220,7 +217,7 @@ protected:
     uint8_t*  m_activeHeapBase;
     uint8_t*  m_activeHeapPointer;
     
-    size_t    m_staticHeapSize;
+    std::size_t m_staticHeapSize;
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
 
@@ -258,22 +255,17 @@ protected:
     // When pointer to a heap object is stored outside of the heap,
     // specific actions need to be taken in order to prevent pointer
     // invalidation. GC uses this information to correct external
-    // pointers so they will point to correct location even after garbage
-    // collection. Usual operating pattern is very similar to the stack,
-    // so list container seems to be a good choice.
-    typedef std::list<TMovableObject**> TPointerList;
-    typedef std::list<TMovableObject**>::iterator TPointerIterator;
-    TPointerList m_externalPointers;
-    
-    object_ptr* m_externalPointersHead; 
+    // pointers so they will point to correct location even after
+    // garbage collection.
+    object_ptr* m_externalPointersHead;
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
     
-    virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
-    virtual bool  initializeStaticHeap(size_t staticHeapSize);
-    virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
-    virtual void* staticAllocate(size_t requestedSize);
+    virtual bool  initializeHeap(std::size_t heapSize, std::size_t maxHeapSize = 0);
+    virtual bool  initializeStaticHeap(std::size_t staticHeapSize);
+    virtual void* allocate(std::size_t requestedSize, bool* gcOccured = 0);
+    virtual void* staticAllocate(std::size_t requestedSize);
     virtual void  collectGarbage();
     
     virtual bool  checkRoot(TObject* value, TObject** objectSlot);
@@ -282,9 +274,6 @@ public:
     virtual bool  isInStaticHeap(void* location);
     
     // External pointer handling
-    virtual void  registerExternalPointer(TObject** pointer);
-    virtual void  releaseExternalPointer(TObject** pointer);
-    
     virtual void  registerExternalHeapPointer(object_ptr& pointer);
     virtual void  releaseExternalHeapPointer(object_ptr& pointer);
     
@@ -311,6 +300,8 @@ protected:
     void addCrossgenReference(TObject** pointer);
     void removeCrossgenReference(TObject** pointer);
     
+    typedef std::list<TMovableObject**> TPointerList;
+    typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_crossGenerationalReferences;
 public:
     GenerationalMemoryManager() : BakerMemoryManager(), 
@@ -352,8 +343,8 @@ extern "C" { extern LLVMMemoryManager::TStackEntry* llvm_gc_root_chain; }
 class Image
 {
 private:
-    int      m_imageFileFD;
-    size_t   m_imageFileSize;
+    int         m_imageFileFD;
+    std::size_t m_imageFileSize;
     
     void*    m_imageMap;     // pointer to the map base
     uint8_t* m_imagePointer; // sliding pointer

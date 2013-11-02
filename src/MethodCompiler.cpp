@@ -212,7 +212,7 @@ Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/,
             case 0: 
                 /* TODO no referers, empty local stack and pop operation = error */ 
                 outs() << "Value stack underflow\n";
-                exit(1);
+                std::exit(1);
                 return compiler->m_globals.nilObject;
                 
             case 1: {
@@ -631,7 +631,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             case opcode::doPrimitive:       doPrimitive(jit);       break;
             
             default:
-                fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
+                std::fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
         }
     }
@@ -725,7 +725,7 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case pushConstants::falseObject: constantValue = m_globals.falseObject; break;
         
         default:
-            fprintf(stderr, "JIT: unknown push constant %d\n", constant);
+            std::fprintf(stderr, "JIT: unknown push constant %d\n", constant);
     }
 
     jit.pushValue(constantValue);
@@ -851,7 +851,7 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
         case unaryBuiltIns::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
         
         default:
-            fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
+            std::fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
     }
     
     Value* result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
@@ -894,7 +894,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         case binaryBuiltIns::operatorLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break;
         case binaryBuiltIns::operatorPlus    : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
         default:
-            fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
+            std::fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
     }
     
     // Checking which operation was performed and
@@ -1153,7 +1153,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         } break;
         
         default:
-            printf("JIT: unknown special opcode %d\n", opcode);
+            std::printf("JIT: unknown special opcode %d\n", opcode);
     }
 }
 

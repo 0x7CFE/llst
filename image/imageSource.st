@@ -1246,9 +1246,7 @@ firstLink |list|
 
 METHOD ListTest
 atPut |list|
-    list <- List new.
-    list add: nil.
-    list add: nil.
+    list <- List with: nil with: nil.
     
     list at: 1 put: 42.
     list at: 2 put: 'qwerty'.
@@ -1275,6 +1273,72 @@ lastLink |list|
     [ list addLast: 'last'. list lastLink value ] assertEq: 'last' withComment: 'appended with addLast:'.
     [ list clear. list lastLink] assertEq: nil withComment: 'cleared'.
 !
+
+METHOD ListTest
+equal |left right|
+    [
+        left <- List new.
+        right <- List new.
+        [ left = right ] assertWithComment: 'empty'.
+    ] value.
+    [
+        left <- List with: 0 with: 42.
+        right <- List with: 0 with: 42.
+        [ left = right ] assertWithComment: 'non empty: numbers'.
+    ] value.
+    [
+        left <- List with: 'qwe' with: ''.
+        right <- List with: 'qwe' with: ''.
+        [ left = right ] assertWithComment: 'non empty: strings'.
+    ] value.
+!
+
+METHOD ListTest
+appendList |left right result standardContent standardSize|
+    [ "non empty + non empty"
+        left <- List with: 1 with: 2.
+        right <- List with: 3 with: 4.
+        
+        standardSize <- left size + (right size).
+        
+        standardContent <- List new.
+        standardContent add: 4.
+        standardContent add: 3.
+        standardContent add: 2.
+        standardContent add: 1.
+        
+        result <- left appendList: right.
+        
+        [result size ] assertEq: standardSize withComment: 'size: both non empty'.
+        [result] assertEq: standardContent withComment: 'content: both non empty'.
+    ] value.
+    [ "empty + non empty"
+        left <- List new.
+        right <- (Array with: 3 with: 4) asList.
+        
+        standardSize <- left size + (right size).
+        
+        standardContent <- List new.
+        standardContent add: 4.
+        standardContent add: 3.
+        
+        result <- left appendList: right.
+        
+        [result size ] assertEq: standardSize withComment: 'size: empty + non empty'.
+        [result] assertEq: standardContent withComment: 'content: empty + non empty'.
+    ] value.
+!
+
+METHOD ListTest
+includes |list|
+    list <- List new.
+    [ list includes: 42 ] assertEq: false withComment: 'empty list'.
+    list <- List with: 0 with: 1.
+    [ list includes: 0 ] assertWithComment: 'non empty list: 0'.
+    [ list includes: 1 ] assertWithComment: 'non empty list: 1'.
+    [ list includes: 42 ] assertEq: false withComment: 'non empty list: 42'.
+!
+
 
 COMMENT                                                                                           -------MagnitudeTest----------
 CLASS MagnitudeTest Test
@@ -1639,6 +1703,7 @@ main    | command  data |
     PrimitiveTest new runAll.
     MagnitudeTest new runAll.
     ListTest new runAll.
+    MethodLookupTest new runAll.
     
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
@@ -2229,9 +2294,9 @@ at: value
 	^ self at: value ifAbsent: [ self noElement ]
 !
 METHOD Collection
-includes: value
-	self at: value ifAbsent: [ ^ false ].
-	^ true
+includes: aValue
+    self do: [ :element | element = aValue ifTrue: [ ^ true ]].
+    ^ false
 !
 METHOD Collection
 asArray		| newArray index |
@@ -2449,11 +2514,6 @@ METHOD Array
 at: index ifAbsent: exceptionBlock
 	<24 self index>.
 	exceptionBlock value
-!
-METHOD Array
-includes: aValue
-	self do: [ :element | element = aValue ifTrue: [ ^ true ]].
-	^ false
 !
 METHOD Array
 indexOf: aValue
@@ -2881,17 +2941,17 @@ firstLink
     ^elements
 !
 METHOD List
-appendList: aList
+appendList: aList | element |
     (elements isNil) ifTrue: [ 
         elements <- aList firstLink.
         size <- aList size.
         ^self 
     ].
     
-    elements <- elements.
-    [elements next isNil]
-        whileFalse: [elements <- elements next].
-    elements next: aList firstLink.
+    element <- elements.
+    [element next isNil]
+        whileFalse: [element <- element next].
+    element next: aList firstLink.
     size <- size + aList size.
     ^self
 !
@@ -3008,10 +3068,8 @@ reverseDo: aBlock
 METHOD List
 select: testBlock | newList |
 	newList <- List new.
-	"self reverseDo: [:element | (testBlock value: element)
-		ifTrue: [ newList add: element ] ]."
-    self do: [:element | (testBlock value: element)
-        ifTrue: [ newList addLast: element ] ].
+	self reverseDo: [:element | (testBlock value: element)
+		ifTrue: [ newList add: element ] ].
 	^ newList
 !
 COMMENT ---------- Dictionary ------------
@@ -3105,6 +3163,10 @@ printString | count res |
 METHOD Dictionary
 add: anAssoc
 	self at: anAssoc key put: anAssoc value
+!
+METHOD Dictionary
+includes: aKey
+    ^keys includes: aKey.
 !
 COMMENT ---------- Set ------------
 METHOD MetaSet
