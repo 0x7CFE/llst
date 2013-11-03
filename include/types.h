@@ -249,6 +249,9 @@ struct TArray : public TObject {
     //       So the first element will have index 1, the second 2 and so on.
     template<typename I>
     Element*& operator [] (I index) {
+        // compile-time check whether Element is in the type tree of TObject
+        (void) static_cast<Element*>( (TObject*) 0 );
+        
         TObject** field   = &fields[index];
         Element** element = reinterpret_cast<Element**>(field);
         return *element;
