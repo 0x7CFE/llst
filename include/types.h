@@ -116,7 +116,10 @@ protected:
     // it contains pointers to other objects. For raw binary objects 
     // it is accessed directly as a raw byte array.
     // Actual size is stored in the TSize field and accessed using getSize()
-    TObject* fields[0];
+    union {
+        TObject* fields[0];
+        uint8_t  bytes[0];
+    };
     
 private:    
     // This class should not be instantinated explicitly
@@ -160,16 +163,12 @@ public:
     // Byte objects are said to be binary
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
     
-    uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(fields); }
-    const uint8_t* getBytes() const {
-        return reinterpret_cast<const uint8_t*>(fields);
-    }
-    const uint8_t getByte(uint32_t index) const {
-        return reinterpret_cast<const uint8_t*>(fields)[index];
-    }
-    uint8_t& operator [] (uint32_t index) { return reinterpret_cast<uint8_t*>(fields)[index]; }
+    uint8_t* getBytes() { return bytes; }
+    const uint8_t* getBytes() const { return bytes; }
+    const uint8_t getByte(uint32_t index) const { return bytes[index]; }
+    uint8_t& operator [] (uint32_t index) { return bytes[index]; }
     
-    void putByte(uint32_t index, uint8_t value) { reinterpret_cast<uint8_t*>(fields)[index] = value; }
+    void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
     
     // Helper function for template instantination
     static bool InstancesAreBinary() { return true; } 
@@ -239,20 +238,27 @@ struct TChar : public TObject {
 // various errors in VM code where object of specific type is expected but
 // incorrect array is used to get it.
 template <typename Element>
-struct TArray : public TObject { 
+struct TArray : public TObject {
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* InstanceClassName() { return "Array"; }
-    
-    Element getField(uint32_t index) { return (Element) fields[index]; }
-    
-// NOTE: Unlike C languages, indexing in Smalltalk is started from the 1. 
-//       So the first element will have index 1, the second 2 and so on.
+
+    Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
+
+    // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
+    //       So the first element will have index 1, the second 2 and so on.
     template<typename I>
-    Element& operator [] (I index) { return (Element&) fields[index]; }
+    Element*& operator [] (I index) {
+        // compile-time check whether Element is in the type tree of TObject
+        (void) static_cast<Element*>( (TObject*) 0 );
+        
+        TObject** field   = &fields[index];
+        Element** element = reinterpret_cast<Element**>(field);
+        return *element;
+    }
 };
 
-typedef TArray<TObject*> TObjectArray;
-typedef TArray<TSymbol*> TSymbolArray;
+typedef TArray<TObject> TObjectArray;
+typedef TArray<TSymbol> TSymbolArray;
 
 // Context class is the heart of Smalltalk's VM execution mechanism.
 // Basicly, it holds all information needed to execute a method.

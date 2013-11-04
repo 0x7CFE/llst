@@ -168,9 +168,12 @@ public:
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
     
-     template<typename I>
-     T& operator [] (I index) const { return static_cast<Object*>(hptr_base<Object>::target.data)->operator[](index); } 
-     //return hptr_base<Object>::target.data->operator[](index); }
+    template<typename I>
+    T*& operator [] (I index) const { 
+        TObject** field = &hptr_base<Object>::target.data->operator[](index); 
+        T** element = static_cast<T**>(field);
+        return *element;
+    }
 };
 
 // Hptr specialization for TByteObject.
