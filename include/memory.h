@@ -35,8 +35,6 @@
 #ifndef LLST_MEMORY_H_INCLUDED
 #define LLST_MEMORY_H_INCLUDED
 
-// #include <stdarg.h>
-
 #include <cstddef>
 #include <stdint.h>
 #include <types.h>
@@ -127,7 +125,6 @@ public:
     hptr_base(const hptr_base<Object>& pointer) : target(pointer.target.data), mm(pointer.mm), isRegistered(true)
     {
         if (mm) mm->registerExternalHeapPointer(target);
-        //if (mm) { mm->registerExternalPointer((TObject**) &target); }
     }
     
     ~hptr_base() { if (mm && isRegistered) mm->releaseExternalHeapPointer(target); }
@@ -142,8 +139,6 @@ public:
     
     template<typename C> C* cast() const { return static_cast<C*>(target.data); }
 };
-
-//typedef hptr_base<TObject>::object_ptr object_ptr;
 
 template <typename O> class hptr : public hptr_base<O> {
 public:
@@ -168,12 +163,7 @@ public:
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
     
-    template<typename I>
-    T*& operator [] (I index) const { 
-        TObject** field = &hptr_base<Object>::target.data->operator[](index); 
-        T** element = static_cast<T**>(field);
-        return *element;
-    }
+    template<typename I> T& operator [] (I index) const { return hptr_base<Object>::target.data->operator[](index); }
 };
 
 // Hptr specialization for TByteObject.
