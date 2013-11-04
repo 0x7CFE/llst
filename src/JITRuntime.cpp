@@ -57,7 +57,7 @@ using namespace llvm;
 
 JITRuntime* JITRuntime::s_instance = 0;
 
-static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime::THotMethod* m2) 
+static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime::THotMethod* m2)
 {
     return m1->hitCount < m2->hitCount;
 }
@@ -103,9 +103,9 @@ void JITRuntime::printStat()
         
         std::map<uint32_t, TCallSite>::iterator iSite = hotMethod->callSites.begin();
         for (; iSite != hotMethod->callSites.end(); ++iSite) {
-            std::printf("\t\t%-20s (index %d, offset %d) class hits: ", 
-                   iSite->second.messageSelector->toString().c_str(), 
-                   iSite->first, 
+            std::printf("\t\t%-20s (index %d, offset %d) class hits: ",
+                   iSite->second.messageSelector->toString().c_str(),
+                   iSite->first,
                    m_methodCompiler->getCallSiteOffset(iSite->first));
             
             std::map<TClass*, uint32_t>::iterator iClassHit = iSite->second.classHits.begin();
@@ -273,7 +273,7 @@ void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blo
 
 void JITRuntime::optimizeFunction(Function* function)
 {
-    m_modulePassManager->run(*m_JITModule); 
+    m_modulePassManager->run(*m_JITModule);
     
     // Running the optimization passes on a function
     m_functionPassManager->run(*function);
@@ -345,7 +345,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         }
         
         // Searching for the jit compiled function
-        compiledMethodFunction = lookupFunctionInCache(method); 
+        compiledMethodFunction = lookupFunctionInCache(method);
         
         if (! compiledMethodFunction) {
             // If function was not found in the cache looking it in the LLVM directly
@@ -399,7 +399,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
 }
 
-void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex) 
+void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex)
 {
     THotMethod& hotMethod = m_hotMethods[methodFunction];
     hotMethod.hitCount += 1;
@@ -424,7 +424,7 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     callSite.classHits[receiverClass] += 1;
 }
 
-void JITRuntime::patchHotMethods() 
+void JITRuntime::patchHotMethods()
 {
     // Selecting most active methods with call sites and patching them.
     // We collected statistics on what classes are affected when invoking
@@ -537,7 +537,7 @@ void JITRuntime::patchHotMethods()
     outs() << "All is done.\n";
 }
 
-llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex) 
+llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunction, uint32_t callSiteIndex)
 {
     using namespace llvm;
     
@@ -556,7 +556,7 @@ llvm::Instruction* JITRuntime::findCallInstruction(llvm::Function* methodFunctio
     return 0;
 }
 
-void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks) 
+void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDirectBlockMap& directBlocks)
 {
     using namespace llvm;
     
@@ -668,7 +668,7 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
             builder.CreateBr(info.nextBlock);
         } else {
             InvokeInst* invokeInst = dyn_cast<InvokeInst>(info.callInstruction);
-            newBlock.returnValue = builder.CreateInvoke(directFunction, 
+            newBlock.returnValue = builder.CreateInvoke(directFunction,
                                                         info.nextBlock,
                                                         invokeInst->getUnwindDest(),
                                                         newContext
@@ -680,7 +680,7 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
     }
 }
 
-void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock) 
+void JITRuntime::cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock)
 {
     builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), directBlock.contextHolder/*, true*/);
     if (directBlock.tempsHolder)
@@ -734,7 +734,7 @@ bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
     if (!receiver) {
         //TODO try to find receiver in GEPs
         return false;
-    } 
+    }
     
     if (isa<ConstantExpr>(receiver)) {
         // inlined SmallInt
@@ -749,7 +749,7 @@ bool JITRuntime::detectLiteralReceiver(llvm::Value* messageArguments)
     return false;
 }
 
-void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex) 
+void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* contextHolder, TCallSite& callSite, uint32_t callSiteIndex)
 {
     using namespace llvm;
     
@@ -764,7 +764,7 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
     BasicBlock* originBlock = callInstruction->getParent();
     IRBuilder<> builder(originBlock);
     
-    // Spliting original block into two parts. 
+    // Spliting original block into two parts.
     // These will be intersected by our code
     BasicBlock* nextBlock = originBlock->splitBasicBlock(callInstruction, "next.");
     
@@ -785,7 +785,7 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
     
     if (! isLiteralReceiver) {
         // Fallback block contains original call to default JIT sendMessage handler.
-        // It is called when message is invoked with an unknown class that does not 
+        // It is called when message is invoked with an unknown class that does not
         // has direct handler.
         BasicBlock* fallbackBlock = BasicBlock::Create(callInstruction->getContext(), "fallback.", methodFunction, nextBlock);
         Value* fallbackReply = 0;
@@ -799,7 +799,7 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
             builder.CreateBr(nextBlock);
         } else {
             InvokeInst* invokeInst = dyn_cast<InvokeInst>(callInstruction);
-            fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(), 
+            fallbackReply = builder.CreateInvoke(invokeInst->getCalledFunction(),
                                                  nextBlock,
                                                  invokeInst->getUnwindDest(),
                                                  fallbackArgs,
@@ -807,7 +807,7 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
             );
         }
     
-        // Creating a switch instruction that will filter the block 
+        // Creating a switch instruction that will filter the block
         // depending on the actual class of the receiver object
         builder.SetInsertPoint(originBlock);
         
@@ -848,15 +848,15 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
             
             // Adding cleanup code for the direct block
             cleanupDirectHolders(builder, directBlock);
-        }    
+        }
         
         callInstruction->replaceAllUsesWith(replyPhi);
     } else {
-        // Literal receivers are constants that are written 
+        // Literal receivers are constants that are written
         // at method compilation time and do not change.
         
-        // We may take advantage of this fact and optimize call 
-        // of method with literal object as a receiver. Because 
+        // We may take advantage of this fact and optimize call
+        // of method with literal object as a receiver. Because
         // literal object is a constant, it's class is constant too.
         // Therefore, we do not need to check it every time we call a method.
         

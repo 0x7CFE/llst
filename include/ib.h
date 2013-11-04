@@ -9,7 +9,7 @@ struct ImageClass {
     std::string parent;
     std::vector<std::string> instanceVariables;
     std::map<std::string, ImageMethod> methods;
-};    
+};
 
 struct ImageMethod {
     std::string className;

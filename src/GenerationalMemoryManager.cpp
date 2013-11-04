@@ -57,12 +57,12 @@ void GenerationalMemoryManager::collectGarbage()
 //     printf("GMM: collectGarbage()\n");
     
     // Generational GC takes advantage of a fact that most objects are alive
-    // for a very short amount of time. Those who survived the first collection 
+    // for a very short amount of time. Those who survived the first collection
     // are typically stay there for much longer.
     //
     // In classic Baker collector both spaces are equal in rights and
     // are used interchangebly. In Generational GC right space is selected
-    // as a storage for long living generation 1 whereas immediate generation 0 
+    // as a storage for long living generation 1 whereas immediate generation 0
     // objects are repeatedly allocated in the space one even after collection.
     
     // In most frequent collection mode LeftToRight we move generation 0 objects from the
@@ -97,7 +97,7 @@ void GenerationalMemoryManager::collectGarbage()
 
 void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
 {
-    // Classic baker algorithm moves objects after swapping the spaces, 
+    // Classic baker algorithm moves objects after swapping the spaces,
     // but in our case we do not want to swap them now. Still, in order to
     // satisfy moveObjects() we do this temporarily and then revert the pointers
     // to the needed state.
@@ -112,9 +112,9 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     // TODO In certain circumstances right heap may not have
     //      enough space to store all active objects from gen 0.
     //      This may happen if massive allocation took place before
-    //      the collection was initiated. In this case we need to interrupt 
-    //      the collection, then allocate a new larger heap and recollect 
-    //      ALL objects from both spaces to a new allocated heap. 
+    //      the collection was initiated. In this case we need to interrupt
+    //      the collection, then allocate a new larger heap and recollect
+    //      ALL objects from both spaces to a new allocated heap.
     //      After that old space is freed and new is treated either as heap one
     //      or heap two depending on the size.
     if (fullCollect) {
@@ -126,7 +126,7 @@ void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)
     m_inactiveHeapBase    = m_heapTwo;
     m_inactiveHeapPointer = m_activeHeapPointer;
     
-    // Now, all active objects are located in the space two 
+    // Now, all active objects are located in the space two
     // (inactive space in terms of classic Baker).
     // Resetting the space one pointers to mark space as empty.
     m_activeHeapBase    = m_heapOne;
@@ -216,7 +216,7 @@ bool GenerationalMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
             if (! previousValueIsYoung) {
                 addCrossgenReference(objectSlot);
                 return true;
-            }                
+            }
         } else {
             if (previousValueIsYoung) {
                 removeCrossgenReference(objectSlot);
@@ -228,7 +228,7 @@ bool GenerationalMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
     return false;
 }
 
-void GenerationalMemoryManager::addCrossgenReference(TObject** pointer) 
+void GenerationalMemoryManager::addCrossgenReference(TObject** pointer)
 {
     //printf("addCrossgenReference %p", pointer);
     m_crossGenerationalReferences.push_front( reinterpret_cast<TMovableObject**>(pointer) );

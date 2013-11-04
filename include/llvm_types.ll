@@ -1,5 +1,5 @@
 ; This module implements types described in types.h within LLVM.
-; Also it implements some base functions and methods such as TObject::getClass(). 
+; Also it implements some base functions and methods such as TObject::getClass().
 ; LLVM passes may optimize/inline them => we will gain more perfomance.
 
 
@@ -7,11 +7,11 @@
 ;;;;;;;;;;;;;;;;;;;;;; types ;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-%TSize = type { 
+%TSize = type {
     i32             ; data
 }
 
-%TObject = type { 
+%TObject = type {
     %TSize,         ; size
     %TClass*,       ; class
     [0 x %TObject*] ; fields
@@ -21,7 +21,7 @@
 %TSymbol     = type { %TByteObject }
 %TString     = type { %TByteObject }
 
-%TChar = type { 
+%TChar = type {
     %TObject,
     i32             ; value
 }
@@ -30,7 +30,7 @@
 %TObjectArray = type { %TObject }
 %TSymbolArray = type { %TObject }
 
-%TContext = type { 
+%TContext = type {
     %TObject,
     %TMethod*,
     %TObjectArray*, ; arguments
@@ -41,14 +41,14 @@
     %TContext*      ; previousContext
 }
 
-%TBlock = type { 
+%TBlock = type {
     %TContext,
     i32,            ; argumentLocation
     %TContext*,     ; creatingContext
     i32             ; blockBytePointer
 }
 
-%TMethod = type { 
+%TMethod = type {
     %TObject,
     %TSymbol*,      ; name
     %TByteObject*,  ; byteCodes
@@ -60,13 +60,13 @@
     %TObject*       ; package
 }
 
-%TDictionary = type { 
+%TDictionary = type {
     %TObject,
     %TSymbolArray*, ; keys
     %TObjectArray*  ; values
 }
 
-%TClass = type { 
+%TClass = type {
     %TObject,
     %TSymbol*,      ; name
     %TClass*,       ; parentClass
@@ -76,14 +76,14 @@
     %TObject*       ; package
 }
 
-%TProcess = type { 
+%TProcess = type {
     %TObject,
     %TContext*,     ; context
     %TObject*,      ; state
     %TObject*       ; result
 }
 
-%TGlobals = type { 
+%TGlobals = type {
     %TObject*,      ; nilObject
     %TObject*,      ; trueObject
     %TObject*,      ; falseObject
@@ -189,8 +189,8 @@ define %TClass** @getObjectClassPtr(%TObject* %this) {
 define %TClass* @getObjectClass(%TObject* %this) {
     ; TODO SmallInt case
     %test = call i1 @isSmallInteger(%TObject* %this)
-    br i1 %test, label %is_smallint, label %is_object    
-is_smallint:    
+    br i1 %test, label %is_smallint, label %is_object
+is_smallint:
     ret %TClass* @SmallInt
 is_object:
     %addr = call %TClass** @getObjectClassPtr(%TObject* %this)

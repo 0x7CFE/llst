@@ -144,7 +144,7 @@ private:
     void doMarkArguments(TVMExecutionContext& ec);
     //Takes selector, arguments from context and sends message
     //The class is taken from the first argument
-    void doSendMessage(TVMExecutionContext& ec); 
+    void doSendMessage(TVMExecutionContext& ec);
     //This method is used to send message to the first argument
     //If receiverClass != 0 then the class is not taken from the first argument (implementation of sendToSuper)
     void doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments, TClass* receiverClass = 0);

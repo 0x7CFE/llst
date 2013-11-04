@@ -177,17 +177,17 @@ struct TBaseFunctions {
 // TStackValue is a base class for stack values. Descendant value may contain either
 // raw value or a deferred command to be done when evaluation takes place.
 // Use get() method to get the stored value.
-// 
+//
 // NOTE: Depending on the actual implementation, invoking method get() may result in
 //       a code generation. This should be done in a known context.
-//       
+//
 // See also: TPlainValue and TDeferredValue
 struct TStackValue {
     virtual ~TStackValue() { }
     virtual llvm::Value* get() = 0;
 };
 
-// TPlainValue represents simple llvm::Value* holder which does not 
+// TPlainValue represents simple llvm::Value* holder which does not
 // perform any additional actions when get() is called. Only stored value is returned.
 struct TPlainValue : public TStackValue {
 private:
@@ -236,8 +236,8 @@ public:
 
         MethodCompiler* compiler; // link to outer class for variable access
         bool hasValue();
-        void pushValue(llvm::Value* value); 
-        llvm::Value* lastValue(); 
+        void pushValue(llvm::Value* value);
+        llvm::Value* lastValue();
         llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0, bool dropValue = false);
 
         llvm::Value* contextHolder;
@@ -276,7 +276,7 @@ public:
                 basicBlockContexts.clear();
             }
             
-            delete builder; 
+            delete builder;
         }
     };
     
@@ -335,7 +335,7 @@ private:
     uint32_t m_callSiteIndex;
     std::map<uint32_t, uint32_t> m_callSiteIndexToOffset;
 public:
-    uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; } 
+    uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; }
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
     TRuntimeAPI& getRuntimeAPI() { return m_runtimeAPI; }
     TJITGlobals& getJitGlobals() { return m_globals; }
@@ -372,7 +372,7 @@ public:
     }
 };
 
-// TDeferredValue is used in cases when some particular actions should be done 
+// TDeferredValue is used in cases when some particular actions should be done
 // when get() method is invoked. Typically this is used to pass an llvm Value*
 // to the later code ensuring that it will not be broken by a garbage collection.
 struct TDeferredValue : public TStackValue {
@@ -382,8 +382,8 @@ struct TDeferredValue : public TStackValue {
         loadTemporary,
         loadLiteral,
         
-        // result of message sent 
-        // or pushed block 
+        // result of message sent
+        // or pushed block
         loadHolder
     };
     
@@ -501,8 +501,8 @@ private:
     void initializeExceptionAPI();
     void createExecuteProcessFunction();
 
-public:    
-    struct TCallSite {        
+public:
+    struct TCallSite {
         typedef std::map<TClass*, uint32_t> TClassHitsMap;
         
         uint32_t hitCount;
@@ -551,13 +551,13 @@ private:
     bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
     void patchHotMethods();
-    void printMethod(TMethod* method) { 
+    void printMethod(TMethod* method) {
         std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
         llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
         
         if (!methodFunction)
             llvm::outs() << "Compiled method " << functionName << " is not found\n";
-        else 
+        else
             llvm::outs() << *methodFunction;
     }
     static JITRuntime* Instance() { return s_instance; }

@@ -1,33 +1,33 @@
 /*
- *    types.h 
- *    
+ *    types.h
+ *
  *    Basic Smalltalk related types and structures
- *    
+ *
  *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
- *    
- *    LLST is 
+ *
+ *    LLST is
  *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
  *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
- *    
- *    LLST is based on the LittleSmalltalk which is 
+ *
+ *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
  *        Copyright (C) 2007 by Charles R. Childers
  *        Copyright (C) 2005-2007 by Danny Reinhold
- *        
+ *
  *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *        
- *    
+ *
+ *
  *    This file is part of LLST.
  *    LLST is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation, either version 3 of the License, or
  *    (at your option) any later version.
- *    
+ *
  *    LLST is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *    GNU General Public License for more details.
- *    
+ *
  *    You should have received a copy of the GNU General Public License
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -64,27 +64,27 @@ inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TIntege
 inline int32_t  getIntegerValue(TInteger value) { return (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
 
-// Helper struct used to hold object size and special 
+// Helper struct used to hold object size and special
 // status flags packed in a 4 bytes space. TSize is used
 // in the TObject hierarchy and in the TMovableObject in GC
 struct TSize {
 private:
     // Raw value holder. Do not edit this value directly
     uint32_t data;
-    
+
     static const int FLAG_RELOCATED = 1;
     static const int FLAG_BINARY    = 2;
     static const int FLAGS_MASK     = FLAG_RELOCATED | FLAG_BINARY;
 public:
-    TSize(uint32_t size, bool binary = false, bool relocated = false) 
-    { 
+    TSize(uint32_t size, bool binary = false, bool relocated = false)
+    {
         data  = (size << 2);
-        data |= binary    ? FLAG_BINARY : 0; 
-        data |= relocated ? FLAG_RELOCATED : 0; 
+        data |= binary    ? FLAG_BINARY : 0;
+        data |= relocated ? FLAG_RELOCATED : 0;
     }
-    
+
     TSize(const TSize& size) : data(size.data) { }
-    
+
     uint32_t getSize() const { return data >> 2; }
     uint32_t setSize(uint32_t size) { return data = (data & 3) | (size << 2); }
     bool isBinary() const { return data & FLAG_BINARY; }
@@ -94,7 +94,7 @@ public:
 };
 
 // TObject is the base class for all objects in smalltalk.
-// Every object in the system starts with two fields. 
+// Every object in the system starts with two fields.
 // One holds data size and the other is the pointer to the object's class.
 struct TObject {
 private:
@@ -104,48 +104,48 @@ private:
     // Depending on the binary status size holds either number of fields
     // or size of objects "tail" which in this case holds raw bytes.
     TSize    size;
-    
+
     // Second field is the pointer to the class which instantinated the object.
     // Every object has a class. Even nil has one. Moreover every class itself
     // is an object too. And yes, it has a class too.
     TClass*  klass;
-    
+
 protected:
     // Actual space allocated for object is larger than sizeof(TObject).
     // Remaining space is used to hold user data. For ordinary objects
-    // it contains pointers to other objects. For raw binary objects 
+    // it contains pointers to other objects. For raw binary objects
     // it is accessed directly as a raw byte array.
     // Actual size is stored in the TSize field and accessed using getSize()
     union {
         TObject* fields[0];
         uint8_t  bytes[0];
     };
-    
-private:    
+
+private:
     // This class should not be instantinated explicitly
     // Descendants should provide own public InstanceClassName method
     static const char* InstanceClassName() { return ""; }
-public:    
+public:
     // this should only be called from Image::readObject
-    void setClass(TClass* aClass) { klass = aClass; } 
-    
+    void setClass(TClass* aClass) { klass = aClass; }
+
     // By default objects subject to non binary specification
-    explicit TObject(uint32_t fieldsCount, TClass* klass, bool isObjectBinary = false) 
+    explicit TObject(uint32_t fieldsCount, TClass* klass, bool isObjectBinary = false)
         : size(fieldsCount, isObjectBinary), klass(klass) { }
-    
+
     uint32_t getSize() const { return size.getSize(); }
     TClass*  getClass() const { return klass; }
-    
+
     // delegated methods from TSize
     bool isBinary() const { return size.isBinary(); }
     bool isRelocated() const { return size.isRelocated(); }
-    
+
     // TODO boundary checks
     TObject** getFields() { return fields; }
     TObject*  getField(uint32_t index) { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
-    
+
     // Helper constant for template instantination
     enum { InstancesAreBinary = false };
 };
@@ -158,26 +158,31 @@ struct TByteObject : public TObject {
 private:
     // This class should not be instantinated directly
     // Descendants should provide own public InstanceClassName method
-    static const char* InstanceClassName() { return ""; } 
+    static const char* InstanceClassName() { return ""; }
 public:
     // Byte objects are said to be binary
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
-    
+
     uint8_t* getBytes() { return bytes; }
     const uint8_t* getBytes() const { return bytes; }
     const uint8_t getByte(uint32_t index) const { return bytes[index]; }
     uint8_t& operator [] (uint32_t index) { return bytes[index]; }
-    
+
     void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
-    
+
+<<<<<<< HEAD
     // Helper constant for template instantination
     enum { InstancesAreBinary = true };
+=======
+    // Helper function for template instantination
+    static bool InstancesAreBinary() { return true; }
+>>>>>>> Removes trailing whitespaces
 };
 
 
 // ByteArray represents Smalltalk's ByteArray class
-// It does not provide any new methods 
-struct TByteArray : public TByteObject { 
+// It does not provide any new methods
+struct TByteArray : public TByteObject {
     static const char* InstanceClassName() { return "ByteArray"; }
 };
 
@@ -186,22 +191,22 @@ struct TByteArray : public TByteObject {
 // is unique. I.e. there are no two equal symbols in the image. All references
 // to the similar symbols are practically point to the single object.
 // #helloWorld will always be == to ('hello'+'World') asSymbol,
-// whereas 'hello' + 'World' will not be == 'helloWorld' because strings are 
+// whereas 'hello' + 'World' will not be == 'helloWorld' because strings are
 // different objects. This is achieved by providing custom implementation of
 // method new: in the MetaSymbol class:
-// 
+//
 // METHOD MetaSymbol
 // new: fromString | sym |
 //      ^ symbols at: fromString
 //      ifAbsent: [ symbols add: (self intern: fromString) ]
-// 
+//
 // Be careful not to use asSymbol exceedingly especial in loops or other places where
 // many different instances of Symbol may be created.
-// 
-struct TSymbol : public TByteObject { 
+//
+struct TSymbol : public TByteObject {
     static const char* InstanceClassName() { return "Symbol"; }
     std::string toString() const { return std::string(reinterpret_cast<const char*>(bytes), getSize()); }
-    
+
     // Helper comparison function functional object. Compares two symbols (or it's string representation).
     // Returns true when 'left' is found to be less than 'right'.
     struct TCompareFunctor {
@@ -213,9 +218,9 @@ struct TSymbol : public TByteObject {
     };
 };
 
-// TString represents the Smalltalk's String class. 
-// Strings are binary objects that hold raw character bytes. 
-struct TString : public TByteObject { 
+// TString represents the Smalltalk's String class.
+// Strings are binary objects that hold raw character bytes.
+struct TString : public TByteObject {
     static const char* InstanceClassName() { return "String"; }
 };
 
@@ -232,7 +237,7 @@ struct TChar : public TObject {
 // Arrays are ordinary objects except that their field space
 // is used to store pointers to arbitary objects. Access to
 // the data is performed by the integer index.
-// 
+//
 // llst defines TArray class as a template. Please use provided standard
 // typedefs instead of bare TArray<TObject*>. This will help to eliminate
 // various errors in VM code where object of specific type is expected but
@@ -241,6 +246,7 @@ template <typename Element>
 struct TArray : public TObject {
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* InstanceClassName() { return "Array"; }
+<<<<<<< HEAD
 
     Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
     template <typename Type>
@@ -248,11 +254,18 @@ struct TArray : public TObject {
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
     //       So the first element will have index 1, the second 2 and so on.
+=======
+
+    Element getField(uint32_t index) { return (Element) fields[index]; }
+
+// NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
+//       So the first element will have index 1, the second 2 and so on.
+>>>>>>> Removes trailing whitespaces
     template<typename I>
     Element*& operator [] (I index) {
         // compile-time check whether Element is in the type tree of TObject
         (void) static_cast<Element*>( reinterpret_cast<TObject*>(0) );
-        
+
         TObject** field   = &fields[index];
         Element** element = reinterpret_cast<Element**>(field);
         return *element;
@@ -275,13 +288,13 @@ struct TContext : public TObject {
     TInteger      bytePointer;
     TInteger      stackTop;
     TContext*     previousContext;
-    
+
     static const char* InstanceClassName() { return "Context"; }
 };
 
 // In Smalltalk, a block is a piece of code that may be executed by sending
 // a #value or #value: message to it. From the VM's point of view blocks are
-// nested contexts that are linked to the wrapping method. Block has direct access to 
+// nested contexts that are linked to the wrapping method. Block has direct access to
 // the lexical context of the wrapping method and its variables. This is needed to
 // implement the closure mechanism.
 
@@ -303,23 +316,23 @@ struct TMethod : public TObject {
     TClass*       klass;
     TString*      text;
     TObject*      package;
-    
+
     static const char* InstanceClassName() { return "Method"; }
 };
 
 // Dictionary is a simple associative container which holds pairs
 // of keys and associated values. Keys are represented with symbols,
 // whereas values may be instances of any class.
-// 
+//
 // Technically, Dictionary is implemented as two parallel arrays:
 // keys[] and values[]. keys[] store sorted symbols. values[] hold
 // objects corresponding to the key at the same position.
-// 
+//
 // Because keys are sorted, we may perform a search as a binary search.
 struct TDictionary : public TObject {
     TSymbolArray* keys;
     TObjectArray* values;
-    
+
     // Find a value associated with a key
     // Returns NULL if nothing was found
     // Explicit instantination of:
@@ -327,7 +340,7 @@ struct TDictionary : public TObject {
     // find(const char* key)
     template<typename K> TObject* find(const K* key) const;
     template<typename T, typename K> T* find(const K* key) const { return static_cast<T*>(find(key)); }
-    
+
     static const char* InstanceClassName() { return "Dictionary"; }
 };
 
@@ -338,7 +351,7 @@ struct TClass : public TObject {
     TInteger      instanceSize;
     TSymbolArray* variables;
     TObject*      package;
-    
+
     static const char*  InstanceClassName() { return "Class"; }
 };
 
@@ -346,15 +359,15 @@ struct TNode : public TObject {
     TObject*      value;
     TNode*        left;
     TNode*        right;
-    
+
     static const char* InstanceClassName() { return "Node"; }
 };
-    
+
 struct TProcess : public TObject {
     TContext*     context;
     TObject*      state;
     TObject*      result;
-    
+
     static const char* InstanceClassName() { return "Process"; }
 };
 
@@ -363,7 +376,7 @@ struct TProcess : public TObject {
 struct TInstruction {
     uint8_t low;
     uint8_t high;
-    
+
     std::string toString();
 };
 
