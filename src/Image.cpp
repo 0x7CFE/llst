@@ -157,7 +157,7 @@ TObject* Image::readObject()
             TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
             m_indirects.push_back(newObject);
             
-            TClass* objectClass  = (TClass*) readObject(); 
+            TClass* objectClass  = readObject<TClass>();
             newObject->setClass(objectClass);
             
             for (uint32_t i = 0; i < fieldsCount; i++)
@@ -191,7 +191,7 @@ TObject* Image::readObject()
             for (uint32_t i = 0; i < dataSize; i++)
                 (*newByteObject)[i] = (uint8_t) readWord();
             
-            TClass* objectClass = (TClass*) readObject();
+            TClass* objectClass = readObject<TClass>();
             newByteObject->setClass(objectClass);
             
             return newByteObject;
@@ -233,19 +233,19 @@ bool Image::loadImage(const char* fileName)
     
     globals.trueObject    = readObject();
     globals.falseObject   = readObject();
-    globals.globalsObject = (TDictionary*) readObject();
-    globals.smallIntClass = (TClass*)  readObject();
-    globals.integerClass  = (TClass*)  readObject();
-    globals.arrayClass    = (TClass*)  readObject();
-    globals.blockClass    = (TClass*)  readObject();
-    globals.contextClass  = (TClass*)  readObject();
-    globals.stringClass   = (TClass*)  readObject();
-    globals.initialMethod = (TMethod*) readObject();
+    globals.globalsObject = readObject<TDictionary>();
+    globals.smallIntClass = readObject<TClass>();
+    globals.integerClass  = readObject<TClass>();
+    globals.arrayClass    = readObject<TClass>();
+    globals.blockClass    = readObject<TClass>();
+    globals.contextClass  = readObject<TClass>();
+    globals.stringClass   = readObject<TClass>();
+    globals.initialMethod = readObject<TMethod>();
     
     for (int i = 0; i < 3; i++)
         globals.binaryMessages[i] = readObject();
     
-    globals.badMethodSymbol = (TSymbol*) readObject();
+    globals.badMethodSymbol = readObject<TSymbol>();
     
     std::fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
     m_indirects.clear();

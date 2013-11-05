@@ -364,6 +364,8 @@ private:
     
     uint32_t readWord();
     TObject* readObject();
+    template<typename ResultType>
+    ResultType* readObject() { return static_cast<ResultType*>(readObject()); }
     bool     openImageFile(const char* fileName);
     void     closeImageFile();
     
