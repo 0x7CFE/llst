@@ -204,7 +204,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
         // until we find one that we can handle
         while (true) {
             // Checking whether this is inline integer
-            if (isSmallInteger((TObject*) currentObject)) {
+            if (isSmallInteger( reinterpret_cast<TObject*>(currentObject) )) {
                 // Inline integers are stored directly in the
                 // pointer space. All we need to do is just copy
                 // contents of the poiner to a new place
@@ -401,7 +401,7 @@ void BakerMemoryManager::moveObjects()
     // Updating external references. Typically these are pointers stored in the hptr<>
     object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {
-        currentPointer->data = (TObject*) moveObject((TMovableObject*) currentPointer->data);
+        currentPointer->data = reinterpret_cast<TObject*>( moveObject( reinterpret_cast<TMovableObject*>(currentPointer->data) ) );
         currentPointer = currentPointer->next;
     }
 }
@@ -455,14 +455,14 @@ bool BakerMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
 
 void BakerMemoryManager::addStaticRoot(TObject** pointer)
 {
-    m_staticRoots.push_front((TMovableObject**) pointer);
+    m_staticRoots.push_front( reinterpret_cast<TMovableObject**>(pointer) );
 }
 
 void BakerMemoryManager::removeStaticRoot(TObject** pointer)
 {
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
-        if (*iRoot == (TMovableObject**) pointer) {
+        if (*iRoot == reinterpret_cast<TMovableObject**>(pointer)) {
             m_staticRoots.erase(iRoot);
             return;
         }

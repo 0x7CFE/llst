@@ -231,14 +231,14 @@ bool GenerationalMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
 void GenerationalMemoryManager::addCrossgenReference(TObject** pointer) 
 {
     //printf("addCrossgenReference %p", pointer);
-    m_crossGenerationalReferences.push_front((TMovableObject**) pointer);
+    m_crossGenerationalReferences.push_front( reinterpret_cast<TMovableObject**>(pointer) );
 }
 
 void GenerationalMemoryManager::removeCrossgenReference(TObject** pointer)
 {
     TPointerIterator iPointer = m_crossGenerationalReferences.begin();
     for (; iPointer != m_crossGenerationalReferences.end(); ++iPointer) {
-        if (*iPointer == (TMovableObject**) pointer) {
+        if (*iPointer == reinterpret_cast<TMovableObject**>(pointer)) {
             m_crossGenerationalReferences.erase(iPointer);
             return;
         }
