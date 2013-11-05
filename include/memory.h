@@ -135,12 +135,12 @@ public:
     //hptr_base<Object>& operator = (hptr_base<Object>& pointer) { target = pointer.target; return *this; }
     //hptr_base<Object>& operator = (Object* object) { target = object; return *this; }
     
-    Object* rawptr() const { return (Object*) target.data; }
-    Object* operator -> () const { return (Object*) target.data; }
+    Object* rawptr() const { return static_cast<Object*>(target.data); }
+    Object* operator -> () const { return static_cast<Object*>(target.data); }
     //Object& (operator*)() const { return *target; }
-    operator Object*() const { return (Object*) target.data; }
+    operator Object*() const { return static_cast<Object*>(target.data); }
     
-    template<typename C> C* cast() const { return (C*) target.data; }
+    template<typename C> C* cast() const { return static_cast<C*>(target.data); }
 };
 
 //typedef hptr_base<TObject>::object_ptr object_ptr;
