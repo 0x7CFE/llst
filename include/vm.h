@@ -40,6 +40,20 @@
 #include <types.h>
 #include <memory.h>
 
+template <int I>
+struct Int2Type
+{
+    enum { value = I };
+    /* The int-to-type idiom helps to use pattern matching in C++.
+     * C++ allows you to overload functions only by type, not by value,
+     * Int2Type creates a new struct per each integral constant, which allows to overload functions.
+     * 
+     * Example:
+     * int factorial(Int2Type<0>) { return 1; }
+     * template<int n> int factorial(Int2Type<n>) { return n*factorial(Int2Type<n-1>()); }
+     */
+};
+
 class SmalltalkVM {
 public:
     enum TExecuteResult {
@@ -167,6 +181,10 @@ public:
 
     TExecuteResult execute(TProcess* p, uint32_t ticks);
     template<class T> hptr<T> newObject(std::size_t dataSize = 0, bool registerPointer = true);
+    
+    template<class T> hptr<T> newObjectWrapper(/*InstancesAreBinary*/ Int2Type<false>, std::size_t dataSize = 0, bool registerPointer = true);
+    template<class T> hptr<T> newObjectWrapper(/*InstancesAreBinary*/ Int2Type<true> , std::size_t dataSize = 0, bool registerPointer = true);
+    
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
 
     void printVMStat();
@@ -174,17 +192,34 @@ public:
 
 template<class T> hptr<T> SmalltalkVM::newObject(std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
 {
-    // TODO fast access to common classes
-    TClass* klass = (TClass*) m_image->getGlobal(T::InstanceClassName());
+    /* There are two types of objects. Their fields are treated as:
+     * 1) objects (ordinary objects)
+     * 2) bytes (binary objects)
+     * The instaces of ordinary and binary objects are created in a different way.
+     * We have to choose which kind of object we are going to create: ordinary or binary.
+     * Each class T contains enum field InstancesAreBinary, which keeps the info.
+     * If class T derives from TByteObject and InstancesAreBinary==false you get compile error and vice versa.
+     */
+    return newObjectWrapper<T>(Int2Type<T::InstancesAreBinary>(), dataSize, registerPointer);
+}
+
+template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ Int2Type<false>, std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
+{
+    TClass* klass = static_cast<TClass*>( m_image->getGlobal(T::InstanceClassName()) );
     if (!klass)
-        return hptr<T>((T*) globals.nilObject, m_memoryManager);
+        return hptr<T>( static_cast<T*>(globals.nilObject), m_memoryManager);
     
-    if (T::InstancesAreBinary()) {
-        return hptr<T>((T*) newBinaryObject(klass, dataSize), m_memoryManager, registerPointer);
-    } else {
-        std::size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
-        return hptr<T>((T*) newOrdinaryObject(klass, slotSize), m_memoryManager, registerPointer);
-    }
+    std::size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
+    return hptr<T>( static_cast<T*>( newOrdinaryObject(klass, slotSize) ), m_memoryManager, registerPointer );
+}
+
+template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ Int2Type<true>,  std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
+{
+    TClass* klass = static_cast<TClass*>( m_image->getGlobal(T::InstanceClassName()) );
+    if (!klass)
+        return hptr<T>( static_cast<T*>(globals.nilObject), m_memoryManager );
+    
+    return hptr<T>( static_cast<T*>( newBinaryObject(klass, dataSize) ), m_memoryManager, registerPointer );
 }
 
 // Specializations of newObject for known types

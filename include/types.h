@@ -146,8 +146,8 @@ public:
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
     
-    // Helper function for template instantination
-    static bool InstancesAreBinary() { return false; } 
+    // Helper constant for template instantination
+    enum { InstancesAreBinary = false };
 };
 
 
@@ -170,8 +170,8 @@ public:
     
     void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
     
-    // Helper function for template instantination
-    static bool InstancesAreBinary() { return true; } 
+    // Helper constant for template instantination
+    enum { InstancesAreBinary = true };
 };
 
 
