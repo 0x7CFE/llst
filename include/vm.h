@@ -86,6 +86,10 @@ private:
             TObject* top = currentContext->stack->getField(--stackTop);
             return top;
         }
+        template <typename ResultType>
+        ResultType* stackPop() {
+            return static_cast<ResultType*>( stackPop() );
+        }
 
         TVMExecutionContext(IMemoryManager* mm, SmalltalkVM* vm) :
             m_vm(vm),
