@@ -102,28 +102,28 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
 template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
-    TObjectArray* instance = (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
+    TObjectArray* instance = static_cast<TObjectArray*>( newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*)) );
     return hptr<TObjectArray>(instance, m_memoryManager, registerPointer);
 }
 
 template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
-    TSymbolArray* instance = (TSymbolArray*) newOrdinaryObject(klass, sizeof(TSymbolArray) + dataSize * sizeof(TObject*));
+    TSymbolArray* instance = static_cast<TSymbolArray*>( newOrdinaryObject(klass, sizeof(TSymbolArray) + dataSize * sizeof(TObject*)) );
     return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
 }
 
 template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
-    TContext* instance = (TContext*) newOrdinaryObject(klass, sizeof(TContext));
+    TContext* instance = static_cast<TContext*>( newOrdinaryObject(klass, sizeof(TContext)) );
     return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
 template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
-    TBlock* instance = (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
+    TBlock* instance = static_cast<TBlock*>( newOrdinaryObject(klass, sizeof(TBlock)) );
     return hptr<TBlock>(instance, m_memoryManager, registerPointer);
 }
 
