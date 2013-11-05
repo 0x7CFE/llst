@@ -6,8 +6,8 @@ std::string TInstruction::toString()
 {
     std::ostringstream ss;
     
-    int iHigh = (int) high;
-    int iLow  = (int) low;
+    int iHigh = high;
+    int iLow  = low;
     
     std::ostringstream errSs;
     errSs << "Unknown instrunction {" << iHigh << ", " << iLow << "}";

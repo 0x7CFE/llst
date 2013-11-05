@@ -76,7 +76,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
                 // String:at:put
                 TInteger value = reinterpret_cast<TInteger>(valueObject);
                 string->putByte(actualIndex, getIntegerValue(value));
-                return (TObject*) string;
+                return static_cast<TObject*>(string);
             }
         } break;
 
@@ -229,7 +229,7 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
             
             //We have to pass NULL-terminated string to open()
             //The easiest way is to build it with std::string
-            std::string filename((char*) name->getBytes(), name->getSize());
+            std::string filename(reinterpret_cast<char*>(name->getBytes()), name->getSize());
             
             int32_t fileID = open(filename.c_str(), mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
             if (fileID < 0) {

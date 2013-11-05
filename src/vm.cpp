@@ -86,7 +86,7 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
-        return (TByteObject*) globals.nilObject;
+        return static_cast<TByteObject*>(globals.nilObject);
     }
 
     // VM need to perform some actions if collection was occured.
@@ -193,7 +193,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     for (TClass* currentClass = klass; currentClass != globals.nilObject; currentClass = currentClass->parentClass) {
         assert(currentClass != 0);
         TDictionary* methods = currentClass->methods;
-        method = (TMethod*) methods->find(selector);
+        method = static_cast<TMethod*>( methods->find(selector) );
         if (method) {
             // Storing result in cache
             updateMethodCache(selector, klass, method);
@@ -473,7 +473,7 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 {
     TObject* top = ec.stackPop();
     
-    switch ((unaryBuiltIns::Opcode) ec.instruction.low) {
+    switch ( static_cast<unaryBuiltIns::Opcode>(ec.instruction.low) ) {
         case unaryBuiltIns::isNil  : ec.returnedValue = (top == globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         case unaryBuiltIns::notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         
@@ -501,7 +501,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         bool unusedCondition;
         
         // Performing an operation
-        switch ((binaryBuiltIns::Operator) ec.instruction.low) {
+        switch ( static_cast<binaryBuiltIns::Operator>(ec.instruction.low) ) {
             case binaryBuiltIns::operatorLess:
                 ec.returnedValue = (leftOperand < rightOperand) ? globals.trueObject : globals.falseObject;
                 break;
@@ -533,7 +533,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         messageArguments[1] = pRightObject;
         messageArguments[0] = pLeftObject;
         
-        TSymbol* messageSelector = (TSymbol*) globals.binaryMessages[ec.instruction.low];
+        TSymbol* messageSelector = static_cast<TSymbol*>( globals.binaryMessages[ec.instruction.low] );
         doSendMessage(ec, messageSelector, messageArguments);
     }
 }
@@ -771,7 +771,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             // TODO Unicode support
             
             TString* prompt = ec.stackPop<TString>();
-            std::string strPrompt((const char*)prompt->getBytes(), prompt->getSize());
+            std::string strPrompt(reinterpret_cast<const char*>(prompt->getBytes()), prompt->getSize());
             
             char* input = readline(strPrompt.c_str());
             if (input) {
@@ -780,7 +780,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 if (inputSize > 0)
                     add_history(input);
                     
-                TString* result = (TString*) newBinaryObject(globals.stringClass, inputSize);
+                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, inputSize) );
                 std::memcpy(result->getBytes(), input, inputSize);
                 
                 std::free(input);
@@ -846,7 +846,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             
             // Switching execution context to the invoking block
             block->previousContext = ec.currentContext->previousContext;
-            ec.currentContext = (TContext*) block;
+            ec.currentContext = static_cast<TContext*>(block);
             ec.stackTop = 0; // resetting stack
             
             // Block is bound to the method's bytecodes, so it's
@@ -907,7 +907,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 array->putField(actualIndex, valueObject);
                 
                 // Return self
-                return (TObject*) array;
+                return static_cast<TObject*>(array);
             }
         } break;
         
@@ -917,11 +917,11 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             
             // Creating clone
             uint32_t dataSize  = original->getSize();
-            TByteObject* clone = (TByteObject*) newBinaryObject(klass, dataSize);
+            TByteObject* clone = newBinaryObject(klass, dataSize);
             
             // Cloning data
             std::memcpy(clone->getBytes(), original->getBytes(), dataSize);
-            return (TObject*) clone;
+            return static_cast<TObject*>(clone);
         } break;
         
         //         case primitive::integerDiv:   // Integer /
@@ -1058,8 +1058,8 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     }
     
-    if (destination->getSize() < (uint32_t) iDestinationStopOffset ||
-        source->getSize() < (uint32_t) (iSourceStartOffset + iCount) )
+    if (destination->getSize() < static_cast<uint32_t>(iDestinationStopOffset) ||
+        source->getSize() < static_cast<uint32_t>(iSourceStartOffset + iCount) )
     {
         return false;
     }
@@ -1099,7 +1099,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 
 void SmalltalkVM::printVMStat()
 {
-    float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    float hitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
     std::printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n",
         m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }

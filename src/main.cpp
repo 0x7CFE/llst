@@ -69,7 +69,7 @@ int main(int argc, char **argv) {
         std::string keyString = key->toString();
         char firstLetter = keyString[0];
         if ( keyString != "Smalltalk" && std::isupper(firstLetter) ) {
-            TClass* currentClass = (TClass*) value;
+            TClass* currentClass = static_cast<TClass*>(value);
 
             // Adding class name
             completionEngine->addWord(currentClass->name->toString());
@@ -113,7 +113,7 @@ int main(int argc, char **argv) {
     initContext->arguments->putField(0, globals.nilObject);
     
     initContext->bytePointer = newInteger(0);
-    initContext->previousContext = (TContext*) globals.nilObject;
+    initContext->previousContext = static_cast<TContext*>(globals.nilObject);
     
     const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
     initContext->stack = vm.newObject<TObjectArray>(stackSize);
@@ -164,9 +164,9 @@ int main(int argc, char **argv) {
     
     TMemoryManagerInfo info = memoryManager->getStat();
     
-    int averageAllocs = info.collectionsCount ? (int) info.allocationsCount / info.collectionsCount : info.allocationsCount;
+    int averageAllocs = info.collectionsCount ? info.allocationsCount / info.collectionsCount : info.allocationsCount;
     std::printf("\nGC count: %d (%d/%d), average allocations per gc: %d, microseconds spent in GC: %d\n", 
-           info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, (uint32_t) info.totalCollectionDelay);
+           info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, static_cast<uint32_t>(info.totalCollectionDelay));
     
     vm.printVMStat();
     runtime.printStat();

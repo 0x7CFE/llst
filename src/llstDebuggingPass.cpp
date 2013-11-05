@@ -97,11 +97,11 @@ void LLSTDebuggingPass::insertLoadInstCheck(Function& F)
         if (belongsToSmalltalkType( Load->getType() )) {
         
             //split BB right after load inst. The new BB contains code that will be executed if pointer is OK
-            BasicBlock* PointerIsOkBB = Load->getParent()->splitBasicBlock(++((BasicBlock::iterator) Load));
+            BasicBlock* PointerIsOkBB = Load->getParent()->splitBasicBlock(++( static_cast<BasicBlock::iterator>(Load) ));
             BasicBlock* PointerIsBrokenBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsOkBB);
             BasicBlock* PointerIsNotSmallIntBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsBrokenBB);
             
-            Instruction* branchToPointerIsOkBB = ++((BasicBlock::iterator) Load);
+            Instruction* branchToPointerIsOkBB = ++( static_cast<BasicBlock::iterator>(Load) );
             //branchToPointerIsOkBB is created by splitBasicBlock() just after load inst
             //We force builder to insert instructions before branchToPointerIsOkBB
             m_builder->SetInsertPoint(branchToPointerIsOkBB);
@@ -146,7 +146,7 @@ void LLSTDebuggingPass::insertSelfInSendMessageCheck(Function& F)
     {
         CallInst* Call = dyn_cast<CallInst>(Calls[i]);
         
-        BasicBlock* PointerIsOkBB = Call->getParent()->splitBasicBlock(((BasicBlock::iterator) Call));
+        BasicBlock* PointerIsOkBB = Call->getParent()->splitBasicBlock( static_cast<BasicBlock::iterator>(Call) );
         BasicBlock* PointerIsBrokenBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsOkBB);
         BasicBlock* PointerIsNotSmallIntBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsBrokenBB);
         

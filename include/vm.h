@@ -107,7 +107,7 @@ private:
 
         TVMExecutionContext(IMemoryManager* mm, SmalltalkVM* vm) :
             m_vm(vm),
-            currentContext((TContext*) globals.nilObject, mm),
+            currentContext( static_cast<TContext*>(globals.nilObject), mm),
             returnedValue(globals.nilObject, mm)
         { }
     };

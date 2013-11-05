@@ -61,7 +61,7 @@ typedef int32_t TInteger;
 
 // Helper functions for TInteger operation
 inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
-inline int32_t  getIntegerValue(TInteger value) { return (int32_t) (value >> 1); }
+inline int32_t  getIntegerValue(TInteger value) { return (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
 
 // Helper struct used to hold object size and special 
@@ -200,7 +200,7 @@ struct TByteArray : public TByteObject {
 // 
 struct TSymbol : public TByteObject { 
     static const char* InstanceClassName() { return "Symbol"; }
-    std::string toString() const { return std::string((const char*)fields, getSize()); }
+    std::string toString() const { return std::string(reinterpret_cast<const char*>(bytes), getSize()); }
     
     // Helper comparison function functional object. Compares two symbols (or it's string representation).
     // Returns true when 'left' is found to be less than 'right'.
@@ -251,7 +251,7 @@ struct TArray : public TObject {
     template<typename I>
     Element*& operator [] (I index) {
         // compile-time check whether Element is in the type tree of TObject
-        (void) static_cast<Element*>( (TObject*) 0 );
+        (void) static_cast<Element*>( reinterpret_cast<TObject*>(0) );
         
         TObject** field   = &fields[index];
         Element** element = reinterpret_cast<Element**>(field);
