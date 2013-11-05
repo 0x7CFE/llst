@@ -237,7 +237,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
         
         TObjectArray& temporaries       = * ec.currentContext->temporaries;
         TObjectArray& arguments         = * ec.currentContext->arguments;
-        TObjectArray& instanceVariables = * (TObjectArray*) arguments[0];
+        TObjectArray& instanceVariables = * arguments.getField<TObjectArray>(0);
         TSymbolArray& literals          = * ec.currentContext->method->literals;
         
         if (ticks && (--ticks == 0)) {

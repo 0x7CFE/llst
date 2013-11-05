@@ -243,6 +243,8 @@ struct TArray : public TObject {
     static const char* InstanceClassName() { return "Array"; }
 
     Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
+    template <typename Type>
+    Type* getField(uint32_t index) { return static_cast<Type*>(fields[index]); }
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
     //       So the first element will have index 1, the second 2 and so on.
