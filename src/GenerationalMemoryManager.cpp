@@ -24,10 +24,11 @@ void GenerationalMemoryManager::moveYoungObjects()
     // Updating external references. Typically these are pointers stored in the hptr<>
     object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {
-        TMovableObject* currentObject = (TMovableObject*) currentPointer->data;
+        TMovableObject* currentObject = reinterpret_cast<TMovableObject*>(currentPointer->data);
+        uint8_t* currentObjectBase    = reinterpret_cast<uint8_t*>(currentObject);
 
-        if ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) &&
-            ((uint8_t*)currentObject < m_heapOne + m_heapSize / 2))
+        if ( (currentObjectBase >= m_inactiveHeapPointer ) &&
+            (currentObjectBase < m_heapOne + m_heapSize / 2))
         {
             currentObject = moveObject(currentObject);
         }
@@ -37,10 +38,12 @@ void GenerationalMemoryManager::moveYoungObjects()
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
         //if (isInYoungHeap(**iRoot))
-        TMovableObject* currentObject = **iRoot;
+        uint8_t* currentRootBase   = reinterpret_cast<uint8_t*>(*iRoot);
+        uint8_t* currentObjectBase = reinterpret_cast<uint8_t*>(**iRoot);
         
-        if ( ((currentObject >= (TMovableObject*) m_inactiveHeapPointer) && (currentObject < (TMovableObject*)(m_heapOne + m_heapSize / 2)))
-            || ((*iRoot >= (TMovableObject**) m_inactiveHeapPointer) && (*iRoot < (TMovableObject**)(m_heapOne + m_heapSize / 2)))
+        
+        if ( ((currentObjectBase >= m_inactiveHeapPointer) && (currentObjectBase < (m_heapOne + m_heapSize / 2)))
+            || ((currentRootBase >= m_inactiveHeapPointer) && (currentRootBase < (m_heapOne + m_heapSize / 2)))
         )
         {
             **iRoot = moveObject(**iRoot);
