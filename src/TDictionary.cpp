@@ -41,7 +41,7 @@ TObject* TDictionary::find(const K* key) const
     // Keys are stored in order
     // Thus we may apply binary search
     const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = (TSymbol**) keys->getFields();
+    TSymbol** keysBase = reinterpret_cast<TSymbol**>( keys->getFields() );
     TSymbol** keysLast = keysBase + keys->getSize();
     TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
     

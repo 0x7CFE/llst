@@ -106,7 +106,7 @@ bool Image::openImageFile(const char* fileName)
     }
     
     // Initializing pointers
-    m_imagePointer = (uint8_t*) m_imageMap;
+    m_imagePointer = static_cast<uint8_t*>(m_imageMap);
     return true;
 }
 
@@ -122,7 +122,7 @@ void Image::closeImageFile()
 
 uint32_t Image::readWord()
 {
-    if (m_imagePointer == ((uint8_t*)m_imageMap + m_imageFileSize) )
+    if (m_imagePointer == (static_cast<uint8_t*>(m_imageMap) + m_imageFileSize) )
         return 0; // Unexpected EOF TODO break
     
     uint32_t value = 0;
@@ -141,10 +141,10 @@ TObject* Image::readObject()
 {
     // TODO error checking 
     
-    TImageRecordType type = (TImageRecordType) readWord();
+    TImageRecordType type = static_cast<TImageRecordType>(readWord());
     switch (type) {
         case invalidObject: 
-            std::fprintf(stderr, "Invalid object at offset %p\n", (void*) (m_imagePointer - (uint8_t*)m_imageMap));
+            std::fprintf(stderr, "Invalid object at offset %d\n", m_imagePointer - static_cast<uint8_t*>(m_imageMap));
             std::exit(1); 
             break;
         
@@ -157,7 +157,7 @@ TObject* Image::readObject()
             TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
             m_indirects.push_back(newObject);
             
-            TClass* objectClass  = (TClass*) readObject(); 
+            TClass* objectClass  = readObject<TClass>();
             newObject->setClass(objectClass);
             
             for (uint32_t i = 0; i < fieldsCount; i++)
@@ -189,9 +189,9 @@ TObject* Image::readObject()
             m_indirects.push_back(newByteObject);
             
             for (uint32_t i = 0; i < dataSize; i++)
-                (*newByteObject)[i] = (uint8_t) readWord();
+                (*newByteObject)[i] = static_cast<uint8_t>(readWord());
             
-            TClass* objectClass = (TClass*) readObject();
+            TClass* objectClass = readObject<TClass>();
             newByteObject->setClass(objectClass);
             
             return newByteObject;
@@ -233,19 +233,19 @@ bool Image::loadImage(const char* fileName)
     
     globals.trueObject    = readObject();
     globals.falseObject   = readObject();
-    globals.globalsObject = (TDictionary*) readObject();
-    globals.smallIntClass = (TClass*)  readObject();
-    globals.integerClass  = (TClass*)  readObject();
-    globals.arrayClass    = (TClass*)  readObject();
-    globals.blockClass    = (TClass*)  readObject();
-    globals.contextClass  = (TClass*)  readObject();
-    globals.stringClass   = (TClass*)  readObject();
-    globals.initialMethod = (TMethod*) readObject();
+    globals.globalsObject = readObject<TDictionary>();
+    globals.smallIntClass = readObject<TClass>();
+    globals.integerClass  = readObject<TClass>();
+    globals.arrayClass    = readObject<TClass>();
+    globals.blockClass    = readObject<TClass>();
+    globals.contextClass  = readObject<TClass>();
+    globals.stringClass   = readObject<TClass>();
+    globals.initialMethod = readObject<TMethod>();
     
     for (int i = 0; i < 3; i++)
         globals.binaryMessages[i] = readObject();
     
-    globals.badMethodSymbol = (TSymbol*) readObject();
+    globals.badMethodSymbol = readObject<TSymbol>();
     
     std::fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
     m_indirects.clear();
@@ -297,7 +297,7 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
 {
     assert(object != 0);
     TImageRecordType type = getObjectType(object);
-    writeWord(os, (uint32_t) type);
+    writeWord(os, static_cast<uint32_t>(type));
     
     if (type == ordinaryObject || type == byteObject)
         m_writtenObjects.push_back(object);
@@ -305,10 +305,10 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
     switch (type) {
         case inlineInteger: {
             uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
-            os.write((char*) &integer, sizeof(integer));
+            os.write(reinterpret_cast<char*>(&integer), sizeof(integer));
         } break;
         case byteObject: {
-            TByteObject* byteObject = (TByteObject*) object;
+            TByteObject* byteObject = static_cast<TByteObject*>(object);
             uint32_t fieldsCount = byteObject->getSize();
             TClass* objectClass = byteObject->getClass();
             assert(objectClass != 0);
@@ -338,7 +338,7 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
             // it has already been written as the first object with type ordinaryObject
         } break;
         default:
-            std::fprintf(stderr, "unexpected type of object: %d\n", (int) type);
+            std::fprintf(stderr, "unexpected type of object: %d\n", static_cast<int>(type));
             std::exit(1);
     }
 }

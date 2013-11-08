@@ -46,11 +46,11 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
             // If the method is String:at:put then pop a value from the stack
             if (opcode == primitive::stringAtPut) {
                 indexObject = args[2];
-                string      = (TString*) args[1];
+                string      = args.getField<TString>(1);
                 valueObject = args[0];
             } else { // String:at:put
                 indexObject = args[1];
-                string      = (TString*) args[0];
+                string      = args.getField<TString>(0);
                 //valueObject is not used in primitive stringAtPut
             }
             
@@ -76,7 +76,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
                 // String:at:put
                 TInteger value = reinterpret_cast<TInteger>(valueObject);
                 string->putByte(actualIndex, getIntegerValue(value));
-                return (TObject*) string;
+                return static_cast<TObject*>(string);
             }
         } break;
 
@@ -224,12 +224,12 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
         } break;
         
         case primitive::ioFileOpen: { // 100
-            TString* name = (TString*) args[0];
+            TString* name = args.getField<TString>(0);
             int32_t  mode = getIntegerValue(reinterpret_cast<TInteger>( args[1] ));
             
             //We have to pass NULL-terminated string to open()
             //The easiest way is to build it with std::string
-            std::string filename((char*) name->getBytes(), name->getSize());
+            std::string filename(reinterpret_cast<char*>(name->getBytes()), name->getSize());
             
             int32_t fileID = open(filename.c_str(), mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
             if (fileID < 0) {
@@ -250,7 +250,7 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
         
         case primitive::ioFileSetStatIntoArray: { // 105
             int32_t fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
-            TObjectArray* array = (TObjectArray*) args[1];
+            TObjectArray* array = args.getField<TObjectArray>(1);
             
             struct stat fileStat;
             if( fstat(fileID, &fileStat) < 0 ) {
@@ -270,7 +270,7 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
         case primitive::ioFileReadIntoByteArray:    // 106
         case primitive::ioFileWriteFromByteArray: { // 107
             int32_t fileID = getIntegerValue(reinterpret_cast<TInteger>( args[0] ));
-            TByteArray* bufferArray = (TByteArray*) args[1];
+            TByteArray* bufferArray = args.getField<TByteArray>(1);
             uint32_t size = getIntegerValue(reinterpret_cast<TInteger>( args[2] ));
             
             if ( size > bufferArray->getSize() ) {

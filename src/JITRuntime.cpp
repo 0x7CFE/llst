@@ -64,8 +64,8 @@ static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime
 
 void JITRuntime::printStat()
 {
-    float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    float blockHitRatio = (float) 100 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
+    float hitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    float blockHitRatio = 100.0 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
     
     std::printf(
         "JIT Runtime stat:\n"
@@ -991,7 +991,7 @@ void JITRuntime::createExecuteProcessFunction() {
     
     IRBuilder<> builder(entry);
     
-    Value* process = (Value*) (executeProcess->arg_begin());
+    Value* process = executeProcess->arg_begin();
     process->setName("process");
     
     Value* processHolder = builder.CreateAlloca(m_baseTypes.process->getPointerTo());

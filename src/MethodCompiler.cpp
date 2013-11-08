@@ -58,7 +58,7 @@ Value* TDeferredValue::get()
             Value* argument = builder.CreateCall2(getArgFromContext, context, builder.getInt32(m_index));
             
             std::ostringstream ss;
-            ss << "arg" << (uint32_t) m_index << ".";
+            ss << "arg" << m_index << ".";
             argument->setName(ss.str());
             
             return argument;
@@ -69,7 +69,7 @@ Value* TDeferredValue::get()
             Value* field = builder.CreateCall2(getObjectField, self, builder.getInt32(m_index));
             
             std::ostringstream ss;
-            ss << "field" << (uint32_t) m_index << ".";
+            ss << "field" << m_index << ".";
             field->setName(ss.str());
             
             return field;
@@ -82,7 +82,7 @@ Value* TDeferredValue::get()
             Value* temporary = builder.CreateCall2(getObjectField, temps, builder.getInt32(m_index));
             
             std::ostringstream ss;
-            ss << "temp" << (uint32_t) m_index << ".";
+            ss << "temp" << m_index << ".";
             temporary->setName(ss.str());
             
             return temporary;
@@ -98,7 +98,7 @@ Value* TDeferredValue::get()
             );
             
             std::ostringstream ss;
-            ss << "lit" << (uint32_t) m_index << ".";
+            ss << "lit" << m_index << ".";
             literalValue->setName(ss.str()); 
             
             return literalValue;
@@ -120,7 +120,7 @@ Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
     CallInst* literal = builder->CreateCall2(getLiteralFromContext, context, builder->getInt32(index));
     
     std::ostringstream ss;
-    ss << "lit" << (uint32_t) index << ".";
+    ss << "lit" << index << ".";
     literal->setName(ss.str()); 
     
     return literal;
@@ -326,11 +326,11 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     
     if (! isBlock) {
         // This is a regular function
-        context = (Value*) (jit.function->arg_begin());
+        context = jit.function->arg_begin();
         context->setName("context");
     } else {
         // This is a block function
-        Value* blockContext = (Value*) (jit.function->arg_begin());
+        Value* blockContext = jit.function->arg_begin();
         blockContext->setName("blockContext");
         
         context = jit.builder->CreateBitCast(blockContext, m_baseTypes.context->getPointerTo());
@@ -698,7 +698,7 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
 {
-    const uint8_t constant = jit.instruction.low;
+    const uint32_t constant = jit.instruction.low;
     Value* constantValue   = 0;
     
     switch (constant) {
@@ -712,11 +712,11 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case 7:
         case 8:
         case 9: {
-            Value* integerValue = jit.builder->getInt32(newInteger((uint32_t)constant));
+            Value* integerValue = jit.builder->getInt32(newInteger(constant));
             constantValue       = jit.builder->CreateIntToPtr(integerValue, m_baseTypes.object->getPointerTo());
             
             std::ostringstream ss;
-            ss << "const" << (uint32_t) constant << ".";
+            ss << "const" << constant << ".";
             constantValue->setName(ss.str());
         } break;
         
@@ -846,7 +846,7 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
     Value* value     = jit.popValue();
     Value* condition = 0;
     
-    switch ((unaryBuiltIns::Opcode) jit.instruction.low) {
+    switch ( static_cast<unaryBuiltIns::Opcode>(jit.instruction.low) ) {
         case unaryBuiltIns::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
         case unaryBuiltIns::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
         
@@ -861,7 +861,7 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
     // 0, 1 or 2 for '<', '<=' or '+' respectively
-    binaryBuiltIns::Operator opcode = (binaryBuiltIns::Operator) jit.instruction.low;
+    binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.instruction.low);
     
     Value* rightValue = jit.popValue();
     Value* leftValue  = jit.popValue();

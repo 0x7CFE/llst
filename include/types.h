@@ -61,7 +61,7 @@ typedef int32_t TInteger;
 
 // Helper functions for TInteger operation
 inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
-inline int32_t  getIntegerValue(TInteger value) { return (int32_t) (value >> 1); }
+inline int32_t  getIntegerValue(TInteger value) { return (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
 
 // Helper struct used to hold object size and special 
@@ -146,8 +146,8 @@ public:
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
     
-    // Helper function for template instantination
-    static bool InstancesAreBinary() { return false; } 
+    // Helper constant for template instantination
+    enum { InstancesAreBinary = false };
 };
 
 
@@ -170,8 +170,8 @@ public:
     
     void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
     
-    // Helper function for template instantination
-    static bool InstancesAreBinary() { return true; } 
+    // Helper constant for template instantination
+    enum { InstancesAreBinary = true };
 };
 
 
@@ -200,7 +200,7 @@ struct TByteArray : public TByteObject {
 // 
 struct TSymbol : public TByteObject { 
     static const char* InstanceClassName() { return "Symbol"; }
-    std::string toString() const { return std::string((const char*)fields, getSize()); }
+    std::string toString() const { return std::string(reinterpret_cast<const char*>(bytes), getSize()); }
     
     // Helper comparison function functional object. Compares two symbols (or it's string representation).
     // Returns true when 'left' is found to be less than 'right'.
@@ -243,13 +243,15 @@ struct TArray : public TObject {
     static const char* InstanceClassName() { return "Array"; }
 
     Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
+    template <typename Type>
+    Type* getField(uint32_t index) { return static_cast<Type*>(fields[index]); }
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
     //       So the first element will have index 1, the second 2 and so on.
     template<typename I>
     Element*& operator [] (I index) {
         // compile-time check whether Element is in the type tree of TObject
-        (void) static_cast<Element*>( (TObject*) 0 );
+        (void) static_cast<Element*>( reinterpret_cast<TObject*>(0) );
         
         TObject** field   = &fields[index];
         Element** element = reinterpret_cast<Element**>(field);

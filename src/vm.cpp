@@ -86,7 +86,7 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
     void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
-        return (TByteObject*) globals.nilObject;
+        return static_cast<TByteObject*>(globals.nilObject);
     }
 
     // VM need to perform some actions if collection was occured.
@@ -102,28 +102,28 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
 template<> hptr<TObjectArray> SmalltalkVM::newObject<TObjectArray>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
-    TObjectArray* instance = (TObjectArray*) newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*));
+    TObjectArray* instance = static_cast<TObjectArray*>( newOrdinaryObject(klass, sizeof(TObjectArray) + dataSize * sizeof(TObject*)) );
     return hptr<TObjectArray>(instance, m_memoryManager, registerPointer);
 }
 
 template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.arrayClass;
-    TSymbolArray* instance = (TSymbolArray*) newOrdinaryObject(klass, sizeof(TSymbolArray) + dataSize * sizeof(TObject*));
+    TSymbolArray* instance = static_cast<TSymbolArray*>( newOrdinaryObject(klass, sizeof(TSymbolArray) + dataSize * sizeof(TObject*)) );
     return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
 }
 
 template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
-    TContext* instance = (TContext*) newOrdinaryObject(klass, sizeof(TContext));
+    TContext* instance = static_cast<TContext*>( newOrdinaryObject(klass, sizeof(TContext)) );
     return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
 template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
-    TBlock* instance = (TBlock*) newOrdinaryObject(klass, sizeof(TBlock));
+    TBlock* instance = static_cast<TBlock*>( newOrdinaryObject(klass, sizeof(TBlock)) );
     return hptr<TBlock>(instance, m_memoryManager, registerPointer);
 }
 
@@ -193,7 +193,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     for (TClass* currentClass = klass; currentClass != globals.nilObject; currentClass = currentClass->parentClass) {
         assert(currentClass != 0);
         TDictionary* methods = currentClass->methods;
-        method = (TMethod*) methods->find(selector);
+        method = static_cast<TMethod*>( methods->find(selector) );
         if (method) {
             // Storing result in cache
             updateMethodCache(selector, klass, method);
@@ -237,7 +237,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
         
         TObjectArray& temporaries       = * ec.currentContext->temporaries;
         TObjectArray& arguments         = * ec.currentContext->arguments;
-        TObjectArray& instanceVariables = * (TObjectArray*) arguments[0];
+        TObjectArray& instanceVariables = * arguments.getField<TObjectArray>(0);
         TSymbolArray& literals          = * ec.currentContext->method->literals;
         
         if (ticks && (--ticks == 0)) {
@@ -460,7 +460,7 @@ void SmalltalkVM::setupVarsForDoesNotUnderstand(hptr<TMethod>& method, hptr<TObj
 
 void SmalltalkVM::doSendMessage(TVMExecutionContext& ec)
 {
-    TObjectArray* messageArguments = (TObjectArray*) ec.stackPop();
+    TObjectArray* messageArguments = ec.stackPop<TObjectArray>();
     
     // These do not need to be hptr'ed
     TSymbolArray& literals   = * ec.currentContext->method->literals;
@@ -473,7 +473,7 @@ void SmalltalkVM::doSendUnary(TVMExecutionContext& ec)
 {
     TObject* top = ec.stackPop();
     
-    switch ((unaryBuiltIns::Opcode) ec.instruction.low) {
+    switch ( static_cast<unaryBuiltIns::Opcode>(ec.instruction.low) ) {
         case unaryBuiltIns::isNil  : ec.returnedValue = (top == globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         case unaryBuiltIns::notNil : ec.returnedValue = (top != globals.nilObject) ? globals.trueObject : globals.falseObject; break;
         
@@ -501,7 +501,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         bool unusedCondition;
         
         // Performing an operation
-        switch ((binaryBuiltIns::Operator) ec.instruction.low) {
+        switch ( static_cast<binaryBuiltIns::Operator>(ec.instruction.low) ) {
             case binaryBuiltIns::operatorLess:
                 ec.returnedValue = (leftOperand < rightOperand) ? globals.trueObject : globals.falseObject;
                 break;
@@ -533,7 +533,7 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
         messageArguments[1] = pRightObject;
         messageArguments[0] = pLeftObject;
         
-        TSymbol* messageSelector = (TSymbol*) globals.binaryMessages[ec.instruction.low];
+        TSymbol* messageSelector = static_cast<TSymbol*>( globals.binaryMessages[ec.instruction.low] );
         doSendMessage(ec, messageSelector, messageArguments);
     }
 }
@@ -625,7 +625,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVME
             uint32_t literalIndex    = byteCodes[ec.bytePointer++];
             TSymbol* messageSelector = literals[literalIndex];
             TClass*  receiverClass   = ec.currentContext->method->klass->parentClass;
-            TObjectArray* messageArguments = (TObjectArray*) ec.stackPop();
+            TObjectArray* messageArguments = ec.stackPop<TObjectArray>();
             
             doSendMessage(ec, messageSelector, messageArguments, receiverClass);
         } break;
@@ -747,8 +747,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             break;
                 
         case primitive::LLVMsendMessage: { //252
-            TObjectArray* args = (TObjectArray*) ec.stackPop();
-            TSymbol*  selector = (TSymbol*) ec.stackPop();
+            TObjectArray* args = ec.stackPop<TObjectArray>();
+            TSymbol*  selector = ec.stackPop<TSymbol>();
             try {
                 return sendMessage(ec.currentContext, selector, args, 0);
             } catch(TBlockReturn& blockReturn) {
@@ -770,8 +770,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case 251: {
             // TODO Unicode support
             
-            TString* prompt = (TString*) ec.stackPop();
-            std::string strPrompt((const char*)prompt->getBytes(), prompt->getSize());
+            TString* prompt = ec.stackPop<TString>();
+            std::string strPrompt(reinterpret_cast<const char*>(prompt->getBytes()), prompt->getSize());
             
             char* input = readline(strPrompt.c_str());
             if (input) {
@@ -780,7 +780,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 if (inputSize > 0)
                     add_history(input);
                     
-                TString* result = (TString*) newBinaryObject(globals.stringClass, inputSize);
+                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, inputSize) );
                 std::memcpy(result->getBytes(), input, inputSize);
                 
                 std::free(input);
@@ -794,7 +794,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             break;
             
         case 249: { // printMethod
-            TMethod* method = (TMethod*) ec.stackPop();
+            TMethod* method = ec.stackPop<TMethod>();
             JITRuntime::Instance()->printMethod(method);
         } break;
         
@@ -805,7 +805,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>( ec.stackPop() );
             uint32_t  ticks = getIntegerValue(value);
-            TProcess* newProcess = (TProcess*) ec.stackPop();
+            TProcess* newProcess = ec.stackPop<TProcess>();
             
             // FIXME possible stack overflow due to recursive call
             TExecuteResult result = this->execute(newProcess, ticks);
@@ -816,7 +816,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::allocateObject: { // 7
             // Taking object's size and class from the stack
             TObject* size  = ec.stackPop();
-            TClass*  klass = (TClass*) ec.stackPop();
+            TClass*  klass = ec.stackPop<TClass>();
             uint32_t fieldsCount = getIntegerValue(reinterpret_cast<TInteger>(size));
             
             // Instantinating the object. Each object has size and class fields
@@ -825,7 +825,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         } break;
 
         case primitive::blockInvoke: { // 8
-            TBlock*  block = (TBlock*) ec.stackPop();
+            TBlock*  block = ec.stackPop<TBlock>();
             uint32_t argumentLocation = getIntegerValue(block->argumentLocation);
             
             // Amount of arguments stored on the stack except the block itself
@@ -846,7 +846,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             
             // Switching execution context to the invoking block
             block->previousContext = ec.currentContext->previousContext;
-            ec.currentContext = (TContext*) block;
+            ec.currentContext = static_cast<TContext*>(block);
             ec.stackTop = 0; // resetting stack
             
             // Block is bound to the method's bytecodes, so it's
@@ -863,7 +863,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         
         case primitive::allocateByteArray: { // 20
             int32_t dataSize = getIntegerValue(reinterpret_cast<TInteger>( ec.stackPop() ));
-            TClass* klass    = (TClass*) ec.stackPop();
+            TClass* klass    = ec.stackPop<TClass>();
             
             return newBinaryObject(klass, dataSize);
         } break;
@@ -871,7 +871,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::arrayAt:      // 24
         case primitive::arrayAtPut: { // 5
             TObject* indexObject = ec.stackPop();
-            TObjectArray* array  = (TObjectArray*) ec.stackPop();
+            TObjectArray* array  = ec.stackPop<TObjectArray>();
             TObject* valueObject = 0;
             
             // If the method is Array:at:put then pop a value from the stack
@@ -907,21 +907,21 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 array->putField(actualIndex, valueObject);
                 
                 // Return self
-                return (TObject*) array;
+                return static_cast<TObject*>(array);
             }
         } break;
         
         case primitive::cloneByteObject: { // 23
-            TClass* klass = (TClass*) ec.stackPop();
-            hptr<TByteObject> original = newPointer((TByteObject*) ec.stackPop());
+            TClass* klass = ec.stackPop<TClass>();
+            hptr<TByteObject> original = newPointer( ec.stackPop<TByteObject>() );
             
             // Creating clone
             uint32_t dataSize  = original->getSize();
-            TByteObject* clone = (TByteObject*) newBinaryObject(klass, dataSize);
+            TByteObject* clone = newBinaryObject(klass, dataSize);
             
             // Cloning data
             std::memcpy(clone->getBytes(), original->getBytes(), dataSize);
-            return (TObject*) clone;
+            return static_cast<TObject*>(clone);
         } break;
         
         //         case primitive::integerDiv:   // Integer /
@@ -1058,8 +1058,8 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
         return false;
     }
     
-    if (destination->getSize() < (uint32_t) iDestinationStopOffset ||
-        source->getSize() < (uint32_t) (iSourceStartOffset + iCount) )
+    if (destination->getSize() < static_cast<uint32_t>(iDestinationStopOffset) ||
+        source->getSize() < static_cast<uint32_t>(iSourceStartOffset + iCount) )
     {
         return false;
     }
@@ -1099,7 +1099,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 
 void SmalltalkVM::printVMStat()
 {
-    float hitRatio = (float) 100 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    float hitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
     std::printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n",
         m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }

@@ -59,14 +59,14 @@ bool BakerMemoryManager::initializeStaticHeap(std::size_t heapSize)
 {
     heapSize = correctPadding(heapSize);
 
-    void* heap = std::malloc(heapSize);
+    uint8_t* heap = static_cast<uint8_t*>( std::malloc(heapSize) );
     if (!heap)
         return false;
 
     std::memset(heap, 0, heapSize);
 
-    m_staticHeapBase = (uint8_t*) heap;
-    m_staticHeapPointer = (uint8_t*) heap + heapSize;
+    m_staticHeapBase = heap;
+    m_staticHeapPointer = heap + heapSize;
     m_staticHeapSize = heapSize;
 
     return true;
@@ -81,8 +81,8 @@ bool BakerMemoryManager::initializeHeap(std::size_t heapSize, std::size_t maxHea
     m_heapSize = heapSize;
     m_maxHeapSize = maxHeapSize;
 
-    m_heapOne = (uint8_t*) std::malloc(mediane);
-    m_heapTwo = (uint8_t*) std::malloc(mediane);
+    m_heapOne = static_cast<uint8_t*>( std::malloc(mediane) );
+    m_heapTwo = static_cast<uint8_t*>( std::malloc(mediane) );
     // TODO check for allocation errors
 
     std::memset(m_heapOne, 0, mediane);
@@ -118,7 +118,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
             std::printf("MM: Cannot reallocate %d bytes for inactive heap\n", newMediane);
             std::abort();
         } else {
-            *inactiveHeapBase = (uint8_t*) newInactiveHeap;
+            *inactiveHeapBase = static_cast<uint8_t*>(newInactiveHeap);
             std::memset(*inactiveHeapBase, 0, newMediane);
         }
     }
@@ -135,7 +135,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
             std::printf("MM: Cannot reallocate %d bytes for active heap\n", newMediane);
             std::abort();
         } else {
-            *activeHeapBase = (uint8_t*) newActiveHeap;
+            *activeHeapBase = static_cast<uint8_t*>(newActiveHeap);
             std::memset(*activeHeapBase, 0, newMediane);
         }
     }
@@ -204,7 +204,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
         // until we find one that we can handle
         while (true) {
             // Checking whether this is inline integer
-            if (isSmallInteger((TObject*) currentObject)) {
+            if (isSmallInteger( reinterpret_cast<TObject*>(currentObject) )) {
                 // Inline integers are stored directly in the
                 // pointer space. All we need to do is just copy
                 // contents of the poiner to a new place
@@ -214,8 +214,8 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 break;
             }
 
-            bool inOldSpace = (currentObject >= (TMovableObject*) m_inactiveHeapPointer) && 
-                              (currentObject < (TMovableObject*) (m_inactiveHeapBase + m_heapSize / 2));
+            bool inOldSpace = (reinterpret_cast<uint8_t*>(currentObject) >= m_inactiveHeapPointer) &&
+                              (reinterpret_cast<uint8_t*>(currentObject) < (m_inactiveHeapBase + m_heapSize / 2));
             
             // Checking if object is not in the old space
             if (!inOldSpace)
@@ -401,7 +401,7 @@ void BakerMemoryManager::moveObjects()
     // Updating external references. Typically these are pointers stored in the hptr<>
     object_ptr* currentPointer = m_externalPointersHead;
     while (currentPointer != 0) {
-        currentPointer->data = (TObject*) moveObject((TMovableObject*) currentPointer->data);
+        currentPointer->data = reinterpret_cast<TObject*>( moveObject( reinterpret_cast<TMovableObject*>(currentPointer->data) ) );
         currentPointer = currentPointer->next;
     }
 }
@@ -455,14 +455,14 @@ bool BakerMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
 
 void BakerMemoryManager::addStaticRoot(TObject** pointer)
 {
-    m_staticRoots.push_front((TMovableObject**) pointer);
+    m_staticRoots.push_front( reinterpret_cast<TMovableObject**>(pointer) );
 }
 
 void BakerMemoryManager::removeStaticRoot(TObject** pointer)
 {
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
-        if (*iRoot == (TMovableObject**) pointer) {
+        if (*iRoot == reinterpret_cast<TMovableObject**>(pointer)) {
             m_staticRoots.erase(iRoot);
             return;
         }

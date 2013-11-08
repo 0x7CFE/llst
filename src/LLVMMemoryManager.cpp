@@ -51,9 +51,9 @@ void LLVMMemoryManager::moveObjects()
         
         // Processing stack objects
         for (; entryIndex < metaCount; entryIndex++) {
-            TMetaInfo* metaInfo = (TMetaInfo*) entry->map->meta[entryIndex];
+            const TMetaInfo* metaInfo = static_cast<const TMetaInfo*>( entry->map->meta[entryIndex] );
             if (metaInfo && metaInfo->isStackObject) {
-                TMovableObject* stackObject = (TMovableObject*) entry->roots[entryIndex];
+                TMovableObject* stackObject = reinterpret_cast<TMovableObject*>( entry->roots[entryIndex] );
                 
                 if (! stackObject)
                     continue;
@@ -73,7 +73,7 @@ void LLVMMemoryManager::moveObjects()
         
         // Iterating through the normal roots in the current stack frame
         for (; entryIndex < rootCount; entryIndex++) {
-            TMovableObject* object = (TMovableObject*) entry->roots[entryIndex];
+            TMovableObject* object = reinterpret_cast<TMovableObject*>( entry->roots[entryIndex] );
 
             if (object != 0)
                 object = moveObject(object);
