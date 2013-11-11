@@ -38,11 +38,15 @@
 #include <cassert>
 #include <iostream>
 #include <cstdlib>
+#include <cstring>
 
 #include <opcodes.h>
 #include <primitives.h>
-#include <jit.h>
 #include <vm.h>
+
+#if defined(LLVM)
+    #include <jit.h>
+#endif
 
 TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, std::size_t slotSize)
 {
@@ -746,6 +750,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             m_memoryManager->collectGarbage();
             break;
                 
+#if defined(LLVM)            
         case primitive::LLVMsendMessage: { //252
             TObjectArray* args = ec.stackPop<TObjectArray>();
             TSymbol*  selector = ec.stackPop<TSymbol>();
@@ -766,6 +771,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
             }
         } break;
+#endif
         
         case 251: {
             // TODO Unicode support
@@ -789,6 +795,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
         } break;
         
+#if defined(LLVM)
         case 250: // patchHotMethods
             JITRuntime::Instance()->patchHotMethods();
             break;
@@ -801,7 +808,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case 248:
             JITRuntime::Instance()->printStat();
             break;
-        
+#endif
+            
         case primitive::startNewProcess: { // 6
             TInteger  value = reinterpret_cast<TInteger>( ec.stackPop() );
             uint32_t  ticks = getIntegerValue(value);
