@@ -193,7 +193,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
     for (TClass* currentClass = klass; currentClass != globals.nilObject; currentClass = currentClass->parentClass) {
         assert(currentClass != 0);
         TDictionary* methods = currentClass->methods;
-        method = static_cast<TMethod*>( methods->find(selector) );
+        method = methods->find<TMethod>(selector);
         if (method) {
             // Storing result in cache
             updateMethodCache(selector, klass, method);

@@ -325,8 +325,8 @@ struct TDictionary : public TObject {
     // Explicit instantination of:
     // find(const TSymbol* key)
     // find(const char* key)
-    template<typename K>
-    TObject* find(const K* key) const;
+    template<typename K> TObject* find(const K* key) const;
+    template<typename T, typename K> T* find(const K* key) const { return static_cast<T*>(find(key)); }
     
     static const char* InstanceClassName() { return "Dictionary"; }
 };
