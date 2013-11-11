@@ -378,8 +378,9 @@ public:
     
     bool     loadImage(const char* fileName);
     void     storeImage(const char* fileName);
-    TObject* getGlobal(const char* name);
-    TObject* getGlobal(TSymbol* name);
+    
+    template<typename N> TObject* getGlobal(const N* name) const;
+    template<typename T, typename N> T* getGlobal(const N* name) const { return static_cast<T*>(getGlobal(name)); }
     
     class ImageWriter;
     // GLobal VM objects

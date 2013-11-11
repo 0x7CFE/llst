@@ -205,7 +205,7 @@ template<class T> hptr<T> SmalltalkVM::newObject(std::size_t dataSize /*= 0*/, b
 
 template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ Int2Type<false>, std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
 {
-    TClass* klass = static_cast<TClass*>( m_image->getGlobal(T::InstanceClassName()) );
+    TClass* klass = m_image->getGlobal<TClass>(T::InstanceClassName());
     if (!klass)
         return hptr<T>( static_cast<T*>(globals.nilObject), m_memoryManager);
     
@@ -215,7 +215,7 @@ template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ I
 
 template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ Int2Type<true>,  std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)
 {
-    TClass* klass = static_cast<TClass*>( m_image->getGlobal(T::InstanceClassName()) );
+    TClass* klass = m_image->getGlobal<TClass>(T::InstanceClassName());
     if (!klass)
         return hptr<T>( static_cast<T*>(globals.nilObject), m_memoryManager );
     
