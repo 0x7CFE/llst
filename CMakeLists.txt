@@ -26,8 +26,9 @@ if (LLVM)
     add_definitions(-DLLVM)
 endif()
 
-set (COMPILER_FLAGS "-m32 -march=native -mtune=native -funroll-loops -Wall ${LLVM_CXX_FLAGS} -O2 -fexceptions -frtti -Wno-cast-qual")
-set (LINKER_FLAGS   "-m32 -L/usr/lib32 -Wall ${LLVM_LD_FLAGS}")
+set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} ${LLVM_LD_FLAGS} -Wall -fexceptions -frtti -Wno-cast-qual")
+set (CMAKE_CXX_FLAGS_DEBUG "-g -ggdb -O0")
+set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 
 add_subdirectory(src)
 add_subdirectory(include)
@@ -61,9 +62,13 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} -ldl -lpthread -lreadline)
-set_target_properties(llst PROPERTIES COMPILE_FLAGS "${COMPILER_FLAGS}")
-set_target_properties(llst PROPERTIES LINK_FLAGS "${LINKER_FLAGS}")
+target_link_libraries(llst ${LLVM_LIBS} dl pthread readline)
+
+if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+    # this is a 64-bit OS
+    add_definitions(-m32 -L/usr/lib32)
+    set(CMAKE_EXE_LINKER_FLAGS "-m32 -L/usr/lib32")
+endif()
 
 set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
 add_custom_command(
