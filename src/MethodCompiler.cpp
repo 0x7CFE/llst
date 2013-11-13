@@ -630,6 +630,12 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             case opcode::doSpecial:         doSpecial(jit);         break;
             case opcode::doPrimitive:       doPrimitive(jit);       break;
             
+            // Treating opcode 0 as NOP command
+            // This is a temporary hack to solve bug #26
+            // It is triggered by malformed method code
+            // compiled by in-image soft compiler
+            case 0: break;
+
             default:
                 std::fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
                         jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
