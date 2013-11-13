@@ -22,7 +22,7 @@ if (LLVM)
     execute_process(COMMAND ${CONFIG_COMMAND} --libs all
                     OUTPUT_STRIP_TRAILING_WHITESPACE
                     OUTPUT_VARIABLE LLVM_LIBS)
-                    
+
     add_definitions(-DLLVM)
 endif()
 

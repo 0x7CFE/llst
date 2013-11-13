@@ -38,7 +38,7 @@ std::auto_ptr<CompletionEngine> CompletionEngine::s_instance(new CompletionEngin
 
 static char* smalltalk_generator(const char* text, int state) {
     CompletionEngine* completionEngine = CompletionEngine::Instance();
-    
+
     if (state == 0)
         completionEngine->getProposals(text);
 

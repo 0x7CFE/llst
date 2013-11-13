@@ -43,7 +43,7 @@ private:
 
     TCompletionTrie m_completionTrie;
     TCompletionTrie::Iterator m_iCurrentProposal;
-    
+
     static std::auto_ptr<CompletionEngine> s_instance;
 public:
     CompletionEngine() : m_completionTrie('\0'), m_iCurrentProposal(m_completionTrie.end()) { }

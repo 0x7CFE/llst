@@ -30,11 +30,11 @@ Module* buildModule(LLVMContext& Context) {
      *       printSomething(s_myObj, 42);
      *    }
      */
-    
+
     Module* module = new Module("Call extern member function", Context);
-    
+
     Constant* s_myObj = module->getOrInsertGlobal("s_myObj", Type::getInt8PtrTy(Context));
-    
+
     //let's link MyClass::printSomething()
     Type* printSomethingParams[] = {
         Type::getInt8PtrTy(Context)->getPointerTo(), // this
@@ -42,14 +42,14 @@ Module* buildModule(LLVMContext& Context) {
     };
     FunctionType* printSomethingType = FunctionType::get(Type::getVoidTy(Context), printSomethingParams, false);
     Constant* printSomething = module->getOrInsertFunction("printSomething", printSomethingType);
-    
+
     //let's build main
     Function* main = cast<Function>(module->getOrInsertFunction("main", Type::getVoidTy(Context), NULL));
     BasicBlock* entry = BasicBlock::Create(Context, "entry", main);
     IRBuilder<> builder(entry);
     builder.CreateCall2(printSomething, s_myObj, builder.getInt32(42));
     builder.CreateRetVoid();
-    
+
     return module;
 }
 
@@ -57,25 +57,25 @@ int main() {
     InitializeNativeTarget();
     LLVMContext& Context = getGlobalContext();
     Module* module = buildModule(Context);
-    
+
     ExecutionEngine* EE = EngineBuilder(module)
                         .setEngineKind(EngineKind::JIT)
                         .create();
-    
+
     Constant* s_myObj = module->getGlobalVariable("s_myObj");
     MyClass* myObj = new MyClass("Hello world");
     EE->addGlobalMapping(cast<GlobalValue>(s_myObj), reinterpret_cast<void*>(myObj));
-    
+
     Function* printSomething = module->getFunction("printSomething");
     EE->addGlobalMapping(cast<GlobalValue>(printSomething), reinterpret_cast<void*>(&MyClass::printSomething));
-    
+
     outs() << *module;
     verifyModule(*module);
-    
+
     Function* mainF = module->getFunction("main");
     std::vector<GenericValue> args;
     EE->runFunction(mainF, args);
-    
+
     delete module;
     delete myObj;
     return 0;

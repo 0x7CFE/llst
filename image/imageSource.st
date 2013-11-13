@@ -777,7 +777,7 @@ goto |x testBlock|
                         ifFalse: [x <- 4]
                     ].
     ].
-    
+
     [ testBlock value: 0. x ] assertEq: 4 withComment: '1'.
     [ testBlock value: 1. x ] assertEq: 4 withComment: '2'.
     [ testBlock value: 2. x ] assertEq: 2 withComment: '3'.
@@ -786,12 +786,12 @@ goto |x testBlock|
 !
 
 METHOD BranchTest
-phi |x|     
+phi |x|
     x <- (true ifTrue:  [ 11 ]
                ifFalse: [ 17 ] ) +
          (true ifTrue:  [ 13 ]
                ifFalse: [ 15 ] ).
-    
+
     [ x ] assertEq: 24.
 !
 
@@ -1113,36 +1113,36 @@ CLASS ListTest Test
 METHOD ListTest
 add |list array|
     array <- Array new: 3.
-    
+
     array at: 1 put: 2.
     array at: 2 put: 42.
     array at: 3 put: true.
-    
+
     list <- List new.
     list add: 2.
     list add: 42.
     list add: true.
-    
+
     list <- list reverse.
-    
+
     [ list asArray ] assertEq: array.
 !
 
 METHOD ListTest
 addLast |list array|
     array <- Array new: 4.
-    
+
     array at: 1 put: 2.
     array at: 2 put: -34.
     array at: 3 put: 42.
     array at: 4 put: 'qwe123'. "That's my password. Don't tell anyone!"
-    
+
     list <- List new.
     list addLast: 2.
     list addLast: -34.
     list addLast: 42.
     list addLast: 'qwe123'.
-    
+
     [ list asArray ] assertEq: array.
 !
 
@@ -1153,9 +1153,9 @@ at |list|
     list add: 42.
     list add: true.
     list add: '124'.
-    
+
     list <- list reverse.
-    
+
     [ list at: 1 ] assertEq: 2 withComment: '1'.
     [ list at: 2 ] assertEq: 42 withComment: '2'.
     [ list at: 3 ] assertEq: true withComment: '3'.
@@ -1169,19 +1169,19 @@ do |list idx standardArray array|
     list add: false.
     list add: true.
     list add: 42.
-    
+
     list <- list reverse.
-    
+
     standardArray <- Array new: 4.
     1 to: (list size) do: [:i| standardArray at: i put: (list at: i). ].
-    
+
     array <- Array new: 4.
     idx <- 1.
     list do: [:val |
         array at: idx put: val.
         idx <- idx + 1.
     ].
-    
+
     [ array ] assertEq: standardArray.
 !
 
@@ -1192,16 +1192,16 @@ removeFirst |list array|
     list add: false.
     list add: true.
     list add: 42.
-    
+
     array <- Array with: nil with: false with: true.
     [ list removeFirst. list reverse asArray ] assertEq: array withComment: '1'.
-    
+
     array <- Array with: nil with: false.
     [ list removeFirst. list reverse asArray ] assertEq: array withComment: '2'.
-    
+
     array <- Array with: nil.
     [ list removeFirst. list reverse asArray ] assertEq: array withComment: '3'.
-    
+
     [ list removeFirst. list ] assertEq: (List new) withComment: '4'.
 !
 
@@ -1212,16 +1212,16 @@ remove |list array|
     list add: false.
     list add: 42.
     list add: true.
-    
+
     array <- Array with: 'qwerty' with: false with: true.
     [ list remove: 42. list reverse asArray ] assertEq: array withComment: 'in the middle'.
-    
+
     array <- Array with: 'qwerty' with: false.
     [ list remove: true. list reverse asArray ] assertEq: array withComment: 'the last'.
-    
+
     array <- Array with: false.
     [ list remove: 'qwerty'. list reverse asArray ] assertEq: array withComment: 'the first'.
-    
+
     [ list remove: false. list ] assertEq: (List new) withComment: 'the only one'.
 !
 
@@ -1233,9 +1233,9 @@ firstLink |list|
     list add: 'middle'.
     list add: 'unknown'.
     list add: 'last'.
-    
+
     list <- list reverse.
-    
+
     [ list firstLink value ] assertEq: 'head' withComment: 'just constructed'.
     [ list remove: 'middle'. list firstLink value ] assertEq: 'head' withComment: 'middle removed'.
     [ list removeFirst. list firstLink value ] assertEq: 'second head' withComment: 'head removed'.
@@ -1247,10 +1247,10 @@ firstLink |list|
 METHOD ListTest
 atPut |list|
     list <- List with: nil with: nil.
-    
+
     list at: 1 put: 42.
     list at: 2 put: 'qwerty'.
-    
+
     [ list at: 1 ] assertEq: 42 withComment: '1'.
     [ list at: 2 ] assertEq: 'qwerty' withComment: '1'.
 !
@@ -1263,9 +1263,9 @@ lastLink |list|
     list add: 'middle'.
     list add: 'second last'.
     list add: 'last'.
-    
+
     list <- list reverse.
-    
+
     [ list lastLink value ] assertEq: 'last' withComment: 'just constructed'.
     [ list remove: 'middle'. list lastLink value ] assertEq: 'last' withComment: 'middle removed'.
     [ list removeFirst. list lastLink value ] assertEq: 'last' withComment: 'head removed'.
@@ -1298,32 +1298,32 @@ appendList |left right result standardContent standardSize|
     [ "non empty + non empty"
         left <- List with: 1 with: 2.
         right <- List with: 3 with: 4.
-        
+
         standardSize <- left size + (right size).
-        
+
         standardContent <- List new.
         standardContent add: 4.
         standardContent add: 3.
         standardContent add: 2.
         standardContent add: 1.
-        
+
         result <- left appendList: right.
-        
+
         [result size ] assertEq: standardSize withComment: 'size: both non empty'.
         [result] assertEq: standardContent withComment: 'content: both non empty'.
     ] value.
     [ "empty + non empty"
         left <- List new.
         right <- (Array with: 3 with: 4) asList.
-        
+
         standardSize <- left size + (right size).
-        
+
         standardContent <- List new.
         standardContent add: 4.
         standardContent add: 3.
-        
+
         result <- left appendList: right.
-        
+
         [result size ] assertEq: standardSize withComment: 'size: empty + non empty'.
         [result] assertEq: standardContent withComment: 'content: empty + non empty'.
     ] value.
@@ -1401,7 +1401,7 @@ between
     [1 between: 1 and: 0] assertEq: false withComment: '4'.
     [1 between: 1 and: 1] assertEq: true withComment: '5'.
     [1 between: 1 and: 2] assertEq: true withComment: '6'.
-    
+
     [1 between: 2 and: 0] assertEq: false withComment: '7'.
     [1 between: 2 and: 1] assertEq: false withComment: '8'.
     [1 between: 2 and: 2] assertEq: false withComment: '9'.
@@ -1475,11 +1475,11 @@ benchmark3: count | ms |
 METHOD Undefined
 benchmark4 | dict ms |
     dict <- Dictionary new.
-    
+
     "creating long living memory consumer"
     1 to: 1000 do: [ :x | dict at: x put: List new ].
     'Load initialized' printNl.
-    
+
     "now performing unrelated memory heavy operations"
     ms <- Timer millisecondsToRun: [ 1 to: 1000000 do: [ :x | List new ] ].
     'Cycle in ms: ' print. ms printNl.
@@ -1556,28 +1556,28 @@ doBlockReturn: x |block|
         (x = 4) ifTrue: [ ^x ].
         (x = 5) ifTrue: [ ^x ].
     ].
-     
+
     [true] ifTrue: [ ^block value ].
 !
 
 
 METHOD StatementsTest
 doRethrow: blockSurelyThrows |blockThatCanThrow|
-    "In LLVM blockReturn opcode is implemented as an exception with 2 fields: 
+    "In LLVM blockReturn opcode is implemented as an exception with 2 fields:
      the creatin context and the value that we need to return from the block.
      While compiling methods we scan blocks on blockReturn opcode.
      If we find it, we replace each 'call @sendMessage' with invoke instruction
      When we catch exception we check whether the context of exception and the context of current method are equal.
      If they are, we do 'ret' from current function, if not, we rethrow exception"
-    
-    "That line forces LLVM to create 'invoke' instead of 'call' :" 
+
+    "That line forces LLVM to create 'invoke' instead of 'call' :"
     blockThatCanThrow <- [ ^1234567 ].
-    
+
     "We are invoking block that has a blockReturn opcode. The exception must be rethrown because 'blockSurelyThrows' is not created in the current method"
     blockSurelyThrows value.
-    
+
     "In LLVM IR exception must be rethrown so ^nil must not be executed"
-     
+
     ^nil.
 !
 
@@ -1590,10 +1590,10 @@ METHOD StatementsTest
 blockReturn |x|
     x <- self doBlockReturn: 4.
     [ x ] assertEq: 4  withComment: 'simple 1'.
-    
+
     x <- self doBlockReturn: 5.
     [ x ] assertEq: 5  withComment: 'simple 2'.
-    
+
     x <- self returnFortyTwoByBlockReturn.
     [ x ] assertEq: 42 withComment: 'rethrow'.
 !
@@ -1632,7 +1632,7 @@ METHOD Undefined
 sortTest | list |
     list <- List new.
     1 to: 100 do: [ :x | list add: 1000 atRandom ].
-    list <- list sort. 
+    list <- list sort.
     ^list
 
     "x <- '#(2 7 4 5 2 0 9 1 4 7 3)' doIt.
@@ -1684,7 +1684,7 @@ loopBenchmark | s |
 !
 
 METHOD Undefined
-sortBenchmark: data 
+sortBenchmark: data
     ^data sort
 !
 
@@ -1696,7 +1696,7 @@ runSortBenchmarkFor: data
 METHOD Undefined
 main    | command  data |
     " initialize classes "
-    
+
     Char initialize.
     SmallIntTest new runAll.
     ArrayTest new runAll.
@@ -1704,31 +1704,31 @@ main    | command  data |
     MagnitudeTest new runAll.
     ListTest new runAll.
     MethodLookupTest new runAll.
-    
+
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
     Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
     Scheduler run."
-    
-    "'Preparing test data ...' print. 
+
+    "'Preparing test data ...' print.
     data <- List new.
     1 to: 1000 do: [ :x | data add: 100000 atRandom ].
     'done' printNl.
-    
+
     'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
     'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
     'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    
+
     Jit patchHotMethods.
-    
+
     'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
     'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
-    
+
     "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
-    
+
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
-    
+
     ^nil.
 !
 
@@ -1833,11 +1833,11 @@ new: aBlock |instance|
 METHOD Thread
 run |context|
     myProcess <- Process new.
-    context <- Context new. 
-    
+    context <- Context new.
+
     myProcess context: context.
     context setup: (Thread methods at: #invokeBlock) withArguments: (Array with: self).
-    
+
     'scheduling process for execution' printNl.
     Scheduler addProcess: myProcess.
 !
@@ -1893,7 +1893,7 @@ endProcess: aProcess
 METHOD Scheduler
 runOnce |result finished|
     finished <- List new.
-    tasks do: [ :task | 
+    tasks do: [ :task |
         result <- task doExecute: granularity.
         ( result ~= 5 ) ifTrue: [ finished add: task ].
     ].
@@ -2376,25 +2376,25 @@ sort
 METHOD List
 insert: aValue onCondition: aBlock
     | link current newLink next |
-    
+
     (self isEmpty) ifTrue: [ ^self add: aValue ].
-    
+
     link <- elements.
-    [link notNil] whileTrue: [ 
+    [link notNil] whileTrue: [
         current <- link value.
         (aBlock value: aValue value: current)
-            ifTrue: [ 
+            ifTrue: [
                 newLink <- Link value: current next: link next.
-                link value: aValue next: newLink. 
-                
-                ^aValue 
+                link value: aValue next: newLink.
+
+                ^aValue
             ].
-        
+
         next <- link next.
-        next isNil ifTrue: [ 
+        next isNil ifTrue: [
             link next: (Link value: aValue next: nil).
             ^aValue.
-        ] 
+        ]
         link <- next.
     ]
 !
@@ -2402,21 +2402,21 @@ insert: aValue onCondition: aBlock
 METHOD Collection
 insertSort: criteria | result |
     (self isEmpty) ifTrue: [^self].
-    
+
     result <- List new.
     self do: [ :x | result insert: x onCondition: criteria. "result printNl." ].
-    
+
     ^result
 !
 
 METHOD Collection
 sort: criteria | left right mediane |
     "(self size < 2) ifTrue: [^self]."
-    (self size < 32) 
+    (self size < 32)
         ifTrue: [ ^ self insertSort: criteria ].
 
     mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
-    
+
     left  <- List new. "if List is instance of MetaList then call MetaList>>new"
     right <- List new.
     self do: [ :x |
@@ -2428,7 +2428,7 @@ sort: criteria | left right mediane |
     right <- right sort: criteria.
 
     "left print. $| print. mediane print. $| print. right printNl."
-    
+
     right add: mediane.
     ^ left appendList: right
 !
@@ -2725,7 +2725,7 @@ METHOD MetaString
 new: size
 	<20 self size>
 !
-METHOD MetaString 
+METHOD MetaString
 readline: prompt
     ^<251 prompt>
 !
@@ -2942,12 +2942,12 @@ firstLink
 !
 METHOD List
 appendList: aList | element |
-    (elements isNil) ifTrue: [ 
+    (elements isNil) ifTrue: [
         elements <- aList firstLink.
         size <- aList size.
-        ^self 
+        ^self
     ].
-    
+
     element <- elements.
     [element next isNil]
         whileFalse: [element <- element next].
@@ -2962,7 +2962,7 @@ addAll: aCollection
 METHOD List
 lastLink |link next|
     elements isNil ifTrue: [ ^nil ].
-    
+
     link <- elements.
     [(next <- link next) notNil] whileTrue: [link <- next].
     ^link
@@ -3754,8 +3754,8 @@ next: aLink
 METHOD Link
 do: aBlock | link |
     link <- self.
-    [link notNil] whileTrue: 
-        [ aBlock value: link value. link <- link next ] 
+    [link notNil] whileTrue:
+        [ aBlock value: link value. link <- link next ]
 
 	"aBlock value: value.
 	next notNil ifTrue: [ ^ next do: aBlock ]"
@@ -4044,11 +4044,11 @@ isExecutableByOthers
 METHOD FileMode
 asString |result|
     result <- ''.
-    
+
     self isDirectory
         ifTrue:  [ result <- result + 'd' ]
         ifFalse: [ result <- result + '-' ].
-    
+
     self isReadableByOwner
         ifTrue:  [ result <- result + 'r' ]
         ifFalse: [ result <- result + '-' ].
@@ -4058,7 +4058,7 @@ asString |result|
     self isExecutableByOwner
         ifTrue:  [ result <- result + 'x' ]
         ifFalse: [ result <- result + '-' ].
-    
+
     self isReadableByGroup
         ifTrue:  [ result <- result + 'r' ]
         ifFalse: [ result <- result + '-' ].
@@ -4068,7 +4068,7 @@ asString |result|
     self isExecutableByGroup
         ifTrue:  [ result <- result + 'x' ]
         ifFalse: [ result <- result + '-' ].
-    
+
     self isReadableByOthers
         ifTrue:  [ result <- result + 'r' ]
         ifFalse: [ result <- result + '-' ].
@@ -4078,7 +4078,7 @@ asString |result|
     self isExecutableByOthers
         ifTrue:  [ result <- result + 'x' ]
         ifFalse: [ result <- result + '-' ].
-    
+
     ^ result.
 !
 
@@ -4100,7 +4100,7 @@ new: descriptor
     FileStat setStatTo: array for: descriptor.
     stat <- self new.
     " extract size "
-    self in: stat at: 1 put: (array at: 1). 
+    self in: stat at: 1 put: (array at: 1).
     " extract inode "
     self in: stat at: 2 put: (array at: 2).
     " extract mode "

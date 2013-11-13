@@ -21,7 +21,7 @@
                 <RegExpr attribute="Class" context="OneLineSelector" String="\+{1}[A-Z]+[_a-zA-Z0-9]*" firstNonSpace="true" />
                 <RegExpr attribute="Class" context="method_def" String="[\!]+[A-Z]+[_a-zA-Z0-9]*$?" firstNonSpace="true" beginRegion="Method" />
                 <RegExpr attribute="MetaClass" context="method_def" String="[\=]+[A-Z]+[_a-zA-Z0-9]*$?" firstNonSpace="true" beginRegion="Method" />
-                   
+
                 <StringDetect attribute="Keyword" context="method_def" String="METHOD" firstNonSpace="true" beginRegion="Method"/>
                 <keyword attribute="Normal" context="keyword_line" String="keywords"/>
                 <keyword attribute="Keyword" context="SelectorContext" String="keyobjects"/>
@@ -62,7 +62,7 @@
             </context> -->
 
             <context attribute="Normal" lineEndContext="method_string" name="method_def"/>
-            <context attribute="Normal" lineEndContext="Normal" name="method_string"> 
+            <context attribute="Normal" lineEndContext="Normal" name="method_string">
                 <AnyChar attribute="Selector" context="#stay" String="+-*/~&lt;&gt;=?"/>
                 <DetectChar attribute="Symbol" context="LocalsDef" char="|"/>
                 <RegExpr attribute="Selector" context="#stay" String="\w[_a-zA-Z]+[_a-zA-Z0-9]*\:" />

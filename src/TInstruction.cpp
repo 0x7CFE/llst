@@ -5,13 +5,13 @@
 std::string TInstruction::toString()
 {
     std::ostringstream ss;
-    
+
     int iHigh = high;
     int iLow  = low;
-    
+
     std::ostringstream errSs;
     errSs << "Unknown instrunction {" << iHigh << ", " << iLow << "}";
-    
+
     switch(high)
     {
         case opcode::pushInstance:    ss << "PushInstance " << iLow;  break;
@@ -42,12 +42,12 @@ std::string TInstruction::toString()
             }
         } break;
         case opcode::pushBlock:       ss << "PushBlock " << iLow;       break;
-        
+
         case opcode::assignTemporary: ss << "AssignTemporary " << iLow; break;
         case opcode::assignInstance:  ss << "AssignInstance " << iLow;  break;
-        
+
         case opcode::markArguments:   ss << "MarkArguments " << iLow;   break;
-        
+
         case opcode::sendUnary: {
             ss << "SendUnary ";
             switch(low) {
@@ -70,7 +70,7 @@ std::string TInstruction::toString()
             }
         } break;
         case opcode::sendMessage: ss << "SendMessage "; break;
-        
+
         case opcode::doSpecial: {
             ss << "Special ";
             switch(low) {
@@ -89,7 +89,7 @@ std::string TInstruction::toString()
             }
         } break;
         case opcode::doPrimitive: ss << "Primitive"; break;
-        
+
         default: {
             throw std::runtime_error(errSs.str());
         }

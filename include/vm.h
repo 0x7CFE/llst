@@ -47,7 +47,7 @@ struct Int2Type
     /* The int-to-type idiom helps to use pattern matching in C++.
      * C++ allows you to overload functions only by type, not by value,
      * Int2Type creates a new struct per each integral constant, which allows to overload functions.
-     * 
+     *
      * Example:
      * int factorial(Int2Type<0>) { return 1; }
      * template<int n> int factorial(Int2Type<n>) { return n*factorial(Int2Type<n-1>()); }
@@ -89,13 +89,13 @@ private:
             currentContext->bytePointer = newInteger(bytePointer);
             currentContext->stackTop    = newInteger(stackTop);
         }
-        
+
         void stackPush(TObject* object);
-        
+
         TObject* stackLast() {
             return currentContext->stack->getField(stackTop - 1);
         }
-        
+
         TObject* stackPop() {
             TObject* top = currentContext->stack->getField(--stackTop);
             return top;
@@ -144,7 +144,7 @@ private:
     void doMarkArguments(TVMExecutionContext& ec);
     //Takes selector, arguments from context and sends message
     //The class is taken from the first argument
-    void doSendMessage(TVMExecutionContext& ec); 
+    void doSendMessage(TVMExecutionContext& ec);
     //This method is used to send message to the first argument
     //If receiverClass != 0 then the class is not taken from the first argument (implementation of sendToSuper)
     void doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObjectArray* arguments, TClass* receiverClass = 0);
@@ -161,7 +161,7 @@ private:
 
     bool m_lastGCOccured;
     void onCollectionOccured();
-    
+
 public:
     bool doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset);
     //This function is used to lookup and return method for #doesNotUnderstand for a given selector of a given object with appropriate arguments.
@@ -181,10 +181,10 @@ public:
 
     TExecuteResult execute(TProcess* p, uint32_t ticks);
     template<class T> hptr<T> newObject(std::size_t dataSize = 0, bool registerPointer = true);
-    
+
     template<class T> hptr<T> newObjectWrapper(/*InstancesAreBinary*/ Int2Type<false>, std::size_t dataSize = 0, bool registerPointer = true);
     template<class T> hptr<T> newObjectWrapper(/*InstancesAreBinary*/ Int2Type<true> , std::size_t dataSize = 0, bool registerPointer = true);
-    
+
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
 
     void printVMStat();
@@ -208,7 +208,7 @@ template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ I
     TClass* klass = m_image->getGlobal<TClass>(T::InstanceClassName());
     if (!klass)
         return hptr<T>( static_cast<T*>(globals.nilObject), m_memoryManager);
-    
+
     std::size_t slotSize = sizeof(T) + dataSize * sizeof(T*);
     return hptr<T>( static_cast<T*>( newOrdinaryObject(klass, slotSize) ), m_memoryManager, registerPointer );
 }
@@ -218,7 +218,7 @@ template<class T> hptr<T> SmalltalkVM::newObjectWrapper(/*InstancesAreBinary*/ I
     TClass* klass = m_image->getGlobal<TClass>(T::InstanceClassName());
     if (!klass)
         return hptr<T>( static_cast<T*>(globals.nilObject), m_memoryManager );
-    
+
     return hptr<T>( static_cast<T*>( newBinaryObject(klass, dataSize) ), m_memoryManager, registerPointer );
 }
 

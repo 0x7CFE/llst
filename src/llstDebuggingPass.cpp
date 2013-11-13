@@ -30,7 +30,7 @@ namespace {
         Function* isSmallInteger;
         Function* getObjectField;
         Function* getObjectClass;
-        
+
         void initFromFunction(Function& F);
         void insertSelfInSendMessageCheck(Function& F);
         void insertLoadInstCheck(Function& F);
@@ -67,10 +67,10 @@ void LLSTDebuggingPass::initFromFunction(Function& F)
     m_module = F.getParent();
     m_baseTypes.initializeFromModule(m_module);
     m_builder = new IRBuilder<>(F.begin());
-    
+
     FunctionType* _printfType = FunctionType::get(m_builder->getInt32Ty(), m_builder->getInt8PtrTy(), true);
      _printf = m_module->getOrInsertFunction("printf", _printfType);
-     
+
     isSmallInteger = m_module->getFunction("isSmallInteger");
     getObjectField = m_module->getFunction("getObjectField");
     getObjectClass = m_module->getFunction("getObjectClass");
@@ -79,7 +79,7 @@ void LLSTDebuggingPass::initFromFunction(Function& F)
 void LLSTDebuggingPass::insertLoadInstCheck(Function& F)
 {
     Value* BrokenPointerMessage = m_builder->CreateGlobalStringPtr("\npointer is broken\n");
-    
+
     InstructionVector Loads;
     for (Function::iterator BB = F.begin(); BB != F.end(); ++BB)
     {
@@ -90,35 +90,35 @@ void LLSTDebuggingPass::insertLoadInstCheck(Function& F)
             }
         }
     }
-    
+
     for(std::size_t i = 0; i < Loads.size(); i++)
     {
         LoadInst* Load = dyn_cast<LoadInst>(Loads[i]);
         if (belongsToSmalltalkType( Load->getType() )) {
-        
+
             //split BB right after load inst. The new BB contains code that will be executed if pointer is OK
             BasicBlock* PointerIsOkBB = Load->getParent()->splitBasicBlock(++( static_cast<BasicBlock::iterator>(Load) ));
             BasicBlock* PointerIsBrokenBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsOkBB);
             BasicBlock* PointerIsNotSmallIntBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsBrokenBB);
-            
+
             Instruction* branchToPointerIsOkBB = ++( static_cast<BasicBlock::iterator>(Load) );
             //branchToPointerIsOkBB is created by splitBasicBlock() just after load inst
             //We force builder to insert instructions before branchToPointerIsOkBB
             m_builder->SetInsertPoint(branchToPointerIsOkBB);
-            
+
             //If pointer to class is null, jump to PointerIsBroken, otherwise to PointerIsOkBB
             Value* objectPtr = m_builder->CreateBitCast( Load, m_baseTypes.object->getPointerTo());
-            
+
             Value* isSmallInt = m_builder->CreateCall(isSmallInteger, objectPtr);
             m_builder->CreateCondBr(isSmallInt, PointerIsOkBB, PointerIsNotSmallIntBB);
-            
+
             m_builder->SetInsertPoint(PointerIsNotSmallIntBB);
             Value* klassPtr = m_builder->CreateCall(getObjectClass, objectPtr);
             Value* pointerIsNull = m_builder->CreateICmpEQ(klassPtr, ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) );
             m_builder->CreateCondBr(pointerIsNull, PointerIsBrokenBB, PointerIsOkBB);
-            
+
             branchToPointerIsOkBB->eraseFromParent(); //We don't need it anymore
-            
+
             m_builder->SetInsertPoint(PointerIsBrokenBB);
             m_builder->CreateCall(_printf, BrokenPointerMessage);
             m_builder->CreateBr(PointerIsOkBB);
@@ -129,7 +129,7 @@ void LLSTDebuggingPass::insertLoadInstCheck(Function& F)
 void LLSTDebuggingPass::insertSelfInSendMessageCheck(Function& F)
 {
     Value* BrokenSelfMessage = m_builder->CreateGlobalStringPtr("\nself is broken\n");
-    
+
     InstructionVector Calls;
     for (Function::iterator BB = F.begin(); BB != F.end(); ++BB)
     {
@@ -141,32 +141,32 @@ void LLSTDebuggingPass::insertSelfInSendMessageCheck(Function& F)
             }
         }
     }
-    
+
     for(std::size_t i = 0; i < Calls.size(); i++)
     {
         CallInst* Call = dyn_cast<CallInst>(Calls[i]);
-        
+
         BasicBlock* PointerIsOkBB = Call->getParent()->splitBasicBlock( static_cast<BasicBlock::iterator>(Call) );
         BasicBlock* PointerIsBrokenBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsOkBB);
         BasicBlock* PointerIsNotSmallIntBB = BasicBlock::Create(m_module->getContext(), "", &F, PointerIsBrokenBB);
-        
+
         Instruction* branchToPointerIsOkBB = & PointerIsOkBB->getSinglePredecessor()->back();
         m_builder->SetInsertPoint(branchToPointerIsOkBB);
-        
-        
+
+
         Value* argsPtr = m_builder->CreateBitCast( Call->getArgOperand(2), m_baseTypes.object->getPointerTo());
         Value* self = m_builder->CreateCall2(getObjectField, argsPtr, m_builder->getInt32(0));
-        
+
         Value* isSmallInt = m_builder->CreateCall(isSmallInteger, self);
         m_builder->CreateCondBr(isSmallInt, PointerIsOkBB, PointerIsNotSmallIntBB);
-        
-        
+
+
         m_builder->SetInsertPoint(PointerIsNotSmallIntBB);
         Value* klassPtr = m_builder->CreateCall(getObjectClass, self);
         Value* pointerIsNull = m_builder->CreateICmpEQ(klassPtr, ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()) );
         m_builder->CreateCondBr(pointerIsNull, PointerIsBrokenBB, PointerIsOkBB);
         branchToPointerIsOkBB->eraseFromParent();
-        
+
         m_builder->SetInsertPoint(PointerIsBrokenBB);
         m_builder->CreateCall(_printf, BrokenSelfMessage);
         m_builder->CreateBr(PointerIsOkBB);

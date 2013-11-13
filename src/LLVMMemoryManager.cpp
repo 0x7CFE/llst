@@ -48,29 +48,29 @@ void LLVMMemoryManager::moveObjects()
         const uint32_t metaCount = entry->map->numMeta;
         const uint32_t rootCount = entry->map->numRoots;
         uint32_t entryIndex = 0;
-        
+
         // Processing stack objects
         for (; entryIndex < metaCount; entryIndex++) {
             const TMetaInfo* metaInfo = static_cast<const TMetaInfo*>( entry->map->meta[entryIndex] );
             if (metaInfo && metaInfo->isStackObject) {
                 TMovableObject* stackObject = reinterpret_cast<TMovableObject*>( entry->roots[entryIndex] );
-                
+
                 if (! stackObject)
                     continue;
-                
+
                 // Stack objects are allocated on a stack frames of jit functions
                 // We need to process only their fields and class pointer
                 for (uint32_t fieldIndex = 0; fieldIndex < stackObject->size.getSize() + 1; fieldIndex++) {
-                    
+
                     TMovableObject* field = stackObject->data[fieldIndex];
                     if (field)
                         field = moveObject(field);
-                    
+
                     stackObject->data[fieldIndex] = field;
                 }
             }
         }
-        
+
         // Iterating through the normal roots in the current stack frame
         for (; entryIndex < rootCount; entryIndex++) {
             TMovableObject* object = reinterpret_cast<TMovableObject*>( entry->roots[entryIndex] );
@@ -89,5 +89,5 @@ LLVMMemoryManager::LLVMMemoryManager()
 
 LLVMMemoryManager::~LLVMMemoryManager()
 {
-    
+
 }

@@ -513,7 +513,7 @@ private:
         delete item;
     }
 
-        
+
     NodeClass * nodeWithKey(const T *key) {
         return const_cast<NodeClass *>(const_cast<const NodeClass *>(this)->nodeWithKey(key));
     }

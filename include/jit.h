@@ -177,17 +177,17 @@ struct TBaseFunctions {
 // TStackValue is a base class for stack values. Descendant value may contain either
 // raw value or a deferred command to be done when evaluation takes place.
 // Use get() method to get the stored value.
-// 
+//
 // NOTE: Depending on the actual implementation, invoking method get() may result in
 //       a code generation. This should be done in a known context.
-//       
+//
 // See also: TPlainValue and TDeferredValue
 struct TStackValue {
     virtual ~TStackValue() { }
     virtual llvm::Value* get() = 0;
 };
 
-// TPlainValue represents simple llvm::Value* holder which does not 
+// TPlainValue represents simple llvm::Value* holder which does not
 // perform any additional actions when get() is called. Only stored value is returned.
 struct TPlainValue : public TStackValue {
 private:
@@ -195,7 +195,7 @@ private:
 public:
     TPlainValue(llvm::Value* value) : m_value(value) {}
     virtual ~TPlainValue() { }
-    
+
     virtual llvm::Value* get() { return m_value; }
 };
 
@@ -211,12 +211,12 @@ public:
         // Compile time stack of values that are
         // produced as a result of opcode processing
         TValueStack valueStack;
-        
+
         // Blocks that are referencing
         // current block by branching to it
         TRefererSet referers;
     };
-    
+
     // This structure contains working data which is
     // used during the compilation process.
     struct TJITContext {
@@ -236,26 +236,26 @@ public:
 
         MethodCompiler* compiler; // link to outer class for variable access
         bool hasValue();
-        void pushValue(llvm::Value* value); 
-        llvm::Value* lastValue(); 
+        void pushValue(llvm::Value* value);
+        llvm::Value* lastValue();
         llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0, bool dropValue = false);
 
         llvm::Value* contextHolder;
         llvm::Value* selfHolder;
-        
+
         llvm::Value* getCurrentContext();
         llvm::Value* getSelf();
         llvm::Value* getMethodClass();
         llvm::Value* getLiteral(uint32_t index);
-        
+
         void pushValue(TStackValue* value);
-        
+
         TJITContext(MethodCompiler* compiler, TMethod* method)
             : method(method), bytePointer(0), function(0), builder(0),
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
-            
+
         };
 
         ~TJITContext() {
@@ -275,11 +275,11 @@ public:
                 }
                 basicBlockContexts.clear();
             }
-            
-            delete builder; 
+
+            delete builder;
         }
     };
-    
+
 private:
     llvm::Module* m_JITModule;
     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
@@ -296,7 +296,7 @@ private:
 
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
-    
+
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
     void writeLandingPad(TJITContext& jit);
@@ -314,7 +314,7 @@ private:
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
     void doSpecial(TJITContext& jit);
-    
+
     void doPrimitive(TJITContext& jit);
     void compilePrimitive(TJITContext& jit,
                             uint8_t opcode,
@@ -331,22 +331,22 @@ private:
 
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
-    
+
     uint32_t m_callSiteIndex;
     std::map<uint32_t, uint32_t> m_callSiteIndexToOffset;
 public:
-    uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; } 
+    uint32_t getCallSiteOffset(const uint32_t index) { return m_callSiteIndexToOffset[index]; }
     TBaseFunctions& getBaseFunctions() { return m_baseFunctions; }
     TRuntimeAPI& getRuntimeAPI() { return m_runtimeAPI; }
     TJITGlobals& getJitGlobals() { return m_globals; }
     TObjectTypes& getBaseTypes() { return m_baseTypes; }
-    
+
     llvm::Function* compileMethod(
         TMethod* method,
         llvm::Function* methodFunction = 0,
         llvm::Value** contextHolder = 0
     );
-    
+
     // TStackObject is a pair of entities allocated on a thread stack space
     // objectSlot is a container for actual object's data
     // objectHolder is a pointer to the objectSlot which is registered in GC roots
@@ -355,7 +355,7 @@ public:
         llvm::AllocaInst* objectSlot;
         llvm::AllocaInst* objectHolder;
     };
-    
+
     TStackObject allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
     MethodCompiler(
@@ -372,7 +372,7 @@ public:
     }
 };
 
-// TDeferredValue is used in cases when some particular actions should be done 
+// TDeferredValue is used in cases when some particular actions should be done
 // when get() method is invoked. Typically this is used to pass an llvm Value*
 // to the later code ensuring that it will not be broken by a garbage collection.
 struct TDeferredValue : public TStackValue {
@@ -381,17 +381,17 @@ struct TDeferredValue : public TStackValue {
         loadArgument,
         loadTemporary,
         loadLiteral,
-        
-        // result of message sent 
-        // or pushed block 
+
+        // result of message sent
+        // or pushed block
         loadHolder
     };
-    
+
 private:
     TOperation   m_operation;
     uint32_t     m_index;
     llvm::Value* m_argument;
-    
+
     MethodCompiler::TJITContext* m_jit;
 public:
     TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index) {
@@ -400,14 +400,14 @@ public:
         m_index = index;
         m_jit = jit;
     }
-    
+
     TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument) {
         m_operation = operation;
         m_argument = argument;
         m_index = 0;
         m_jit = jit;
     }
-    
+
     virtual ~TDeferredValue() { }
     virtual llvm::Value* get();
 };
@@ -434,11 +434,11 @@ class JITRuntime {
 public:
     typedef TObject* (*TMethodFunction)(TContext*);
     typedef TObject* (*TBlockFunction)(TBlock*);
-    
+
 private:
     llvm::FunctionPassManager* m_functionPassManager;
     llvm::PassManager*         m_modulePassManager;
-    
+
     SmalltalkVM* m_softVM;
     llvm::ExecutionEngine* m_executionEngine;
     MethodCompiler* m_methodCompiler;
@@ -452,7 +452,7 @@ private:
     static JITRuntime* s_instance;
 
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex = 0);
-    
+
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     TObject* invokeBlock(TBlock* block, TContext* callingContext);
 
@@ -461,7 +461,7 @@ private:
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
-    
+
     struct TFunctionCacheEntry
     {
         TMethod* method;
@@ -472,14 +472,14 @@ private:
     {
         TMethod* containerMethod;
         uint32_t blockOffset;
-        
+
         TBlockFunction function;
     };
-    
+
     static const unsigned int LOOKUP_CACHE_SIZE = 512;
     TFunctionCacheEntry      m_functionLookupCache[LOOKUP_CACHE_SIZE];
     TBlockFunctionCacheEntry m_blockFunctionLookupCache[LOOKUP_CACHE_SIZE];
-    
+
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
     uint32_t m_blockCacheHits;
@@ -487,12 +487,12 @@ private:
     uint32_t m_messagesDispatched;
     uint32_t m_blocksInvoked;
     uint32_t m_objectsAllocated;
-    
+
     TMethodFunction lookupFunctionInCache(TMethod* method);
     TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
     void updateFunctionCache(TMethod* method, TMethodFunction function);
     void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
-    
+
     void initializePassManager();
 
     //The following methods use m_baseTypes. Don't forget to init it before calling these methods
@@ -501,46 +501,46 @@ private:
     void initializeExceptionAPI();
     void createExecuteProcessFunction();
 
-public:    
-    struct TCallSite {        
+public:
+    struct TCallSite {
         typedef std::map<TClass*, uint32_t> TClassHitsMap;
-        
+
         uint32_t hitCount;
         TSymbol* messageSelector;
         TClassHitsMap classHits;
         TCallSite() : hitCount(0), messageSelector(0) {}
     };
-    
+
     struct THotMethod {
         typedef std::map<uint32_t, TCallSite> TCallSiteMap;
-        
+
         bool processed;
         uint32_t hitCount;
         TMethod* method;
         llvm::Function* methodFunction;
         TCallSiteMap callSites;
-        
+
         THotMethod() : processed(false), hitCount(0), method(0), methodFunction(0) {}
     };
-    
+
     struct TDirectBlock {
         llvm::BasicBlock* basicBlock;
         llvm::Value* returnValue;
-        
+
         llvm::Value* contextHolder;
         llvm::Value* tempsHolder;
     };
-    
+
     struct TPatchInfo {
         llvm::Instruction* callInstruction;
         llvm::Value* messageArguments;
         llvm::BasicBlock* nextBlock;
         llvm::Value* contextHolder;
     };
-    
+
     typedef std::map<TMethodFunction, THotMethod> THotMethodsMap;
     typedef std::map<TClass*, TDirectBlock> TDirectBlockMap;
-    
+
 private:
     THotMethodsMap m_hotMethods;
     void updateHotSites(TMethodFunction methodFunction, TContext* callingContext, TSymbol* message, TClass* receiverClass, uint32_t callSiteIndex);
@@ -551,13 +551,13 @@ private:
     bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
     void patchHotMethods();
-    void printMethod(TMethod* method) { 
+    void printMethod(TMethod* method) {
         std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
         llvm::Function* methodFunction = m_JITModule->getFunction(functionName);
-        
+
         if (!methodFunction)
             llvm::outs() << "Compiled method " << functionName << " is not found\n";
-        else 
+        else
             llvm::outs() << *methodFunction;
     }
     static JITRuntime* Instance() { return s_instance; }
@@ -569,7 +569,7 @@ public:
 
     void optimizeFunction(llvm::Function* function);
     void printStat();
-    
+
     void initialize(SmalltalkVM* softVM);
     ~JITRuntime();
 };

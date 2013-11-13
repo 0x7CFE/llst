@@ -24,7 +24,7 @@ void createGlobals() {
     //First of all, lets init tGlobals
     tGlobals.x = 42;
     tGlobals.y = 23;
-    
+
     LLVMContext& context = M->getContext();
     StructType* globalsType = StructType::create(context, "struct.TGlobals");
     Type* globalsTypeFields[] = {
@@ -32,8 +32,8 @@ void createGlobals() {
         IntegerType::get(context, 32)  //y
     };
     globalsType->setBody(globalsTypeFields, false);
-    
-    
+
+
     GlobalVariable* globals = cast<GlobalVariable>( M->getOrInsertGlobal("globals", globalsType) );
 }
 
@@ -41,22 +41,22 @@ int main() {
     InitializeNativeTarget();
     LLVMContext& Context = getGlobalContext();
     M = new Module("test", Context);
-  
+
     createGlobals();
-  
+
     Function* testGlobals = cast<Function>(M->getOrInsertFunction("testGlobals", Type::getInt32Ty(Context), NULL));
 
     BasicBlock *BB = BasicBlock::Create(Context, "", testGlobals);
     IRBuilder<> builder(BB);
-    
+
     GlobalValue* globals = M->getGlobalVariable("globals");
-    
+
     Value* globalsX = builder.CreateStructGEP(globals, 0);
     Value* xValue   = builder.CreateLoad(globalsX);
     builder.CreateRet(xValue);
 
     ExecutionEngine* EE = EngineBuilder(M).create();
-    
+
     // !!!! map globals
     EE->addGlobalMapping(globals, reinterpret_cast<void*>(&tGlobals));
 

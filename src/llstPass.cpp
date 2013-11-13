@@ -52,10 +52,10 @@ bool isLoadFromRoot(LoadInst* Load) {
     AllocaInst* pointerAlloc = dyn_cast<AllocaInst>(Load->getPointerOperand());
     if (!pointerAlloc)
         return false;
-    
+
     Function* F = Load->getParent()->getParent();
     BasicBlock& entryBB = F->getEntryBlock();
-    
+
     for (BasicBlock::iterator I = entryBB.begin(); I != entryBB.end(); ++I) {
         if (IntrinsicInst* createRootCall = dyn_cast<IntrinsicInst>(I)) {
             if(createRootCall->getCalledFunction()->getIntrinsicID() == Intrinsic::gcroot) {
@@ -74,10 +74,10 @@ bool LLSTPass::isPotentialGCFunction(Function* F)
     std::string name = F->getName();
     if (m_GCFunctionNames.find(name) != m_GCFunctionNames.end())
         return true;
-    
+
     if (F->isIntrinsic())
         return false;
-    
+
     if ( F->getGC() )
         return true;
     return false;
@@ -88,7 +88,7 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
 {
     InstructionVector LoadNCall;
     InstructionSet toDelete;
-    
+
     for (BasicBlock::iterator Instr = B->begin(); Instr != B->end(); ++Instr)
     {
         if ( LoadInst* load = dyn_cast<LoadInst>(Instr) ) {
@@ -102,21 +102,21 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
             }
         }
     }
-    
+
     for(std::size_t i = 0; i < LoadNCall.size(); i++)
     {
         if( isa<CallInst>(LoadNCall[i]) )
             continue;
-        
+
         LoadInst* CurrentLoad = dyn_cast<LoadInst>(LoadNCall[i]);
-        
+
         for(std::size_t j = i+1; j < LoadNCall.size(); j++)
         {
             if( isa<CallInst>(LoadNCall[j]) )
                 break; // we have faced a call that might collect garbage
-            
+
             LoadInst* NextLoad = dyn_cast<LoadInst>(LoadNCall[j]);
-            
+
             if (NextLoad->isIdenticalTo(CurrentLoad)) {
                 //Loads are equal
                 NextLoad->replaceAllUsesWith( CurrentLoad );
@@ -124,14 +124,14 @@ bool LLSTPass::removeRootLoads(BasicBlock* B)
             }
         }
     }
-    
+
     rootLoadsRemoved += toDelete.size();
-    
+
     bool BBChanged = !toDelete.empty();
     for(InstructionSI I = toDelete.begin(); I != toDelete.end(); ++I) {
         (*I)->eraseFromParent();
     }
-    
+
     return BBChanged;
 }
 
@@ -163,7 +163,7 @@ bool LLSTPass::removeRedundantRoots(Function& F)
             {
                 if (! isa<ConstantPointerNull>(createRootCall->getArgOperand(1)))
                     continue; // this is a special case of stack objects that should be preserved
-                    
+
                 Value* holder = cast<Instruction>( createRootCall->getArgOperand(0)->stripPointerCasts() );
                 bool onlyStoresToRoot = true;
                 for(Value::use_iterator U = holder->use_begin(); U != holder->use_end() ; ++U) {
@@ -188,10 +188,10 @@ bool LLSTPass::removeRedundantRoots(Function& F)
     for(InstructionSI I = toDelete.begin(); I != toDelete.end(); ++I) {
         (*I)->eraseFromParent();
     }
-    
+
     //If there are no gc.root intrinsics why should we use GC for that function?
     if (getNumRoots(F) == 0)
         F.clearGC();
-    
+
     return CFGChanged;
 }

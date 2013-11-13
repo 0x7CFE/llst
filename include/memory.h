@@ -1,41 +1,39 @@
 /*
- *    memory.h 
- *    
+ *    memory.h
+ *
  *    LLST memory management routines and interfaces
- *    
+ *
  *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
- *    
- *    LLST is 
+ *
+ *    LLST is
  *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
  *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
- *    
- *    LLST is based on the LittleSmalltalk which is 
+ *
+ *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
  *        Copyright (C) 2007 by Charles R. Childers
  *        Copyright (C) 2005-2007 by Danny Reinhold
- *        
+ *
  *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *        
- *    
+ *
+ *
  *    This file is part of LLST.
  *    LLST is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation, either version 3 of the License, or
  *    (at your option) any later version.
- *    
+ *
  *    LLST is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *    GNU General Public License for more details.
- *    
+ *
  *    You should have received a copy of the GNU General Public License
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #ifndef LLST_MEMORY_H_INCLUDED
 #define LLST_MEMORY_H_INCLUDED
-
-// #include <stdarg.h>
 
 #include <cstddef>
 #include <stdint.h>
@@ -51,7 +49,7 @@ struct TMemoryManagerInfo {
     uint32_t collectionsCount;
     uint32_t allocationsCount;
     uint64_t totalCollectionDelay;
-    
+
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
     uint64_t rightCollectionDelay;
@@ -74,44 +72,44 @@ class IMemoryManager {
 public:
     virtual bool initializeHeap(std::size_t heapSize, std::size_t maxSize = 0) = 0;
     virtual bool initializeStaticHeap(std::size_t staticHeapSize) = 0;
-    
+
     virtual void* allocate(std::size_t size, bool* collectionOccured = 0) = 0;
     virtual void* staticAllocate(std::size_t size) = 0;
     virtual void  collectGarbage() = 0;
-    
+
     virtual bool  checkRoot(TObject* value, TObject** objectSlot) = 0;
     virtual void  addStaticRoot(TObject** pointer) = 0;
     virtual void  removeStaticRoot(TObject** pointer) = 0;
     virtual bool  isInStaticHeap(void* location) = 0;
-    
+
     // External pointer handling
     virtual void  registerExternalHeapPointer(object_ptr& pointer) = 0;
     virtual void  releaseExternalHeapPointer(object_ptr& pointer) = 0;
-    
+
     virtual uint32_t allocsBeyondCollection() = 0;
     virtual TMemoryManagerInfo getStat() = 0;
-    
+
     virtual ~IMemoryManager() {};
 };
 
 // When pointer to a heap object is stored outside of the heap,
 // specific actions need to be taken in order to prevent pointer
-// invalidation due to GC procedure. External pointers need to be 
+// invalidation due to GC procedure. External pointers need to be
 // registered in GC so it will use this pointers as roots for the
-// object traversing. GC will update the pointer data with the 
+// object traversing. GC will update the pointer data with the
 // actual object location. hptr<> helps to organize external pointers
-// by automatically calling registerExternalPointer() in constructor 
+// by automatically calling registerExternalPointer() in constructor
 // and releaseExternalPointer() in desctructor.
 //
-// External pointers are widely used in the VM execution code. 
+// External pointers are widely used in the VM execution code.
 // VM provide helper functions newPointer() and newObject() which
 // deal with hptr<> in a user friendly way. Use of these functions
-// is highly recommended. 
+// is highly recommended.
 
 template <typename O> class hptr_base {
 public:
     typedef O Object;
-    
+
 protected:
     object_ptr target;  // TODO static heap optimization && volatility
     IMemoryManager* mm; // TODO assign on copy operators
@@ -123,27 +121,24 @@ public:
         if (mm && registerPointer) mm->registerExternalHeapPointer(target);
             //mm->registerExternalPointer((TObject**) &target);
     }
-    
+
     hptr_base(const hptr_base<Object>& pointer) : target(pointer.target.data), mm(pointer.mm), isRegistered(true)
     {
         if (mm) mm->registerExternalHeapPointer(target);
-        //if (mm) { mm->registerExternalPointer((TObject**) &target); }
     }
-    
+
     ~hptr_base() { if (mm && isRegistered) mm->releaseExternalHeapPointer(target); }
-    
+
     //hptr_base<Object>& operator = (hptr_base<Object>& pointer) { target = pointer.target; return *this; }
     //hptr_base<Object>& operator = (Object* object) { target = object; return *this; }
-    
+
     Object* rawptr() const { return static_cast<Object*>(target.data); }
     Object* operator -> () const { return static_cast<Object*>(target.data); }
     //Object& (operator*)() const { return *target; }
     operator Object*() const { return static_cast<Object*>(target.data); }
-    
+
     template<typename C> C* cast() const { return static_cast<C*>(target.data); }
 };
-
-//typedef hptr_base<TObject>::object_ptr object_ptr;
 
 template <typename O> class hptr : public hptr_base<O> {
 public:
@@ -152,7 +147,7 @@ public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
-    
+
 //     template<typename I>
 //     Object& operator [] (I index) const { return hptr_base<Object>::target->operator[](index); }
 };
@@ -167,13 +162,8 @@ public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
-    
-    template<typename I>
-    T*& operator [] (I index) const { 
-        TObject** field = &hptr_base<Object>::target.data->operator[](index); 
-        T** element = static_cast<T**>(field);
-        return *element;
-    }
+
+    template<typename I> T*& operator [] (I index) const { return hptr_base<Object>::target.data->operator[](index); }
 };
 
 // Hptr specialization for TByteObject.
@@ -185,7 +175,7 @@ public:
 public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
-    
+
     uint8_t& operator [] (uint32_t index) const { return static_cast<Object*>(target.data)->operator[](index); }
 };
 
@@ -200,26 +190,26 @@ public:
 // When collection is done heaps are interchanged so the new one became active.
 // All objects that were not moved during the collection are said to be disposed,
 // so thier space may be reused by newly allocated ones.
-// 
+//
 class BakerMemoryManager : public IMemoryManager
 {
 protected:
     uint32_t  m_collectionsCount;
     uint32_t  m_allocationsCount;
     uint64_t  m_totalCollectionDelay;
-    
+
     std::size_t m_heapSize;
     std::size_t m_maxHeapSize;
-    
+
     uint8_t*  m_heapOne;
     uint8_t*  m_heapTwo;
     bool      m_activeHeapOne;
-    
+
     uint8_t*  m_inactiveHeapBase;
     uint8_t*  m_inactiveHeapPointer;
     uint8_t*  m_activeHeapBase;
     uint8_t*  m_activeHeapPointer;
-    
+
     std::size_t m_staticHeapSize;
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
@@ -243,7 +233,7 @@ protected:
     /*virtual*/ TMovableObject* moveObject(TMovableObject* object);
     virtual void moveObjects();
     virtual void growHeap(uint32_t requestedSize);
-    
+
     // These variables contain an array of pointers to objects from the
     // static heap to the dynamic one. Ihey are used during the GC
     // as a root for pointer iteration.
@@ -264,26 +254,26 @@ protected:
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
-    
+
     virtual bool  initializeHeap(std::size_t heapSize, std::size_t maxHeapSize = 0);
     virtual bool  initializeStaticHeap(std::size_t staticHeapSize);
     virtual void* allocate(std::size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(std::size_t requestedSize);
     virtual void  collectGarbage();
-    
+
     virtual bool  checkRoot(TObject* value, TObject** objectSlot);
     virtual void  addStaticRoot(TObject** pointer);
     virtual void  removeStaticRoot(TObject** pointer);
     virtual bool  isInStaticHeap(void* location);
-    
+
     // External pointer handling
     virtual void  registerExternalHeapPointer(object_ptr& pointer);
     virtual void  releaseExternalHeapPointer(object_ptr& pointer);
-    
+
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
     virtual uint32_t allocsBeyondCollection() { return m_allocationsCount; }
-    
+
     virtual TMemoryManagerInfo getStat();
 };
 
@@ -293,24 +283,24 @@ protected:
     uint32_t m_leftToRightCollections;
     uint32_t m_rightToLeftCollections;
     uint32_t m_rightCollectionDelay;
-    
+
     void collectLeftToRight(bool fullCollect = false);
     void collectRightToLeft();
     bool checkThreshold();
     void moveYoungObjects();
-    
+
     bool isInYoungHeap(void* location);
     void addCrossgenReference(TObject** pointer);
     void removeCrossgenReference(TObject** pointer);
-    
+
     typedef std::list<TMovableObject**> TPointerList;
     typedef std::list<TMovableObject**>::iterator TPointerIterator;
     TPointerList m_crossGenerationalReferences;
 public:
-    GenerationalMemoryManager() : BakerMemoryManager(), 
+    GenerationalMemoryManager() : BakerMemoryManager(),
         m_leftToRightCollections(0), m_rightToLeftCollections(0), m_rightCollectionDelay(0) { }
     virtual ~GenerationalMemoryManager();
-    
+
     virtual bool checkRoot(TObject* value, TObject** objectSlot);
     virtual void collectGarbage();
     virtual TMemoryManagerInfo getStat();
@@ -322,24 +312,24 @@ protected:
     size_t    m_heapSize;
     uint8_t*  m_heapBase;
     uint8_t*  m_heapPointer;
-    
+
     std::vector<void*> m_usedHeaps;
-    
+
     size_t    m_staticHeapSize;
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
-    
+
     void growHeap();
 public:
     NonCollectMemoryManager();
     virtual ~NonCollectMemoryManager();
-    
+
     virtual bool  initializeHeap(size_t heapSize, size_t maxHeapSize = 0);
     virtual bool  initializeStaticHeap(size_t staticHeapSize);
     virtual void* allocate(size_t requestedSize, bool* gcOccured = 0);
     virtual void* staticAllocate(size_t requestedSize);
     virtual bool  isInStaticHeap(void* location);
-    
+
     virtual void  collectGarbage() {}
     virtual void  addStaticRoot(TObject** pointer) {}
     virtual void  removeStaticRoot(TObject** pointer) {}
@@ -355,7 +345,7 @@ public:
 class LLVMMemoryManager : public BakerMemoryManager {
 protected:
     virtual void moveObjects();
-    
+
 public:
     struct TFrameMap {
         int32_t numRoots;
@@ -372,7 +362,7 @@ public:
     struct TMetaInfo {
         bool isStackObject : 1;
     };
-    
+
     LLVMMemoryManager();
     virtual ~LLVMMemoryManager();
 };
@@ -384,40 +374,40 @@ class Image
 private:
     int         m_imageFileFD;
     std::size_t m_imageFileSize;
-    
+
     void*    m_imageMap;     // pointer to the map base
     uint8_t* m_imagePointer; // sliding pointer
     std::vector<TObject*> m_indirects;
-    
+
     enum TImageRecordType {
         invalidObject = 0,
         ordinaryObject,
         inlineInteger,  // inline 32 bit integer in network byte order
-        byteObject,     // 
+        byteObject,     //
         previousObject, // link to previously loaded object
         nilObject       // uninitialized (nil) field
     };
-    
+
     uint32_t readWord();
     TObject* readObject();
     template<typename ResultType>
     ResultType* readObject() { return static_cast<ResultType*>(readObject()); }
     bool     openImageFile(const char* fileName);
     void     closeImageFile();
-    
+
     IMemoryManager* m_memoryManager;
 public:
-    Image(IMemoryManager* manager) 
-        : m_imageFileFD(-1), m_imageFileSize(0), 
-          m_imagePointer(0), m_memoryManager(manager) 
+    Image(IMemoryManager* manager)
+        : m_imageFileFD(-1), m_imageFileSize(0),
+          m_imagePointer(0), m_memoryManager(manager)
     { }
-    
+
     bool     loadImage(const char* fileName);
     void     storeImage(const char* fileName);
-    
+
     template<typename N> TObject* getGlobal(const N* name) const;
     template<typename T, typename N> T* getGlobal(const N* name) const { return static_cast<T*>(getGlobal(name)); }
-    
+
     class ImageWriter;
     // GLobal VM objects
 };
@@ -445,7 +435,7 @@ class Image::ImageWriter
 private:
     std::vector<TObject*> m_writtenObjects; //used to link objects together with type 'previousObject'
     TGlobals              m_globals;
-    
+
     TImageRecordType getObjectType(TObject* object) const;
     int              getPreviousObjectIndex(TObject* object) const;
     void             writeWord(std::ofstream& os, uint32_t word);

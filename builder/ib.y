@@ -53,7 +53,7 @@
 %token NENE         "~~"
 
 /*  arithmetics */
-%token MINUS        "-" 
+%token MINUS        "-"
 %token PLUS         "+"
 %token MUL          "*"
 %token DIV          "/"
@@ -80,7 +80,7 @@
 %left UNARY_MESSAGE
 %left "("
 
-%left UNARY_MINUS 
+%left UNARY_MINUS
 %nonassoc PRIMITIVE
 
 %%
@@ -94,25 +94,25 @@ image_contents : /* empty image */
     | method_definition
     ;
 
-image : image_contents initial_method;    
-    
+image : image_contents initial_method;
+
 id : IDENTIFIER;
 
 arg_id : ARGUMENT;
-    
+
 id_list_tail : /* empty tail */
     | id id_list_tail;
 
 id_list : id id_list_tail;
-    
+
 comment : COMMENT;
-    
-class_definition : 
+
+class_definition :
       CLASS id id id_list "\n"
     | error "\n"
     ;
 
-rawclass_definition : 
+rawclass_definition :
       RAWCLASS id id id id_list "\n"
     /* | error "\n" */
     ;
@@ -126,7 +126,7 @@ arg_list_tail : /* empty */
 
 arg_list : arg_id arg_list_tail;
 
-arguments : 
+arguments :
       arg_list "|"
     | error    "|" /* error recovery */
     ;
@@ -136,13 +136,13 @@ block_body :
     | arguments statements
     ;
 
-block : 
+block :
       "[" block_body "]"
     | "[" error      "]" /* error recovery */
     ;
 
-selector : SELECTOR;    
-    
+selector : SELECTOR;
+
 selector_value_pair: selector expression;
 
 key_message_tail : /* empty */
@@ -150,10 +150,10 @@ key_message_tail : /* empty */
 
 key_message : selector_value_pair key_message_tail;
 
-message : 
+message :
       /* simple unary message identifier */
-      id %prec UNARY_MESSAGE 
-      
+      id %prec UNARY_MESSAGE
+
       /* a set of selector-value pairs */
     | key_message %prec KEY_MESSAGE
     ;
@@ -172,7 +172,7 @@ string : STRING;
 symbol : SYMBOL;
 number : INTEGER;
 char   : CHARACTER;
-array  : 
+array  :
       "#(" literals ")"
     | "#(" error    ")"  /* error recovery */
     ;
@@ -183,7 +183,7 @@ literal:
     | number  /* number literal */
     | char    /* character literal $x */
     | array   /* inline literal array #( ) */
-    
+
     | "-" number %prec UNARY_MINUS
     ;
 
@@ -191,10 +191,10 @@ subexpression:
       "(" expression ")"
     | "(" error      ")" /* error recovery */
     ;
-    
-receiver : 
+
+receiver :
       id            /* global, temporary or instance variable identifier */
-    | literal       /* inline literal object */ 
+    | literal       /* inline literal object */
     | TRUE
     | FALSE
     | NIL
@@ -205,13 +205,13 @@ receiver :
     ;
 
 assignment : id "<-" expression;
-    
-expression : 
+
+expression :
       receiver
     | receiver message_chain
-    
+
     | assignment
-    
+
     | expression "+"  expression
     | expression "-"  expression
     | expression "*"  expression
@@ -224,28 +224,28 @@ expression :
     | expression ">"  expression
     | expression "<=" expression
     | expression ">=" expression
-    
+
     | expression "isNil"                            %prec UNARY_MESSAGE
     | expression "notNil"                           %prec UNARY_MESSAGE
     | expression "not"                              %prec UNARY_MESSAGE
-    
+
     | expression "and:"     block                   %prec SPECIAL_MESSAGE
     | expression "or:"      block                   %prec SPECIAL_MESSAGE
-    
+
     | expression "ifTrue:"  block                   %prec SPECIAL_MESSAGE
     | expression "ifFalse:" block                   %prec SPECIAL_MESSAGE
     | expression "ifTrue:"  block "ifFalse:" block  %prec SPECIAL_MESSAGE
     | expression "ifFalse:" block "ifTrue:"  block  %prec SPECIAL_MESSAGE
-    
+
     /* TODO #to:do: #to:by:do: */
     | block "whileTrue:"    block                   %prec SPECIAL_MESSAGE
     | block "whileFalse:"   block                   %prec SPECIAL_MESSAGE
-    
+
     | block "whileTrue"                             %prec UNARY_MESSAGE
     | block "whileFalse"                            %prec UNARY_MESSAGE
     ;
 
-return: 
+return:
       "^" expression
     | "^" primitive
     ;
@@ -253,40 +253,40 @@ return:
 primitive_params : /* empty */
     | receiver primitive_params;
 
-primitive : 
+primitive :
       "<" number primitive_params ">" %prec PRIMITIVE
     | "<" error ">" /* error recovery */
     ;
 
-statement : 
+statement :
       expression
     | primitive
     | return
     ;
 
-statements : /* empty */    
+statements : /* empty */
     | statement "." statements
     | statement /* last one in a block */
-    
+
     | error "." /* error recovery till end of a statement */
     ;
 
 method_body : statements;
 
-temporaries : 
+temporaries :
       "|" id_list "|"
     | "|" error   "|" /* error recovery */
     ;
 
 method_interface_tail : /* empty */
     | selector id;
-    
-method_interface : 
+
+method_interface :
       id                                /* simple unary method name */
     | selector id method_interface_tail /* parametrized method */
     ;
 
-method : 
+method :
       method_interface method_body "!"
     | method_interface temporaries method_body "!"
     | error "!" /* error recovery till end of a method */

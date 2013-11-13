@@ -30,7 +30,7 @@ NL    \n
 <STRING>{NL}+                       m_buf += yytext; yylloc->lines(yyleng);
 <STRING>"'"                         BEGIN(INITIAL); RETURN_B(STRING);
 
-"."             RETURN( DOT          );     
+"."             RETURN( DOT          );
 ";"             RETURN( CASCADE      );
 "^"             RETURN( RET          );
 "|"             RETURN( PIPE         );
@@ -57,7 +57,7 @@ NL    \n
 "*"             RETURN( MUL          );
 "/"             RETURN( DIV          );
 
-"isNil"         RETURN( ISNIL        );        
+"isNil"         RETURN( ISNIL        );
 "notNil"        RETURN( NOTNIL       );
 "not"           RETURN( NOT          );
 "and:"          RETURN( AND          );
@@ -69,10 +69,10 @@ NL    \n
 "whileTrue"     RETURN( UNARY_WHILETRUE  );
 "whileFalse"    RETURN( UNARY_WHILEFALSE );
 
-true            RETURN(TRUE);         
-false           RETURN(FALSE);        
-nil             RETURN(NIL);          
-self            RETURN(SELF);        
+true            RETURN(TRUE);
+false           RETURN(FALSE);
+nil             RETURN(NIL);
+self            RETURN(SELF);
 super           RETURN(SUPER);
 
 
@@ -85,13 +85,13 @@ super           RETURN(SUPER);
                                             PushError(yylloc, "symbol is too long");
                                         RETURN(SYMBOL);
                                     }
-                                    
+
 \:[a-zA-Z_][a-zA-Z0-9_]*            {
                                         if(strlen(yytext) > 128)
                                             PushError(yylloc, "argument identifier is too long");
                                         RETURN(ARGUMENT);
                                     }
-                                    
+
 [a-zA-Z_][a-zA-Z0-9_]\:*            {
                                         if(strlen(yytext) > 128)
                                             PushError(yylloc, "selector is too long");
@@ -104,8 +104,8 @@ super           RETURN(SUPER);
                                         RETURN(IDENTIFIER);
                                     }
 
-                                    
 
-                                    
-                                    
+
+
+
 %%

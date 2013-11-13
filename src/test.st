@@ -36,7 +36,7 @@ tryCatch: anException with: aBlock
 
 METHOD Block
 test
-    [ Exception throw: 'Hello' ] 
+    [ Exception throw: 'Hello' ]
         tryCatch: Exception
         with: [ :e | e printStackTrace ].
 !
