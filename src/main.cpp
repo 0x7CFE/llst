@@ -37,9 +37,12 @@
 #include <memory>
 
 #include <vm.h>
-#include <jit.h>
 #include <console.h>
 #include <args.h>
+
+#if defined(LLVM)
+    #include <jit.h>
+#endif
 
 int main(int argc, char **argv) {
     args llstArgs;
@@ -50,7 +53,11 @@ int main(int argc, char **argv) {
     
     llstArgs.parse(argc, argv);
     
+#if defined(LLVM)    
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
+#else
+    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
+#endif
     memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
     
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
@@ -107,9 +114,11 @@ int main(int argc, char **argv) {
         }
     }
 
+#if defined(LLVM)    
     JITRuntime runtime;
     runtime.initialize(&vm);
-
+#endif
+    
     // Creating runtime context
     hptr<TContext> initContext = vm.newObject<TContext>();
     hptr<TProcess> initProcess = vm.newObject<TProcess>();
@@ -175,7 +184,10 @@ int main(int argc, char **argv) {
            info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, static_cast<uint32_t>(info.totalCollectionDelay));
     
     vm.printVMStat();
+
+#if defined(LLVM)
     runtime.printStat();
+#endif
     
     return 0;
 }
