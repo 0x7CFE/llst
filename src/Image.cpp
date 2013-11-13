@@ -68,7 +68,7 @@ bool Image::openImageFile(const char* fileName)
     m_imageFileFD = open(fileName, O_RDONLY);
     if (m_imageFileFD < 0)
     {
-        std::fprintf(stderr, "Failed to open file %s : %s\n", fileName, strerror(errno));
+        std::fprintf(stderr, "Failed to open file %s : %s\n", fileName, std::strerror(errno));
         return false;
     }
 
@@ -77,7 +77,7 @@ bool Image::openImageFile(const char* fileName)
     if (fstat(m_imageFileFD, &st) < 0) {
         close(m_imageFileFD);
         m_imageFileFD = -1;
-        std::fprintf(stderr, "Failed to get file size : %s\n", strerror(errno));
+        std::fprintf(stderr, "Failed to get file size : %s\n", std::strerror(errno));
         return false;
     }
     m_imageFileSize = st.st_size;
@@ -92,7 +92,7 @@ bool Image::openImageFile(const char* fileName)
         0);               // from the very beginning (zero offset)
 
     if (!m_imageMap) {
-        std::fprintf(stderr, "Failed to mmap image file: %s\n", strerror(errno));
+        std::fprintf(stderr, "Failed to mmap image file: %s\n", std::strerror(errno));
 
         // Something goes wrong
         close(m_imageFileFD);
