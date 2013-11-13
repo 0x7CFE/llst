@@ -52,20 +52,15 @@
 // Placeholder for root objects
 TGlobals globals;
 
-
-TObject* Image::getGlobal(const char* name)
-{
+template<typename N>
+TObject* Image::getGlobal(const N* name) const {
     TDictionary* globalsDictionary = globals.globalsObject;
     TObject* result = globalsDictionary->find(name);
     return result;
 }
 
-TObject* Image::getGlobal(TSymbol* name)
-{
-    TDictionary* globalsDictionary = globals.globalsObject;
-    TObject* result = globalsDictionary->find(name);
-    return result;
-}
+template TObject* Image::getGlobal<char>(const char* key) const;
+template TObject* Image::getGlobal<TSymbol>(const TSymbol* key) const;
 
 bool Image::openImageFile(const char* fileName)
 {
