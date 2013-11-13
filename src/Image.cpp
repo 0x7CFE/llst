@@ -147,8 +147,7 @@ TObject* Image::readObject()
             uint32_t fieldsCount = readWord();
 
             std::size_t slotSize = sizeof(TObject) + fieldsCount * sizeof(TObject*);
-            void*  objectSlot = m_memoryManager->staticAllocate(slotSize);
-
+            void* objectSlot = m_memoryManager->staticAllocate(slotSize);
             TObject* newObject = new(objectSlot) TObject(fieldsCount, 0);
             m_indirects.push_back(newObject);
 
@@ -177,9 +176,9 @@ TObject* Image::readObject()
 
             // We need to align memory by even addresses so that
             // normal pointers will always have the lowest bit 0
-            slotSize = (slotSize + sizeof(TObject*) - 1) & ~0x3;
+            slotSize = correctPadding(slotSize);
 
-            void*  objectSlot = m_memoryManager->staticAllocate(slotSize);
+            void* objectSlot = m_memoryManager->staticAllocate(slotSize);
             TByteObject* newByteObject = new(objectSlot) TByteObject(dataSize, 0);
             m_indirects.push_back(newByteObject);
 
