@@ -137,7 +137,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // Initializing JIT module.
     // All JIT functions will be created here
     SMDiagnostic Err;
-    m_JITModule = ParseIRFile("../include/llvm_types.ll", Err, llvmContext); // FIXME Hardcoded path
+    m_JITModule = ParseIRFile("../include/Core.ll", Err, llvmContext); // FIXME Hardcoded path
     if (!m_JITModule) {
         Err.print("JITRuntime.cpp", errs());
         std::exit(1);
