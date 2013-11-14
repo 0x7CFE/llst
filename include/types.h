@@ -205,6 +205,7 @@ struct TSymbol : public TByteObject {
     // Helper comparison function functional object. Compares two symbols (or it's string representation).
     // Returns true when 'left' is found to be less than 'right'.
     struct TCompareFunctor {
+        TCompareFunctor() { }
         // This function compares two byte objects depending on their lenght and contents
         bool operator() (const TSymbol* left, const TSymbol* right) const;
         // This function compares byte object and null terminated string depending on their lenght and contents
