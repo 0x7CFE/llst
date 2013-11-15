@@ -26,7 +26,7 @@ if (LLVM)
     add_definitions(-DLLVM)
 endif()
 
-set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} ${LLVM_LD_FLAGS} -Wall -fexceptions -frtti -Wno-cast-qual")
+set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} -Wall -fexceptions -frtti -Wno-cast-qual")
 set (CMAKE_CXX_FLAGS_DEBUG "-g -ggdb -O0")
 set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 
@@ -62,7 +62,7 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} dl pthread readline)
+target_link_libraries(llst ${LLVM_LIBS} pthread readline ${LLVM_LD_FLAGS})
 
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     # this is a 64-bit OS
