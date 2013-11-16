@@ -60,7 +60,7 @@ inline std::size_t correctPadding(std::size_t size) { return (size + sizeof(void
 typedef int32_t TInteger;
 
 // Helper functions for TInteger operation
-inline bool     isSmallInteger(TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
+inline bool     isSmallInteger(const TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
 inline int32_t  getIntegerValue(TInteger value) { return (value >> 1); }
 inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
 
@@ -145,6 +145,8 @@ public:
     TObject*  getField(uint32_t index) { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
+
+    template<typename T> T* cast() const { return static_cast<T*>(this); }
 
     // Helper constant for template instantination
     enum { InstancesAreBinary = false };
