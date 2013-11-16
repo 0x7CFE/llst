@@ -48,6 +48,9 @@ set(CPP_FILES
     src/TInstruction.cpp
     src/TSymbol.cpp
     src/vm.cpp
+
+    # Native method implementations
+    src/TArray.cpp
 )
 
 if (LLVM)

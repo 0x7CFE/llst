@@ -260,6 +260,9 @@ struct TArray : public TObject {
         Element** element = reinterpret_cast<Element**>(field);
         return *element;
     }
+
+    typedef TArray<TObject> TObjectArray;
+    TObjectArray* sortBy(TObjectArray* args); // native
 };
 
 typedef TArray<TObject> TObjectArray;

@@ -2652,6 +2652,7 @@ replaceFrom: start to: stop with: replacement
 !
 METHOD Array
 sort: aBlock
+    <247>
     ^ (super asList sort: aBlock) asArray
 !
 

@@ -178,6 +178,7 @@ public:
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager)
     {
         flushMethodCache();
+        registerBuiltinNatives();
     }
 
     TExecuteResult execute(TProcess* p, uint32_t ticks);
@@ -227,6 +228,7 @@ public:
         }
     }
 
+    void registerBuiltinNatives();
     void printVMStat();
 };
 

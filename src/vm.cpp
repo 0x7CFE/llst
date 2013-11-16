@@ -1140,3 +1140,11 @@ void SmalltalkVM::printVMStat()
     std::printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n",
         m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }
+
+void SmalltalkVM::registerBuiltinNatives() {
+    static const TNativeMethod arrayMethods[] = {
+        { "sort:", (PNativeMethod) &TArray<TObject>::sortBy }
+    };
+
+    registerNativeMethods(getClass("Array"), arrayMethods);
+}
