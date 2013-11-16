@@ -188,24 +188,15 @@ public:
 
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
 
-    class TNativeMethod {
-    public:
-        virtual ~TNativeMethod() { }
-        virtual TObject* run() = 0;
+    typedef TObject* (TObject::*PNativeMethod)(TObjectArray* args);
+    typedef std::map<TSymbol*, PNativeMethod> TSymbolToNativeMethodMap;
+    typedef std::map<TClass*, TSymbolToNativeMethodMap> TNativeMethodMap;
 
-        void setVM(SmalltalkVM* vm) { m_VM = vm; }
-        void setArguments(TObjectArray* arguments) { m_arguments = arguments; }
-    protected:
-        SmalltalkVM* getVM() { return m_VM; }
-        TObjectArray* getArguments() { return m_arguments; }
-        TObject* getSelf() { return m_arguments->getField(0); }
-    private:
-        SmalltalkVM* m_VM;
-        TObjectArray* m_arguments;
+    struct TNativeMethod {
+        const char* selector;
+        PNativeMethod method;
     };
 
-    typedef std::map<TSymbol*, TNativeMethod*> TSymbolToNativeMethodMap;
-    typedef std::map<TClass*, TSymbolToNativeMethodMap> TNativeMethodMap;
     TNativeMethodMap m_nativeMethods;
 
     TSymbol* getSymbol(const char* symbol) {
@@ -220,27 +211,20 @@ public:
         return (TClass*) globals.nilObject; // TODO
     }
 
-    void addMethod(TClass* klass, TSymbol* selector, TNativeMethod* method) {
-        method->setVM(this);
+    void addMethod(TClass* klass, TSymbol* selector, PNativeMethod method) {
         m_nativeMethods[klass][selector] = method;
-
-        // Stub method contains the only bytecode which invokes control primitive
-        // Primitive knows the method selector and thus may find the actual actual
-        // implementation in the m_classMap which will then be called.
-        hptr<TClass> pClass = newPointer(klass);
-        hptr<TMethod> stubMethod = newObject<TMethod>();
-        stubMethod->klass = pClass;
-        stubMethod->stackSize = newInteger(0); // FIXME check if it will work
-        stubMethod->temporarySize = newInteger(0);
-        stubMethod->text = (TString*) globals.nilObject; // TODO newString("\"Call stub for native method %s>>%s\"\n    <247>\n", ...);
-        stubMethod->byteCodes = newObject<TByteArray>(1);
-        // TODO stubMethod->byteCodes->putByte(0, ?); <247> primitive
-
-        // TODO Send message klass->methods at: selector put: stubMethod
+        // TODO add stub method in the Smalltalk bytecodes
     }
 
-    void addMethod(const char* klass, const char* selector, TNativeMethod* method) {
-        addMethod(getClass(klass), getSymbol(selector), method);
+    template <std::size_t N>
+    void registerNativeMethods(TClass* klass, const TNativeMethod (&methods)[N]) {
+        //const std::size_t numMethods = sizeof(*methods) / sizeof(TNativeMethod);
+        TSymbolToNativeMethodMap& methodMap = m_nativeMethods[klass];
+        for (std::size_t i = 0; i < N; i++) {
+            TSymbol* selector = getSymbol(methods[i].selector);
+            methodMap[selector] = methods[i].method;
+            // TODO add stub method in the Smalltalk bytecodes
+        }
     }
 
     void printVMStat();

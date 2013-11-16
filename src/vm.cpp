@@ -831,12 +831,12 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
             }
 
-            // Initializing call info
-            TNativeMethod* nativeMethod = iNativeMethod->second;
-            nativeMethod->setArguments(ec.currentContext->arguments);
+            // Invoking native method
+            PNativeMethod nativeMethod = iNativeMethod->second;
+            TObjectArray* arguments = ec.currentContext->arguments;
+            TObject* self = arguments->getField(0);
 
-            // Executing native method
-            return nativeMethod->run();
+            return (self->*nativeMethod)(arguments);
         } break;
 
         case primitive::startNewProcess: { // 6
