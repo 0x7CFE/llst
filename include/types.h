@@ -250,6 +250,7 @@ struct TArray : public TObject {
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
     //       So the first element will have index 1, the second 2 and so on.
+    //       However, all native operators are working in a classic way.
     template<typename I>
     Element*& operator [] (I index) {
         // compile-time check whether Element is in the type tree of TObject
