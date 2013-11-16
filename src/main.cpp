@@ -101,12 +101,27 @@ int main(int argc, char **argv) {
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42);
 
-    class TestMethod : public SmalltalkVM::TNativeMethod {
-        virtual TObject* run() {
-            return globals.nilObject;
-        }
+    class TMyClass : public TObject {
+    private:
+        TObject* field1;
+        TInteger field2;
+    public:
+        TObject* getField1(TObjectArray* args) { return field1; }
+        TObject* getField2(TObjectArray* args) { return reinterpret_cast<TObject*>(field2); }
+
+        TObject* setField1(TObjectArray* args) { field1 = args->getField(1); return this; }
+        TObject* setField2(TObjectArray* args) { field2 = reinterpret_cast<TInteger>(args->getField(2)); return this; }
+
     };
-    vm.addMethod("Undefined", "testMethod", new TestMethod);
+
+    static const SmalltalkVM::TNativeMethod nativeMethods[] = {
+        { "field1",  (SmalltalkVM::PNativeMethod) &TMyClass::getField1 },
+        { "field2",  (SmalltalkVM::PNativeMethod) &TMyClass::getField2 },
+        { "field1:", (SmalltalkVM::PNativeMethod) &TMyClass::setField1 },
+        { "field2:", (SmalltalkVM::PNativeMethod) &TMyClass::setField2 }
+    };
+
+    vm.registerNativeMethods(vm.getClass("MyClass"), nativeMethods);
 
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
