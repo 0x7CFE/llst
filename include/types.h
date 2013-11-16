@@ -334,6 +334,8 @@ struct TDictionary : public TObject {
     template<typename K> TObject* find(const K* key) const;
     template<typename T, typename K> T* find(const K* key) const { return static_cast<T*>(find(key)); }
 
+    TObject* at(TObjectArray* args); // native
+
     static const char* InstanceClassName() { return "Dictionary"; }
 };
 

@@ -33,6 +33,7 @@
  */
 
 #include <types.h>
+#include <memory.h>
 #include <algorithm>
 
 template<typename K>
@@ -56,3 +57,9 @@ TObject* TDictionary::find(const K* key) const
 
 template TObject* TDictionary::find<char>(const char* key) const;
 template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
+
+TObject* TDictionary::at(TObjectArray* args) {
+    TSymbol* key = args->getField<TSymbol>(1);
+    TObject* result = find(key);
+    return result ? result : globals.nilObject;
+}

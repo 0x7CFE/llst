@@ -3096,6 +3096,7 @@ noKey
 !
 METHOD Dictionary
 at: key
+    <247>
 	^ self at: key ifAbsent: [ self noKey ]
 !
 METHOD Dictionary

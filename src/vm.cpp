@@ -1146,5 +1146,10 @@ void SmalltalkVM::registerBuiltinNatives() {
         { "sort:", (PNativeMethod) &TArray<TObject>::sortBy }
     };
 
+    static const TNativeMethod dictionaryMethods[] = {
+        { "at:", (PNativeMethod) &TDictionary::at }
+    };
+
     registerNativeMethods(getClass("Array"), arrayMethods);
+    registerNativeMethods(getClass("Dictionary"), dictionaryMethods);
 }
