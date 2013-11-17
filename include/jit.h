@@ -3,11 +3,11 @@
  *
  *    LLVM related routines
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.1
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
  *    LLST is
- *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
- *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
+ *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
