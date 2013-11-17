@@ -1,7 +1,7 @@
 /*
  *    CompletionEngine.h
  *
- *    Console completionn proposals engine
+ *    Console completion proposals engine
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.1
  *
@@ -42,7 +42,7 @@ private:
     typedef radix_tree< std::string, int > TCompletionDatabase;
     typedef std::vector< TCompletionDatabase::iterator > TProposals;
 
-    TCompletionDatabase m_completionDatabsae;
+    TCompletionDatabase m_completionDatabase;
     TProposals m_currentProposals;
     TProposals::iterator m_iCurrentProposal;
     int m_totalWords;
@@ -52,10 +52,10 @@ public:
     CompletionEngine() : m_totalWords(0) { }
     static CompletionEngine* Instance() { return s_instance.get(); }
 
-    void addWord(const std::string& word) { m_completionDatabsae[word] = m_totalWords++; }
+    void addWord(const std::string& word) { m_completionDatabase[word] = m_totalWords++; }
     void getProposals(const std::string& prefix) {
         m_currentProposals.clear();
-        m_completionDatabsae.prefix_match(prefix, m_currentProposals);
+        m_completionDatabase.prefix_match(prefix, m_currentProposals);
         m_iCurrentProposal = m_currentProposals.begin();
     }
     bool hasMoreProposals() { return m_iCurrentProposal != m_currentProposals.end(); }
