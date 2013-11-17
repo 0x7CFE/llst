@@ -3,7 +3,7 @@
  *
  *    Implementation of Image class which loads the file image into memory
  *
- *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.1
  *
  *    LLST is
  *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
