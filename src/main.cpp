@@ -37,8 +37,9 @@
 #include <memory>
 
 #include <vm.h>
-#include <console.h>
 #include <args.h>
+
+#include <CompletionEngine.h>
 
 #if defined(LLVM)
     #include <jit.h>
@@ -69,50 +70,10 @@ int main(int argc, char **argv) {
     }
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
+    // Creating completion database and filling it with info
     CompletionEngine* completionEngine = CompletionEngine::Instance();
+    completionEngine->initialize(globals.globalsObject);
     completionEngine->addWord("Smalltalk");
-    initializeCompletion();
-
-    // Populating completion database
-    TDictionary* globalObjects = globals.globalsObject;
-    for (uint32_t i = 0; i < globalObjects->keys->getSize(); i++) {
-        TSymbol* key   = (*globalObjects->keys)[i];
-        TObject* value = (*globalObjects->values)[i];
-
-        std::string keyString = key->toString();
-        char firstLetter = keyString[0];
-        if ( keyString != "Smalltalk" && std::isupper(firstLetter) ) {
-            TClass* currentClass = static_cast<TClass*>(value);
-
-            // Adding class name
-            completionEngine->addWord(currentClass->name->toString());
-
-            // Acquiring selectors of class methods
-            TSymbolArray* selectors = currentClass->methods->keys;
-            const uint32_t keysSize = selectors->getSize();
-
-            // Adding selectors
-            for ( uint32_t methodIndex = 0; methodIndex < keysSize; methodIndex++) {
-                const std::string methodName = (*selectors)[methodIndex]->toString();
-
-                // Adding method name
-                completionEngine->addWord(methodName);
-            }
-
-            // Adding metaclass name and methods
-            TClass* metaClass = currentClass->getClass();
-            //completionEngine->addWord(metaClass->name->toString());
-
-            TSymbolArray*  metaSelectors = metaClass->methods->keys;
-            const uint32_t metaSize = metaSelectors->getSize();
-            for (uint32_t methodIndex = 0; methodIndex < metaSize; methodIndex++) {
-                const std::string methodName = (*metaSelectors)[methodIndex]->toString();
-
-                // Adding meta method name
-                completionEngine->addWord(methodName);
-            }
-        }
-    }
 
 #if defined(LLVM)
     JITRuntime runtime;

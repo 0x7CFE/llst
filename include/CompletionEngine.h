@@ -1,7 +1,7 @@
 /*
- *    console.h
+ *    CompletionEngine.h
  *
- *    Console tools
+ *    Console completionn proposals engine
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.1
  *
@@ -32,18 +32,17 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <readline/readline.h>
 #include <radix_tree/radix_tree.hpp>
-#include <string>
 #include <memory>
+
+#include "types.h"
 
 class CompletionEngine {
 private:
-    typedef radix_tree< std::string, int > TCompletionTrie;
-    typedef std::vector< TCompletionTrie::iterator > TProposals;
-    
+    typedef radix_tree< std::string, int > TCompletionDatabase;
+    typedef std::vector< TCompletionDatabase::iterator > TProposals;
 
-    TCompletionTrie m_completionTrie;
+    TCompletionDatabase m_completionDatabsae;
     TProposals m_currentProposals;
     TProposals::iterator m_iCurrentProposal;
     int m_totalWords;
@@ -53,10 +52,10 @@ public:
     CompletionEngine() : m_totalWords(0) { }
     static CompletionEngine* Instance() { return s_instance.get(); }
 
-    void addWord(const std::string& word) { m_completionTrie[word] = m_totalWords++; }
+    void addWord(const std::string& word) { m_completionDatabsae[word] = m_totalWords++; }
     void getProposals(const std::string& prefix) {
         m_currentProposals.clear();
-        m_completionTrie.prefix_match(prefix, m_currentProposals);
+        m_completionDatabsae.prefix_match(prefix, m_currentProposals);
         m_iCurrentProposal = m_currentProposals.begin();
     }
     bool hasMoreProposals() { return m_iCurrentProposal != m_currentProposals.end(); }
@@ -65,6 +64,6 @@ public:
         ++m_iCurrentProposal;
         return result;
     }
-};
 
-void initializeCompletion();
+    void initialize(TDictionary* globals);
+};
