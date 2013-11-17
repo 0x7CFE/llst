@@ -1,7 +1,7 @@
 /*
- *    TDictionary.cpp
+ *    TSymbol.cpp
  *
- *    Implementation of TDictionary lookup methods
+ *    Helper functions for TSymbol class
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
@@ -33,26 +33,32 @@
  */
 
 #include <types.h>
+#include <cstring>
 #include <algorithm>
 
-template<typename K>
-TObject* TDictionary::find(const K* key) const
+bool TSymbol::TCompareFunctor::operator() (const TSymbol* left, const TSymbol* right) const
 {
-    // Keys are stored in order
-    // Thus we may apply binary search
-    const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = reinterpret_cast<TSymbol**>( keys->getFields() );
-    TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
+    const uint8_t* leftBase = left->getBytes();
+    const uint8_t* leftEnd  = leftBase + left->getSize();
 
-    // std::lower_bound returns an element which is >= key,
-    // we have to check whether the found element is not > key.
-    if (foundKey != keysLast && !compare(key, *foundKey)) {
-        std::ptrdiff_t index = std::distance(keysBase, foundKey);
-        return values->getField(index);
-    } else
-        return 0; // key not found
+    const uint8_t* rightBase = right->getBytes();
+    const uint8_t* rightEnd  = rightBase + right->getSize();
+
+    return std::lexicographical_compare(leftBase, leftEnd, rightBase, rightEnd);
 }
 
-template TObject* TDictionary::find<char>(const char* key) const;
-template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
+bool TSymbol::TCompareFunctor::operator() (const TSymbol* left, const char* right) const
+{
+    const uint8_t* leftBase = left->getBytes();
+    const uint8_t* leftEnd  = leftBase + left->getSize();
+
+    return std::lexicographical_compare(leftBase, leftEnd, right, right + std::strlen(right));
+}
+
+bool TSymbol::TCompareFunctor::operator() (const char* left, const TSymbol* right) const
+{
+    const uint8_t* rightBase = right->getBytes();
+    const uint8_t* rightEnd  = rightBase + right->getSize();
+
+    return std::lexicographical_compare(left, left + std::strlen(left), rightBase, rightEnd);
+}

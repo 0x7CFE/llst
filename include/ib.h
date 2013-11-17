@@ -1,7 +1,7 @@
 /*
- *    TDictionary.cpp
+ *    ib.h
  *
- *    Implementation of TDictionary lookup methods
+ *    Interface for the native method compiler
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
@@ -32,27 +32,40 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <memory.h>
 #include <types.h>
-#include <algorithm>
+#include <map>
 
-template<typename K>
-TObject* TDictionary::find(const K* key) const
-{
-    // Keys are stored in order
-    // Thus we may apply binary search
-    const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = reinterpret_cast<TSymbol**>( keys->getFields() );
-    TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
+namespace ib {
 
-    // std::lower_bound returns an element which is >= key,
-    // we have to check whether the found element is not > key.
-    if (foundKey != keysLast && !compare(key, *foundKey)) {
-        std::ptrdiff_t index = std::distance(keysBase, foundKey);
-        return values->getField(index);
-    } else
-        return 0; // key not found
+struct ImageClass {
+    std::string name;
+    std::string parent;
+    std::vector<std::string> instanceVariables;
+    std::map<std::string, ImageMethod> methods;
+};
+
+struct ImageMethod {
+    std::string className;
+    std::string name;
+    std::vector<std::string> temporaries;
+    std::vector<std::string> arguments;
+    std::vector<uint8_t> bytecodes;
+};
+
+class ImageBuilder {
+private:
+    std::map<std::string, ImageClass> m_imageObjects;
+
+public:
+};
+
+class MethodCompiler {
+private:
+    ImageMethod m_currentMethod;
+
+public:
+    bool compile(const std::string& className, const std::string& methodSource);
+};
+
 }
-
-template TObject* TDictionary::find<char>(const char* key) const;
-template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;

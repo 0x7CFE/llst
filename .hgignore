@@ -7,3 +7,6 @@ CMakeCache.txt
 llst
 *.kdev4
 *~
+^deploy/
+^llvm/
+

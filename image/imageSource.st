@@ -12,36 +12,36 @@ COMMENT
 COMMENT Copyright (C) 1987-2005 by Timothy A. Budd
 COMMENT Copyright (C) 2007 by Charles R. Childers
 COMMENT Copyright (C) 2005-2007 by Danny Reinhold
-COMMENT 
+COMMENT
 COMMENT Some parts of this file are
-COMMENT Copyright (C) 2012 Dmitry Kashitsyn   <korvin@deeptown.org>
-COMMENT Copyright (C) 2012 Roman Proskuryakov <humbug@deeptown.org>
+COMMENT Copyright (C) 2012-2013 Dmitry Kashitsyn   <korvin@deeptown.org>
+COMMENT Copyright (C) 2012-2013 Roman Proskuryakov <humbug@deeptown.org>
 COMMENT
 COMMENT ============================================================================
-COMMENT This license applies to the virtual machine and to the initial image of 
-COMMENT the Little Smalltalk system and to all files in the Little Smalltalk 
+COMMENT This license applies to the virtual machine and to the initial image of
+COMMENT the Little Smalltalk system and to all files in the Little Smalltalk
 COMMENT packages.
 COMMENT ============================================================================
-COMMENT Permission is hereby granted, free of charge, to any person obtaining a copy 
-COMMENT of this software and associated documentation files (the "Software"), to deal 
-COMMENT in the Software without restriction, including without limitation the rights 
-COMMENT to use, copy, modify, merge, publish, distribute, sublicense, and/or sell 
-COMMENT copies of the Software, and to permit persons to whom the Software is 
+COMMENT Permission is hereby granted, free of charge, to any person obtaining a copy
+COMMENT of this software and associated documentation files (the "Software"), to deal
+COMMENT in the Software without restriction, including without limitation the rights
+COMMENT to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+COMMENT copies of the Software, and to permit persons to whom the Software is
 COMMENT furnished to do so, subject to the following conditions:
 COMMENT
-COMMENT The above copyright notice and this permission notice shall be included in 
+COMMENT The above copyright notice and this permission notice shall be included in
 COMMENT all copies or substantial portions of the Software.
 COMMENT
-COMMENT THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR 
-COMMENT IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
-COMMENT FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
-COMMENT AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
-COMMENT LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING 
-COMMENT FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER 
+COMMENT THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+COMMENT IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+COMMENT FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+COMMENT AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+COMMENT LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+COMMENT FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 COMMENT DEALINGS IN THE SOFTWARE.
 COMMENT
 COMMENT
-COMMENT	
+COMMENT
 COMMENT-----------------------------------------------------------
 COMMENT RAWCLASS name   instanceOf subclassOf  (instance variable names)
 COMMENT  or... CLASS name subclassOf (instance vars)
@@ -69,7 +69,7 @@ RAWCLASS Symbol        MetaSymbol    Magnitude
 RAWCLASS MetaChar      Class         MetaMagnitude     chars
 RAWCLASS Char          MetaChar      Magnitude         value
 CLASS Collection    Magnitude
-CLASS List          Collection         elements
+CLASS List          Collection        elements size
 CLASS Dictionary    Collection        keys values
 CLASS Array         Collection
 CLASS OrderedArray  Array
@@ -117,6 +117,18 @@ COMMENT ---------------------------------------------------
 COMMENT --- Package: GUI
 RAWCLASS MetaGuiPrimitives Class MetaObject theInstance
 RAWCLASS GuiPrimitives MetaGuiPrimitives Object iup
+
+CLASS MetaJit          Class            MetaObject  hotMethods
+CLASS Jit              MetaJit          Object
+CLASS JitTest          Object                       field1
+
+CLASS CallSite         Object                       hitCount selector classHits
+CLASS HotMethod        Object                       hitCount method callSites
+
+RAWCLASS MetaScheduler Class            MetaObject  instance
+RAWCLASS Scheduler     MetaScheduler    Object      tasks stop granularity
+CLASS    Thread        Object                       myBlock myProcess
+
 COMMENT ---------- method bodies ------------
 COMMENT -----------Object-------------------
 METHOD MetaObject
@@ -204,7 +216,7 @@ error: str
 	" print the message "
 	'ERROR' printNl.
 	String newline print.
-	
+
 	str printNl.
 	" then halt "
 	<19>
@@ -303,7 +315,7 @@ METHOD Class
 hierarchy | class list |
     list <- List new.
     class <- self.
-    [class isNil] whileFalse: 
+    [class isNil] whileFalse:
         [ list add: class. class <- class parent ]
     ^list
 !
@@ -481,7 +493,6 @@ notNil
 	^ false
 !
 
-
 METHOD Block
 assertEq: arg withComment: comment
     |result header headerTab|
@@ -489,27 +500,26 @@ assertEq: arg withComment: comment
     header <- header + (method name printString).
 
     comment notNil ifTrue: [ header <- header + '(' + comment + ') ' ].
-    
+
     header print.
-    
+
     headerTab <- 42 - (header size).
     [headerTab > 0] whileTrue: [
         ' ' print.
         headerTab <- headerTab - 1
     ].
-    
+
     result <- self value.
-    
+
     (result = arg)
         ifTrue:  [ 'OK'   printNl ]
         ifFalse: [
                    'FAIL' printNl.
                    ('Expected ' + arg printString + ', ') print.
                    'got ' print. result printNl. String newline print.
-                   
+
                    method text printNl.
                  ]
-               
 !
 
 METHOD Block
@@ -585,48 +595,63 @@ CLASS Test Class
 METHOD Test
 runAll |reservedNames|
     self init.
-    reservedNames <- Array with: #init.
-    
+    reservedNames <- Array with: #init with: #reservedNames.
+    reservedNames <- reservedNames + self reservedNames.
+
     Char newline print.
     'Running ' print. self class printNl.
-    
+
     self class methods
             do: [:m |
                     ( reservedNames includes: (m name) )
                         ifFalse: [ Context new performTest: m withArguments: (Array with: self) ]
                 ]
 !
+
 METHOD Test
 init
     ^nil
 !
 
-COMMENT FIXME make tests be singletons 
+METHOD Test
+reservedNames
+    ^Array new.
+!
 
 COMMENT                                                                                                --------CompareTest----------
 CLASS CompareTest Test
 
 METHOD CompareTest
 greater
-    [ 3 > 2  ] assertWithComment: 'int int'.
+    [ 3 > 2  ] assertWithComment: 'small ints'.
     [ 3 > #2 ] assertWithComment: 'int symbol'.
+    ['ac' > 'ab' ] assertWithComment: 'strings'.
+    [$b > $a ] assertWithComment: 'chars'.
 !
 
 METHOD CompareTest
 equal
-    [ 42 == 42 ] assertWithComment: '1'.
-    [ $z  = $z ] assertWithComment: '2'.
+    [ 42 == 42 ] assertWithComment: 'small ints'.
+    [ $z  = $z ] assertWithComment: 'chars'.
+    [ 0  == -0 ] assertWithComment: 'zero -zero'.
+    [ ''  = '' ] assertWithComment: 'empty strings'.
+    [ ' ' = ' '] assertWithComment: 'non-emty strings'.
+    [ Array new = Array new ] assertWithComment: 'empty arrays'.
 !
 
 METHOD CompareTest
 less
     [ -1 < 0 ] assertWithComment: 'int int'.
     [ #2 < 3 ] assertWithComment: 'symbol int'.
+    [ '12' < '13' ] assertWithComment: 'strings'.
 !
 
 METHOD CompareTest
-nilIsNil
-    [ nil isNil ] assert
+compareWithNil
+    [ nil isNil  ] assertWithComment: 'nil isNil'.
+    [ nil notNil ] assertEq: false withComment: 'nil notNil'.
+    [ 1 isNil ] assertEq: false withComment: '1 isNil'.
+    [ 1 notNil ] assertEq: true withComment: '1 notNil'.
 !
 
 METHOD CompareTest
@@ -634,45 +659,91 @@ nilEqNil
     [ nil ] assertEq: nil
 !
 
+METHOD CompareTest
+min
+    [  1 min: 0  ] assertEq:  0 withComment: '1'.
+    [ -1 min: 0  ] assertEq: -1 withComment: '2'.
+    [' ' min: '' ] assertEq: '' withComment: '3'.
+!
+
 
 COMMENT                                                                                                 --------SmallIntTest----------
 CLASS SmallIntTest Test
 METHOD SmallIntTest
 add
-    [12 + 64] assertEq: 76
+    [ 12 + 64 ] assertEq: 76  withComment: '1'.
+    [ 0  + 0  ] assertEq: 0   withComment: '2'.
+    [ 0  + -0 ] assertEq: 0   withComment: '3'.
+    [-12 + -14] assertEq: -26 withComment: '4'.
+    [ 17 + -17] assertEq: 0   withComment: '5'.
 !
 
 METHOD SmallIntTest
 sub
-    [22 - 42 ] assertEq: -20
+    [22 - 42 ] assertEq: -20 withComment: '1'.
+    [0  - 0  ] assertEq: 0   withComment: '2'.
+    [0  - 1  ] assertEq: -1  withComment: '3'.
+    [1  - -41] assertEq: 42  withComment: '4'.
 !
 
 METHOD SmallIntTest
 div
-    [ 10 / 5 ] assertEq: 2
+    [ 10 / 5 ] assertEq: 2   withComment: '1'.
+    [ 11 / 5 ] assertEq: 2   withComment: '2'.
+    [ 0  / 1 ] assertEq: 0   withComment: '4'.
 !
 
 METHOD SmallIntTest
 mul
-    [ 21 * 2 ] assertEq: 42
+    [ 21 * 2   ] assertEq: 42 withComment: '1'.
+    [ 0  * 42  ] assertEq: 0  withComment: '2'.
+    [ -1 * -17 ] assertEq: 17 withComment: '3'.
 !
 
 METHOD SmallIntTest
 negative
     [ -42 negative ] assertWithComment: '1'.
     [  42 negative ] assertEq: false withComment: '2'.
+    [ -0  negative ] assertEq: false withComment: '3'.
 !
 
 METHOD SmallIntTest
 negated
     [ -42 negated ] assertEq:  42 withComment: '1'.
     [  42 negated ] assertEq: -42 withComment: '2'.
+    [   0 negated printString ] assertEq: '0' withComment: '3'.
 !
 
 METHOD SmallIntTest
-quo
-    [ 5 / 2 ] assertEq: 2 withComment: '1'.
-    [ 200 / 1001 ] assertEq: 0 withComment: '2'.
+rem
+    [ 10 rem: 3  ] assertEq: 1  withComment: '1'.
+    [ 0  rem: 1  ] assertEq: 0  withComment: '2'.
+    [ 1  rem: 1  ] assertEq: 0  withComment: '3'.
+    [ 42 rem: 1  ] assertEq: 0  withComment: '4'.
+    [ 16 rem: 12 ] assertEq: 4  withComment: '5'.
+    [ 12 rem: 16 ] assertEq: 12 withComment: '6'.
+    [100 rem: 10 ] assertEq: 0  withComment: '7'.
+!
+
+METHOD SmallIntTest
+abs
+    [  0 absolute ] assertEq: 0  withComment: '1'.
+    [  1 absolute ] assertEq: 1  withComment: '2'.
+    [ -1 absolute ] assertEq: 1  withComment: '3'.
+    [-42 absolute ] assertEq: 42 withComment: '4'.
+    [ 42 absolute ] assertEq: 42 withComment: '5'.
+!
+
+METHOD SmallIntTest
+asChar |testBlock|
+    testBlock <- [:x |
+        (x asChar) = (Char new: x)
+    ].
+    [ testBlock value: 0 ] assertWithComment: '1'.
+    [ testBlock value: 1 ] assertWithComment: '2'.
+    [ testBlock value: 2 ] assertWithComment: '3'.
+    [ testBlock value: 3 ] assertWithComment: '4'.
+    [ testBlock value: 4 ] assertWithComment: '5'.
 !
 
 COMMENT                                                                                                 --------BranchTest----------
@@ -693,19 +764,35 @@ ifFalse |x|
     [ x ] assertEq: 521
 !
 
-CLASS MyArray Array
-METHOD MyArray
-location: value | low high mid |
-        low <- 1.
-        high <- self size + 1.
-        [ low < high ]
-            whileTrue: [
-                mid <- (low + high) quo: 2.
-                (self at: mid) < value
-                        ifTrue: [ low <- mid + 1 ]
-                        ifFalse: [ high <- mid ] 
-        ].
-        ^ low
+METHOD BranchTest
+goto |x testBlock|
+    x <- SmallInt new.
+    testBlock <- [:val |
+        x <- val.
+        (x = 1) ifTrue: [ x <- 1 ].
+        (x = 2)
+            ifTrue:  [ x <- 2 ]
+            ifFalse: [ (x = 3)
+                        ifTrue: [ x <- 3 ]
+                        ifFalse: [x <- 4]
+                    ].
+    ].
+
+    [ testBlock value: 0. x ] assertEq: 4 withComment: '1'.
+    [ testBlock value: 1. x ] assertEq: 4 withComment: '2'.
+    [ testBlock value: 2. x ] assertEq: 2 withComment: '3'.
+    [ testBlock value: 3. x ] assertEq: 3 withComment: '4'.
+    [ testBlock value: 4. x ] assertEq: 4 withComment: '5'.
+!
+
+METHOD BranchTest
+phi |x|
+    x <- (true ifTrue:  [ 11 ]
+               ifFalse: [ 17 ] ) +
+         (true ifTrue:  [ 13 ]
+               ifFalse: [ 15 ] ).
+
+    [ x ] assertEq: 24.
 !
 
 COMMENT                                                                                                 --------LoopTest----------
@@ -714,19 +801,35 @@ CLASS LoopTest Test
 METHOD LoopTest
 loopCount |count|
     count <- SmallInt new.
-    
+
     1 to: 151251 do: [:i| count <- count + 1 ]
-    
+
     [ count ] assertEq: 151251
 !
 
 METHOD LoopTest
 sum |result|
     result <- SmallInt new.
-    
+
     1 to: 100 do: [:i| result <- result + i ]
-    
+
     [ result ] assertEq: 5050
+!
+
+CLASS MyArray Array
+
+METHOD MyArray
+location: value | low high mid |
+    low <- 1.
+    high <- self size + 1.
+    [ low < high ]
+        whileTrue: [
+            mid <- (low + high) quo: 2.
+            (self at: mid) < value
+                    ifTrue: [ low <- mid + 1 ]
+                    ifFalse: [ high <- mid ]
+        ].
+    ^ low
 !
 
 METHOD LoopTest
@@ -750,6 +853,17 @@ sendSuper
     [ Array super printString ] assertEq: 'Collection'
 !
 
+METHOD ClassTest
+isKindOf |kindOf|
+    [ 1 isKindOf: Object ] assertWithComment: '1'.
+    [ Class isKindOf: Object ] assertWithComment: '2'.
+    [ Object isKindOf: Class ] assertWithComment: '3'.
+    [ 1 isKindOf: Magnitude ] assertWithComment: '4'.
+    [ 'hello' isKindOf: Magnitude ] assertWithComment: '5'.
+    [ 'hello' isKindOf: Collection ] assertWithComment: '6'.
+    [ 'hello' isKindOf: Array ] assertWithComment: '7'.
+!
+
 COMMENT                                                                                                --------MethodLookupTest----
 CLASS MethodLookupTest Test
 
@@ -769,8 +883,8 @@ COMMENT                                                                         
 CLASS StringTest Test
 
 METHOD StringTest
-plus
-    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: 'operator +. 1'.
+concat
+    [ 'foo' + 'bar' ] assertEq: 'foobar' withComment: '1'.
     [ 'b' + 'a' ] assertEq: 'ba' withComment: '2'.
     [ '' + 'asd' ] assertEq: 'asd' withComment: '3'.
     [ '12' + 'asd' ] assertEq: '12asd' withComment: '4'.
@@ -779,7 +893,6 @@ plus
     [ 'fox' + 'baz' + 'bar' ] assertEq: 'foxbazbar' withComment: '7'.
     [ 'fox' + 'baz' + 'bar' + 'bam' ] assertEq: 'foxbazbarbam' withComment: '8'.
     [ 'abcd' + 'efgh' + 'ijkl' + 'mnop' ] assertEq: 'abcdefghijklmnop' withComment: '9'.
-    
 !
 
 METHOD StringTest
@@ -789,17 +902,31 @@ asSymbol
 
 METHOD StringTest
 lowerCase
-    [ 'FoXBar' lowerCase ] assertEq: 'foxbar'
+    [ 'FoXBar' lowerCase ] assertEq: 'foxbar' withComment: 'non-empty'.
+    [ '' lowerCase ] assertEq: '' withComment: 'empty'.
+    [ '123' lowerCase ] assertEq: '123' withComment: 'numbers'.
+!
+
+METHOD StringTest
+upperCase
+    [ 'FoXBar' upperCase ] assertEq: 'FOXBAR' withComment: 'non-empty'.
+    [ '' upperCase ] assertEq: '' withComment: 'empty'.
+    [ '123' upperCase ] assertEq: '123' withComment: 'numbers'.
 !
 
 METHOD StringTest
 asNumber
-    [ '42' asNumber ] assertEq: 42
+    [ '42'  asNumber ] assertEq: 42  withComment: 'only digits'.
+    [ ''    asNumber ] assertEq: 0   withComment: 'empty'. "FIXME is it okay?"
+    [ '0a'  asNumber ] assertEq: nil withComment: 'non-digit suffix'.
+    [ 'a0'  asNumber ] assertEq: nil withComment: 'non-digit prefix'.
+    [ '1 3' asNumber ] assertEq: nil withComment: 'splitted digits'.
 !
 
 METHOD StringTest
 copy
-    [ 'foobar' copy ] assertEq: 'foobar'
+    [ 'foobar' copy ] assertEq: 'foobar' withComment: 'non-empty'.
+    [ '' copy ] assertEq: '' withComment: 'empty'.
 !
 
 METHOD StringTest
@@ -814,13 +941,25 @@ at | str |
 !
 
 METHOD StringTest
-indexOf
-    [ 'foobar' indexOf: 'b' ] assertEq: 4
+indexOf |str|
+    str <- 'foobar'.
+    [ str indexOf: 'f' ] assertEq: 1 withComment: 'foobar(f)'.
+    [ str indexOf: 'o' ] assertEq: 2 withComment: 'o'.
+    [ str indexOf: 'b' ] assertEq: 4 withComment: 'b'.
+    [ str indexOf: 'a' ] assertEq: 5 withComment: 'a'.
+    [ str indexOf: 'r' ] assertEq: 6 withComment: 'r'.
+    [ str indexOf: 'bar' ] assertEq: 4 withComment: 'bar'.
+    [ str indexOf: 'foo' ] assertEq: 1 withComment: 'foo'.
+    [ str indexOf: '123' ] assertEq: nil withComment: 'not a substr'.
 !
 
 METHOD StringTest
 reverse
-    [ 'reverse' reverse ] assertEq: 'esrever'
+    [ '' reverse ] assertEq: '' withComment: 'empty'.
+    [ 'x' reverse ] assertEq: 'x' withComment: '1 char'.
+    [ 'zy' reverse ] assertEq: 'yz' withComment: '2 chars'.
+    [ 'reverse' reverse ] assertEq: 'esrever' withComment: 'odd-char string'.
+    [ 'little smalltalk' reverse ] assertEq: 'klatllams elttil' withComment: 'even-char string'.
 !
 
 METHOD StringTest
@@ -840,12 +979,11 @@ init
     1 to: 100 do: [:idx|
         arrOfInts at: idx put: idx
     ].
-    
+
     arrOfChars <- Array new: 257.
     1 to: 257 do: [:idx|
         arrOfChars at: idx put: (Char basicNew: idx-1)
     ].
-    
 !
 
 METHOD ArrayTest
@@ -954,7 +1092,7 @@ METHOD PrimitiveTest
 objectsAreEqual |x|
     x <- Array with: 'a' with: 42.
     [ <1 x x> ] assertWithComment: '1'.
-    
+
     [ <1 $z $z> ] assertEq: false withComment: '2'.
 !
 
@@ -969,43 +1107,312 @@ bulkReplace
     [ <38 1 7 'Hello W' 1 'hello world!'> ] assertEq: 'Hello World!'.
 !
 
+COMMENT                                                                                                 -------ListTest----------
+CLASS ListTest Test
 
-METHOD Array
-replaceFrom: start to: stop with: replacement startingAt: repStart | base |
-       <38 start stop replacement repStart self>.
-       base <- repStart-1.
-       0 to: (stop - start) do: [:idx|
-               self at: (idx + start) put:
-                       (replacement at: (idx + repStart))
-       ]
+METHOD ListTest
+add |list array|
+    array <- Array new: 3.
+
+    array at: 1 put: 2.
+    array at: 2 put: 42.
+    array at: 3 put: true.
+
+    list <- List new.
+    list add: 2.
+    list add: 42.
+    list add: true.
+
+    list <- list reverse.
+
+    [ list asArray ] assertEq: array.
 !
+
+METHOD ListTest
+addLast |list array|
+    array <- Array new: 4.
+
+    array at: 1 put: 2.
+    array at: 2 put: -34.
+    array at: 3 put: 42.
+    array at: 4 put: 'qwe123'. "That's my password. Don't tell anyone!"
+
+    list <- List new.
+    list addLast: 2.
+    list addLast: -34.
+    list addLast: 42.
+    list addLast: 'qwe123'.
+
+    [ list asArray ] assertEq: array.
+!
+
+METHOD ListTest
+at |list|
+    list <- List new.
+    list add: 2.
+    list add: 42.
+    list add: true.
+    list add: '124'.
+
+    list <- list reverse.
+
+    [ list at: 1 ] assertEq: 2 withComment: '1'.
+    [ list at: 2 ] assertEq: 42 withComment: '2'.
+    [ list at: 3 ] assertEq: true withComment: '3'.
+    [ list at: 4 ] assertEq: '124' withComment: '4'.
+!
+
+METHOD ListTest
+do |list idx standardArray array|
+    list <- List new.
+    list add: nil.
+    list add: false.
+    list add: true.
+    list add: 42.
+
+    list <- list reverse.
+
+    standardArray <- Array new: 4.
+    1 to: (list size) do: [:i| standardArray at: i put: (list at: i). ].
+
+    array <- Array new: 4.
+    idx <- 1.
+    list do: [:val |
+        array at: idx put: val.
+        idx <- idx + 1.
+    ].
+
+    [ array ] assertEq: standardArray.
+!
+
+METHOD ListTest
+removeFirst |list array|
+    list <- List new.
+    list add: nil.
+    list add: false.
+    list add: true.
+    list add: 42.
+
+    array <- Array with: nil with: false with: true.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '1'.
+
+    array <- Array with: nil with: false.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '2'.
+
+    array <- Array with: nil.
+    [ list removeFirst. list reverse asArray ] assertEq: array withComment: '3'.
+
+    [ list removeFirst. list ] assertEq: (List new) withComment: '4'.
+!
+
+METHOD ListTest
+remove |list array|
+    list <- List new.
+    list add: 'qwerty'.
+    list add: false.
+    list add: 42.
+    list add: true.
+
+    array <- Array with: 'qwerty' with: false with: true.
+    [ list remove: 42. list reverse asArray ] assertEq: array withComment: 'in the middle'.
+
+    array <- Array with: 'qwerty' with: false.
+    [ list remove: true. list reverse asArray ] assertEq: array withComment: 'the last'.
+
+    array <- Array with: false.
+    [ list remove: 'qwerty'. list reverse asArray ] assertEq: array withComment: 'the first'.
+
+    [ list remove: false. list ] assertEq: (List new) withComment: 'the only one'.
+!
+
+METHOD ListTest
+firstLink |list|
+    list <- List new.
+    list add: 'head'.
+    list add: 'second head'.
+    list add: 'middle'.
+    list add: 'unknown'.
+    list add: 'last'.
+
+    list <- list reverse.
+
+    [ list firstLink value ] assertEq: 'head' withComment: 'just constructed'.
+    [ list remove: 'middle'. list firstLink value ] assertEq: 'head' withComment: 'middle removed'.
+    [ list removeFirst. list firstLink value ] assertEq: 'second head' withComment: 'head removed'.
+    [ list remove: 'last'. list firstLink value ] assertEq: 'second head' withComment: 'last removed'.
+    [ list add: 'head'. list firstLink value] assertEq: 'head' withComment: 'appended with add:'.
+    [ list clear. list firstLink] assertEq: nil withComment: 'cleared'.
+!
+
+METHOD ListTest
+atPut |list|
+    list <- List with: nil with: nil.
+
+    list at: 1 put: 42.
+    list at: 2 put: 'qwerty'.
+
+    [ list at: 1 ] assertEq: 42 withComment: '1'.
+    [ list at: 2 ] assertEq: 'qwerty' withComment: '1'.
+!
+
+METHOD ListTest
+lastLink |list|
+    list <- List new.
+    list add: 'head'.
+    list add: 'second head'.
+    list add: 'middle'.
+    list add: 'second last'.
+    list add: 'last'.
+
+    list <- list reverse.
+
+    [ list lastLink value ] assertEq: 'last' withComment: 'just constructed'.
+    [ list remove: 'middle'. list lastLink value ] assertEq: 'last' withComment: 'middle removed'.
+    [ list removeFirst. list lastLink value ] assertEq: 'last' withComment: 'head removed'.
+    [ list remove: 'last'. list lastLink value ] assertEq: 'second last' withComment: 'last removed'.
+    [ list addLast: 'last'. list lastLink value ] assertEq: 'last' withComment: 'appended with addLast:'.
+    [ list clear. list lastLink] assertEq: nil withComment: 'cleared'.
+!
+
+METHOD ListTest
+equal |left right|
+    [
+        left <- List new.
+        right <- List new.
+        [ left = right ] assertWithComment: 'empty'.
+    ] value.
+    [
+        left <- List with: 0 with: 42.
+        right <- List with: 0 with: 42.
+        [ left = right ] assertWithComment: 'non empty: numbers'.
+    ] value.
+    [
+        left <- List with: 'qwe' with: ''.
+        right <- List with: 'qwe' with: ''.
+        [ left = right ] assertWithComment: 'non empty: strings'.
+    ] value.
+!
+
+METHOD ListTest
+appendList |left right result standardContent standardSize|
+    [ "non empty + non empty"
+        left <- List with: 1 with: 2.
+        right <- List with: 3 with: 4.
+
+        standardSize <- left size + (right size).
+
+        standardContent <- List new.
+        standardContent add: 4.
+        standardContent add: 3.
+        standardContent add: 2.
+        standardContent add: 1.
+
+        result <- left appendList: right.
+
+        [result size ] assertEq: standardSize withComment: 'size: both non empty'.
+        [result] assertEq: standardContent withComment: 'content: both non empty'.
+    ] value.
+    [ "empty + non empty"
+        left <- List new.
+        right <- (Array with: 3 with: 4) asList.
+
+        standardSize <- left size + (right size).
+
+        standardContent <- List new.
+        standardContent add: 4.
+        standardContent add: 3.
+
+        result <- left appendList: right.
+
+        [result size ] assertEq: standardSize withComment: 'size: empty + non empty'.
+        [result] assertEq: standardContent withComment: 'content: empty + non empty'.
+    ] value.
+!
+
+METHOD ListTest
+includes |list|
+    list <- List new.
+    [ list includes: 42 ] assertEq: false withComment: 'empty list'.
+    list <- List with: 0 with: 1.
+    [ list includes: 0 ] assertWithComment: 'non empty list: 0'.
+    [ list includes: 1 ] assertWithComment: 'non empty list: 1'.
+    [ list includes: 42 ] assertEq: false withComment: 'non empty list: 42'.
+!
+
+
+COMMENT                                                                                           -------MagnitudeTest----------
+CLASS MagnitudeTest Test
+
+METHOD MagnitudeTest
+L
+    [1 < 2] assertEq: true withComment: '1'.
+    [1 < 1] assertEq: false withComment: '2'.
+    [1 < 0] assertEq: false withComment: '3'.
+!
+
+METHOD MagnitudeTest
+GEQ
+    [1 >= 2] assertEq: false withComment: '1'.
+    [1 >= 1] assertEq: true withComment: '2'.
+    [1 >= 0] assertEq: true withComment: '3'.
+!
+
+METHOD MagnitudeTest
+EQ
+    [1 = 2] assertEq: false withComment: '1'.
+    [1 = 1] assertEq: true withComment: '2'.
+    [1 = 0] assertEq: false withComment: '3'.
+!
+
+METHOD MagnitudeTest
+LEQ
+    [1 <= 2] assertEq: true withComment: '1'.
+    [1 <= 1] assertEq: true withComment: '2'.
+    [1 <= 0] assertEq: false withComment: '3'.
+!
+
+METHOD MagnitudeTest
+G
+    [1 > 2] assertEq: false withComment: '1'.
+    [1 > 1] assertEq: false withComment: '2'.
+    [1 > 0] assertEq: true withComment: '3'.
+!
+
+METHOD MagnitudeTest
+min
+    [1 min: 2] assertEq: 1 withComment: '1'.
+    [1 min: 1] assertEq: 1 withComment: '2'.
+    [1 min: 0] assertEq: 0 withComment: '3'.
+!
+
+METHOD MagnitudeTest
+max
+    [1 max: 2] assertEq: 2 withComment: '1'.
+    [1 max: 1] assertEq: 1 withComment: '2'.
+    [1 max: 0] assertEq: 1 withComment: '3'.
+!
+
+METHOD MagnitudeTest
+between
+    [1 between: 0 and: 0] assertEq: false withComment: '1'.
+    [1 between: 0 and: 1] assertEq: true withComment: '2'.
+    [1 between: 0 and: 2] assertEq: true withComment: '3'.
+
+    [1 between: 1 and: 0] assertEq: false withComment: '4'.
+    [1 between: 1 and: 1] assertEq: true withComment: '5'.
+    [1 between: 1 and: 2] assertEq: true withComment: '6'.
+
+    [1 between: 2 and: 0] assertEq: false withComment: '7'.
+    [1 between: 2 and: 1] assertEq: false withComment: '8'.
+    [1 between: 2 and: 2] assertEq: false withComment: '9'.
+!
+
+
 
 METHOD Undefined
 printHierarchy: aClass | class |
     class <- aClass.
-    [ class isNil ] whileFalse: [ class printNl. class <- class parent ] 
-!
-
-CLASS MyDict Dictionary
-METHOD MyDict
-at: key put: value | position |
-    $" print. value name print. $" printNl.
-        position <- keys location: key.
-        (position <= keys size and: [ key = (keys at: position)])
-                ifTrue: [ values at: position put: value ]
-                ifFalse: [ keys <- keys insert: key at: position.
-                        values <- values insert: value at: position ].
-        ^ value
-!
-
-METHOD Undefined
-testArrayAllMethods |allMethods|
-    allMethods <- MyDict new.
-    
-    Object methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from = to ~~"
-    Magnitude methods binaryDo: [ :n :m | allMethods at: n put: m ]. "from <= to min:"
-    "Collection methods binaryDo: [ :n :m | allMethods at: n put: m ]."
-    "Array methods binaryDo: [ :n :m | allMethods at: n put: m ]."
+    [ class isNil ] whileFalse: [ class printNl. class <- class parent ]
 !
 
 CLASS Timer Object initValue
@@ -1042,46 +1449,287 @@ METHOD Undefined
 benchmark: size | list ms |
     list <- List new.
     1 to: size do: [ :x | list add: 1000 atRandom ].
-    ms <- Timer millisecondsToRun: [ list <- list sort ].
+    ms <- Timer millisecondsToRun: [ list <- list sort. ].
+    "list do: [ :e | e printNl ]."
     'Sorted in ms: ' print. ms printNl.
+    list printNl.
 !
 
 METHOD Undefined
 benchmark2: random | dict ms |
     dict <- Dictionary new.
-    ms <- Timer millisecondsToRun: [ 
-    random 
-        ifTrue:  [ 1 to: 10000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
-        ifFalse: [ 1 to: 10000 do: [ :x | dict at: x put: x ] ] ].
+    ms <- Timer millisecondsToRun: [
+    random
+        ifTrue:  [ 1 to: 20000 do: [ :x | dict at: x put: 1000000 atRandom ] ]
+        ifFalse: [ 1 to: 20000 do: [ :x | dict at: x put: x ] ] ].
     dict printNl. 'size ' print. dict size printNl.
     ms printNl
 !
 
 METHOD Undefined
-main    | command x y allMethods |
-        " initialize classes "
-        
-        Char initialize.
-        
-        "nil testArrayAllMethods."
-        
-        CompareTest      new runAll.
-        SmallIntTest     new runAll.
-        LoopTest         new runAll.
-        ClassTest        new runAll.
-        MethodLookupTest new runAll.
-        StringTest       new runAll.
-        ArrayTest        new runAll.
-        GCTest           new runAll.
-        ContextTest      new runAll.
-        PrimitiveTest    new runAll.
-        
-        " main execution loop "
-        [ '-> ' print. command <- String input. command notNil ]
-                whileTrue: [ command isEmpty
-                        ifFalse: [ command doIt printNl ] ]
-        
-        ^nil.                  
+benchmark3: count | ms |
+    ms <- Timer millisecondsToRun: [ Number primes: count ].
+    'Found in ms: ' print. ms printNl.
+!
+
+METHOD Undefined
+benchmark4 | dict ms |
+    dict <- Dictionary new.
+
+    "creating long living memory consumer"
+    1 to: 1000 do: [ :x | dict at: x put: List new ].
+    'Load initialized' printNl.
+
+    "now performing unrelated memory heavy operations"
+    ms <- Timer millisecondsToRun: [ 1 to: 1000000 do: [ :x | List new ] ].
+    'Cycle in ms: ' print. ms printNl.
+!
+
+METHOD Number
+isPrime
+        ((self rem: 2) = 0) ifTrue: [ ^ false ].
+        (3 to: (self quo: 2) by: 2) do: [:cand|
+                ((self rem: cand) = 0) ifTrue: [ ^ false ]
+        ].
+        ^ true
+!
+
+METHOD MetaNumber
+primes: n | cand count |
+        2 print.
+        cand <- 3.
+        count <- 0.
+        [count < n] whileTrue: [
+                [cand isPrime not] whileTrue: [
+                        cand <- cand + 2
+                ].
+                ' ' print. cand print.
+                count <- count + 1.
+                cand <- cand + 2
+        ].
+        Char newline print
+!
+
+METHOD MetaJit
+sendMessage: aSelector withArguments: anArguments
+    "calling context will be taken from VM"
+    <252 aSelector anArguments>
+!
+
+METHOD MetaJit
+do: aBlock
+    self sendMessage: #value withArguments: (Array with: aBlock).
+!
+
+METHOD MetaJit
+printStatistics
+    <248>
+!
+
+METHOD MetaJit
+printMethod: aMethod
+    <249 aMethod>
+!
+
+METHOD MetaJit
+patchHotMethods
+    <250>
+!
+
+CLASS StatementsTest Test
+
+METHOD StatementsTest
+reservedNames |res|
+    res <- Array new: 5.
+    res at: 1 put: ('doBlockReturn:' asSymbol).
+    res at: 2 put: ('doRethrow:' asSymbol).
+    res at: 3 put: #returnFortyTwoByBlockReturn.
+    res at: 4 put: #customSize.
+    res at: 5 put: #doTempAssignInBlock.
+    ^res
+!
+
+METHOD StatementsTest
+doBlockReturn: x |block|
+    "This method returns x with blockReturn opcode"
+    block <- [
+        (x = 4) ifTrue: [ ^x ].
+        (x = 5) ifTrue: [ ^x ].
+    ].
+
+    [true] ifTrue: [ ^block value ].
+!
+
+
+METHOD StatementsTest
+doRethrow: blockSurelyThrows |blockThatCanThrow|
+    "In LLVM blockReturn opcode is implemented as an exception with 2 fields:
+     the creatin context and the value that we need to return from the block.
+     While compiling methods we scan blocks on blockReturn opcode.
+     If we find it, we replace each 'call @sendMessage' with invoke instruction
+     When we catch exception we check whether the context of exception and the context of current method are equal.
+     If they are, we do 'ret' from current function, if not, we rethrow exception"
+
+    "That line forces LLVM to create 'invoke' instead of 'call' :"
+    blockThatCanThrow <- [ ^1234567 ].
+
+    "We are invoking block that has a blockReturn opcode. The exception must be rethrown because 'blockSurelyThrows' is not created in the current method"
+    blockSurelyThrows value.
+
+    "In LLVM IR exception must be rethrown so ^nil must not be executed"
+
+    ^nil.
+!
+
+METHOD StatementsTest
+returnFortyTwoByBlockReturn
+     self doRethrow: [ ^42 ].
+!
+
+METHOD StatementsTest
+blockReturn |x|
+    x <- self doBlockReturn: 4.
+    [ x ] assertEq: 4  withComment: 'simple 1'.
+
+    x <- self doBlockReturn: 5.
+    [ x ] assertEq: 5  withComment: 'simple 2'.
+
+    x <- self returnFortyTwoByBlockReturn.
+    [ x ] assertEq: 42 withComment: 'rethrow'.
+!
+
+METHOD StatementsTest
+doTempAssignInBlock | block a b |
+    block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
+    block value: 1 value: 2.
+
+    (((a = 2) and: [ b = 4 ]) and: [ a < b ])
+        ifTrue:  [ ^ 42]
+        ifFalse: [ ^ 666]
+!
+
+METHOD StatementsTest
+tempAssignInBlock |x|
+    x <- self doTempAssignInBlock.
+    [ x ] assertEq: 42.
+!
+
+METHOD StatementsTest
+pushConstants |testBlock|
+    ['0' asNumber ] assertEq: 0 withComment: '0'.
+    ['1' asNumber ] assertEq: 1 withComment: '1'.
+    ['2' asNumber ] assertEq: 2 withComment: '2'.
+    ['3' asNumber ] assertEq: 3 withComment: '3'.
+    ['4' asNumber ] assertEq: 4 withComment: '4'.
+    ['5' asNumber ] assertEq: 5 withComment: '5'.
+    ['6' asNumber ] assertEq: 6 withComment: '6'.
+    ['7' asNumber ] assertEq: 7 withComment: '7'.
+    ['8' asNumber ] assertEq: 8 withComment: '8'.
+    ['9' asNumber ] assertEq: 9 withComment: '9'.
+!
+
+METHOD Undefined
+sortTest | list |
+    list <- List new.
+    1 to: 100 do: [ :x | list add: 1000 atRandom ].
+    list <- list sort.
+    ^list
+
+    "x <- '#(2 7 4 5 2 0 9 1 4 7 3)' doIt.
+    ^x sort."
+!
+
+METHOD Undefined
+sortTest2: aList
+    ^ aList sort
+!
+
+METHOD Class "TODO for tests only"
+name
+    ^name.
+!
+
+METHOD MetaJitTest
+runAllFrom: testSuite | suite |
+    suite <- testSuite new.
+    Jit sendMessage: #runAll withArguments: (Array with: suite).
+!
+
+METHOD Undefined
+runSort: size | x1 list ms1 selector args1 block1 |
+        list <- List new.
+        1 to: size do: [ :x | list add: 1000000 atRandom ].
+
+        selector <- ('sortTest2:' asSymbol).
+        args1 <- Array with: nil with: list.
+
+        System collectGarbage.
+        ms1 <- Timer millisecondsToRun: [ Jit sendMessage: selector withArguments: args1 ].
+
+        'Sorted in ms: ' print. ms1 printNl.
+!
+
+COMMENT Uncomment this method if you are going to run Smalltalk
+COMMENT immediately in Jit. Don't forget to change main.cpp (executeProcess)
+COMMENT METHOD Undefined
+COMMENT boot
+COMMENT     nil main.
+COMMENT !
+
+METHOD Undefined
+loopBenchmark | s |
+    s <- 0.
+    1 to: 1000000 do: [ :x | s <- s + 1. ].
+    ^s
+!
+
+METHOD Undefined
+sortBenchmark: data
+    ^data sort
+!
+
+METHOD Undefined
+runSortBenchmarkFor: data
+    ^Timer millisecondsToRun: [ nil sortBenchmark: data ]
+!
+
+METHOD Undefined
+main    | command  data |
+    " initialize classes "
+
+    Char initialize.
+    SmallIntTest new runAll.
+    ArrayTest new runAll.
+    PrimitiveTest new runAll.
+    MagnitudeTest new runAll.
+    ListTest new runAll.
+    MethodLookupTest new runAll.
+
+    "Scheduler initialize.
+    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
+    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
+    Scheduler run."
+
+    "'Preparing test data ...' print.
+    data <- List new.
+    1 to: 1000 do: [ :x | data add: 100000 atRandom ].
+    'done' printNl.
+
+    'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
+    'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+
+    Jit patchHotMethods.
+
+    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
+
+    "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
+
+    [ command <- String readline: '->'. command notNil ]
+        whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
+
+    ^nil.
 !
 
 
@@ -1175,6 +1823,95 @@ or: aBlock
 METHOD False
 and: aBlock
 	^ false
+!
+METHOD MetaThread
+new: aBlock |instance|
+    instance <- self new.
+    self in: instance at: 1 put: aBlock.
+    ^instance
+!
+METHOD Thread
+run |context|
+    myProcess <- Process new.
+    context <- Context new.
+
+    myProcess context: context.
+    context setup: (Thread methods at: #invokeBlock) withArguments: (Array with: self).
+
+    'scheduling process for execution' printNl.
+    Scheduler addProcess: myProcess.
+!
+METHOD Thread
+invokeBlock |result|
+    result <- myBlock value.
+    ^result
+!
+METHOD MetaThread
+run: aBlock
+    ^(self new: aBlock) run
+!
+METHOD MetaScheduler
+initialize
+    instance <- self basicNew.
+    self in: instance at: 1 put: List new. "tasks"
+    self in: instance at: 2 put: false.    "stop"
+    self in: instance at: 3 put: 1000.     "granularity"
+    ^instance.
+!
+METHOD MetaScheduler
+instance
+    ^instance
+!
+METHOD MetaScheduler
+new
+    ^instance.
+!
+METHOD MetaScheduler
+addProcess: aProcess
+    'MetaScheduler: adding process' printNl.
+    instance addProcess: aProcess.
+    'done' printNl
+!
+METHOD MetaScheduler
+endProcess: aProcess
+    ^instance endProcess: aProcess
+!
+METHOD MetaScheduler
+run
+    ^instance run
+!
+METHOD Scheduler
+addProcess: aProcess
+    'Scheduler: adding task' printNl.
+    tasks add: aProcess.
+!
+METHOD Scheduler
+endProcess: aProcess
+    tasks remove: aProcess ifAbsent: [^false].
+    ^true.
+!
+METHOD Scheduler
+runOnce |result finished|
+    finished <- List new.
+    tasks do: [ :task |
+        result <- task doExecute: granularity.
+        ( result ~= 5 ) ifTrue: [ finished add: task ].
+    ].
+    finished do: [ :task | tasks remove: task ].
+    stop <- (tasks size = 0).
+!
+METHOD Scheduler
+run
+    stop <- false.
+    [stop] whileFalse: [ self runOnce ]
+!
+METHOD Scheduler
+stop
+    stop <- true
+!
+METHOD Scheduler
+granularity: aValue
+    granularity <- aValue
 !
 COMMENT -----------Process--------------
 METHOD Process
@@ -1270,6 +2007,16 @@ whileFalse: aBlock
 	self value ifFalse: [ aBlock value. ^ self whileFalse: aBlock ]
 !
 METHOD Block
+whileTrue |result|
+    result <- true.
+    [result] whileTrue: [ result <- self value ]
+!
+METHOD Block
+whileFalse |result|
+    result <- false.
+    [result] whileFalse: [ result <- self value ]
+!
+METHOD Block
 backtrace | narg |
 		" backtrace context calls "
 	'block from ' print. method name print.
@@ -1286,28 +2033,32 @@ backtrace | narg |
 !
 COMMENT -----------Magnitude--------------
 METHOD Magnitude
-<= arg
-	^ self < arg or: [ self = arg ]
+>= arg
+    ^ (self < arg) not
 !
 METHOD Magnitude
 > arg
-	^ arg < self
+    ^ arg < self
 !
 METHOD Magnitude
->= arg
-	^ (self > arg) or: [ self = arg ]
+<= arg
+    ^ (arg < self) not
+!
+METHOD Magnitude
+= arg
+    ^ (self >= arg) and: [self <= arg]
 !
 METHOD Magnitude
 min: arg
-	^ self < arg ifTrue: [ self ] ifFalse: [ arg ]
+    ^ self < arg ifTrue: [ self ] ifFalse: [ arg ]
 !
 METHOD Magnitude
 max: arg
-	^ self < arg ifTrue: [ arg ] ifFalse: [ self ]
+    ^ self < arg ifTrue: [ arg ] ifFalse: [ self ]
 !
 METHOD Magnitude
-between: low and: high
-	^ low <= self and: [ self <= high ]
+between: min and: max
+    ^ self >= min and: [self <= max]
 !
 COMMENT -----------Symbol--------------
 METHOD MetaSymbol
@@ -1543,9 +2294,9 @@ at: value
 	^ self at: value ifAbsent: [ self noElement ]
 !
 METHOD Collection
-includes: value
-	self at: value ifAbsent: [ ^ false ].
-	^ true
+includes: aValue
+    self do: [ :element | element = aValue ifTrue: [ ^ true ]].
+    ^ false
 !
 METHOD Collection
 asArray		| newArray index |
@@ -1622,24 +2373,63 @@ sort
     ^ self sort: [ :x :y | x < y ]
 !
 
+METHOD List
+insert: aValue onCondition: aBlock
+    | link current newLink next |
+
+    (self isEmpty) ifTrue: [ ^self add: aValue ].
+
+    link <- elements.
+    [link notNil] whileTrue: [
+        current <- link value.
+        (aBlock value: aValue value: current)
+            ifTrue: [
+                newLink <- Link value: current next: link next.
+                link value: aValue next: newLink.
+
+                ^aValue
+            ].
+
+        next <- link next.
+        next isNil ifTrue: [
+            link next: (Link value: aValue next: nil).
+            ^aValue.
+        ]
+        link <- next.
+    ]
+!
+
 METHOD Collection
-sort: criteria | left right mediane |
+insertSort: criteria | result |
     (self isEmpty) ifTrue: [^self].
 
-    mediane <- self popFirst.
+    result <- List new.
+    self do: [ :x | result insert: x onCondition: criteria. "result printNl." ].
 
-    left  <- List new.
+    ^result
+!
+
+METHOD Collection
+sort: criteria | left right mediane |
+    "(self size < 2) ifTrue: [^self]."
+    (self size < 32)
+        ifTrue: [ ^ self insertSort: criteria ].
+
+    mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
+
+    left  <- List new. "if List is instance of MetaList then call MetaList>>new"
     right <- List new.
     self do: [ :x |
         (criteria value: x value: mediane)
             ifTrue:  [ left  add: x ]
             ifFalse: [ right add: x ] ].
 
-    left  <- left  sort: criteria.
+    left  <- left  sort: criteria. "if left is instance of List then call Collection>>sort"
     right <- right sort: criteria.
-            
+
+    "left print. $| print. mediane print. $| print. right printNl."
+
     right add: mediane.
-    "left reverseDo: [ :x | right add: x ]."
     ^ left appendList: right
 !
 
@@ -1649,7 +2439,7 @@ printString | count res |
 	(self respondsTo: #do:) ifFalse: [ ^ res ].
 	count <- 0.
 	res <- res + ' ('.
-	self basicDo: [:elem| 
+	self basicDo: [:elem|
 		(count = 0) ifFalse: [ res <- res + ' ' ].
 		res <- res + elem printString.
 		count <- count + 1.
@@ -1724,11 +2514,6 @@ METHOD Array
 at: index ifAbsent: exceptionBlock
 	<24 self index>.
 	exceptionBlock value
-!
-METHOD Array
-includes: aValue
-	self do: [ :element | element = aValue ifTrue: [ ^ true ]].
-	^ false
 !
 METHOD Array
 indexOf: aValue
@@ -1816,10 +2601,10 @@ insert: value at: position | newArray newSize |
 	newArray <- self class new: newSize.
 	newArray replaceFrom: 1 to: position-1 with: self.
 	newArray at: position put: value.
-	newArray 
-        replaceFrom: position+1 
-        to: newSize 
-        with: self 
+	newArray
+        replaceFrom: position+1
+        to: newSize
+        with: self
         startingAt: position.
 	^ newArray
 !
@@ -1870,7 +2655,15 @@ sort: aBlock
     ^ (super asList sort: aBlock) asArray
 !
 
-COMMENT FIXME insert replaceFrom:..... here
+METHOD Array
+replaceFrom: start to: stop with: replacement startingAt: repStart | base |
+	<38 start stop replacement repStart self>.
+	base <- repStart-1.
+	0 to: (stop - start) do: [:idx|
+		self at: (idx + start) put:
+		(replacement at: (idx + repStart))
+	]
+!
 
 COMMENT ---------- OrderedArray ------------
 METHOD OrderedArray
@@ -1933,6 +2726,10 @@ new: size
 	<20 self size>
 !
 METHOD MetaString
+readline: prompt
+    ^<251 prompt>
+!
+METHOD MetaString
 input	| value c nl |
 	" read a line from input "
 	value <- ''. nl <- Char newline.
@@ -1970,6 +2767,10 @@ break: separators  | words word |
 	^ words
 !
 METHOD String
+words
+    ^self break: ' '
+!
+METHOD String
 collect: transformationBlock
 	^ (super collect: transformationBlock) asString
 !
@@ -1978,8 +2779,8 @@ reverse
 	^ self asList reverse asString
 !
 METHOD String
-select: testBlock
-	^ (super select: testBlock) asString
+select: filterBlock
+    ^ (super select: filterBlock) asString
 !
 METHOD String
 printString
@@ -1987,7 +2788,7 @@ printString
 !
 METHOD String
 asString
-  ^self
+    ^self
 !
 METHOD String
 printWidth: width | ret |
@@ -2008,8 +2809,11 @@ asSymbol
 	^ Symbol new: self
 !
 METHOD String
-doIt	| meth |
-	meth <- Undefined parseMethod: 'doItCommand ^' + self.
+doIt	| meth command |
+    command <- 'doItCommand '.
+    ((self words at: 1) at: 1) = $| ifFalse: [ command <- command + ' ^ ' ].
+
+	meth <- Undefined parseMethod: command + self.
 	^ meth notNil
 		ifTrue: [ ^ Context new
 			  perform: meth withArguments: (Array new: 1) ]
@@ -2066,14 +2870,12 @@ hash | sz |
 	^ (self at: 1) value + (self at: sz) value
 !
 METHOD String
-lowerCase | ret c |
-	ret <- String new: (self size).
-	1 to: self size do: [:x|
-		c <- self at: x.
-		c isUpperCase ifTrue: [c <- c lowerCase].
-		ret at: x put: c
-	].
-	^ ret
+lowerCase
+    ^ self collect: [:c| c lowerCase]
+!
+METHOD String
+upperCase
+    ^ self collect: [:c| c upperCase]
 !
 METHOD String
 indexOf: val | c s |
@@ -2094,6 +2896,12 @@ indexOf: val | c s |
 !
 COMMENT --------- List -----------
 METHOD MetaList
+new | instance |
+    instance <- super new.
+    self in: instance at: 2 put: 0. "set size to 0"
+    ^instance
+!
+METHOD MetaList
 with: elemA	| newList |
 	newList <- self new.
 	newList add: elemA.
@@ -2112,16 +2920,21 @@ with: elemA with: elemB with: elemC	| newList |
 	^ newList
 !
 METHOD List
+size
+    ^size
+!
+METHOD List
 add: anElement
 	elements <- Link value: anElement next: elements.
+	size <- size + 1.
 	^ anElement
 !
 METHOD List
 addLast: anElement
-	elements isNil
-		ifTrue: [ self add: anElement]
-		ifFalse: [ elements addLast: anElement ].
-	^ anElement
+    elements isNil
+       ifTrue: [ self add: anElement]
+       ifFalse: [ elements addLast: anElement. size <- size + 1. ].
+    ^ anElement
 !
 METHOD List
 firstLink
@@ -2129,16 +2942,30 @@ firstLink
 !
 METHOD List
 appendList: aList | element |
-    (elements isNil) ifTrue: [ elements <- aList firstLink. ^self ].
+    (elements isNil) ifTrue: [
+        elements <- aList firstLink.
+        size <- aList size.
+        ^self
+    ].
 
     element <- elements.
-    [element next isNil] whileFalse: [element <- element next].
+    [element next isNil]
+        whileFalse: [element <- element next].
     element next: aList firstLink.
+    size <- size + aList size.
     ^self
 !
 METHOD List
 addAll: aCollection
-	aCollection do: [ :element | self addLast: element ]
+    aCollection do: [ :element | self addLast: element ]
+!
+METHOD List
+lastLink |link next|
+    elements isNil ifTrue: [ ^nil ].
+
+    link <- elements.
+    [(next <- link next) notNil] whileTrue: [link <- next].
+    ^link
 !
 METHOD List
 + aCollection
@@ -2175,13 +3002,13 @@ at: index | link |
 !
 METHOD List
 at: index ifAbsent: aBlock | link |
-	link <- self findLink: index ifAbsent: [nil].
+	link <- self findLink: index ifAbsent: [ ^ aBlock value].
 	link isNil ifTrue: [ ^ aBlock value ].
 	^ link value
 !
 METHOD List
 at: index put: value | link |
-	link <- self findLink: index.
+	link <- self findLink: index ifAbsent: [ self badIndex: index ].
 	link value: value
 !
 METHOD List
@@ -2190,21 +3017,22 @@ first
 !
 METHOD List
 isEmpty
-	^ elements isNil
+	^ size = 0
 !
 METHOD List
 removeFirst
-	elements isNil
-		ifTrue: [ self emptyCollection ]
-		ifFalse: [ elements <- elements next ]
+    elements isNil
+        ifTrue: [ self emptyCollection ]
+        ifFalse: [ elements <- elements next. size <- size - 1 ]
 !
 METHOD List
 popFirst | value |
     elements isNil
-        ifTrue: [ ^nil ]
+        ifTrue: [ self emptyCollection ]
         ifFalse: [
             value <- elements value.
             elements <- elements next.
+            size <- size - 1.
             ^value ]
 !
 METHOD List
@@ -2221,8 +3049,13 @@ reverse | newList |
 METHOD List
 remove: anElement ifAbsent: exceptionBlock
 	elements isNil
-		ifTrue: [ exceptionBlock value ]
-		ifFalse: [ elements remove: anElement ifAbsent: exceptionBlock ]
+		ifTrue: [ exceptionBlock value. ^self ]
+		ifFalse: [ elements <- elements remove: anElement ifAbsent: [ exceptionBlock value. ^self ]. size <- size - 1. ]
+!
+METHOD List
+clear
+    elements <- nil.
+    size <- 0
 !
 METHOD List
 do: aBlock
@@ -2319,7 +3152,7 @@ METHOD Dictionary
 printString | count res |
 	res <- self class printString + ' ('.
 	count <- 0.
-	self binaryDo: [:k :elem| 
+	self binaryDo: [:k :elem|
 		(count = 0) ifFalse: [ res <- res + ', ' ].
 		res <- res + (k printString + ' -> ' + elem printString).
 		count <- count + 1.
@@ -2330,6 +3163,10 @@ printString | count res |
 METHOD Dictionary
 add: anAssoc
 	self at: anAssoc key put: anAssoc value
+!
+METHOD Dictionary
+includes: aKey
+    ^keys includes: aKey.
 !
 COMMENT ---------- Set ------------
 METHOD MetaSet
@@ -2906,13 +3743,22 @@ next
 	^ next
 !
 METHOD Link
+value: aValue next: aLink
+    value <- aValue.
+    next  <- aLink
+!
+METHOD Link
 next: aLink
     next <- aLink
 !
 METHOD Link
-do: aBlock
-	aBlock value: value.
-	next notNil ifTrue: [ ^ next do: aBlock ]
+do: aBlock | link |
+    link <- self.
+    [link notNil] whileTrue:
+        [ aBlock value: link value. link <- link next ]
+
+	"aBlock value: value.
+	next notNil ifTrue: [ ^ next do: aBlock ]"
 !
 METHOD Link
 remove: anElement ifAbsent: exceptionBlock
@@ -3029,7 +3875,7 @@ reverseDo: aBlock
 !
 METHOD Tree
 removeFirst
-	root isNIl ifTrue: [ self emptyCollection ].
+	root isNil ifTrue: [ self emptyCollection ].
 	root <- root removeFirst
 !
 METHOD Tree
@@ -3048,115 +3894,397 @@ METHOD Tree
 isEmpty
 	^ root isNil
 !
+
+COMMENT -------------- MetaFileOpenFlag -----------------
+
+COMMENT <fcntl.h>
+CLASS FileOpenFlag Object
+
+METHOD MetaFileOpenFlag
+readOnly
+    ^0
+!
+
+METHOD MetaFileOpenFlag
+writeOnly
+    ^1
+!
+
+METHOD MetaFileOpenFlag
+readWrite
+    ^2
+!
+
+METHOD MetaFileOpenFlag
+create
+    ^64
+!
+
+METHOD MetaFileOpenFlag
+Truncate
+    ^512
+!
+
+METHOD MetaFileOpenFlag
+Append
+    ^1024
+!
+
+COMMENT -------------- FileMode -----------------
+
+COMMENT <sys/stat.h>
+CLASS FileMode Object modeMask
+
+METHOD MetaFileMode
+new: modeMask
+    ^ self in: (self new) at: 1 put: modeMask.
+!
+
+METHOD MetaFileMode
+fyleTypeMask
+    " 0170000 "
+    ^ 61440.
+!
+
+METHOD MetaFileMode
+isDirectory
+    " 040000 "
+    ^ 16384.
+!
+METHOD FileMode
+isDirectory
+    ^ (modeMask bitAnd: FileMode fyleTypeMask) = FileMode isDirectory.
+!
+
+METHOD MetaFileMode
+isReadableByOwner
+    " 0400 "
+    ^ 256.
+!
+METHOD MetaFileMode
+isReadableByGroup
+    " 0400 >> 3 "
+    ^ 32.
+!
+METHOD MetaFileMode
+isReadableByOthers
+    " 0400 >> 6 "
+    ^ 4.
+!
+METHOD FileMode
+isReadableByOwner
+    ^ (modeMask bitAnd: FileMode isReadableByOwner) = FileMode isReadableByOwner.
+!
+METHOD FileMode
+isReadableByGroup
+    ^ (modeMask bitAnd: FileMode isReadableByGroup) = FileMode isReadableByGroup.
+!
+METHOD FileMode
+isReadableByOthers
+    ^ (modeMask bitAnd: FileMode isReadableByOthers) = FileMode isReadableByOthers.
+!
+
+
+METHOD MetaFileMode
+isWritableByOwner
+    " 0200 "
+    ^ 128.
+!
+METHOD MetaFileMode
+isWritableByGroup
+    " 0200 >> 3 "
+    ^ 16.
+!
+METHOD MetaFileMode
+isWritableByOthers
+    " 0200 >> 6 "
+    ^ 2.
+!
+METHOD FileMode
+isWritableByOwner
+    ^ (modeMask bitAnd: FileMode isWritableByOwner) = FileMode isWritableByOwner.
+!
+METHOD FileMode
+isWritableByGroup
+    ^ (modeMask bitAnd: FileMode isWritableByGroup) = FileMode isWritableByGroup.
+!
+METHOD FileMode
+isWritableByOthers
+    ^ (modeMask bitAnd: FileMode isWritableByOthers) = FileMode isWritableByOthers.
+!
+
+METHOD MetaFileMode
+isExecutableByOwner
+    " 0100 "
+    ^ 64.
+!
+METHOD MetaFileMode
+isExecutableByGroup
+    " 0100 >> 3 "
+    ^ 8.
+!
+METHOD MetaFileMode
+isExecutableByOthers
+    " 0100 >> 6 "
+    ^ 1.
+!
+METHOD FileMode
+isExecutableByOwner
+    ^ (modeMask bitAnd: FileMode isExecutableByOwner) = FileMode isExecutableByOwner.
+!
+METHOD FileMode
+isExecutableByGroup
+    ^ (modeMask bitAnd: FileMode isExecutableByGroup) = FileMode isExecutableByGroup.
+!
+METHOD FileMode
+isExecutableByOthers
+    ^ (modeMask bitAnd: FileMode isExecutableByOthers) = FileMode isExecutableByOthers.
+!
+
+METHOD FileMode
+asString |result|
+    result <- ''.
+
+    self isDirectory
+        ifTrue:  [ result <- result + 'd' ]
+        ifFalse: [ result <- result + '-' ].
+
+    self isReadableByOwner
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByOwner
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByOwner
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+
+    self isReadableByGroup
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByGroup
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByGroup
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+
+    self isReadableByOthers
+        ifTrue:  [ result <- result + 'r' ]
+        ifFalse: [ result <- result + '-' ].
+    self isWritableByOthers
+        ifTrue:  [ result <- result + 'w' ]
+        ifFalse: [ result <- result + '-' ].
+    self isExecutableByOthers
+        ifTrue:  [ result <- result + 'x' ]
+        ifFalse: [ result <- result + '-' ].
+
+    ^ result.
+!
+
+COMMENT -------------- FileStat -----------------
+
+CLASS FileStat Object size inode mode
+
+METHOD MetaFileStat
+setStatTo: array for: descriptor
+    " fstat(descriptor, &stat) "
+    <105 descriptor array>.
+    self primitiveFailed.
+!
+
+METHOD MetaFileStat
+new: descriptor
+    |stat array modeMask mode|
+    array <- Array new: 3.
+    FileStat setStatTo: array for: descriptor.
+    stat <- self new.
+    " extract size "
+    self in: stat at: 1 put: (array at: 1).
+    " extract inode "
+    self in: stat at: 2 put: (array at: 2).
+    " extract mode "
+    modeMask <- array at: 3.
+    mode <- FileMode new: modeMask.
+    self in: stat at: 3 put: mode.
+    ^ stat.
+!
+
+METHOD FileStat
+size
+    ^ size
+!
+
+METHOD FileStat
+inode
+    ^ inode
+!
+
+METHOD FileStat
+mode
+    ^ mode
+!
+
 COMMENT --------------file methods-----------------
 METHOD MetaFile
 test
-  | file |
-  file <- File openWrite: 'test.txt'.
-  file opened
-    ifTrue: [ 'opened!' printNl ]
-    ifFalse: [ 'not opened!' printNl. ^nil ].
-  file write: 'foo bar'.
-  file newline.
-  file close.
-  'Done!' printNl.
+    | file |
+    file <- File openWrite: 'test.txt'.
+    file opened
+        ifTrue: [ 'opened!' printNl ]
+        ifFalse: [ 'not opened!' printNl. ^nil ].
+    file do: [:f |
+        f write: 'foo bar'.
+        f newline.
+    ].
+    'Done!' printNl.
+    file opened
+        ifTrue: [ 'opened!' printNl ]
+        ifFalse: [ 'not opened!' printNl. ^nil ].
 !
 METHOD MetaFile
-doOpen: nm mode: mode
-	<100 nm mode>
+doOpen: name mode: mode
+    <100 name mode>.
+    self primitiveFailed
+!
+
+METHOD File
+stat
+    ^FileStat new: fileID.
+!
+
+METHOD MetaFile
+openRead: name
+    " fopen( , r ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: (FileOpenFlag readOnly))
 !
 METHOD MetaFile
-openRead: nm
-		" open new file for reading "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'r')
+openWrite: name
+    " fopen( , w ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileOpenFlag writeOnly bitOr: FileOpenFlag create) bitOr: FileOpenFlag truncate))
 !
 METHOD MetaFile
-openWrite: nm
-		" open new file for writing "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'w')
+open: name mode: mode
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: mode)
 !
 METHOD MetaFile
-open: nm mode: mode
-  ^self in: (self new) at: 1 put: (self doOpen: nm mode: mode)
+openUpdate: name
+    " fopen( , a+ ) "
+    ^ self in: (self new) at: 1 put: (self doOpen: name mode: ((FileOpenFlag append bitOr: FileOpenFlag readWrite) bitOr: FileOpenFlag create))
 !
-METHOD MetaFile
-openUpdate: nm
-		" open new file for reading and writing "
-	^ self in: (self new) at: 1 put: (self doOpen: nm mode: 'r+')
+METHOD File
+do: block
+    block value: self.
+    self close.
 !
-METHOD MetaFile
-fileIn: nm | file |
-	file <- self openRead: nm.
-	file opened ifFalse: [ ^ self error: 'cannot open file ' + nm ].
-	file fileIn.
-	file close.
-	^ 'file in completed'
+METHOD File
+setPosition: position
+    "return lseek(position, SEEK_SET)"
+    <108 fileID position>.
+    self primitiveFailed
 !
-METHOD MetaFile
-image: nm | file |
-		" open a file, write the image, then close "
-	file <- self openWrite: nm.
-	file opened ifFalse: [ ^ self error: 'cannot open file ' + nm ].
-	file writeImage.
-	file close
+METHOD File
+rewind
+    self setPosition: 0.
+!
+METHOD File
+write: buffer | size |
+    "return the number of bytes affected by write()"
+    size <- buffer size.
+    <107 fileID buffer size>.
+    self primitiveFailed
+!
+METHOD File
+rawRead: count into: buffer
+    "return the number of bytes affected by read()"
+    <106 fileID buffer count>.
+    self primitiveFailed
+!
+METHOD File
+read: count | buffer bytesRead |
+    buffer <- ByteArray new: count.
+    bytesRead <- self rawRead: count into: buffer.
+    (bytesRead < count) ifTrue: [
+        "truncate buffer"
+        buffer <- buffer from: 1 to: bytesRead
+    ].
+    ^buffer.
+!
+METHOD File
+at: idx put: buffer
+    self setPosition: idx.
+    ^self write: buffer.
+!
+METHOD File
+at: idx size: count | buf res |
+    self setPosition: idx.
+    ^self read: count.
+!
+METHOD File
+newline
+    ^ self write: (String newline)
 !
 METHOD File
 opened
-	^ fileID notNil
+    ^fileID notNil
 !
-METHOD File
+METHOD MetaFile
 close: id
-	<103 id>
+    <103 id>.
+    self primitiveFailed
 !
 METHOD File
 close
-		" close file, return file descriptor "
-	fileID notNil ifTrue: [
-		self close: fileID.
-		fileID <- nil
-	]
+    fileID notNil ifTrue: [
+        File close: fileID.
+        fileID <- nil
+    ]
+!
+METHOD File
+getc | buffer bytesRead |
+    buffer <- ByteArray new: 1.
+    bytesRead <- self rawRead: 1 into: buffer.
+    (bytesRead = 1)
+        ifTrue:  [ ^buffer asString at: 1. ]
+        ifFalse: [ ^nil ].
+!
+METHOD File
+putc: char
+    ^self write: (char asString)
+!
+METHOD File
+readLine	| result  c nl |
+    " read a line from input "
+    fileID isNil ifTrue: [ self error: 'cannot read from unopened file' ].
+    result <- ''.
+    nl <- Char newline.
+    [   c <- self getc.
+        c isNil ifTrue: [ ^nil ].
+        c ~= nl ] whileTrue: [
+            result <- result + c asString
+    ].
+    ^ result
+!
+METHOD MetaFile
+fileIn: name | file |
+    file <- self openRead: name.
+    file opened ifFalse: [ ^ self error: 'cannot open file ' + name ].
+    file fileIn.
+    file close.
+    ^ 'file in completed'
+!
+METHOD MetaFile
+image: name | file |
+    " open a file, write the image, then close "
+    file <- self openWrite: name.
+    file opened ifFalse: [ ^ self error: 'cannot open file ' + name ].
+    file writeImage.
+    file close
 !
 METHOD File
 writeImage
-		" save the current image in a file "
-	fileID notNil
-		ifTrue: [ <104 fileID> ]
-!
-METHOD File
-notOpened
-	self error: 'file is not open'
-!
-METHOD File
-writeCharValue: n
-	<102 fileID n>.
-	fileID isNil ifTrue: [ self notOpened ].
-	self primitiveFailed
-!
-METHOD File
-doRead
-	<101 fileID>.
-	fileID isNil ifTrue: [ self notOpened ].
-	self primitiveFailed
-!
-METHOD File
-readChar	| c |
-		" read a single character from a file "
-	c <- self doRead.
-	c notNil ifTrue: [ ^ Char new: c ].
-	^ c
-!
-METHOD File
-readLine	| value  c nl |
-	" read a line from input "
-	fileID isNil ifTrue: [ self error: 'cannot read from unopened file' ].
-	value <- ''.
-	nl <- Char newline.
-	[ c <- self doRead.
-	  c isNil ifTrue: [ ^ nil ].
-	  c <- Char new: c.
-	  c ~= nl ] whileTrue:
-		[ value <- value + c asString ].
-	^ value
+    " save the current image in a file "
+    fileID notNil ifTrue: [ <104 fileID> ]
 !
 METHOD File
 fileInDispatch: cmd | c |
@@ -3174,7 +4302,7 @@ fileInDispatch: cmd | c |
 
 	" Comment enclosed in quotes... find matching quote "
 	(cmd = $") ifTrue: [
-		[ c <- self readChar. c ~= $" ] whileTrue: [
+		[ c <- self getc. c ~= $" ] whileTrue: [
 			" Consume chars until closing quote "
 			nil
 		].
@@ -3191,7 +4319,7 @@ fileInDispatch: cmd | c |
 !
 METHOD File
 fileIn		| cmd |
-	[ cmd <- self readChar. cmd notNil ] whileTrue: [
+	[ cmd <- self getc. cmd notNil ] whileTrue: [
 		self fileInDispatch: cmd
 	]
 !
@@ -3208,42 +4336,6 @@ methodCommand: classCmd | name aClass text line |
 	classCmd
 		ifTrue: [ aClass addMethod: text ]
 		ifFalse: [ aClass class addMethod: text ]
-!
-METHOD File
-at: idx
-	<108 fileID idx>.
-	self primitiveFailed
-!
-METHOD File
-write: buf size: count
-	<107 fileID buf count>.
-	self primitiveFailed
-!
-METHOD File
-write: buf
-	^ self write: buf size: (buf size)
-!
-METHOD File
-at: idx put: buf
-	self at: idx.
-	self write: buf size: buf size
-!
-METHOD File
-at: idx get: buf | size |
-	self at: idx.
-	size <- buf size.
-	<106 fileID buf size>
-!
-METHOD File
-at: idx size: count | buf res |
-	buf <- ByteArray new: count.
-	res <- self at: idx get: buf.
-	(res < count) ifTrue: [ buf <- buf from: 1 to: res ].
-	^ buf
-!
-METHOD File
-newline
-	^ self write: (String newline)
 !
 COMMENT --------------parser methods-----------------
 METHOD Parser
@@ -3301,7 +4393,7 @@ nextChar
 	^self currentChar
 !
 METHOD Parser
-nextLex	
+nextLex
 	self skipBlanks.
 	tokenType <- self currentChar.
 	tokenType isEOF   " end of input "

@@ -1,7 +1,7 @@
 /*
- *    TDictionary.cpp
+ *    CompletionEngine.h
  *
- *    Implementation of TDictionary lookup methods
+ *    Console completion proposals engine
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
@@ -32,27 +32,38 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <types.h>
-#include <algorithm>
+#include <radix_tree/radix_tree.hpp>
+#include <memory>
 
-template<typename K>
-TObject* TDictionary::find(const K* key) const
-{
-    // Keys are stored in order
-    // Thus we may apply binary search
-    const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = reinterpret_cast<TSymbol**>( keys->getFields() );
-    TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
+#include "types.h"
 
-    // std::lower_bound returns an element which is >= key,
-    // we have to check whether the found element is not > key.
-    if (foundKey != keysLast && !compare(key, *foundKey)) {
-        std::ptrdiff_t index = std::distance(keysBase, foundKey);
-        return values->getField(index);
-    } else
-        return 0; // key not found
-}
+class CompletionEngine {
+private:
+    typedef radix_tree< std::string, int > TCompletionDatabase;
+    typedef std::vector< TCompletionDatabase::iterator > TProposals;
 
-template TObject* TDictionary::find<char>(const char* key) const;
-template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
+    TCompletionDatabase m_completionDatabase;
+    TProposals m_currentProposals;
+    TProposals::iterator m_iCurrentProposal;
+    int m_totalWords;
+
+    static std::auto_ptr<CompletionEngine> s_instance;
+public:
+    CompletionEngine() : m_totalWords(0) { }
+    static CompletionEngine* Instance() { return s_instance.get(); }
+
+    void addWord(const std::string& word) { m_completionDatabase[word] = m_totalWords++; }
+    void getProposals(const std::string& prefix) {
+        m_currentProposals.clear();
+        m_completionDatabase.prefix_match(prefix, m_currentProposals);
+        m_iCurrentProposal = m_currentProposals.begin();
+    }
+    bool hasMoreProposals() { return m_iCurrentProposal != m_currentProposals.end(); }
+    std::string getNextProposal() {
+        std::string result((*m_iCurrentProposal)->first);
+        ++m_iCurrentProposal;
+        return result;
+    }
+
+    void initialize(TDictionary* globals);
+};

@@ -1,7 +1,7 @@
 /*
- *    TDictionary.cpp
+ *    primitives.h
  *
- *    Implementation of TDictionary lookup methods
+ *    Primitive handling functions which are part of soft VM
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
@@ -32,27 +32,13 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef LLST_PRIMITIVES_H_INCLUDED
+#define LLST_PRIMITIVES_H_INCLUDED
+
 #include <types.h>
-#include <algorithm>
 
-template<typename K>
-TObject* TDictionary::find(const K* key) const
-{
-    // Keys are stored in order
-    // Thus we may apply binary search
-    const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = reinterpret_cast<TSymbol**>( keys->getFields() );
-    TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
+TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveFailed);
+TObject* callSmallIntPrimitive(uint8_t opcode, int32_t leftOperand, int32_t rightOperand, bool& primitiveFailed);
+TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFailed);
 
-    // std::lower_bound returns an element which is >= key,
-    // we have to check whether the found element is not > key.
-    if (foundKey != keysLast && !compare(key, *foundKey)) {
-        std::ptrdiff_t index = std::distance(keysBase, foundKey);
-        return values->getField(index);
-    } else
-        return 0; // key not found
-}
-
-template TObject* TDictionary::find<char>(const char* key) const;
-template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
+#endif

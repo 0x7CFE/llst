@@ -1,3 +1,683 @@
+METHOD Array
++ aValue    | size1 size2 newValue |
+    " catenate two strings together "
+    size1 <- self size.
+    size2 <- aValue size.
+    newValue <- self class new: (size1 + size2).
+    newValue replaceFrom: 1 to: size1 with: self.
+    newValue replaceFrom: size1+1 to: size1+size2 with: aValue.
+    ^ newValue
+!
+
+0000 PushArgument 0
+0001 MarkArguments 1
+0002 SendMessage size
+0003 AssignTemporary 0
+0004 DoSpecial popTop
+0005 PushArgument 1
+0006 MarkArguments 1
+0007 SendMessage size
+0008 AssignTemporary 1
+0009 DoSpecial popTop
+0010 PushArgument 0
+0011 MarkArguments 1
+0012 SendMessage class
+0013 PushTemporary 0
+0014 PushTemporary 1
+0015 SendBinary +
+0016 MarkArguments 2
+0017 SendMessage new:
+0018 AssignTemporary 2
+0019 DoSpecial popTop
+0020 PushTemporary 2
+0021 PushConstant 1
+0022 PushTemporary 0
+0023 PushArgument 0
+0024 MarkArguments 4
+0025 SendMessage replaceFrom:to:with:
+0026 DoSpecial popTop
+0027 PushTemporary 2
+0028 PushTemporary 0
+0029 PushConstant 1
+0030 SendBinary +
+0031 PushTemporary 0
+0032 PushTemporary 1
+0033 SendBinary +
+0034 PushArgument 1
+0035 MarkArguments 4
+0036 SendMessage replaceFrom:to:with:
+0037 DoSpecial popTop
+0038 PushTemporary 2
+0039 DoSpecial stackReturn
+0040 DoSpecial popTop
+0041 DoSpecial selfReturn
+
+
+METHOD String
+basicAt: index put: value
+    <22 value self index>.
+    ^nil
+!
+0000 PushArgument 2
+0001 PushArgument 0
+0002 PushArgument 1
+0003 DoPrimitive String at:put:
+0005 DoSpecial popTop
+0006 PushConstant nil
+0007 DoSpecial stackReturn
+0008 DoSpecial popTop
+0009 DoSpecial selfReturn
+
+
+METHOD Number
+negative
+    ^self < 0
+!
+
+0000 PushArgument 0
+0001 PushConstant 0
+0002 SendBinary <
+0003 DoSpecial stackReturn
+0004 DoSpecial popTop
+0005 DoSpecial selfReturn
+
+
+METHOD Block
+value: a value: b
+    " start block execution "
+    <8 a b self>.
+    (self argCount)
+!
+
+0000 PushArgument 1
+0001 PushArgument 2
+0002 PushArgument 0
+0003 DoPrimitive block invoke
+0005 DoSpecial popTop
+0006 PushArgument 0
+0007 MarkArguments 1
+0008 SendMessage argCount
+0009 DoSpecial popTop
+0010 DoSpecial selfReturn
+
+
+METHOD LLVMTestStatements
+testblockParam | block a b |
+    block <- [ :x :y | a <- x + 1.  b <- y * 2. ].
+    block value: 1 value: 2.
+
+    ((a = 2) and: [ b = 4 ])
+        ifTrue:  [ ^ 42]
+        ifFalse: [ ^ 666]
+!
+
+0000 PushBlock
+0003     PushTemporary 3
+0004     PushConstant 1
+0005     SendBinary +
+0006     AssignTemporary 1
+0007     DoSpecial popTop
+0008     PushTemporary 4
+0009     PushConstant 2
+0010     MarkArguments 2
+0011     SendMessage *
+0012     AssignTemporary 2
+0013     DoSpecial stackReturn
+0014 AssignTemporary 0
+0015 DoSpecial popTop
+0016 PushTemporary 0
+0017 PushConstant 1
+0018 PushConstant 2
+0019 MarkArguments 3
+0020 SendMessage value:value:
+0021 DoSpecial popTop
+0022 PushTemporary 1
+0023 PushConstant 2
+0024 MarkArguments 2
+0025 SendMessage =
+0026 DoSpecial branchIfFalse 36      A
+0029 PushTemporary 2
+0030 PushConstant 4
+0031 MarkArguments 2
+0032 SendMessage =
+0033 DoSpecial branch 37                   B
+0036 PushConstant false              A
+0037 DoSpecial branchIfFalse 45            B
+0040 PushLiteral 4
+0041 DoSpecial stackReturn
+0042 DoSpecial branch 47                        C
+0045 PushLiteral 5
+0046 DoSpecial stackReturn
+0047 DoSpecial popTop                           C
+0048 DoSpecial selfReturn
+
+
+METHOD SmallInt
+rem: arg
+    <12 self arg>.
+    (arg isMemberOf: SmallInt) ifFalse: [^self rem: arg asSmallInt].
+    (0 = arg) ifTrue: [^ self error: 'division by zero'].
+    self primitiveFailed
+!
+
+0000 PushArgument 0
+0001 PushArgument 1
+0002 DoPrimitive SmallInt %
+0004 DoSpecial popTop
+0005 PushArgument 1
+0006 PushLiteral 0
+0007 MarkArguments 2
+0008 SendMessage isMemberOf:
+0009 DoSpecial branchIfTrue 22
+0012 PushArgument 0
+0013 PushArgument 1
+0014 MarkArguments 1
+0015 SendMessage asSmallInt
+0016 MarkArguments 2
+0017 SendMessage rem:
+0018 DoSpecial stackReturn
+0019 DoSpecial branch 23
+0022 PushConstant nil
+0023 DoSpecial popTop
+0024 PushConstant 0
+0025 PushArgument 1
+0026 MarkArguments 2
+0027 SendMessage =
+0028 DoSpecial branchIfFalse 39
+0031 PushArgument 0
+0032 PushLiteral 5
+0033 MarkArguments 2
+0034 SendMessage error:
+0035 DoSpecial stackReturn
+0036 DoSpecial branch 40
+0039 PushConstant nil
+0040 DoSpecial popTop
+0041 PushArgument 0
+0042 MarkArguments 1
+0043 SendMessage primitiveFailed
+0044 DoSpecial popTop
+0045 DoSpecial selfReturn
+
+
+
+METHOD Number
+printWidth: width base: base | res n dig wasNeg wide |
+    res <- ''.
+    (self negative) ifTrue: [
+        wasNeg <- true.
+        wide <- width-1.
+        n <- self negated
+    ] ifFalse: [
+        wasNeg <- false.
+        wide <- width.
+        n <- self
+    ].
+    [true] whileTrue: [
+        res <- ((n rem: base) asDigit) + res.
+        n <- n quo: base.
+        (n = 0) ifTrue: [
+            ((res size)+1) to: wide do: [:ignore|
+                res <- '0' + res
+            ].
+            wasNeg ifTrue: [ res <- '-' + res ].
+            ^res
+        ]
+    ]
+!
+
+0000 PushLiteral 0
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushArgument 0
+0004 MarkArguments 1
+0005 SendMessage negative
+0006 DoSpecial branchIfFalse 25
+0009 PushConstant true
+0010 AssignTemporary 3
+0011 DoSpecial popTop
+0012 PushArgument 1
+0013 PushConstant 1
+0014 MarkArguments 2
+0015 SendMessage -
+0016 AssignTemporary 4
+0017 DoSpecial popTop
+0018 PushArgument 0
+0019 MarkArguments 1
+0020 SendMessage negated
+0021 AssignTemporary 1
+0022 DoSpecial branch 33
+0025 PushConstant false
+0026 AssignTemporary 3
+0027 DoSpecial popTop
+0028 PushArgument 1
+0029 AssignTemporary 4
+0030 DoSpecial popTop
+0031 PushArgument 0
+0032 AssignTemporary 1
+0033 DoSpecial popTop
+0034 PushBlock
+0037     PushConstant true
+0038     DoSpecial stackReturn
+0039 PushConstant true
+0040 DoSpecial branchIfFalse 106
+0043 PushTemporary 1
+0044 PushArgument 2
+0045 MarkArguments 2
+0046 SendMessage rem:
+0047 MarkArguments 1
+0048 SendMessage asDigit
+0049 PushTemporary 0
+0050 SendBinary +
+0051 AssignTemporary 0
+0052 DoSpecial popTop
+0053 PushTemporary 1
+0054 PushArgument 2
+0055 MarkArguments 2
+0056 SendMessage quo:
+0057 AssignTemporary 1
+0058 DoSpecial popTop
+0059 PushTemporary 1
+0060 PushConstant 0
+0061 MarkArguments 2
+0062 SendMessage =
+0063 DoSpecial branchIfFalse 101
+0066 PushTemporary 0
+0067 MarkArguments 1
+0068 SendMessage size
+0069 PushConstant 1
+0070 SendBinary +
+0071 PushTemporary 4
+0072 PushBlock
+0075     PushLiteral 9
+0076     PushTemporary 0
+0077     SendBinary +
+0078     AssignTemporary 0
+0079     DoSpecial stackReturn
+0080 MarkArguments 3
+0081 SendMessage to:do:
+0082 DoSpecial popTop
+0083 PushTemporary 3
+0084 DoSpecial branchIfFalse 94
+0087 PushLiteral 11
+0088 PushTemporary 0
+0089 SendBinary +
+0090 AssignTemporary 0
+0091 DoSpecial branch 95
+0094 PushConstant nil
+0095 DoSpecial popTop
+0096 PushTemporary 0
+0097 DoSpecial stackReturn
+0098 DoSpecial branch 102
+0101 PushConstant nil
+0102 DoSpecial popTop
+0103 DoSpecial branch 39
+0106 PushConstant 0
+0107 DoSpecial popTop
+0108 DoSpecial selfReturn
+
+
+METHOD Undefined
+testBranches: x
+     (x = 1) ifTrue: [ ^x ].
+     (x = 2)
+        ifTrue:  [ ^x ]
+        ifFalse: [ (x = 3) ifTrue: [ ^x ]. ].
+!
+
+0000 PushArgument 1
+0001 PushConstant 1
+0002 MarkArguments 2
+0003 SendMessage =
+0004 DoSpecial branchIfFalse 12                  A
+0007 PushArgument 1
+0008 DoSpecial stackReturn
+0009 DoSpecial branch 13                            B
+0012 PushConstant nil                            A
+0013 DoSpecial popTop                               B
+0014 PushArgument 1
+0015 PushConstant 2
+0016 MarkArguments 2
+0017 SendMessage =
+0018 DoSpecial branchIfFalse 26                        C
+0021 PushArgument 1
+0022 DoSpecial stackReturn
+0023 DoSpecial branch 39                                   D1
+0026 PushArgument 1                                    C
+0027 PushConstant 3
+0028 MarkArguments 2
+0029 SendMessage =
+0030 DoSpecial branchIfFalse 38                                 E
+0033 PushArgument 1
+0034 DoSpecial stackReturn
+0035 DoSpecial branch 39                                   D2
+0038 PushConstant nil                                           E
+0039 DoSpecial popTop                                      D
+0040 DoSpecial selfReturn
+
+Branch site: 4 -> 12 (branch.)
+Branch site: 9 -> 13 (branch.1)
+Branch site: 18 -> 26 (branch.2)
+Branch site: 23 -> 39 (branch.3)
+Branch site: 30 -> 38 (branch.4)
+Branch site: 35 -> 39 (branch.5)
+
+METHOD MetaChar
+basicNew: value
+    " create and initialize a new char "
+    ^ self in: self new at: 1 put: value
+!
+METHOD MetaChar
+new: value
+    " return unique Char for ASCII value (or EOF) "
+    (value < 257) ifTrue: [ ^ chars at: value+1 ].
+
+    " otherwise build a custom Char "
+    ^ self basicNew: value
+!
+
+0000 PushArgument 1
+0001 PushLiteral 0
+0002 SendBinary <
+0003 DoSpecial branchIfFalse 16
+0006 PushInstance 6
+0007 PushArgument 1
+0008 PushConstant 1
+0009 SendBinary +
+0010 MarkArguments 2
+0011 SendMessage at:
+0012 DoSpecial stackReturn
+0013 DoSpecial branch 17
+0016 PushConstant nil
+0017 DoSpecial popTop
+0018 PushArgument 0
+0019 PushArgument 1
+0020 MarkArguments 2
+0021 SendMessage basicNew:
+0022 DoSpecial stackReturn
+0023 DoSpecial popTop
+0024 DoSpecial selfReturn
+
+
+
+METHOD String
+asNumber | val |
+    " parse a base-10 ASCII number, return nil on failure "
+    val <- 0.
+    self do: [:c|
+        c isDigit ifFalse: [^nil].
+        val <- (val * 10) + (c value - 48)
+    ].
+    ^val
+!
+
+0000 PushConstant 0
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushArgument 0
+0004 PushBlock
+0007     PushTemporary 1
+0008     MarkArguments 1
+0009     SendMessage isDigit
+0010     DoSpecial branchIfTrue 18
+0013     PushConstant nil
+0014     DoSpecial blockReturn         "!"
+0015     DoSpecial branch 19
+0018     PushConstant nil
+0019     DoSpecial popTop
+0020     PushTemporary 0
+0021     PushLiteral 1
+0022     MarkArguments 2
+0023     SendMessage *
+0024     PushTemporary 1
+0025     MarkArguments 1
+0026     SendMessage value
+0027     PushLiteral 4
+0028     MarkArguments 2
+0029     SendMessage -
+0030     SendBinary +
+0031     AssignTemporary 0
+0032     DoSpecial stackReturn
+0033 MarkArguments 2
+0034 SendMessage do:
+0035 DoSpecial popTop
+0036 PushTemporary 0
+0037 DoSpecial stackReturn
+0038 DoSpecial popTop
+0039 DoSpecial selfReturn
+
+
+
+
+METHOD LLVMTest
+loopTest | i sum |
+    i   <- 1.
+    sum <- 0.
+
+    [ i < 101 ] whileTrue:
+        [ sum <- sum + i. i <- i + 1. ].
+
+    ^sum
+!
+
+0000 PushConstant 1
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushConstant 0
+0004 AssignTemporary 1
+0005 DoSpecial popTop
+0006 PushBlock
+0009     PushTemporary 0
+0010     PushLiteral 0
+0011     SendBinary <
+0012     DoSpecial stackReturn
+0013 PushTemporary 0                   A
+0014 PushLiteral 1
+0015 SendBinary <
+0016 DoSpecial branchIfFalse 27                                B
+0019 PushTemporary 1
+0020 PushTemporary 0
+0021 SendBinary +
+0022 AssignTemporary 1
+0023 DoSpecial popTop
+     PushTemporary 0
+     PushConstant 1
+     SendBinary +
+     AssignTemporary 0
+     DoSpecial popTop
+0024 DoSpecial branch 13               A^
+0027 PushConstant 0         ; these two are thrown out         B
+0028 DoSpecial popTop       ; at the compilation time
+0029 PushTemporary 1
+0030 DoSpecial stackReturn
+0031 DoSpecial popTop
+0032 DoSpecial selfReturn
+
+
+METHOD LLVMTest
+test1: arg1  | temp1 |
+    temp1 <- 42.
+    (arg1 < temp1)
+        ifTrue:  [self doSomething]
+        ifFalse: [arg1 do: [ :x | ^field1 theOtherThing: x ] ].
+    ^self
+!
+
+0000 PushArgument 1
+0001 PushTemporary 0
+0002 SendBinary <
+0003 DoSpecial branchIfFalse 12
+0006 PushArgument 0
+0007 MarkArguments 1
+0008 SendMessage doSomething
+0009 DoSpecial branch 24
+0012 PushArgument 1
+0013 PushBlock
+0016     PushInstance 0
+0017     PushTemporary 1
+0018     MarkArguments 2
+0019     SendMessage theOtherThing:
+0020     DoSpecial blockReturn
+0021     DoSpecial stackReturn
+0022 MarkArguments 2
+0023 SendMessage do:
+
+0024 DoSpecial popTop
+0025 PushArgument 0
+0026 DoSpecial stackReturn
+
+0027 DoSpecial popTop
+0028 DoSpecial selfReturn
+
+
+METHOD LLVMTest
+test2: arg1  | temp1 |
+    temp1 <- 42.
+    ^arg1 + temp1
+!
+
+-> LLVMTest methods at: #test2:; disassemble
+0000 PushLiteral 0
+0001 AssignTemporary 0
+0002 DoSpecial popTop
+0003 PushArgument 1
+0004 PushTemporary 0
+0005 SendBinary +
+0006 DoSpecial stackReturn
+0007 DoSpecial popTop
+0008 DoSpecial selfReturn
+
+
+
+
+METHOD LLVMTest
+returnFourtyTwo
+    ^42
+!
+
+
+-> LLVMTest methods at: #returnFourtyTwo; disassemble
+0000 PushLiteral 0
+0001 DoSpecial stackReturn
+0002 DoSpecial popTop
+0003 DoSpecial selfReturn
+Method
+
+
+
+
+
+
+
+METHOD Collection
+sort: criteria | left right mediane |
+    (self isEmpty) ifTrue: [^self].
+
+    mediane <- self popFirst.
+
+    left  <- List new.
+    right <- List new.
+    self do: [ :x |
+        (criteria value: x value: mediane)
+            ifTrue:  [ left  add: x ]
+            ifFalse: [ right add: x ] ].
+
+    left  <- left  sort: criteria.
+    right <- right sort: criteria.
+
+    right add: mediane.
+    ^ left appendList: right
+!
+
+-> Collection methods at: #sort: ; disassemble
+    0000 PushArgument 0
+    0001 MarkArguments 1
+    0002 SendMessage isEmpty
+    0003 DoSpecial branchIfFalse 11
+    0006 PushArgument 0
+    0007 DoSpecial stackReturn
+    0008 DoSpecial branch 12
+
+    0011 PushConstant nil
+    0012 DoSpecial popTop
+    0013 PushArgument 0
+    0014 MarkArguments 1
+    0015 SendMessage popFirst
+    0016 AssignTemporary 2
+    0017 DoSpecial popTop
+    0018 PushLiteral 2
+    0019 MarkArguments 1
+    0020 SendMessage new
+    0021 AssignTemporary 0
+    0022 DoSpecial popTop
+    0023 PushLiteral 4
+    0024 MarkArguments 1
+    0025 SendMessage new
+    0026 AssignTemporary 1
+    0027 DoSpecial popTop
+    0028 PushArgument 0
+    0029 PushBlock
+    0032     PushArgument 1
+    0033     PushTemporary 3
+    0034     PushTemporary 2
+    0035     MarkArguments 3
+    0036     SendMessage value:value:
+    0037     DoSpecial branchIfFalse 47   *
+    0040     PushTemporary 0
+    0041     PushTemporary 3
+    0042     MarkArguments 2
+    0043     SendMessage add:
+    0044     DoSpecial branch 51              #
+    0047     PushTemporary 1              *
+    0048     PushTemporary 3
+    0049     MarkArguments 2
+    0050     SendMessage add:
+    0051     DoSpecial stackReturn            #
+    0052 MarkArguments 2
+    0053 SendMessage do:
+    0054 DoSpecial popTop
+    0055 PushTemporary 0
+    0056 PushArgument 1
+    0057 MarkArguments 2
+    0058 SendMessage sort:
+    0059 AssignTemporary 0
+    0060 DoSpecial popTop
+    0061 PushTemporary 1
+    0062 PushArgument 1
+    0063 MarkArguments 2
+    0064 SendMessage sort:
+    0065 AssignTemporary 1
+    0066 DoSpecial popTop
+    0067 PushTemporary 1
+    0068 PushTemporary 2
+    0069 MarkArguments 2
+    0070 SendMessage add:
+    0071 DoSpecial popTop
+    0072 PushTemporary 0
+    0073 PushTemporary 1
+    0074 MarkArguments 2
+    0075 SendMessage appendList:
+    0076 DoSpecial stackReturn
+    0077 DoSpecial popTop
+    0078 DoSpecial selfReturn
+Method
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Undefined>>main
     ...
     0059 SendMessage name
@@ -12,7 +692,7 @@ Method>>name
     0002 DoSpecial popTop
     0003 DoSpecial selfReturn
 
-OrderedArray location: value    
+OrderedArray location: value
     0000 PushConstant 1
     0001 AssignTemporary 0              low <- 1
     0002 DoSpecial popTop
@@ -31,7 +711,7 @@ OrderedArray location: value
     0017 PushTemporary 0
     0018 PushTemporary 1
     0019 SendBinary <
-    0020 DoSpecial branchIfFalse 53
+ *  0020 DoSpecial branchIfFalse 53
     0023 PushTemporary 0
     0024 PushTemporary 1
     0025 SendBinary +
@@ -46,26 +726,26 @@ OrderedArray location: value
     0034 SendMessage at:
     0035 PushArgument 1
     0036 SendBinary <
-    0037 DoSpecial branchIfFalse 47
+ #  0037 DoSpecial branchIfFalse 47
     0040 PushTemporary 2
     0041 PushConstant 1
     0042 SendBinary +
     0043 AssignTemporary 0
     0044 DoSpecial branch 49
-    0047 PushTemporary 2
+ #  0047 PushTemporary 2
     0048 AssignTemporary 1
     0049 DoSpecial popTop
     0050 DoSpecial branch 17
-    0053 PushConstant 0
+ *  0053 PushConstant 0
     0054 DoSpecial popTop
     0055 PushTemporary 0
     0056 DoSpecial stackReturn
     0057 DoSpecial popTop
     0058 DoSpecial selfReturn
-    
-    
+
+
 Dictionary at: index put: value
-    0000 PushInstance 0                 keys  
+    0000 PushInstance 0                 keys
     0001 PushArgument 1                 value
     0002 MarkArguments 2                #(keys value)
     0003 SendMessage location:          keys location: value
@@ -75,8 +755,8 @@ Dictionary at: index put: value
     0007 PushInstance 0                 keys
     0008 MarkArguments 1                #(keys)
     0009 SendMessage size               keys size
-    0010 SendBinary <=                  keys size <= 
-    0011 DoSpecial branchIfFalse 24     position <= keys size
+    0010 SendBinary <=                  keys size <=
+ *  0011 DoSpecial branchIfFalse 24     position <= keys size
     0014 PushArgument 1
     0015 PushInstance 0
     0016 PushTemporary 0
@@ -84,16 +764,16 @@ Dictionary at: index put: value
     0018 SendMessage at:
     0019 MarkArguments 2
     0020 SendMessage =
-    0021 DoSpecial branch 25
-    0024 PushConstant false
-    0025 DoSpecial branchIfFalse 36
+ #  0021 DoSpecial branch 25
+ *  0024 PushConstant false
+ #  0025 DoSpecial branchIfFalse 36
     0028 PushInstance 1
     0029 PushTemporary 0
     0030 PushArgument 2
     0031 MarkArguments 3
     0032 SendMessage at:put:
-    0033 DoSpecial branch 49
-    0036 PushInstance 0
+ @  0033 DoSpecial branch 49
+ #  0036 PushInstance 0
     0037 PushArgument 1
     0038 PushTemporary 0
     0039 MarkArguments 3
@@ -106,7 +786,7 @@ Dictionary at: index put: value
     0046 MarkArguments 3
     0047 SendMessage insert:at:
     0048 AssignInstance 1
-    0049 DoSpecial popTop
+ @  0049 DoSpecial popTop
     0050 PushArgument 2
     0051 DoSpecial stackReturn
     0052 DoSpecial popTop
@@ -121,7 +801,7 @@ initialMethod
     pushConstant    10 (nil)
     markArguments   1
     sendMessage     main
-    
+
 nil>>main
     0000 PushLiteral 0              Char
     0001 MarkArguments 1            #(Char)
@@ -129,8 +809,8 @@ nil>>main
     ...
 
 Array new: size
-    0000 PushArgument 0                 self                                                
-    0001 PushArgument 1                 257                                         
+    0000 PushArgument 0                 self
+    0001 PushArgument 1                 257
     0002 DoPrimitive new                <7 self 257>
     0004 DoSpecial popTop               nil? кого вытаскиваем?
     0005 DoSpecial selfReturn
@@ -139,19 +819,19 @@ Block value: arg
     0000 PushArgument 1                  i
     0001 PushArgument 0                  block
     0002 DoPrimitive block invoke
-         TOS : 
+         TOS :
     0004 DoSpecial popTop
     0005 PushArgument 0
     0006 MarkArguments 1
     0007 SendMessage argCount
     0008 DoSpecial popTop
     0009 DoSpecial selfReturn
-    
+
 
 ???
     0000 PushArgument 1                 1
-    0001 PushArgument 0 
-    
+    0001 PushArgument 0
+
 MetaChar
 initialize
     0000 PushInstance 6                 chars
@@ -169,25 +849,25 @@ initialize
     0016     PushInstance 6             chars
     0017     PushTemporary 0            :idx
     0018     PushLiteral 4              Char
-    0019     PushTemporary 0            :idx                                                                                                                      
-    0020     PushConstant 1             1                                                                                                                     
+    0019     PushTemporary 0            :idx
+    0020     PushConstant 1             1
     0021     MarkArguments 2            #(:idx 1)
     0022     SendMessage -              :(idx - 1) SmallInt ?
-    0023     MarkArguments 2                                                                                                                                 
-    0024     SendMessage basicNew:      new_char 
+    0023     MarkArguments 2
+    0024     SendMessage basicNew:      new_char
              TOS : instance of char
     0025     MarkArguments 3            #(chars idx new_char)
-    0026     SendMessage at:put:                                                                                                                             
+    0026     SendMessage at:put:
              TOS : chars
-    0027     DoSpecial stackReturn                                                                                                                           
-    0028 MarkArguments 3                 #(1 257 block)                                                                                                                    
+    0027     DoSpecial stackReturn
+    0028 MarkArguments 3                 #(1 257 block)
     0029 SendMessage to:do:
     0030 DoSpecial branch 34
     0033 PushConstant nil
     0034 DoSpecial popTop
     0035 DoSpecial selfReturn
 
-Number to: limit do: aBlock   
+Number to: limit do: aBlock
     0000 PushArgument 0                  self
     0001 AssignTemporary 0               | i | i <- self
     0002 DoSpecial popTop
@@ -214,34 +894,34 @@ Number to: limit do: aBlock
     0029 PushConstant 0
     0030 DoSpecial popTop
     0031 DoSpecial selfReturn
-    
+
 SmallInt -
     0000 PushArgument 0                  1
     0001 PushArgument 1                  1
     0002 DoPrimitive SmallInt -          1 - 1
     0004 DoSpecial popTop                this should not be executed
-    
 
-MetaChar basicNew:    
+
+MetaChar basicNew:
     0000 PushArgument 0                  MetaChar
     0001 PushArgument 0                  MetaChar
     0002 MarkArguments 1
     0003 SendMessage new                 MetaChar new
-    
+
          TOS: instance of Char
-    
+
     0004 PushConstant 1                  1
     0005 PushArgument 1                  0
     0006 MarkArguments 4                 #(MetaChar new_char 1 0)
     0007 SendMessage in:at:put:
-         
+
          TOS: instance of Char
-         
+
     0008 DoSpecial stackReturn
     0009 DoSpecial popTop
     0010 DoSpecial selfReturn
-    
-Char new  
+
+Char new
     0000 PushArgument 0                 Char
     0001 PushInstance 3                 1
     0002 DoPrimitive new
@@ -253,18 +933,18 @@ MetaObject in:at:put:
     0001 PushArgument 1                 new_char
     0002 PushArgument 2                 1
     0003 DoPrimitive at:put:            <5>
-    
+
     0005 DoSpecial popTop
     0006 DoSpecial selfReturn
 
-Array at: index put: value   
+Array at: index put: value
     0000 PushArgument 2                 char
     0001 PushArgument 0                 chars
     0002 PushArgument 1                 1
     0003 DoPrimitive at:put:            chars at: idx put: (Char basicNew: idx-1)
-    
+
          TOS : chars
-    
+
     0005 DoSpecial popTop
     0006 PushArgument 0
     0007 PushArgument 1
@@ -283,4 +963,3 @@ Array at: index put: value
     0023 SendMessage primitiveFailed
     0024 DoSpecial popTop
     0025 DoSpecial selfReturn
-    

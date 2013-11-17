@@ -1,48 +1,48 @@
 /*
- *    BakerMemoryManager.cpp 
- *    
+ *    BakerMemoryManager.cpp
+ *
  *    Implementation of BakerMemoryManager class
- *    
- *    LLST (LLVM Smalltalk or Lo Level Smalltalk) version 0.1
- *    
- *    LLST is 
- *        Copyright (C) 2012 by Dmitry Kashitsyn   aka Korvin aka Halt <korvin@deeptown.org>
- *        Copyright (C) 2012 by Roman Proskuryakov aka Humbug          <humbug@deeptown.org>
- *    
- *    LLST is based on the LittleSmalltalk which is 
+ *
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *
+ *    LLST is
+ *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *
+ *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
  *        Copyright (C) 2007 by Charles R. Childers
  *        Copyright (C) 2005-2007 by Danny Reinhold
- *        
+ *
  *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *        
- *    
+ *
+ *
  *    This file is part of LLST.
  *    LLST is free software: you can redistribute it and/or modify
  *    it under the terms of the GNU General Public License as published by
  *    the Free Software Foundation, either version 3 of the License, or
  *    (at your option) any later version.
- *    
+ *
  *    LLST is distributed in the hope that it will be useful,
  *    but WITHOUT ANY WARRANTY; without even the implied warranty of
  *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  *    GNU General Public License for more details.
- *    
+ *
  *    You should have received a copy of the GNU General Public License
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <memory.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <cstring>
+#include <cstdlib>
 #include <sys/time.h>
 
 BakerMemoryManager::BakerMemoryManager() :
-    m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0), 
+    m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),
     m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
     m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0),
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
-    m_staticHeapBase(0), m_staticHeapPointer(0)
+    m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
     // Nothing to be done here
 }
@@ -50,65 +50,116 @@ BakerMemoryManager::BakerMemoryManager() :
 BakerMemoryManager::~BakerMemoryManager()
 {
     // TODO Reset the external pointers to catch the null pointers if something goes wrong
-    free(m_staticHeapBase);
-    free(m_heapOne);
+    std::free(m_staticHeapBase);
+    std::free(m_heapOne);
+    std::free(m_heapTwo);
 }
 
-bool BakerMemoryManager::initializeStaticHeap(size_t heapSize)
+bool BakerMemoryManager::initializeStaticHeap(std::size_t heapSize)
 {
     heapSize = correctPadding(heapSize);
 
-    void* heap = malloc(heapSize);
+    uint8_t* heap = static_cast<uint8_t*>( std::malloc(heapSize) );
     if (!heap)
         return false;
 
-    memset(heap, 0, heapSize);
+    std::memset(heap, 0, heapSize);
 
-    m_staticHeapBase = (uint8_t*) heap;
-    m_staticHeapPointer = (uint8_t*) heap + heapSize;
+    m_staticHeapBase = heap;
+    m_staticHeapPointer = heap + heapSize;
     m_staticHeapSize = heapSize;
 
     return true;
 }
 
-bool BakerMemoryManager::initializeHeap(size_t heapSize, size_t maxHeapSize /* = 0 */)
+bool BakerMemoryManager::initializeHeap(std::size_t heapSize, std::size_t maxHeapSize /* = 0 */)
 {
     // To initialize properly we need a heap with an even size
     heapSize = correctPadding(heapSize);
 
-    void* base = malloc(heapSize);
-    if (!base)
-        return false;
-
-    memset(base, 0, heapSize);
-
+    uint32_t mediane = heapSize / 2;
     m_heapSize = heapSize;
     m_maxHeapSize = maxHeapSize;
 
-    uint32_t mediane = heapSize / 2;
-    m_heapOne = (uint8_t*) base;
-    m_heapTwo = (uint8_t*) base + mediane;
+    m_heapOne = static_cast<uint8_t*>( std::malloc(mediane) );
+    m_heapTwo = static_cast<uint8_t*>( std::malloc(mediane) );
+    // TODO check for allocation errors
+
+    std::memset(m_heapOne, 0, mediane);
+    std::memset(m_heapTwo, 0, mediane);
 
     m_activeHeapOne = true;
-    
+
     m_activeHeapBase = m_heapOne;
-    m_activeHeapPointer = (uint8_t*) base + mediane;
-    
-    m_inactiveHeapBase = (uint8_t*) base + mediane;
-    m_inactiveHeapPointer = (uint8_t*) base + heapSize;
+    m_activeHeapPointer = m_heapOne + mediane;
+
+    m_inactiveHeapBase =  m_heapTwo;
+    m_inactiveHeapPointer = m_heapTwo + mediane;
 
     return true;
 }
 
-void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
+void BakerMemoryManager::growHeap(uint32_t requestedSize)
+{
+    // Stage1. Growing inactive heap
+    uint32_t newHeapSize = correctPadding(requestedSize + m_heapSize + m_heapSize / 2);
+
+    std::printf("MM: Growing heap to %d\n", newHeapSize);
+
+    uint32_t newMediane = newHeapSize / 2;
+    uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
+    uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
+
+    // Reallocating space and zeroing it
+    {
+        void* newInactiveHeap = std::realloc(*inactiveHeapBase, newMediane);
+        if (!newInactiveHeap)
+        {
+            std::printf("MM: Cannot reallocate %d bytes for inactive heap\n", newMediane);
+            std::abort();
+        } else {
+            *inactiveHeapBase = static_cast<uint8_t*>(newInactiveHeap);
+            std::memset(*inactiveHeapBase, 0, newMediane);
+        }
+    }
+    // Stage 2. Collecting garbage so that
+    // active objects will be moved to a new home
+    collectGarbage();
+
+    // Now pointers are swapped and previously active heap is now inactive
+    // We need to reallocate it too
+    {
+        void* newActiveHeap = std::realloc(*activeHeapBase, newMediane);
+        if (!newActiveHeap)
+        {
+            std::printf("MM: Cannot reallocate %d bytes for active heap\n", newMediane);
+            std::abort();
+        } else {
+            *activeHeapBase = static_cast<uint8_t*>(newActiveHeap);
+            std::memset(*activeHeapBase, 0, newMediane);
+        }
+    }
+    collectGarbage();
+
+    m_heapSize = newHeapSize;
+}
+
+void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
     if (gcOccured)
         *gcOccured = false;
 
-    size_t attempts = 2;
+    std::size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
+
+            // If even after collection there is too less space
+            // we may try to expand the heap
+            const uintptr_t distance = m_activeHeapPointer - m_activeHeapBase;
+            if ((m_heapSize < m_maxHeapSize) && (distance < m_heapSize / 6))
+               growHeap(requestedSize);
+
             if (gcOccured)
                 *gcOccured = true;
             continue;
@@ -124,16 +175,16 @@ void* BakerMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/
 
     // TODO Grow the heap if object still not fits
 
-    fprintf(stderr, "Could not allocate %d bytes in heap\n", requestedSize);
+    std::fprintf(stderr, "Could not allocate %u bytes in heap\n", requestedSize);
     return 0;
 }
 
-void* BakerMemoryManager::staticAllocate(size_t requestedSize)
+void* BakerMemoryManager::staticAllocate(std::size_t requestedSize)
 {
     uint8_t* newPointer = m_staticHeapPointer - requestedSize;
     if (newPointer < m_staticHeapBase)
     {
-        fprintf(stderr, "Could not allocate %d bytes in static heaps\n", requestedSize);
+        std::fprintf(stderr, "Could not allocate %u bytes in static heaps\n", requestedSize);
         return 0; // TODO Report memory allocation error
     }
     m_staticHeapPointer = newPointer;
@@ -153,7 +204,7 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
         // until we find one that we can handle
         while (true) {
             // Checking whether this is inline integer
-            if (isSmallInteger((TObject*) currentObject)) {
+            if (isSmallInteger( reinterpret_cast<TObject*>(currentObject) )) {
                 // Inline integers are stored directly in the
                 // pointer space. All we need to do is just copy
                 // contents of the poiner to a new place
@@ -163,12 +214,14 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
                 break;
             }
 
+            bool inOldSpace = (reinterpret_cast<uint8_t*>(currentObject) >= m_inactiveHeapPointer) &&
+                              (reinterpret_cast<uint8_t*>(currentObject) < (m_inactiveHeapBase + m_heapSize / 2));
+
             // Checking if object is not in the old space
-            if ( (currentObject > (TMovableObject*) (m_inactiveHeapBase + m_heapSize / 2))
-              || (currentObject < (TMovableObject*) m_inactiveHeapPointer))
+            if (!inOldSpace)
             {
                 // Object does not belong to a heap.
-                // Either it is located in static space 
+                // Either it is located in static space
                 // or this is a broken pointer
                 replacement   = currentObject;
                 currentObject = previousObject;
@@ -200,14 +253,14 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 
                 // We need to allocate space evenly, so calculating the
                 // actual size of the block being reserved for the moving object
-                m_activeHeapPointer -= sizeof(TByteObject) + correctPadding(dataSize); 
+                m_activeHeapPointer -= sizeof(TByteObject) + correctPadding(dataSize);
                 objectCopy = new (m_activeHeapPointer) TMovableObject(dataSize, true);
 
-                // Copying byte data. data[0] is the class pointer, 
+                // Copying byte data. data[0] is the class pointer,
                 // actual binary data starts from the data[1]
                 uint8_t* source      = reinterpret_cast<uint8_t*>( & currentObject->data[1] );
                 uint8_t* destination = reinterpret_cast<uint8_t*>( & objectCopy->data[1] );
-                memcpy(destination, source, dataSize);
+                std::memcpy(destination, source, dataSize);
 
                 // Marking original copy of object as relocated so it would not be processed again
                 currentObject->size.setRelocated();
@@ -323,25 +376,34 @@ void BakerMemoryManager::collectGarbage()
     // Storing timestamp on start
     timeval tv1;
     gettimeofday(&tv1, NULL);
-    
+
+    // Moving the live objects in the new heap
+    moveObjects();
+
+    // Storing timestamp of the end
+    timeval tv2;
+    gettimeofday(&tv2, NULL);
+
+    std::memset(m_inactiveHeapBase, 0, m_heapSize / 2);
+
+    // Calculating total microseconds spent in the garbage collection procedure
+    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+}
+
+void BakerMemoryManager::moveObjects()
+{
     // Here we need to check the rootStack, staticRoots and the VM execution context
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
         **iRoot = moveObject(**iRoot);
     }
 
-    // Updating external references. Typically this is pointers stored in the hptr<>
-    TPointerIterator iExternalPointer = m_externalPointers.begin();
-    for (; iExternalPointer != m_externalPointers.end(); ++iExternalPointer) {
-        **iExternalPointer = moveObject(**iExternalPointer);
+    // Updating external references. Typically these are pointers stored in the hptr<>
+    object_ptr* currentPointer = m_externalPointersHead;
+    while (currentPointer != 0) {
+        currentPointer->data = reinterpret_cast<TObject*>( moveObject( reinterpret_cast<TMovableObject*>(currentPointer->data) ) );
+        currentPointer = currentPointer->next;
     }
-    
-    // Storing timestamp of the end
-    timeval tv2;
-    gettimeofday(&tv2, NULL);
-    
-    // Calculating total microseconds spent in the garbage collection procedure
-    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
 }
 
 bool BakerMemoryManager::isInStaticHeap(void* location)
@@ -349,41 +411,98 @@ bool BakerMemoryManager::isInStaticHeap(void* location)
     return (location >= m_staticHeapPointer) && (location < m_staticHeapBase + m_staticHeapSize);
 }
 
+bool BakerMemoryManager::checkRoot(TObject* value, TObject** objectSlot)
+{
+    // Here we need to perform some actions depending on whether the object slot and
+    // the value resides. Generally, all pointers from the static heap to the dynamic one
+    // should be tracked by the GC because it may be the only valid link to the object.
+    // Object may be collected otherwise.
+
+    bool slotIsStatic  = isInStaticHeap(objectSlot);
+
+    // Only static slots are subject of our interest
+    if (slotIsStatic) {
+        TObject* oldValue  = *objectSlot;
+
+        bool valueIsStatic = isInStaticHeap(value);
+        bool oldValueIsStatic = isInStaticHeap(oldValue);
+
+        if (!valueIsStatic) {
+            // Adding dynamic value to a static slot. If slot previously contained
+            // the dynamic value then it means that slot was already registered before.
+            // In that case we do not need to register it again.
+
+            if (oldValueIsStatic) {
+                addStaticRoot(objectSlot);
+                return true; // Root list was altered
+            }
+        } else {
+            // Adding static value to a static slot. Typically it means assigning something
+            // like nilObject. We need to check what pointer was in the slot before (oldValue).
+            // If it was dynamic, we need to remove the slot from the root list, so GC will not
+            // try to collect a static value from the static heap (it's just a waste of time).
+
+            if (!oldValueIsStatic) {
+                removeStaticRoot(objectSlot);
+                return true; // Root list was altered
+            }
+        }
+    }
+
+    // Root list was not altered
+    return false;
+}
+
 void BakerMemoryManager::addStaticRoot(TObject** pointer)
 {
-    m_staticRoots.push_front((TMovableObject**) pointer);
+    m_staticRoots.push_front( reinterpret_cast<TMovableObject**>(pointer) );
 }
 
 void BakerMemoryManager::removeStaticRoot(TObject** pointer)
 {
     TStaticRootsIterator iRoot = m_staticRoots.begin();
     for (; iRoot != m_staticRoots.end(); ++iRoot) {
-        if (*iRoot == (TMovableObject**) pointer) {
+        if (*iRoot == reinterpret_cast<TMovableObject**>(pointer)) {
             m_staticRoots.erase(iRoot);
             return;
         }
     }
 }
 
-void BakerMemoryManager::registerExternalPointer(TObject** pointer)
-{
-    m_externalPointers.push_front((TMovableObject**) pointer);
+void BakerMemoryManager::registerExternalHeapPointer(object_ptr& pointer) {
+    pointer.next = m_externalPointersHead;
+    m_externalPointersHead = &pointer;
 }
 
-void BakerMemoryManager::releaseExternalPointer(TObject** pointer)
-{
-    TPointerIterator iPointer = m_externalPointers.begin();
-    for (; iPointer != m_externalPointers.end(); ++iPointer) {
-        if (*iPointer == (TMovableObject**) pointer) {
-            m_externalPointers.erase(iPointer);
-            return;
-        }
+void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
+    if (m_externalPointersHead == &pointer) {
+        m_externalPointersHead = pointer.next;
+        return;
+    }
+
+    // If it is not the last element of the list
+    //  we replace the given pointer with the next one
+    if (pointer.next) {
+        object_ptr* next_object = pointer.next;
+        pointer.data = next_object->data;
+        pointer.next = next_object->next;
+    } else {
+        // This is the last element, we have to find the previous
+        // element in the list and unlink the given pointer
+        object_ptr* previousPointer = m_externalPointersHead;
+        while (previousPointer->next != &pointer)
+            previousPointer = previousPointer->next;
+
+        previousPointer->next = 0;
+        return;
     }
 }
 
-TMemoryManagerInfo BakerMemoryManager::getStat() 
+TMemoryManagerInfo BakerMemoryManager::getStat()
 {
     TMemoryManagerInfo info;
+    std::memset(&info, 0, sizeof(info));
+
     info.allocationsCount     = m_allocationsCount;
     info.collectionsCount     = m_collectionsCount;
     info.totalCollectionDelay = m_totalCollectionDelay;

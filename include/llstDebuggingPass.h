@@ -1,7 +1,7 @@
 /*
- *    TDictionary.cpp
+ *    llstDebuggingPass.h
  *
- *    Implementation of TDictionary lookup methods
+ *    Debugging LLVM pass
  *
  *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
@@ -32,27 +32,15 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <types.h>
-#include <algorithm>
+#include <llvm/Function.h>
+#include <llvm/Module.h>
+#include <llvm/Pass.h>
+#include <llvm/Instructions.h>
+#include <llvm/IntrinsicInst.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/ADT/Statistic.h>
+#include <llvm/Support/IRBuilder.h>
+#include <set>
 
-template<typename K>
-TObject* TDictionary::find(const K* key) const
-{
-    // Keys are stored in order
-    // Thus we may apply binary search
-    const TSymbol::TCompareFunctor compare;
-    TSymbol** keysBase = reinterpret_cast<TSymbol**>( keys->getFields() );
-    TSymbol** keysLast = keysBase + keys->getSize();
-    TSymbol** foundKey = std::lower_bound(keysBase, keysLast, key, compare);
-
-    // std::lower_bound returns an element which is >= key,
-    // we have to check whether the found element is not > key.
-    if (foundKey != keysLast && !compare(key, *foundKey)) {
-        std::ptrdiff_t index = std::distance(keysBase, foundKey);
-        return values->getField(index);
-    } else
-        return 0; // key not found
-}
-
-template TObject* TDictionary::find<char>(const char* key) const;
-template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
+llvm::FunctionPass* createLLSTDebuggingPass();
