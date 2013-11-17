@@ -62,7 +62,7 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} pthread readline ${LLVM_LD_FLAGS})
+target_link_libraries(llst ${LLVM_LIBS} readline ${LLVM_LD_FLAGS})
 
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     # this is a 64-bit OS
