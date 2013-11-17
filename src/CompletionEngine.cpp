@@ -32,7 +32,8 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <console.h>
+#include <CompletionEngine.h>
+#include <readline/readline.h>
 
 std::auto_ptr<CompletionEngine> CompletionEngine::s_instance(new CompletionEngine);
 
@@ -52,7 +53,54 @@ static char** smalltalk_completion(const char* text, int start, int end) {
     return rl_completion_matches(text, smalltalk_generator);
 }
 
-void initializeCompletion() {
+static void initializeReadline()
+{
     rl_readline_name = "llst";
     rl_attempted_completion_function = smalltalk_completion;
+}
+
+void CompletionEngine::initialize(TDictionary* globals)
+{
+    // Binding completion helpers to the readline subsystem
+    initializeReadline();
+
+    // Populating completion database with globals
+    for (uint32_t i = 0; i < globals->keys->getSize(); i++) {
+        TSymbol* key   = (*globals->keys)[i];
+        TObject* value = (*globals->values)[i];
+
+        std::string keyString = key->toString();
+        char firstLetter = keyString[0];
+        if ( keyString != "Smalltalk" && std::isupper(firstLetter) ) {
+            TClass* currentClass = static_cast<TClass*>(value);
+
+            // Adding class name
+            addWord(currentClass->name->toString());
+
+            // Acquiring selectors of class methods
+            TSymbolArray* selectors = currentClass->methods->keys;
+            const uint32_t keysSize = selectors->getSize();
+
+            // Adding selectors
+            for ( uint32_t methodIndex = 0; methodIndex < keysSize; methodIndex++) {
+                const std::string methodName = (*selectors)[methodIndex]->toString();
+
+                // Adding method name
+                addWord(methodName);
+            }
+
+            // Adding metaclass name and methods
+            TClass* metaClass = currentClass->getClass();
+            //addWord(metaClass->name->toString());
+
+            TSymbolArray*  metaSelectors = metaClass->methods->keys;
+            const uint32_t metaSize = metaSelectors->getSize();
+            for (uint32_t methodIndex = 0; methodIndex < metaSize; methodIndex++) {
+                const std::string methodName = (*metaSelectors)[methodIndex]->toString();
+
+                // Adding meta method name
+                addWord(methodName);
+            }
+        }
+    }
 }
