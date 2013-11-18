@@ -3,7 +3,7 @@
  *
  *    Program entry point
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.1
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
  *
  *    LLST is
  *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
