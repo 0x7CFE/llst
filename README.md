@@ -23,25 +23,30 @@ Features
 
 Usage
 =====
-In order to compile LLST you have to install the following packages (along with cmake and gcc):
+LLST is a 32-bit software. In order to compile it on a 64-bit OS you have to install the following 32-bit versions of packages (along with cmake and gcc):
 
 ```
 $ sudo apt-get install ia32-libs g++-multilib libreadline-dev:i386
 ```
 
-Then you may clone the repository and build the binaries.
+32-bit OS do not require ia32-libs because it is a compatibility package. Then you may clone the repository and build the binaries.
 
 ```
 ~ $ git clone https://github.com/0x7CFE/llst.git
 ~ $ cd llst
 
-~/llst $ mkdir build & cd build
+~/llst $ mkdir build && cd build
 ~/llst/build $ cmake ..
 ~/llst/build $ make
 ~/llst/build $ ./llst
 ```
 
-If you now wish to build LLST with LLVM support, you should pass -DLLVM=ON parameter to the cmake:
+**Note**: Don't forget about make's ```-jN``` parameter. It allows parallel compilation on a multicore system where N represents the number of parallel tasks that make should handle. Typically N is defined as number of cores +1. So, for quad core system ```make -j5``` will be fine.
+
+LLVM
+====
+
+By default LLST is built without LLVM support. If you wish to enable it, you should pass -DLLVM=ON parameter to the cmake:
 ```
 ~/llst/build $ rm CMakeCache.txt
 ~/llst/build $ cmake -DLLVM=ON ..
