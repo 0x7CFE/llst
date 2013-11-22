@@ -81,12 +81,16 @@ add_custom_command(
 
 add_custom_target(image ALL DEPENDS ${IMAGE_DIR}/LittleSmalltalk.image)
 
+install(TARGETS llst DESTINATION bin)
 
+set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "LLVM powered Little Smalltalk")
+set (CPACK_PACKAGE_CONTACT "info@llst.org")
 set (CPACK_PACKAGE_VERSION_MAJOR "0")
 set (CPACK_PACKAGE_VERSION_MINOR "2")
 set (CPACK_PACKAGE_VERSION_PATCH "0")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set (CPACK_SOURCE_GENERATOR "TGZ")
 set (CPACK_SOURCE_IGNORE_FILES "build/;\\\\.kdev4.*;\\\\.git/;\\\\.hgignore")
+set (CPACK_GENERATOR "DEB")
 
 include(CPack)
