@@ -82,6 +82,8 @@ add_custom_command(
 add_custom_target(image ALL DEPENDS ${IMAGE_DIR}/LittleSmalltalk.image)
 
 install(TARGETS llst DESTINATION bin)
+install(FILES LICENSE DESTINATION share/doc/${PROJECT_NAME} RENAME copyright)
+
 
 set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "LLVM powered Little Smalltalk")
 set (CPACK_PACKAGE_CONTACT "info@llst.org")
