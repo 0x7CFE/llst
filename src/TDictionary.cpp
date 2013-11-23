@@ -58,8 +58,7 @@ TObject* TDictionary::find(const K* key) const
 template TObject* TDictionary::find<char>(const char* key) const;
 template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
 
-TObject* TDictionary::at(TObjectArray* args) {
-    TSymbol* key = args->getField<TSymbol>(1);
-    TObject* result = find(key);
+TObject* TDictionary::at(TObject* key) {
+    TObject* result = find(key->cast<const TSymbol>());
     return result ? result : globals.nilObject;
 }

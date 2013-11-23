@@ -43,6 +43,7 @@
 #include <opcodes.h>
 #include <primitives.h>
 #include <vm.h>
+#include <api.h>
 
 #if defined(LLVM)
     #include <jit.h>
@@ -832,11 +833,32 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             }
 
             // Invoking native method
-            PNativeMethod nativeMethod = iNativeMethod->second;
+            TNativeMethodBase* nativeMethod = iNativeMethod->second;
             TObjectArray* arguments = ec.currentContext->arguments;
             TObject* self = arguments->getField(0);
 
-            return (self->*nativeMethod)(arguments);
+            // And here goes the black magic
+            switch (nativeMethod->getType()) {
+                case TNativeMethodBase::mtNoArg: {
+                    TNativeMethod* pNativeMethod = static_cast<TNativeMethod*>(nativeMethod);
+                    return (self ->* pNativeMethod->get()) ();
+                }
+
+                case TNativeMethodBase::mtOneArg: {
+                    TNativeMethod1* pNativeMethod = static_cast<TNativeMethod1*>(nativeMethod);
+                    return (self ->* pNativeMethod->get()) (arguments->getField(1));
+                }
+
+                case TNativeMethodBase::mtTwoArg: {
+                    TNativeMethod2* pNativeMethod = static_cast<TNativeMethod2*>(nativeMethod);
+                    return (self ->* pNativeMethod->get()) (arguments->getField(1), arguments->getField(2));
+                }
+
+                case TNativeMethodBase::mtArgArray: {
+                    TNativeMethodA* pNativeMethod = static_cast<TNativeMethodA*>(nativeMethod);
+                    return (self ->* pNativeMethod->get()) (arguments);
+                }
+            }
         } break;
 
         case primitive::startNewProcess: { // 6
@@ -1142,14 +1164,14 @@ void SmalltalkVM::printVMStat()
 }
 
 void SmalltalkVM::registerBuiltinNatives() {
-    static const TNativeMethod arrayMethods[] = {
-        { "sort:", (PNativeMethod) &TArray<TObject>::sortBy }
+    static const TNativeMethodInfo arrayMethods[] = {
+        { "sort:", new TNativeMethod1(&TArray<TObject>::sortBy) }
     };
 
-    static const TNativeMethod dictionaryMethods[] = {
-        { "at:", (PNativeMethod) &TDictionary::at }
+    static const TNativeMethodInfo dictionaryMethods[] = {
+        { "at:",  new TNativeMethod1(&TDictionary::at) }
     };
 
-    registerNativeMethods(getClass("Array"), arrayMethods);
     registerNativeMethods(getClass("Dictionary"), dictionaryMethods);
+    registerNativeMethods(getClass("Array"), arrayMethods);
 }

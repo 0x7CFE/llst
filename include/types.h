@@ -262,7 +262,7 @@ struct TArray : public TObject {
     }
 
     typedef TArray<TObject> TObjectArray;
-    TObjectArray* sortBy(TObjectArray* args); // native
+    TObject* sortBy(TObject* criteria); // native
 };
 
 typedef TArray<TObject> TObjectArray;
@@ -334,7 +334,7 @@ struct TDictionary : public TObject {
     template<typename K> TObject* find(const K* key) const;
     template<typename T, typename K> T* find(const K* key) const { return static_cast<T*>(find(key)); }
 
-    TObject* at(TObjectArray* args); // native
+    TObject* at(TObject* key); // native
 
     static const char* InstanceClassName() { return "Dictionary"; }
 };

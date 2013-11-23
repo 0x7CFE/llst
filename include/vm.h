@@ -40,6 +40,7 @@
 
 #include <types.h>
 #include <memory.h>
+#include <api.h>
 
 template <int I>
 struct Int2Type
@@ -189,14 +190,9 @@ public:
 
     template<class T> hptr<T> newPointer(T* object) { return hptr<T>(object, m_memoryManager); }
 
-    typedef TObject* (TObject::*PNativeMethod)(TObjectArray* args);
-    typedef std::map<TSymbol*, PNativeMethod> TSymbolToNativeMethodMap;
-    typedef std::map<TClass*, TSymbolToNativeMethodMap> TNativeMethodMap;
 
-    struct TNativeMethod {
-        const char* selector;
-        PNativeMethod method;
-    };
+    typedef std::map<TSymbol*, TNativeMethodBase*> TSymbolToNativeMethodMap;
+    typedef std::map<TClass*, TSymbolToNativeMethodMap> TNativeMethodMap;
 
     TNativeMethodMap m_nativeMethods;
 
@@ -212,14 +208,13 @@ public:
         return (TClass*) globals.nilObject; // TODO
     }
 
-    void addMethod(TClass* klass, TSymbol* selector, PNativeMethod method) {
+    void addMethod(TClass* klass, TSymbol* selector, TNativeMethodBase* method) {
         m_nativeMethods[klass][selector] = method;
         // TODO add stub method in the Smalltalk bytecodes
     }
 
     template <std::size_t N>
-    void registerNativeMethods(TClass* klass, const TNativeMethod (&methods)[N]) {
-        //const std::size_t numMethods = sizeof(*methods) / sizeof(TNativeMethod);
+    void registerNativeMethods(TClass* klass, const TNativeMethodInfo(&methods)[N]) {
         TSymbolToNativeMethodMap& methodMap = m_nativeMethods[klass];
         for (std::size_t i = 0; i < N; i++) {
             TSymbol* selector = getSymbol(methods[i].selector);
@@ -230,6 +225,13 @@ public:
 
     void registerBuiltinNatives();
     void printVMStat();
+
+    ~SmalltalkVM() {
+        // Cleaning up native method tables
+        for (TNativeMethodMap::iterator iClass = m_nativeMethods.begin(), end = m_nativeMethods.end(); iClass != end; ++iClass)
+            for (TSymbolToNativeMethodMap::iterator iMethod = iClass->second.begin(), end = iClass->second.end(); iMethod != end; ++iMethod)
+                delete iMethod->second;
+    }
 };
 
 template<class T> hptr<T> SmalltalkVM::newObject(std::size_t dataSize /*= 0*/, bool registerPointer /*= true*/)

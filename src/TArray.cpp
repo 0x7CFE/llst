@@ -41,12 +41,12 @@ public:
     }
 };
 
-template<> TObjectArray* TObjectArray::sortBy(TObjectArray* args) {
+template<> TObject* TObjectArray::sortBy(TObject* criteriaObject) {
     const std::size_t size = getSize();
     if (size < 2)
         return this;
 
-    TBlock* criteria = args->getField<TBlock>(1);
+    TBlock* criteria = static_cast<TBlock*>(criteriaObject);
     TCompareFunctor compare(criteria != globals.nilObject ? criteria : NULL);
 
     // Populating temporary array for sorting
