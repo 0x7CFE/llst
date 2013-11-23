@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(llst_project)
+project(llst-project)
 
 if (LLVM)
     if(LLVM_VERSION)
@@ -93,6 +93,11 @@ set (CPACK_PACKAGE_VERSION_PATCH "0")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set (CPACK_SOURCE_GENERATOR "TGZ")
 set (CPACK_SOURCE_IGNORE_FILES "build/;\\\\.kdev4.*;\\\\.git/;\\\\.hgignore")
+set (CPACK_STRIP_FILES "llst")
+
+
 set (CPACK_GENERATOR "DEB")
+set (CPACK_DEBIAN_PACKAGE_MAINTAINER "Team <info@llst.org>")
+set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libreadline6-dev")
 
 include(CPack)
