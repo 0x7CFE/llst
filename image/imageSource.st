@@ -1523,17 +1523,17 @@ do: aBlock
 
 METHOD MetaJit
 printStatistics
-    <248>
+    <247>
 !
 
 METHOD MetaJit
 printMethod: aMethod
-    <249 aMethod>
+    <247>
 !
 
 METHOD MetaJit
 patchHotMethods
-    <250>
+    <247>
 !
 
 CLASS StatementsTest Test

@@ -796,21 +796,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
         } break;
 
-#if defined(LLVM)
-        case 250: // patchHotMethods
-            JITRuntime::Instance()->patchHotMethods();
-            break;
-
-        case 249: { // printMethod
-            TMethod* method = ec.stackPop<TMethod>();
-            JITRuntime::Instance()->printMethod(method);
-        } break;
-
-        case 248:
-            JITRuntime::Instance()->printStat();
-            break;
-#endif
-
         case 247: {
             // Extracting current method info
             TMethod* currentMethod   = ec.currentContext->method;

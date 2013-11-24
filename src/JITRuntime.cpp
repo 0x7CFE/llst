@@ -57,6 +57,24 @@ using namespace llvm;
 
 JITRuntime* JITRuntime::s_instance = 0;
 
+// Jit native interface
+struct TJit : public TObject {
+    TObject* patchHotMethods() {
+        JITRuntime::Instance()->patchHotMethods();
+        return globals.nilObject;
+    }
+
+    TObject* printStatistics() {
+        JITRuntime::Instance()->printStat();
+        return globals.nilObject;
+    }
+
+    TObject* printMethod(TObject* method) {
+        JITRuntime::Instance()->printMethod(method->cast<TMethod>());
+        return globals.nilObject;
+    }
+};
+
 static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime::THotMethod* m2)
 {
     return m1->hitCount < m2->hitCount;
@@ -188,6 +206,15 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_messagesDispatched = 0;
     m_blocksInvoked = 0;
     m_objectsAllocated = 0;
+
+    // Initializing native interface
+    static const TNativeMethodInfo nativeMethods[] = {
+        { "patchHotMethods",  new TNativeMethod(&TJit::patchHotMethods) },
+        { "printStatistics",  new TNativeMethod(&TJit::printStatistics) },
+        { "printMethod:",     new TNativeMethod1(&TJit::printMethod) }
+    };
+
+    softVM->registerNativeMethods(softVM->getClass("MetaJit"), nativeMethods);
 }
 
 JITRuntime::~JITRuntime() {
@@ -1098,4 +1125,4 @@ bool bulkReplace(TObject* destination,
                                                         sourceStartOffset);
 }
 
-}
+} // extern "C"
