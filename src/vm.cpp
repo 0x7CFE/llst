@@ -774,28 +774,6 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         } break;
 #endif
 
-        case 251: {
-            // TODO Unicode support
-
-            TString* prompt = ec.stackPop<TString>();
-            std::string strPrompt(reinterpret_cast<const char*>(prompt->getBytes()), prompt->getSize());
-
-            char* input = readline(strPrompt.c_str());
-            if (input) {
-                uint32_t inputSize = std::strlen(input);
-
-                if (inputSize > 0)
-                    add_history(input);
-
-                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, inputSize) );
-                std::memcpy(result->getBytes(), input, inputSize);
-
-                std::free(input);
-                return result;
-            } else
-                return globals.nilObject;
-        } break;
-
         case 247: {
             // Extracting current method info
             TMethod* currentMethod   = ec.currentContext->method;
@@ -1148,6 +1126,30 @@ void SmalltalkVM::printVMStat()
         m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
 }
 
+struct TMetaString : public TObject {
+    TObject* readline(TObject* prompt) {
+        // TODO Unicode support
+
+        TString* promptString = prompt->cast<TString>();
+        std::string strPrompt(reinterpret_cast<const char*>(promptString->getBytes()), promptString->getSize());
+
+        char* input = ::readline(strPrompt.c_str());
+        if (input) {
+            uint32_t inputSize = std::strlen(input);
+
+            if (inputSize > 0)
+                add_history(input);
+
+            TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, inputSize) );
+            std::memcpy(result->getBytes(), input, inputSize);
+
+            std::free(input);
+            return result;
+        } else
+            return globals.nilObject;
+    }
+};
+
 void SmalltalkVM::registerBuiltinNatives() {
     static const TNativeMethodInfo arrayMethods[] = {
         { "sort:", new TNativeMethod1(&TArray<TObject>::sortBy) }
@@ -1159,4 +1161,6 @@ void SmalltalkVM::registerBuiltinNatives() {
 
     registerNativeMethods(getClass("Dictionary"), dictionaryMethods);
     registerNativeMethods(getClass("Array"), arrayMethods);
+
+    addMethod(getClass("MetaString"), getSymbol("readline:"), new TNativeMethod1(&TMetaString::readline));
 }

@@ -2728,7 +2728,7 @@ new: size
 !
 METHOD MetaString
 readline: prompt
-    ^<251 prompt>
+    <247>
 !
 METHOD MetaString
 input	| value c nl |
