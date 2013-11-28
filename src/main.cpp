@@ -54,6 +54,11 @@ int main(int argc, char **argv) {
 
     llstArgs.parse(argc, argv);
 
+    if (llstArgs.showHelp) {
+        std::cout << args::getHelp() << std::endl;
+        return EXIT_SUCCESS;
+    }
+
 #if defined(LLVM)
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
 #else
@@ -150,5 +155,5 @@ int main(int argc, char **argv) {
     runtime.printStat();
 #endif
 
-    return 0;
+    return EXIT_SUCCESS;
 }
