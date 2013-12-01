@@ -33,10 +33,10 @@
  */
 
 
+#include <iostream>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <cassert>
-#include <iostream>
 #include <cstdlib>
 #include <cstring>
 
