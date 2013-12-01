@@ -49,6 +49,7 @@ struct args
     {
     }
     void parse(int argc, char **argv);
+    static std::string getHelp();
 };
 
 #endif

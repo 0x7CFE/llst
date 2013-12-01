@@ -1,0 +1,15 @@
+#pod2man --section=1 --center="LLST Documentation" --release=0.2 --name=llst ./doc/llst.1.en.pod | gzip -9 > ./doc/llst.1.en.gz
+=head1 NAME
+
+llst - a SmallTalk virtual machine
+
+=head1 DESCRIPTION
+
+TODO:
+
+
+=head1 SEE ALSO
+
+POD examples: L<http://juerd.nl/site.plp/perlpodtut>
+
+=cut

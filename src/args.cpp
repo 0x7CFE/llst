@@ -103,3 +103,14 @@ void args::parse(int argc, char **argv)
         }
     }
 }
+
+std::string args::getHelp()
+{
+    return
+        "Usage: llst [options] path-to-image\n"
+        "Options:\n"
+        "  -h, --heap <number>              Starting <number> of the heap in bytes\n"
+        "  -H, --heap_max <number>          Maximum allowed heap size\n"
+        "  -i, --image <path>               Path to image\n"
+        "      --help                       Display this information and quit";
+}
