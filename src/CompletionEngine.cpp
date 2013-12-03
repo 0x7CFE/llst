@@ -32,8 +32,10 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <CompletionEngine.h>
+#include <cstdio>
 #include <readline/readline.h>
+
+#include <CompletionEngine.h>
 
 std::auto_ptr<CompletionEngine> CompletionEngine::s_instance(new CompletionEngine);
 
