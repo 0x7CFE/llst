@@ -35,6 +35,7 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
+#include <cstdlib>
 
 #include <vm.h>
 #include <args.h>
