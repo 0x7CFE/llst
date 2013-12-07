@@ -456,8 +456,7 @@ void JITRuntime::patchHotMethods()
             continue;
 
         // Cleaning up the function
-        m_executionEngine->freeMachineCodeForFunction(methodFunction);
-        methodFunction->getBasicBlockList().clear();
+        methodFunction->deleteBody();
 
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
@@ -472,16 +471,10 @@ void JITRuntime::patchHotMethods()
             patchCallSite(hotMethod->methodFunction, contextHolder, iSite->second, iSite->first);
             ++iSite;
         }
-
-//         outs() << "Patched code: \n" << *hotMethod->methodFunction << "\n";
-
-        outs() << "done. Verifying ...";
-
-        verifyModule(*m_JITModule, AbortProcessAction);
-
         outs() << "done.\n";
-
     }
+
+    verifyModule(*m_JITModule, AbortProcessAction);
 
     // Running optimization passes on functions
     for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
@@ -499,36 +492,18 @@ void JITRuntime::patchHotMethods()
         outs() << "Optimizing " << hotMethod->methodFunction->getName().str() << " ...";
         optimizeFunction(hotMethod->methodFunction);
 
-        outs() << "done. Verifying ...";
-
-        verifyModule(*m_JITModule, AbortProcessAction);
-
-//         outs() << "Optimized code: \n" << *hotMethod->methodFunction;
-
         outs() << "done.\n";
     }
 
-    // Compiling functions
-    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
-        THotMethod* hotMethod = hotMethods[j];
+    verifyModule(*m_JITModule, AbortProcessAction);
 
-        // We're interested only in methods with call sites
-        if (hotMethod->callSites.empty())
-            continue;
-
-        TMethod* method = hotMethod->method;
-        Function* methodFunction = hotMethod->methodFunction;
-        if (!method || !methodFunction)
-            continue;
-
-        outs() << "Compiling machine code for " << hotMethod->methodFunction->getName().str() << " ...";
-        m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
-
-
-//         outs() << "Final code: \n" << *hotMethod->methodFunction;
-
-        outs() << "done.\n";
+    outs() << "Recompiling ...";
+    for (ilist_iterator<Function> F = m_JITModule->getFunctionList().begin(); F != m_JITModule->getFunctionList().end(); F++) {
+        if( !F->isDeclaration() ) {
+            m_executionEngine->recompileAndRelinkFunction(F);
+        }
     }
+    outs() << "done.\n";
 
     // Invalidating caches
     std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
