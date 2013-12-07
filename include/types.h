@@ -123,17 +123,6 @@ private:
     // is an object too. And yes, it has a class too.
     TClass*  klass;
 
-protected:
-    // Actual space allocated for object is larger than sizeof(TObject).
-    // Remaining space is used to hold user data. For ordinary objects
-    // it contains pointers to other objects. For raw binary objects
-    // it is accessed directly as a raw byte array.
-    // Actual size is stored in the TSize field and accessed using getSize()
-    union {
-        TObject* fields[0];
-        uint8_t  bytes[0];
-    };
-
 private:
     // This class should not be instantinated explicitly
     // Descendants should provide own public InstanceClassName method
@@ -154,10 +143,11 @@ public:
     bool isRelocated() const { return size.isRelocated(); }
 
     // TODO boundary checks
-    TObject** getFields() { return fields; }
-    TObject*  getField(uint32_t index) { return fields[index]; }
-    TObject*& operator [] (uint32_t index) { return fields[index]; }
-    void putField(uint32_t index, TObject* value) { fields[index] = value; }
+    TObject** getFields() { return reinterpret_cast<TObject**>(reinterpret_cast<uint8_t*>(this) + sizeof(TSize) + sizeof(TClass*)); }
+    TObject** getFields() const { return getFields(); }
+    TObject*  getField(uint32_t index) { return getFields()[index]; }
+    TObject*& operator [] (uint32_t index) { return getFields()[index]; }
+    void putField(uint32_t index, TObject* value) { getFields()[index] = value; }
 
     template<typename T> T* cast() const { return static_cast<T*>(this); }
 
@@ -178,12 +168,12 @@ public:
     // Byte objects are said to be binary
     explicit TByteObject(uint32_t dataSize, TClass* klass) : TObject(dataSize, klass, true) { }
 
-    uint8_t* getBytes() { return bytes; }
-    const uint8_t* getBytes() const { return bytes; }
-    const uint8_t getByte(uint32_t index) const { return bytes[index]; }
-    uint8_t& operator [] (uint32_t index) { return bytes[index]; }
+    uint8_t* getBytes() { return reinterpret_cast<uint8_t*>(getFields()); }
+    const uint8_t* getBytes() const { return reinterpret_cast<const uint8_t*>(getFields());  }
+    const uint8_t getByte(uint32_t index) const { return getBytes()[index]; }
+    uint8_t& operator [] (uint32_t index) { return getBytes()[index]; }
 
-    void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
+    void putByte(uint32_t index, uint8_t value) { getBytes()[index] = value; }
 
     // Helper constant for template instantination
     enum { InstancesAreBinary = true };
@@ -215,7 +205,7 @@ struct TByteArray : public TByteObject {
 //
 struct TSymbol : public TByteObject {
     static const char* InstanceClassName() { return "Symbol"; }
-    std::string toString() const { return std::string(reinterpret_cast<const char*>(bytes), getSize()); }
+    std::string toString() const { return std::string(reinterpret_cast<const char*>(getBytes()), getSize()); }
 
     // Helper comparison function functional object. Compares two symbols (or it's string representation).
     // Returns true when 'left' is found to be less than 'right'.
@@ -258,8 +248,8 @@ struct TArray : public TObject {
     TArray(uint32_t capacity, TClass* klass) : TObject(capacity, klass) { }
     static const char* InstanceClassName() { return "Array"; }
 
-    Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
-    template <typename Type> Type* getField(uint32_t index) { return static_cast<Type*>(fields[index]); }
+    Element* getField(uint32_t index) { return static_cast<Element*>(getFields()[index]); }
+    template <typename Type> Type* getField(uint32_t index) { return static_cast<Type*>(getFields()[index]); }
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
     //       So the first element will have index 1, the second 2 and so on.
@@ -269,7 +259,7 @@ struct TArray : public TObject {
         // compile-time check whether Element is in the type tree of TObject
         (void) static_cast<Element*>( reinterpret_cast<TObject*>(0) );
 
-        TObject** field   = &fields[index];
+        TObject** field   = &getFields()[index];
         Element** element = reinterpret_cast<Element**>(field);
         return *element;
     }
