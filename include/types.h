@@ -167,7 +167,7 @@ public:
 
     uint8_t* getBytes() { return bytes; }
     const uint8_t* getBytes() const { return bytes; }
-    const uint8_t getByte(uint32_t index) const { return bytes[index]; }
+    const uint8_t& getByte(uint32_t index) const { return bytes[index]; }
     uint8_t& operator [] (uint32_t index) { return bytes[index]; }
 
     void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
