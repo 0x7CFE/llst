@@ -45,7 +45,15 @@
     #include <jit.h>
 #endif
 
+#include "LinkedList.h"
+
 int main(int argc, char **argv) {
+    LinkedList<TObject> list;
+    StackLinkedNode<TObject> asd;
+    list.insert(asd);
+    list.erase(&asd);
+    return 0;
+
     args llstArgs;
 
     llstArgs.heapSize = 1048576;
