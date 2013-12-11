@@ -144,12 +144,12 @@ public:
 
     // TODO boundary checks
     TObject** getFields() { return reinterpret_cast<TObject**>(reinterpret_cast<uint8_t*>(this) + sizeof(TSize) + sizeof(TClass*)); }
-    TObject** getFields() const { return getFields(); }
+    TObject** getFields() const { return const_cast<TObject*>(this)->getFields(); }
     TObject*  getField(uint32_t index) { return getFields()[index]; }
     TObject*& operator [] (uint32_t index) { return getFields()[index]; }
     void putField(uint32_t index, TObject* value) { getFields()[index] = value; }
 
-    template<typename T> T* cast() const { return static_cast<T*>(this); }
+    template<typename T> const T* cast() const { return static_cast<const T*>(this); }
 
     // Helper constant for template instantination
     enum { InstancesAreBinary = false };
