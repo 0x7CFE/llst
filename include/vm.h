@@ -214,8 +214,8 @@ public:
     }
 
     template <std::size_t N>
-    void registerNativeMethods(TClass* klass, const TNativeMethodInfo(&methods)[N]) {
-        TSymbolToNativeMethodMap& methodMap = m_nativeMethods[klass];
+    void registerNativeMethods(const char* className, const TNativeMethodInfo(&methods)[N]) {
+        TSymbolToNativeMethodMap& methodMap = m_nativeMethods[getClass(className)];
         for (std::size_t i = 0; i < N; i++) {
             TSymbol* selector = getSymbol(methods[i].selector);
             methodMap[selector] = methods[i].method;

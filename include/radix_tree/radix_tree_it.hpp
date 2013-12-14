@@ -24,9 +24,10 @@ public:
         bool        operator!= (const radix_tree_it<K, T> &lhs) const;
         bool        operator== (const radix_tree_it<K, T> &lhs) const;
 
+        // FIXME Switching to C++ 11 standard complains to this constructor if private
+        radix_tree_it(radix_tree_node<K, T> *p) : m_pointee(p) { }
 private:
         radix_tree_node<K, T> *m_pointee;
-        radix_tree_it(radix_tree_node<K, T> *p) : m_pointee(p) { }
 
         radix_tree_node<K, T>* increment(radix_tree_node<K, T>* node);
         radix_tree_node<K, T>* descend(radix_tree_node<K, T>* node);

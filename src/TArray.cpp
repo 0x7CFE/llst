@@ -41,13 +41,14 @@ public:
     }
 };
 
-template<> TObject* TObjectArray::sortBy(TObject* criteriaObject) {
+template<> TObject* TObjectArray::sortBy(TBlock* criteria) {
+    checkClass(criteria);
+
     const std::size_t size = getSize();
     if (size < 2)
         return this;
 
-    TBlock* criteria = static_cast<TBlock*>(criteriaObject);
-    TCompareFunctor compare(criteria != globals.nilObject ? criteria : NULL);
+    TCompareFunctor compare(criteria->cast<TObject>() != globals.nilObject ? criteria : NULL);
 
     // Populating temporary array for sorting
     // TODO Implement non-copying logic

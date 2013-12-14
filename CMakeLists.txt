@@ -26,7 +26,7 @@ if (LLVM)
     add_definitions(-DLLVM)
 endif()
 
-set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} -Wall -fexceptions -frtti -Wno-cast-qual")
+set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} -std=c++11 -fexceptions -frtti -Wall -Wno-cast-qual")
 set (CMAKE_CXX_FLAGS_DEBUG "-g -ggdb -O0")
 set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 

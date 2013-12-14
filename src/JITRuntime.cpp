@@ -69,8 +69,9 @@ struct TJit : public TObject {
         return globals.nilObject;
     }
 
-    TObject* printMethod(TObject* method) {
-        JITRuntime::Instance()->printMethod(method->cast<TMethod>());
+    TObject* printMethod(TMethod* method) {
+        checkClass(method);
+        JITRuntime::Instance()->printMethod(method);
         return globals.nilObject;
     }
 };
@@ -209,12 +210,12 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
 
     // Initializing native interface
     static const TNativeMethodInfo nativeMethods[] = {
-        { "patchHotMethods",  new TNativeMethod(&TJit::patchHotMethods) },
-        { "printStatistics",  new TNativeMethod(&TJit::printStatistics) },
-        { "printMethod:",     new TNativeMethod1(&TJit::printMethod) }
+        { "patchHotMethods",  NATIVE_METHOD(&TJit::patchHotMethods) },
+        { "printStatistics",  NATIVE_METHOD(&TJit::printStatistics) },
+        { "printMethod:",     NATIVE_METHOD(&TJit::printMethod) }
     };
 
-    softVM->registerNativeMethods(softVM->getClass("MetaJit"), nativeMethods);
+    softVM->registerNativeMethods("MetaJit", nativeMethods);
 }
 
 JITRuntime::~JITRuntime() {

@@ -1127,11 +1127,11 @@ void SmalltalkVM::printVMStat()
 }
 
 struct TMetaString : public TObject {
-    TObject* readline(TObject* prompt) {
-        // TODO Unicode support
+    TObject* readline(TString* prompt) {
+        checkClass(prompt);
 
-        TString* promptString = prompt->cast<TString>();
-        std::string strPrompt(reinterpret_cast<const char*>(promptString->getBytes()), promptString->getSize());
+        // TODO Unicode support
+        std::string strPrompt(reinterpret_cast<const char*>(prompt->getBytes()), prompt->getSize());
 
         char* input = ::readline(strPrompt.c_str());
         if (input) {
@@ -1148,19 +1148,28 @@ struct TMetaString : public TObject {
         } else
             return globals.nilObject;
     }
+
+    TObject* test(TObjectArray* args) {
+        checkClass(args);
+        return globals.nilObject;
+    }
 };
 
 void SmalltalkVM::registerBuiltinNatives() {
     static const TNativeMethodInfo arrayMethods[] = {
-        { "sort:", new TNativeMethod1(&TArray<TObject>::sortBy) }
+        { "sort:",      NATIVE_METHOD(&TArray<TObject>::sortBy) }
     };
 
     static const TNativeMethodInfo dictionaryMethods[] = {
-        { "at:",  new TNativeMethod1(&TDictionary::at) }
+        { "at:",        NATIVE_METHOD(&TDictionary::at) }
     };
 
-    registerNativeMethods(getClass("Dictionary"), dictionaryMethods);
-    registerNativeMethods(getClass("Array"), arrayMethods);
+    static const TNativeMethodInfo metaStringMethods[] = {
+        { "readlie:",   NATIVE_METHOD(&TMetaString::readline) },
+        { "test:",      NATIVE_METHOD(&TMetaString::test) }
+    };
 
-    addMethod(getClass("MetaString"), getSymbol("readline:"), new TNativeMethod1(&TMetaString::readline));
+    registerNativeMethods("Dictionary", dictionaryMethods);
+    registerNativeMethods("Array", arrayMethods);
+    registerNativeMethods("MetaString", metaStringMethods);
 }

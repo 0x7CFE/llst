@@ -52,13 +52,14 @@ TObject* TDictionary::find(const K* key) const
         std::ptrdiff_t index = std::distance(keysBase, foundKey);
         return values->getField(index);
     } else
-        return 0; // key not found
+        return 0; // key was not found
 }
 
 template TObject* TDictionary::find<char>(const char* key) const;
 template TObject* TDictionary::find<TSymbol>(const TSymbol* key) const;
 
-TObject* TDictionary::at(TObject* key) {
-    TObject* result = find(key->cast<const TSymbol>());
+TObject* TDictionary::at(TSymbol* key) {
+    checkClass(key);
+    TObject* result = find(key);
     return result ? result : globals.nilObject;
 }

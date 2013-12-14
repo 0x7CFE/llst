@@ -44,6 +44,7 @@
 struct TClass;
 struct TObject;
 struct TMethod;
+struct TBlock;
 
 // All our objects needed to be aligned by the 4 bytes at least.
 // This function helps to calculate the buffer size enough to fit the data,
@@ -92,6 +93,10 @@ public:
     void setBinary() { data |= FLAG_BINARY; }
     void setRelocated() { data |= FLAG_RELOCATED; }
 };
+
+// Forward declarations for Native API template
+template <typename Element> struct TArray;
+typedef TArray<TObject> TObjectArray;
 
 // TObject is the base class for all objects in smalltalk.
 // Every object in the system starts with two fields.
@@ -150,8 +155,62 @@ public:
 
     // Helper constant for template instantination
     enum { InstancesAreBinary = false };
+
+    // Native API helper functions
+    template <typename Subclass, typename R, R* (Subclass::*PM)()>
+    TObject* methodTrampoline()
+    {
+        return (static_cast<Subclass*>(this)->*PM)();
+    }
+
+    template <typename Subclass, typename R, typename A1, R* (Subclass::*PM)(A1*)>
+    TObject* methodTrampoline1(TObject* arg1)
+    {
+        return (static_cast<Subclass*>(this)->*PM)(static_cast<A1*>(arg1));
+    }
+
+    template <typename Subclass, typename R, typename A1, typename A2, R* (Subclass::*PM)(A1*, A2*)>
+    TObject* methodTrampoline2(TObject* arg1, TObject* arg2)
+    {
+        return (static_cast<Subclass*>(this)->*PM)(static_cast<A1*>(arg1), static_cast<A2*>(arg2));
+    }
+
+    template <typename Subclass, typename R, R* (Subclass::*PM)(TObjectArray*)>
+    TObject* methodTrampolineA(TObjectArray* arr)
+    {
+        return (static_cast<Subclass*>(this)->*PM)(arr);
+    }
+
+    // Object's class should be descendant of
+    // formal class specified as parameter type.
+    // Use this function in native methods to
+    // check input parameters at runtime
+    // FIXME Should probably be moved to VM class
+    // TODO  Should throw exception if classes do not match
+    template <class O>
+    bool checkClass(O* object) {
+        // Checking whether small integer parameter is
+        // mistreated as real object which will cause a crash
+        if (isSmallInteger(object))
+            return false;
+
+        const char* className = O::InstanceClassName();
+        TClass* formalClass = 0; // TODO Get the class by className
+        TClass* actualClass = object->getClass();
+
+        // Checking trivial case
+        if (actualClass == formalClass)
+            return true;
+
+        // TODO Check in dynamic that actualClass
+        //      is a descendant of formalClass
+        return true;
+    }
 };
 
+// Passing TObject is always considered safe
+// It is now user's responsibility to perform safely
+template<> inline bool TObject::checkClass<TObject>(TObject* object) { return true; }
 
 // Descendants of this class store raw byte data instead of their instance variables
 // The only valid fields are size and class which are inherited from TObject
@@ -261,8 +320,7 @@ struct TArray : public TObject {
         return *element;
     }
 
-    typedef TArray<TObject> TObjectArray;
-    TObject* sortBy(TObject* criteria); // native
+    TObject* sortBy(TBlock* criteria); // native
 };
 
 typedef TArray<TObject> TObjectArray;
@@ -334,7 +392,7 @@ struct TDictionary : public TObject {
     template<typename K> TObject* find(const K* key) const;
     template<typename T, typename K> T* find(const K* key) const { return static_cast<T*>(find(key)); }
 
-    TObject* at(TObject* key); // native
+    TObject* at(TSymbol* key); // native
 
     static const char* InstanceClassName() { return "Dictionary"; }
 };

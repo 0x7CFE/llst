@@ -53,16 +53,15 @@ public:
     TObject* getField1() { return field1; }
     TObject* getField2() { return reinterpret_cast<TObject*>(field2); }
 
-    TObject* setField1(TObject* value) { field1 = value; return this; }
-    TObject* setField2(TObject* value) { field2 = reinterpret_cast<TInteger>(value); return this; }
-
+    TObject* setField1(TObject* value) { checkClass(value); field1 = value; return this; }
+    TObject* setField2(TObject* value) { checkClass(value); field2 = reinterpret_cast<TInteger>(value); return this; }
 };
 
 static const TNativeMethodInfo nativeMethods[] = {
-    { "field1",  new TNativeMethod(&TMyClass::getField1) },
-    { "field2",  new TNativeMethod(&TMyClass::getField2) },
-    { "field1:", new TNativeMethod1(&TMyClass::setField1) },
-    { "field2:", new TNativeMethod1(&TMyClass::setField2) }
+    { "field1",  NATIVE_METHOD(&TMyClass::getField1) },
+    { "field2",  NATIVE_METHOD(&TMyClass::getField2) },
+    { "field1:", NATIVE_METHOD(&TMyClass::setField1) },
+    { "field2:", NATIVE_METHOD(&TMyClass::setField2) }
 };
 
 int main(int argc, char **argv) {
@@ -121,7 +120,7 @@ int main(int argc, char **argv) {
     //uint32_t tempsSize = getIntegerValue(initContext->method->temporarySize);
     initContext->temporaries = vm.newObject<TObjectArray>(42);
 
-    vm.registerNativeMethods(vm.getClass("MyClass"), nativeMethods);
+    vm.registerNativeMethods("MyClass", nativeMethods);
 
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
