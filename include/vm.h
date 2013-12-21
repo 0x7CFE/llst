@@ -81,13 +81,13 @@ private:
         hptr<TObject>  returnedValue;
 
         void loadPointers() {
-            bytePointer = getIntegerValue(currentContext->bytePointer);
-            stackTop    = getIntegerValue(currentContext->stackTop);
+            bytePointer = currentContext->bytePointer;
+            stackTop    = currentContext->stackTop;
         }
 
         void storePointers() {
-            currentContext->bytePointer = newInteger(bytePointer);
-            currentContext->stackTop    = newInteger(stackTop);
+            currentContext->bytePointer = bytePointer;
+            currentContext->stackTop    = stackTop;
         }
 
         void stackPush(TObject* object);

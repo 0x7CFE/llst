@@ -718,7 +718,7 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case 7:
         case 8:
         case 9: {
-            Value* integerValue = jit.builder->getInt32(newInteger(constant));
+            Value* integerValue = jit.builder->getInt32( TInteger(constant) );
             constantValue       = jit.builder->CreateIntToPtr(integerValue, m_baseTypes.object->getPointerTo());
 
             std::ostringstream ss;

@@ -40,6 +40,7 @@
 #include <new>
 #include <string>
 #include <sstream>
+#include <typeinfo>
 
 struct TClass;
 struct TObject;
@@ -51,18 +52,25 @@ struct TMethod;
 inline std::size_t correctPadding(std::size_t size) { return (size + sizeof(void*) - 1) & ~(sizeof(void*) - 1); }
 //inline size_t correctPadding(size_t size) { return (size + 3) & ~3; }
 
-// This is a special interpretation of Smalltalk's SmallInteger
 // VM handles the special case when object pointer has lowest bit set to 1
 // In that case pointer is treated as explicit 31 bit integer equal to (value >> 1)
-// Any operation should be done using SmalltalkVM::getIntegerValue() and SmalltalkVM::newInteger()
-// Explicit type cast should be strictly avoided for the sake of design and stability
-// TODO May be we should refactor TInteger to a class which provides cast operators.
-typedef int32_t TInteger;
+inline bool isSmallInteger(const TObject* value) { return reinterpret_cast<int32_t>(value) & 1; }
 
-// Helper functions for TInteger operation
-inline bool     isSmallInteger(const TObject* value) { return reinterpret_cast<TInteger>(value) & 1; }
-inline int32_t  getIntegerValue(TInteger value) { return (value >> 1); }
-inline TInteger newInteger(int32_t value) { return (value << 1) | 1; }
+// This is a special interpretation of Smalltalk's SmallInteger
+// The class is binary compatible with the TObject*
+class TInteger {
+public:
+    TInteger(int32_t value) : m_value(newInteger(value)) { }
+    TInteger(const TObject* value) : m_value(isSmallInteger(value) ? value : throw std::bad_cast()) { }
+
+    operator int32_t() const { return getIntegerValue(m_value); }
+    operator TObject*() const { return const_cast<TObject*>(m_value); }
+private:
+    const TObject* m_value;
+protected:
+    static int32_t  getIntegerValue(const TObject* value) { return reinterpret_cast<int32_t>(value) >> 1; }
+    static TObject* newInteger(int32_t value) { return reinterpret_cast<TObject*>((value << 1) | 1); }
+};
 
 // Helper struct used to hold object size and special
 // status flags packed in a 4 bytes space. TSize is used

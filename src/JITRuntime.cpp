@@ -207,8 +207,8 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     // Creating new context object and inheriting context variables
     // NOTE We do not allocating stack because it's not used in LLVM
     hptr<TBlock> newBlock      = m_softVM->newObject<TBlock>();
-    newBlock->argumentLocation = newInteger(argLocation);
-    newBlock->blockBytePointer = newInteger(bytePointer);
+    newBlock->argumentLocation = argLocation;
+    newBlock->blockBytePointer = bytePointer;
     newBlock->method           = previousContext->method;
     newBlock->arguments        = previousContext->arguments;
     newBlock->temporaries      = previousContext->temporaries;
@@ -282,7 +282,7 @@ void JITRuntime::optimizeFunction(Function* function)
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
-    const uint16_t blockOffset = getIntegerValue(block->blockBytePointer);
+    const uint16_t blockOffset = block->blockBytePointer;
 
     TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
 
@@ -379,7 +379,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         // initialization of various objects such as stackTop and bytePointer.
 
         // Creating context object and temporaries
-        hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+        hptr<TObjectArray> newTemps = m_softVM->newObject<TObjectArray>(method->temporarySize);
         newContext = m_softVM->newObject<TContext>();
 
         // Initializing context variables
@@ -589,9 +589,9 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
         // is required. Moreover, this is operation is much faster than heap allocation.
-        const bool hasTemporaries  = getIntegerValue(directMethod->temporarySize) > 0;
+        const bool hasTemporaries  = static_cast<int32_t>(directMethod->temporarySize) > 0;
         const uint32_t contextSize = sizeof(TContext);
-        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize) : 0;
+        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * static_cast<int32_t>(directMethod->temporarySize) : 0;
 
         // Allocating stack space for objects and registering GC protection holder
 
@@ -601,7 +601,7 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
 
         Value* tempsSlot = 0;
         if (hasTemporaries) {
-            MethodCompiler::TStackObject tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            MethodCompiler::TStackObject tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), directMethod->temporarySize);
             tempsSlot = tempsPair.objectSlot;
             newBlock.tempsHolder = tempsPair.objectHolder;
         } else
