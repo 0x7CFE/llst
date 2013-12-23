@@ -372,12 +372,8 @@ extern "C" { extern LLVMMemoryManager::TStackEntry* llvm_gc_root_chain; }
 class Image
 {
 private:
-    int         m_imageFileFD;
-    std::size_t m_imageFileSize;
-
-    void*    m_imageMap;     // pointer to the map base
-    uint8_t* m_imagePointer; // sliding pointer
     std::vector<TObject*> m_indirects;
+    std::ifstream m_inputStream;
 
     enum TImageRecordType {
         invalidObject = 0,
@@ -392,17 +388,14 @@ private:
     TObject* readObject();
     template<typename ResultType>
     ResultType* readObject() { return static_cast<ResultType*>(readObject()); }
-    bool     openImageFile(const char* fileName);
-    void     closeImageFile();
 
     IMemoryManager* m_memoryManager;
 public:
     Image(IMemoryManager* manager)
-        : m_imageFileFD(-1), m_imageFileSize(0),
-          m_imagePointer(0), m_memoryManager(manager)
+        : m_memoryManager(manager)
     { }
 
-    bool     loadImage(const char* fileName);
+    bool     loadImage(const std::string& fileName);
     void     storeImage(const char* fileName);
 
     template<typename N> TObject* getGlobal(const N* name) const;
