@@ -8,11 +8,18 @@ typedef StackLinkedNode<T> selfType;
 private:
     void* operator new(size_t);
     void operator delete(void*);
+    StackLinkedNode(const selfType&);
 protected:
     T* m_data;
     selfType* m_next;
 public:
     StackLinkedNode() : m_data(0), m_next(0) {}
+    selfType& operator=(const selfType& right) {
+        m_data = right.m_data;
+        m_next = this->m_next; // We copy only data
+        return *this;
+    }
+
     selfType* setNext(selfType* next) {
         m_next = next;
         return this;
@@ -30,6 +37,9 @@ public:
     T* getData() {
         return m_data;
     }
+    T* getData() const {
+        return m_data;
+    }
 };
 
 template <typename T>
@@ -39,6 +49,7 @@ typedef StackLinkedNode<T> nodeType;
 protected:
     nodeType* m_head;
 public:
+    LinkedList() : m_head(0) { }
     void insert(nodeType& node) {
         node.setNext(m_head);
         m_head = &node;
@@ -62,6 +73,9 @@ public:
             nodeType* previousNode = findPreviousOf(node);
             previousNode->setNext(0);
         }
+    }
+    nodeType* getHead() {
+        return m_head;
     }
 private:
     nodeType* findPreviousOf(nodeType* needle) {
