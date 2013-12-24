@@ -58,9 +58,9 @@ void GenerationalMemoryManager::moveYoungObjects()
     m_crossGenerationalReferences.clear();
 
     // Updating external references. Typically these are pointers stored in the hptr<>
-    object_ptr* currentPointer = m_externalPointersHead;
+    StackLinkedNode<TObject>* currentPointer = m_externalPointers.getHead();
     while (currentPointer != 0) {
-        TMovableObject* currentObject = reinterpret_cast<TMovableObject*>(currentPointer->data);
+        TMovableObject* currentObject = reinterpret_cast<TMovableObject*>(currentPointer->getData());
         uint8_t* currentObjectBase    = reinterpret_cast<uint8_t*>(currentObject);
 
         if ( (currentObjectBase >= m_inactiveHeapPointer ) &&
@@ -68,7 +68,7 @@ void GenerationalMemoryManager::moveYoungObjects()
         {
             currentObject = moveObject(currentObject);
         }
-        currentPointer = currentPointer->next;
+        currentPointer = currentPointer->getNext();
     }
 
     TStaticRootsIterator iRoot = m_staticRoots.begin();

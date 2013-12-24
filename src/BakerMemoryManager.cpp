@@ -42,7 +42,7 @@ BakerMemoryManager::BakerMemoryManager() :
     m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
     m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0),
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
-    m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
+    m_staticHeapBase(0), m_staticHeapPointer(0)
 {
     // Nothing to be done here
 }
@@ -399,10 +399,11 @@ void BakerMemoryManager::moveObjects()
     }
 
     // Updating external references. Typically these are pointers stored in the hptr<>
-    object_ptr* currentPointer = m_externalPointersHead;
+    StackLinkedNode<TObject>* currentPointer = m_externalPointers.getHead();
     while (currentPointer != 0) {
-        currentPointer->data = reinterpret_cast<TObject*>( moveObject( reinterpret_cast<TMovableObject*>(currentPointer->data) ) );
-        currentPointer = currentPointer->next;
+        TMovableObject* movedData = moveObject( reinterpret_cast<TMovableObject*>(currentPointer->getData()) );
+        currentPointer->setData( reinterpret_cast<TObject*>( movedData ) );
+        currentPointer = currentPointer->getNext();
     }
 }
 
@@ -469,33 +470,12 @@ void BakerMemoryManager::removeStaticRoot(TObject** pointer)
     }
 }
 
-void BakerMemoryManager::registerExternalHeapPointer(object_ptr& pointer) {
-    pointer.next = m_externalPointersHead;
-    m_externalPointersHead = &pointer;
+void BakerMemoryManager::registerExternalHeapPointer(StackLinkedNode<TObject>& pointer) {
+    m_externalPointers.insert(pointer);
 }
 
-void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
-    if (m_externalPointersHead == &pointer) {
-        m_externalPointersHead = pointer.next;
-        return;
-    }
-
-    // If it is not the last element of the list
-    //  we replace the given pointer with the next one
-    if (pointer.next) {
-        object_ptr* next_object = pointer.next;
-        pointer.data = next_object->data;
-        pointer.next = next_object->next;
-    } else {
-        // This is the last element, we have to find the previous
-        // element in the list and unlink the given pointer
-        object_ptr* previousPointer = m_externalPointersHead;
-        while (previousPointer->next != &pointer)
-            previousPointer = previousPointer->next;
-
-        previousPointer->next = 0;
-        return;
-    }
+void BakerMemoryManager::releaseExternalHeapPointer(StackLinkedNode<TObject>& pointer) {
+    m_externalPointers.erase(&pointer);
 }
 
 TMemoryManagerInfo BakerMemoryManager::getStat()

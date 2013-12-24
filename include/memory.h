@@ -42,6 +42,7 @@
 #include <list>
 #include <fstream>
 
+#include "LinkedList.h"
 
 // Memory manager statics is held
 // in the following structure
@@ -53,16 +54,6 @@ struct TMemoryManagerInfo {
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
     uint64_t rightCollectionDelay;
-};
-
-struct object_ptr {
-    TObject* data;
-    object_ptr* next;
-    object_ptr() : data(0), next(0) {}
-    explicit object_ptr(TObject* data)  : data(data), next(0) {}
-    object_ptr& operator=(const object_ptr& value) { this->data = value.data; return *this; }
-private:
-    object_ptr(const object_ptr& value);
 };
 
 // Generic interface to a memory manager.
@@ -83,8 +74,8 @@ public:
     virtual bool  isInStaticHeap(void* location) = 0;
 
     // External pointer handling
-    virtual void  registerExternalHeapPointer(object_ptr& pointer) = 0;
-    virtual void  releaseExternalHeapPointer(object_ptr& pointer) = 0;
+    virtual void  registerExternalHeapPointer(StackLinkedNode<TObject>& pointer) = 0;
+    virtual void  releaseExternalHeapPointer(StackLinkedNode<TObject>& pointer) = 0;
 
     virtual uint32_t allocsBeyondCollection() = 0;
     virtual TMemoryManagerInfo getStat() = 0;
@@ -111,20 +102,25 @@ public:
     typedef O Object;
 
 protected:
-    object_ptr target;  // TODO static heap optimization && volatility
+    StackLinkedNode<TObject> target;  // TODO static heap optimization && volatility
     IMemoryManager* mm; // TODO assign on copy operators
     bool isRegistered;  // TODO Pack flag into address
 public:
     hptr_base(Object* object, IMemoryManager* mm, bool registerPointer = true)
-    : target(object), mm(mm), isRegistered(registerPointer)
+    : mm(mm), isRegistered(registerPointer)
     {
-        if (mm && registerPointer) mm->registerExternalHeapPointer(target);
-            //mm->registerExternalPointer((TObject**) &target);
+        if (mm && registerPointer) {
+            target.setData(object);
+            mm->registerExternalHeapPointer(target);
+        }
     }
 
-    hptr_base(const hptr_base<Object>& pointer) : target(pointer.target.data), mm(pointer.mm), isRegistered(true)
+    hptr_base(const hptr_base<Object>& pointer) : mm(pointer.mm), isRegistered(true)
     {
-        if (mm) mm->registerExternalHeapPointer(target);
+        if (mm) {
+            target = pointer.target;
+            mm->registerExternalHeapPointer(target);
+        }
     }
 
     ~hptr_base() { if (mm && isRegistered) mm->releaseExternalHeapPointer(target); }
@@ -132,12 +128,12 @@ public:
     //hptr_base<Object>& operator = (hptr_base<Object>& pointer) { target = pointer.target; return *this; }
     //hptr_base<Object>& operator = (Object* object) { target = object; return *this; }
 
-    Object* rawptr() const { return static_cast<Object*>(target.data); }
-    Object* operator -> () const { return static_cast<Object*>(target.data); }
+    Object* rawptr() const { return static_cast<Object*>(target.getData()); }
+    Object* operator -> () const { return static_cast<Object*>(target.getData()); }
     //Object& (operator*)() const { return *target; }
-    operator Object*() const { return static_cast<Object*>(target.data); }
+    operator Object*() const { return static_cast<Object*>(target.getData()); }
 
-    template<typename C> C* cast() const { return static_cast<C*>(target.data); }
+    template<typename C> C* cast() const { return static_cast<C*>(target.getData()); }
 };
 
 template <typename O> class hptr : public hptr_base<O> {
@@ -146,7 +142,7 @@ public:
 public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
-    hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
+    hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.setData(object); return *this; }
 
 //     template<typename I>
 //     Object& operator [] (I index) const { return hptr_base<Object>::target->operator[](index); }
@@ -161,9 +157,9 @@ public:
 public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
-    hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
+    hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.setData(object); return *this; }
 
-    template<typename I> T*& operator [] (I index) const { return hptr_base<Object>::target.data->operator[](index); }
+    template<typename I> T*& operator [] (I index) const { return hptr_base<Object>::target.getData()->operator[](index); }
 };
 
 // Hptr specialization for TByteObject.
@@ -176,7 +172,7 @@ public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
     hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
 
-    uint8_t& operator [] (uint32_t index) const { return static_cast<Object*>(target.data)->operator[](index); }
+    uint8_t& operator [] (uint32_t index) const { return static_cast<Object*>(target.getData())->operator[](index); }
 };
 
 // Simple memory manager implementing classic baker two space algorithm.
@@ -250,7 +246,7 @@ protected:
     // invalidation. GC uses this information to correct external
     // pointers so they will point to correct location even after
     // garbage collection.
-    object_ptr* m_externalPointersHead;
+    LinkedList<TObject> m_externalPointers;
 public:
     BakerMemoryManager();
     virtual ~BakerMemoryManager();
@@ -267,8 +263,8 @@ public:
     virtual bool  isInStaticHeap(void* location);
 
     // External pointer handling
-    virtual void  registerExternalHeapPointer(object_ptr& pointer);
-    virtual void  releaseExternalHeapPointer(object_ptr& pointer);
+    virtual void  registerExternalHeapPointer(StackLinkedNode<TObject>& pointer);
+    virtual void  releaseExternalHeapPointer(StackLinkedNode<TObject>& pointer);
 
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
@@ -333,10 +329,8 @@ public:
     virtual void  collectGarbage() {}
     virtual void  addStaticRoot(TObject** pointer) {}
     virtual void  removeStaticRoot(TObject** pointer) {}
-    virtual void  registerExternalPointer(TObject** pointer) {}
-    virtual void  releaseExternalPointer(TObject** pointer) {}
-    virtual void  registerExternalHeapPointer(object_ptr& pointer) {}
-    virtual void  releaseExternalHeapPointer(object_ptr& pointer) {}
+    virtual void  registerExternalHeapPointer(StackLinkedNode<TObject>& pointer) {}
+    virtual void  releaseExternalHeapPointer(StackLinkedNode<TObject>& pointer) {}
     virtual bool  checkRoot(TObject* value, TObject** objectSlot) { return false; }
     virtual uint32_t allocsBeyondCollection() { return 0; }
     virtual TMemoryManagerInfo getStat() { return TMemoryManagerInfo(); }
