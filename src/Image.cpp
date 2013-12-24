@@ -35,7 +35,7 @@
 #include <vm.h>
 #include <memory.h>
 
-#include <netinet/in.h> //TODO endianness
+//#include <netinet/in.h> //TODO endianness
 
 #include <cerrno>
 #include <cstring>

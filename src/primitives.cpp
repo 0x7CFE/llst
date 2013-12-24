@@ -265,7 +265,7 @@ TObject* callIOPrimitive(uint8_t opcode, TObjectArray& args, bool& primitiveFail
             //The easiest way is to build it with std::string
             std::string filename(reinterpret_cast<char*>(name->getBytes()), name->getSize());
 
-            int32_t fileID = open(filename.c_str(), mode, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP );
+            int32_t fileID = open(filename.c_str(), mode, S_IRUSR | S_IWUSR );
             if (fileID < 0) {
                 primitiveFailed = true;
             } else {
