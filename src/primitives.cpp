@@ -94,7 +94,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
 
             // Smalltalk indexes arrays starting from 1, not from 0
             // So we need to recalculate the actual array index before
-            uint32_t actualIndex = static_cast<int32_t>(TInteger(indexObject)) - 1;
+            uint32_t actualIndex = TInteger(indexObject) - 1;
 
             // Checking boundaries
             if (actualIndex >= string->getSize()) {

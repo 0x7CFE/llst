@@ -892,7 +892,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
 
             // Smalltalk indexes arrays starting from 1, not from 0
             // So we need to recalculate the actual array index before
-            uint32_t actualIndex = static_cast<int32_t>( TInteger(indexObject) ) - 1;
+            uint32_t actualIndex = TInteger(indexObject) - 1;
 
             // Checking boundaries
             if (actualIndex >= array->getSize()) {
@@ -1049,9 +1049,9 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 
     // Smalltalk indexes are counted starting from 1.
     // We need to decrement all values to get the zero based index:
-    int32_t iSourceStartOffset      = static_cast<int32_t>( TInteger(sourceStartOffset) ) - 1;
-    int32_t iDestinationStartOffset = static_cast<int32_t>( TInteger(destinationStartOffset) ) - 1;
-    int32_t iDestinationStopOffset  = static_cast<int32_t>( TInteger(destinationStopOffset) ) - 1;
+    int32_t iSourceStartOffset      = TInteger(sourceStartOffset) - 1;
+    int32_t iDestinationStartOffset = TInteger(destinationStartOffset) - 1;
+    int32_t iDestinationStopOffset  = TInteger(destinationStopOffset) - 1;
     int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset + 1;
 
     if ( iSourceStartOffset      < 0 ||
