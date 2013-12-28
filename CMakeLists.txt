@@ -94,7 +94,7 @@ set (CPACK_PACKAGE_VERSION_MINOR "2")
 set (CPACK_PACKAGE_VERSION_PATCH "1")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set (CPACK_SOURCE_GENERATOR "TGZ")
-set (CPACK_SOURCE_IGNORE_FILES "build/;\\\\.kdev4.*;\\\\.git/;\\\\.hgignore")
+set (CPACK_SOURCE_IGNORE_FILES "build/;\\\\.kdev.*;\\\\.git.*;\\\\.hgignore;.*\\\\.image")
 set (CPACK_STRIP_FILES "llst")
 
 
