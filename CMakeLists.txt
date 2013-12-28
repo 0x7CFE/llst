@@ -88,6 +88,10 @@ install(FILES misc/bash-completion.sh DESTINATION share/bash-completion/completi
 
 
 set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "LLVM powered Little Smalltalk")
+set (CPACK_DEBIAN_PACKAGE_DESCRIPTION # The format of Description: http://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Description
+"LLVM powered Little Smalltalk
+ LLST is a virtual machine with integrated JIT.
+")
 set (CPACK_PACKAGE_CONTACT "info@llst.org")
 set (CPACK_PACKAGE_VERSION_MAJOR "0")
 set (CPACK_PACKAGE_VERSION_MINOR "2")
