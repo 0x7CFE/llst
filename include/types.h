@@ -57,19 +57,21 @@ inline std::size_t correctPadding(std::size_t size) { return (size + sizeof(void
 inline bool isSmallInteger(const TObject* value) { return reinterpret_cast<int32_t>(value) & 1; }
 
 // This is a special interpretation of Smalltalk's SmallInteger
-// The class is binary compatible with the TObject*
-class TInteger {
-public:
-    TInteger(int32_t value) : m_value(newInteger(value)) { }
-    TInteger(const TObject* value) : m_value(isSmallInteger(value) ? value : throw std::bad_cast()) { }
+// The struct is binary compatible with the TObject*
+struct TInteger {
+    TInteger(int32_t value) : m_value( reinterpret_cast<int32_t>(newInteger(value)) ) { }
+    TInteger(const TObject* value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
 
-    operator int32_t() const { return getIntegerValue(m_value); }
-    int32_t  operator +(int32_t right) const { return getIntegerValue(m_value) + right; }
-    int32_t  operator -(int32_t right) const { return getIntegerValue(m_value) - right; }
-    operator TObject*() const { return const_cast<TObject*>(m_value); }
-    int32_t  rawValue() const { return reinterpret_cast<int32_t>(m_value); }
+    int32_t getValue() const { return getIntegerValue(reinterpret_cast<TObject*>(m_value)); }
+    int32_t rawValue() const { return m_value; }
+
+    operator int32_t() const { return getValue(); }
+    int32_t  operator +(int32_t right) const { return getValue() + right; }
+    int32_t  operator -(int32_t right) const { return getValue() - right; }
+    operator TObject*() const { return reinterpret_cast<TObject*>(m_value); }
+
 private:
-    const TObject* m_value;
+    int32_t m_value;
 protected:
     static int32_t  getIntegerValue(const TObject* value) { return reinterpret_cast<int32_t>(value) >> 1; }
     static TObject* newInteger(int32_t value) { return reinterpret_cast<TObject*>((value << 1) | 1); }
