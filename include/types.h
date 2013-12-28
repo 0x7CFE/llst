@@ -67,6 +67,7 @@ public:
     int32_t  operator +(int32_t right) const { return getIntegerValue(m_value) + right; }
     int32_t  operator -(int32_t right) const { return getIntegerValue(m_value) - right; }
     operator TObject*() const { return const_cast<TObject*>(m_value); }
+    int32_t  rawValue() const { return reinterpret_cast<int32_t>(m_value); }
 private:
     const TObject* m_value;
 protected:
