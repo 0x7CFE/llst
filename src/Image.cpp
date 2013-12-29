@@ -165,8 +165,7 @@ TObject* Image::readObject()
             uint32_t value = m_imagePointer[0] | (m_imagePointer[1] << 8) |
                             (m_imagePointer[2] << 16) | (m_imagePointer[3] << 24);
             m_imagePointer += sizeof(uint32_t);
-            TInteger newObject = newInteger(value); // FIXME endianness
-            return reinterpret_cast<TObject*>(newObject);
+            return TInteger(value); // FIXME endianness
         }
 
         case byteObject: {
@@ -298,7 +297,7 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
 
     switch (type) {
         case inlineInteger: {
-            uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
+            uint32_t integer = TInteger(object);
             os.write(reinterpret_cast<char*>(&integer), sizeof(integer));
         } break;
         case byteObject: {

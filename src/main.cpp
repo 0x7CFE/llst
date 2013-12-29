@@ -93,12 +93,12 @@ int main(int argc, char **argv) {
     initContext->arguments = vm.newObject<TObjectArray>(1);
     initContext->arguments->putField(0, globals.nilObject);
 
-    initContext->bytePointer = newInteger(0);
+    initContext->bytePointer = 0;
     initContext->previousContext = static_cast<TContext*>(globals.nilObject);
 
-    const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
+    const uint32_t stackSize = globals.initialMethod->stackSize;
     initContext->stack = vm.newObject<TObjectArray>(stackSize);
-    initContext->stackTop = newInteger(0);
+    initContext->stackTop = 0;
 
     initContext->method = globals.initialMethod;
 
