@@ -26,6 +26,24 @@ if (LLVM)
     add_definitions(-DLLVM)
 endif()
 
+if (DEFINED READLINE)
+    set(USE_READLINE ${READLINE})
+else()
+    # Readline is a very common library and is supported on
+    # a wide variaty of platforms except redmond, so we're
+    # defaulting variable to true.
+    set(USE_READLINE "TRUE")
+endif()
+
+if (USE_READLINE)
+    message(STATUS "Using readline library")
+    set_source_files_properties(src/CompletionEngine.cpp PROPERTIES COMPILE_DEFINITIONS USE_READLINE)
+    set (READLINE_LIB "readline")
+else()
+    message(STATUS "Readline library is disabled")
+    set (READLINE_LIB "")
+endif()
+
 set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} -Wall -fexceptions -frtti -Wno-cast-qual")
 set (CMAKE_CXX_FLAGS_DEBUG "-g -ggdb -O0")
 set (CMAKE_CXX_FLAGS_RELEASE "-O3")
@@ -62,7 +80,7 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} readline ${LLVM_LD_FLAGS})
+target_link_libraries(llst ${LLVM_LIBS} ${READLINE_LIB} ${LLVM_LD_FLAGS})
 
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     # this is a 64-bit OS
