@@ -589,9 +589,9 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
         // is required. Moreover, this is operation is much faster than heap allocation.
-        const bool hasTemporaries  = static_cast<int32_t>(directMethod->temporarySize) > 0;
+        const bool hasTemporaries  = directMethod->temporarySize > 0;
         const uint32_t contextSize = sizeof(TContext);
-        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * static_cast<int32_t>(directMethod->temporarySize) : 0;
+        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * directMethod->temporarySize : 0;
 
         // Allocating stack space for objects and registering GC protection holder
 
