@@ -66,4 +66,6 @@ public:
     }
 
     void initialize(TDictionary* globals);
+    bool readline(const std::string& prompt, std::string& result);
+    void addHistory(const std::string& line);
 };

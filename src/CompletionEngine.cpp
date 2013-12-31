@@ -34,6 +34,9 @@
 
 #include <CompletionEngine.h>
 #include <readline/readline.h>
+#include <readline/history.h>
+#include <cstring>
+#include <cstdlib>
 
 std::auto_ptr<CompletionEngine> CompletionEngine::s_instance(new CompletionEngine);
 
@@ -103,4 +106,19 @@ void CompletionEngine::initialize(TDictionary* globals)
             }
         }
     }
+}
+
+bool CompletionEngine::readline(const std::string& prompt, std::string& result) {
+    char* input = ::readline(prompt.c_str());
+    if (input) {
+        uint32_t inputSize = std::strlen(input);
+        result = std::string(input, inputSize);
+        std::free(input);
+        return true;
+    }
+    return false;
+}
+
+void CompletionEngine::addHistory(const std::string& line) {
+    add_history( line.c_str() );
 }
