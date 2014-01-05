@@ -1,0 +1,3793 @@
+
+[Current]
+2013-12-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds script to generate ChangeLog
+    
+    Issue: #43
+
+2013-12-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds a template for extended description for deb package
+    
+    Issue: #43
+
+2013-12-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes CPACK_SOURCE_IGNORE_FILES
+    
+    Target `package_source` should not pack neither .kdev_include_paths nor *.image files.
+    
+    Issue: #43
+
+2013-12-02  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds bash completion for llst installed with deb
+    
+    Issue: #43
+
+2013-12-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes error: 'unknown type name FILE'
+    
+    Issue: #45
+
+2013-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds the help about llst args
+    
+    To display it run `./llst --help`.
+    
+    Issue: #33
+
+2013-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds an empty man for llst
+    
+    Issue: #43
+
+2013-11-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes a lot of lintian warnings
+    
+    -strips executable
+    -adds maintainer
+    -adds dependencies
+    -changes the name of the project
+    
+    Issue: #43
+
+2013-11-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix LICENSE due to `http://www.debian.org/doc/debian-policy/ch-docs.html#s-copyrightfile`
+    
+    Issue: #43
+
+2013-11-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds `make package`
+    
+    Issue: #43
+
+2013-11-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds `make package_source`
+    
+    Issue: #43
+
+
+[v_0.2.1]
+2013-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes version in main.cpp
+
+2013-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes readme
+    
+    Issue: #23
+
+
+[v_0.2]
+2013-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Bumps version to 0.2
+
+2013-11-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds readme
+    
+    Issue: #23
+
+2013-11-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes typos in CompletionEngine
+    
+    Issue: #27
+
+2013-11-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Moves completion engine init code to the proper place
+    
+    Issue: #40
+
+2013-11-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds copyleft notice to Core.ll and args.h
+    
+    Issue: #10
+
+2013-11-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds copyleft notice to source files
+    
+    Issue: #10
+
+2013-11-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes s/Lo/Low/ in source files copyleft notice
+    
+    Issue: #10
+
+2013-11-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds specifying comment to TArray::operator[]
+    
+    Issue: #27
+
+2013-11-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds const specifier to isSmallInteger and TObject::cast<T>()
+    
+    Issue: #27
+
+2013-11-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Links to pthread only in LLVM mode
+    
+    llvm-config utility provides required libraries to link to.
+    We do not need to specify pthread ourselves.
+    
+    Issue: #27
+
+2013-11-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes clang warnings about unused arguments of linker
+    
+    Issue: #39
+
+2013-11-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Switch to a new radix tree by Yuuki Takano
+    
+    Issue: #39
+
+2013-11-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds default ctor for TSymbol::TCompareFunctor
+    
+    Issue: #39
+
+2013-11-13  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames llvm_types.ll -> Core.ll
+    
+    Issue: #27
+
+2013-11-13  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Calls strerror with strict std:: prefix
+    
+    Issue: #27
+
+2013-11-13  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes correct padding in Image::readObject():byteObject
+    
+    Issue: #27
+
+2013-11-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes trailing whitespaces
+    
+    Issue: #27
+
+2013-11-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Prettifies memory.h
+    
+    Removes redundant and outdated comments.
+    Removes static_cast from volatile experiments.
+    
+    Issue: #27
+
+2013-11-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Autodetects 64 bit architecture and sets -m32
+    
+    The parameter is set only on 64-bit OS.
+    
+    Now you can compile llst under Raspberry Pi or Ubuntu/i686
+    or Ubuntu/x86_64 without any changes in CMakelists.txt.
+    
+    Issue: #9
+
+2013-11-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Add workaround for JIT compiler to handle soft compiled methods
+    
+    In-image Smalltalk compiler produces byte codes with trailing zeroes.
+    In case of soft VM this is not a problem, because control flow
+    never reaches them due to default method exit sequence.
+    
+    In case of JIT compiler we need to fully process all available
+    bytecodes because we do not know how control will flow.
+    
+    Correct solution will be to fix the in-image Smalltalk compiler.
+    However it is a complex task that should be handled carefully.
+    
+    For now we're just ignoring such zero opcodes treating them as NOP.
+    
+    Issue: #26
+
+2013-11-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Makes LLVM optional
+    
+    In order to build llst with llvm support, pass -DLLVM=ON to cmake
+    
+    Issue: #9
+
+2013-11-11  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds templated and casting version of Image::getGlobal<>()
+    
+    Issue: #38
+
+2013-11-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds casting version of TDictionary::find<>()
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Replaces a lot of C-style casts with static_cast
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes specific casts in memory managers
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes casts in pointer arithmetic in memory managers
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds static_cast to specialized SmalltalkVM::newObject<>()
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds static_cast into hptr_base
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Rewrites unspecialized SmalltalkVM::newObject<T> with static_cast
+    
+    Issue: #38
+
+2013-10-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds the skeleton of CLI args
+    
+    Issue: #33
+
+2013-10-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds NonCollect MM
+    
+    Issue: #36
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds templated TArray::getField<>()
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds templated TVMExecutionContext::stackPop<>()
+    
+    Issue: #38
+
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds templated Image::readObject<>()
+    
+    Issue: #38
+
+2013-11-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes TArray<T>::operator[]
+    
+    The previous implementation used reinterpret_cast which is type-unsafe.
+    Now the compiler throws error if you try to instantiate TArray<int> and
+    use operator[].
+    
+    Issue: #34
+
+2013-10-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Prettifies BakerMemoryManager::releaseExternalHeapPointer.
+    
+    Issue: #27
+
+2013-10-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes unneeded volatile qualifiers.
+    
+    Issue: #27
+
+2013-10-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes IMemoryManager::registerExternalPointer and IMemoryManager::releaseExternalPointer.
+    Fixes GenerationalMemoryManager::moveYoungObjects.
+    
+    Issue: #27
+
+2013-10-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes Dictionary>>includes: which broke Collection>>printString
+    
+    Issue: #35
+
+2013-10-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes Collection>>includes: which broke List>>=
+    Adds tests for List>>includes: and fixes other tests for class List.
+    
+    Issue: #35
+
+2013-10-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Reverts List>>select: to original recursive form
+    
+    Previous experiments with tail field was not correctly reverted.
+    One of them was the #select: method.
+    
+    Issue: #35
+
+2013-10-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Reverts List>>appendList: to it's original state
+    
+    Previous experiments with tail field was not correctly reverted.
+    One of them was the #appendList: method.
+    
+    Issue: #35
+
+2013-10-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more tests for class List
+    
+    Issue: #35
+
+2013-10-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the condition for symbols for completion engine.
+    
+    Issue: #27
+
+2013-10-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Add strict std:: for standard functions.
+    
+    Issue: #27
+
+2013-10-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors TArray<T>::operator[] to eliminate unsafe cast
+    
+    FreeBSD complains that cast in TArray::operator[] may
+    break aliasing rules due to access through badly aliased pointers.
+    
+    Linux port of GCC on the other hand do not complain.
+    However we need to eliminate this potential problems.
+    
+    This commit slightly modifies the template parameter from T* to T.
+    Also C-style cast is changed to C++ cast.
+    
+    Note:
+        Current implementation uses reinterpret_cast but technically
+        static_cast should be OK. Adding static_cast forces compiler
+        to complain that the cast is invalid.
+    
+        TArray<T> is expected to be specialized with descendants
+        of TObject as T. Therefore static_cast from TObject* to T* should
+        be considered safe. But it isn't probably due to template nature.
+    
+        Needs more investigation though.
+    
+    Issue: #34
+
+2013-10-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Defines fields and bytes as union in TObject
+    
+    Issue: #34
+
+2013-10-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes #include headers.
+    
+    Issue: #27
+
+2013-10-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes unused parameter 'callingContext' from MethodCompiler::compileMethod.
+    
+    Issue: #27
+
+2013-10-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Renames MethodCompiler::StackAlloca to TStackObject and adds comment
+    
+    Issue: #27
+
+2013-10-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Redeclares descendants of TStackValue as struct instead of class
+    
+    Issue: #27
+
+2013-10-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Transforms TDictionary::find into a templated function.
+    
+    Issue: #30
+
+2013-10-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Add newline at EOF.
+    
+    Issue: #27
+
+2013-10-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes const_cast from hptr::operator[].
+    
+    Issue: #27
+
+2013-10-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Replaces LLVM>>do: to Jit>>do: in doc
+    
+    Issue: #27
+
+2013-09-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Uses objectSlot everywhere in the case opcode::assignInstance.
+    
+    Issue: #27
+
+2013-09-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames TSymbol::less to TSymbol::TCompareFunctor.
+    
+    Issue: #20
+
+2013-09-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes -UNDEBUG due to crash in Jit>>do:
+
+2013-09-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes GC per tick invocation
+
+2013-09-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves compare operators from TDictionary to TSymbol.
+    
+    Issue #20
+
+2013-09-21  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Reverts List methods. Removes fields tail and head.
+    
+    Issue #18
+
+2013-09-21  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Prettifies the usage of memset function inside LLVM IR.
+    
+    Issue #11
+
+2013-09-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    MethodCompiler::createArray now uses stack allocation.
+    
+    Issue #11
+
+2013-09-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves allocateStackObject from JITRuntime to MethodCompiler
+    
+    Issue #11
+
+2013-09-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Add tests for class Magnitude
+    
+    Issue #19
+
+2013-09-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes comparison operators in class Magnitude
+    
+    Issue #19
+
+2013-09-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes redundant calls to memset from TObject ctor and TByteObject ctor.
+    Memory manager will zero it, no need to memset it twice.
+    We gain ~9% speedup :D
+
+2013-09-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the comparison operator
+    
+    Issue #1
+
+2013-09-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes redundant cast and header style in Baker MM
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-llvm-3 for changeset 28f11517e164
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-llvm-2 for changeset 6f7824033410
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-llvm-1 for changeset 4a6bdbdcbae8
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-humbug-5 for changeset b9a122a22fb4
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-humbug-4 for changeset c8878db5b232
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-humbug-3 for changeset 8703e9ed25b4
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-humbug-2 for changeset 520782976b69
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-humbug-1 for changeset b0512aeac249
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-dk-2 for changeset f41ccf4cb6d6
+
+2013-09-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag orphan-dk-1 for changeset c47c3ba57ec4
+
+2013-09-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes some cppcheck warnings
+
+2013-09-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes common realloc mistake
+
+2013-09-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes headers
+
+2013-09-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes comparison between signed and unsigned integer expressions
+
+2013-09-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes headers
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Collects GC per each tick
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more asserts
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more asserts
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes volatility in object_ptr
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Reports about TContext::stack overflow
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix: overflow in TContext::stack
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds some cv-qualifiers
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes unused function TSymbol::equalsTo
+
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes uninitialized field in Image::ImageWriter
+
+2013-09-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes
+
+2013-09-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes some cppcheck warnings
+
+2013-09-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix magic number in MethodCompiler::doSendBinary
+
+2013-09-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Improves LLVM primitive::getClass, primitive::getSize
+
+2013-09-02  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Creates wrap to work with ec.stack
+
+2013-08-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Improves llvm_types.ll
+
+2013-08-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Improves bool JITRuntime::detectLiteralReceiver
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more test cases for ListTest>>firstLink, ListTest>>lastLink
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Add ListTest>>lastLink
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes ListTest>>firstLink
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes ListTest>>remove
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List>>at:put:
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes List>>at:put: , List>>at:ifAbsent:
+
+2013-08-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-08-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes List
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List>>at:put:
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List>>firstLink
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List>>remove:
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Add ST test for List>>removeFirst
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List>>do:
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List>>at:
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for List
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix comment
+
+2013-08-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes list
+
+2013-08-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors List. Adds tail field and takes advantage of it
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more ST tests
+
+2013-08-15  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes StringTest>>lowerCase. Adds more tests
+
+2013-08-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Renames LLVM to Jit in image source
+
+2013-08-11  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes JITRuntime::detectLiteralReceiver
+
+2013-08-11  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the style of the code in JITRuntime::detectLiteralReceiver
+
+2013-08-11  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the style of the code in Image.cpp
+
+2013-08-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds JITRuntime::detectLiteralReceiver
+
+2013-08-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Attempt to perform literal call optimization
+
+2013-08-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes llstPass
+
+2013-08-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes crash in sort test (bug in createDirectBlocks())
+
+2013-08-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Debugging crash in patching Collection>>sort:
+
+2013-08-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes llvmBitcodes field from TMethod
+
+2013-08-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes stack overflow due to direct alloca, removes volatiles
+
+2013-08-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2013-08-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes stupid bug in root init
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes direct temps creation
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    debug temp
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes moveObjects()
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds holder cleanup code
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds support for stack objects in LLVMMemoryManager
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes direct blocks and disables llst optimization pass
+
+2013-08-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Rewrites stack object protection using separate pointer
+
+2013-08-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more asserts
+
+2013-08-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes redundant variables
+
+2013-08-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Rewrites TObject* TDictionary::find with STL lower_bound
+
+2013-08-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Second attempt to push through metadata
+
+2013-08-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds allocateStackObject (incorrect)
+
+2013-08-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Prettifies class Image (Image::ImageWriter)
+
+2013-08-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes unneeded volatile specifiers
+
+2013-08-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes direct code
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Setup debug environment
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Passes correct context reference to newContext
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes MethodCompiler::pushBlock()
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes naming
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes patching code
+
+2013-08-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes ImageWriter
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix & cleanup
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes branching
+
+2013-08-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes branching and block location
+
+2013-08-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves writing operations for Image to class ImageWriter: writeWord, writeObject, void writeTo(const char* fileName)
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes direct block init
+
+2013-08-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes void Image::writeWord(std::ofstream& os, uint32_t word)
+    Adds void Image::writeObject(std::ofstream& os, TObject* object)
+    Adds Image::TImageRecordType Image::getObjectType(TObject* object)
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes crashes
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds debug tools
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds SmallInt check to @getObjectClass()
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds recompilation and cache invalidation code
+
+2013-08-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds Image::writeWord(uint32_t word)
+
+2013-08-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Improves Image::readWord()
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds receiver & receiverClass loading code
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more context fields init
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds direct context initialization code
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes direct method call in createDirectBlocks()
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds selector to the call stat output text
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors code to use callSiteIndex instead of callSiteOffset
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-08-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes fallback call arguments
+
+2013-08-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds switch and phi code to patchCallSite()
+
+2013-08-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors call patching code
+
+2013-08-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds direct method invocation codegen
+
+2013-08-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more code to the patch function
+
+2013-08-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more code to patchCallSite()
+
+2013-08-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up indentation in llvm_types.ll
+
+2013-08-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds patchCallSite() stub
+
+2013-08-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors stats, adds patchHotMethods() code
+
+2013-08-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds patchHotMethods() stub
+
+2013-07-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds site stats for class hits
+
+2013-07-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds call site parameter to jit calls
+
+2013-07-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-07-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors call site stats code
+
+2013-07-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds method hit stats
+
+2013-07-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds stubs for call site processing in a jit code
+
+2013-07-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds sample thread messaging interface
+
+2013-07-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Moves assignment to expression instead of statement
+
+2013-07-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Allows variables in console
+
+2013-07-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Block>>whileTrue and whileFalse methods
+
+2013-07-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds image builder's header stub
+
+2013-07-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes grammar
+
+2013-07-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes reduce/reduce conflict in grammar
+
+2013-07-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds lexer and parser fixes
+
+2013-07-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more tokens and error recovery rules
+
+2013-07-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds tokens and priority spec
+
+2013-07-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes grammar
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds disassembler code, more grammar
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more grammar
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds symbol entry for inline_object
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more grammar
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Picks grammar file from commit b0512ae
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Reverts back to the llvm gc
+
+2013-07-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes Scheduler>>run
+
+2013-07-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes Scheduler. Fixes List>>remove:
+
+2013-07-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes File>>fileIn and Scheduler debug code
+
+2013-07-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    adds test that segfaults vm
+
+2013-07-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes Scheduler>>runOnce
+
+2013-07-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Scheduler and Thread classes
+
+2013-07-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Speeds up BakerMemoryManager::releaseExternalHeapPointer
+
+2013-07-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the last merge
+
+2013-07-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Reverts rootStack due to object_ptr::next looping
+
+2013-07-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors rootStack to std::list<hptr<TProcess>> and ptr fix
+
+2013-07-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds volatile specifier to object_ptr::data
+
+2013-07-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-07-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes bug in new hptr<>
+
+2013-07-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds experimental hptr<> implementation using stack objects
+
+2013-06-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST bindins to get the mode of a file: f stat mode asString -> '-rw-r-----'
+
+2013-06-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds primitive ioFileSetStatIntoArray to get file stat. Adds ST class FileStat
+
+2013-06-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes ST class File
+
+2013-06-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Changes primitive fopen to open... Modifies ST class File
+
+2013-06-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds primitives: fopen, fclose, fwrite, fread, fgetc, fputc, fseek
+
+2013-06-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Simplifies the code of generational GC
+
+2013-05-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more docs
+
+2013-05-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds info how to run Smalltalk right in LLVM
+
+2013-05-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes some memory leaks
+
+2013-05-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Backed out changeset: fb3f87d03444
+
+2013-05-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes outdated doc
+
+2013-05-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more docs
+
+2013-05-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    fix
+
+2013-05-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    GGC fix
+
+2013-05-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds missing inactive pointer setting
+
+2013-04-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more GGC code
+
+2013-04-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds traces for TJITContext::popValue
+
+2013-04-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Prettifies linkage of blocks in MethodCompiler::writeFunctionBody
+
+2013-04-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes EH in soft VM for TContext* and TBlockReturn
+
+2013-04-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames unaryMessage to unaryBuiltIns, binaryMessage to binaryBuiltIns.
+    Removes unused special opcode 'breakpoint'
+
+2013-04-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Modifies some primitives
+
+2013-04-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds GGC lists research
+
+2013-04-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes blockReturn handling in the SoftVM. Adds docs for blockReturn.
+
+2013-04-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds test for MethodCompiler::TJITContext::popValue
+
+2013-04-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes SmalltalkVM::rootStack
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds GGC benchmark
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Changes default image file
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds counters and statistics
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Code cleanup & fixes
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes comments
+
+2013-04-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small changes
+
+2013-04-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds generational GC code. Not tested yet
+
+2013-04-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds image building rules
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds docs for JIT compilation
+
+2013-04-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds metaclass methods to the completion list
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Changes the logic of codegeneration of primitives. Adds more comments.
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the declaration of compileSmallIntPrimitive
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fix
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves some primitives from vm.cpp to primitives.cpp
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds function callPrimitive
+
+2013-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Cosmetic changes
+
+2013-04-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes dependency graph
+
+2013-04-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code, stub for meta methods
+
+2013-04-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes trace messages
+
+2013-04-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds smalltalk completion engine for readline library
+
+2013-04-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds trie container and completion backend db
+
+2013-04-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2013-04-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves the branch of #doesNotUnderstand: to function
+
+2013-04-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves declaration of exception API to .ll
+
+2013-04-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes readline
+
+2013-04-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves declaration of runtime API to .ll
+
+2013-04-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds how-to call extern member function
+
+2013-04-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Backed out changeset 2e2a65a11314
+
+2013-04-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds readline support. Use 'exit' command to quit
+
+2013-04-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Comments code
+
+2013-04-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes dev stuff. Adds exit(1) to unexpected cases.
+
+2013-04-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small changes
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves codegeneration of primitives of SmallInt to MethodCompiler::writeSmallIntPrimitive( ... )
+    Renames primitiveSucceeded to primitiveSucceededBB, primitiveFailed to primitiveFailedBB
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames instruction.* to TInstruction.*
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes files with bug reports
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Backed out changeset d36c6a11061b
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes unnecessary TDeferredValue::isLazy()
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes dev comments
+
+2013-04-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes TJITContext::popValue (phi)
+
+2013-04-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-04-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes popTop
+
+2013-04-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes dup
+
+2013-04-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes dup
+
+2013-04-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Plays with lazy push
+
+2013-04-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small changes
+
+2013-04-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves BrokenPointerPass to llstDebuggingPass.cpp
+
+2013-04-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    "Duplicate" must be fixed
+
+2013-04-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Added tag Monkey patching for changeset 03c043a82c0b
+
+2013-04-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes PushTemporary in MarkArguments
+
+2013-04-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test for Push* and MarkArgumens codegeneration
+
+2013-04-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-04-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    MarkArguments and Push* instructions lead to pointer invalidation
+
+2013-04-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds pointer check for "self" in sendMessage args
+
+2013-04-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds pass that checks whether the class of object points to null
+
+2013-04-02  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames LLVMTestStatements to StatementsTest. Tests are not forced to run in LLVM
+
+2013-03-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes .gdbinit guide
+
+2013-03-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds a script that builds the image
+
+2013-03-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames binaryMessage enum
+
+2013-03-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds TInstruction::toString()
+
+2013-03-21  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Starts init process from soft VM
+
+2013-03-21  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes GC leak
+
+2013-03-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames globals and base functions
+
+2013-03-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes GC leak in primitive::cloneByteObject
+
+2013-03-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds checkRoot to primitive array:at:put
+
+2013-03-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pointer loss in doesNotUnderstand part of sendMessage()
+
+2013-03-13  Roman Proskuryakov  <humbug@deeptown.org>
+
+    ST code results in a segmentation fault
+
+2013-03-13  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes primitive throwError
+
+2013-03-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more ST tests
+
+2013-03-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more ST tests
+
+2013-03-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Starts initial process in LLVM
+
+2013-03-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Enables llst optimization passes
+
+2013-03-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes leaking roots, cleans up the code
+
+2013-03-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes check of count of args and temps in blockInvoke
+
+2013-03-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes intrinsic declaration from llvm_types.ll
+
+2013-03-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes context->previousContext in LLVM:executeProcess
+
+2013-03-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames JITRuntime::ot to m_baseTypes
+
+2013-03-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes llvm_types.ll indentation
+
+2013-03-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes backtrace in method Process>>execute
+
+2013-03-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Cleans up LLSTPass
+
+2013-03-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes blockBytePointer, disables llst opts
+
+2013-03-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more ST tests(compiler fails)
+
+2013-03-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST tests
+
+2013-03-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Changes EH due to C++ ABI for Itanium docs
+
+2013-03-02  Roman Proskuryakov  <humbug@deeptown.org>
+
+    LLVM: <throwError primitive> throws TContext*. Fixes JIT->sendMessage messageArguments.
+
+2013-02-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes primitive SmallIntDiv
+
+2013-02-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes IR generation
+
+2013-02-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    llstPass: removes unused GC roots
+
+2013-02-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes Link>>do:, sendMessage and block code optimization
+
+2013-02-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Code cleanup
+
+2013-02-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes in llstPass
+
+2013-02-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Backed out changeset 9e4ba46605c2
+
+2013-02-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds insertion sort and list size
+
+2013-02-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Enqueus createGCLoweringPass()
+
+2013-02-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adjusts heap grow criteria
+
+2013-02-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes growHeap()
+
+2013-02-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes indentation
+
+2013-02-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds llst pass which removes unnecessary loads of GC protected pointers
+
+2013-02-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes 9af5a06a331c
+
+2013-02-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes args on 3.1 branch
+
+2013-02-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Allows gc to grow heap
+
+2013-02-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    cleanup
+
+2013-02-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Grow heap stub
+
+2013-02-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-02-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes LLVM gc
+
+2013-02-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds .gdbinit support to views
+
+2013-02-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes unused variable
+
+2013-02-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-02-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes assign instructions
+
+2013-02-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleanup
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes holders
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes %struct. prefix
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Renames 'TObject::getField(int)' to 'getObjectField'
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes self holder
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds cleanup code, traces
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes incorrect protectPointer()-s
+
+2013-02-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors deferred operations to use getField()
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleanup
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors preamble and object access (literals, class, etc)
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Probably fixes popValue in the complex cases
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes self access
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes assign opcodes to use deferred values
+
+2013-02-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more deferred loads, makes code compile
+
+2013-02-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds pretty prints for gdb
+
+2013-02-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more code for deferred value support
+
+2013-02-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes tclass view(instance size)
+
+2013-02-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds llst-views.gdb (TSymbol, TMethod, TClass)
+
+2013-02-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes for primitive::bulkReplace
+
+2013-02-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves functions from llvm_types.ll to struct TBaseFunctions. Adds trailing spaces to MethodCompiler.cpp
+
+2013-02-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames ot to m_baseTypes
+
+2013-02-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-02-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds trailing spaces. Removes magic numbers(sendBinary)
+
+2013-02-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds deferred functional to value stack (stub)
+
+2013-02-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds forgotten file(fixes 5e59eadd1414)
+
+2013-02-18  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves enums from SmalltalkVM class to opcodes.h
+
+2013-02-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    gc root research
+
+2013-02-17  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes forming of blockFunctionName
+
+2013-02-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes GC interface
+
+2013-02-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes compile error
+
+2013-02-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes traces, sets -O0
+
+2013-02-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Working 3.1 branch with some forward changes
+
+2013-02-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds comments to throwError primitive
+
+2013-02-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes boundary checks in string|array At:Put: primitives
+
+2013-02-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds SmallIntShift primitive
+
+2013-02-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds throwError primitive. Fixes startNewProcess primitive.
+
+2013-02-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes allocateRoot()
+
+2013-02-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds GC root stuff
+
+2013-02-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes caches
+
+2013-02-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds runtime stats
+
+2013-02-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds #doesNotUnderstand: handler
+
+2013-02-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds sendToSuper special opcode
+
+2013-02-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes receiverClass in sendMessage
+
+2013-02-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes sendMessageArgs
+
+2013-02-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds receiverClass parameter
+
+2013-02-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes cloneObject primitive
+
+2013-02-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds isKindOf test
+
+2013-02-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST test which localises Class>>asString problem
+
+2013-02-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more tests. Class asString fails.
+
+2013-02-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds TODO for startNewProcess stub
+
+2013-02-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds startNewProcess stub
+
+2013-02-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds module pass manager
+
+2013-02-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Enables optimizations
+
+2013-02-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-02-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Simplifies caches
+
+2013-02-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes cache
+
+2013-02-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds function and block caches to runtime, comments out traces
+
+2013-02-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds a few more tests
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes primitives, adds meta testing code
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes bulkReplace
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes bulkReplace primitive (function call still fails though)
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds strcat test
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes popValue() and adds missing pop chains
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes at:[put:] vs jit.popValue
+
+2013-02-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes blockInvoke and value stack refactoring
+
+2013-02-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some FIXME notes
+
+2013-02-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hasValue()
+
+2013-02-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes popValue
+
+2013-02-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Reworks the value stack
+
+2013-02-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-02-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-02-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block invocation (LOL). Note: testblockParam fails
+
+2013-01-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes test
+
+2013-01-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds blockParam test
+
+2013-01-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes rethrow in landingpad BB
+
+2013-01-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST closure test
+
+2013-01-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes allocate* primitives
+
+2013-01-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes smallint primitive
+
+2013-01-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes getClass primitive
+
+2013-01-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes scanners code
+
+2013-01-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes scanForBranches
+
+2013-01-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Test code disassembly
+
+2013-01-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds some ST tests.
+
+2013-01-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes testBlockReturn
+
+2013-01-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds primitive getClass of SmallInt
+
+2013-01-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Error in scanForBranches
+
+2013-01-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds putChar primitive. Fixes indentation
+
+2013-01-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes array at:put:
+
+2013-01-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds checking code to array at:[put:]
+
+2013-01-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pushInstance
+
+2013-01-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes typos, adds comments
+
+2013-01-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Sets -O0 in cmake lists
+
+2013-01-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes getSize primitive
+
+2013-01-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes primitive logic
+
+2013-01-26  humbug  <humbug@deeptown.org>
+
+    Fixes invoke and smallint primitives
+
+2013-01-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes stringAt:[Put:] primitive
+
+2013-01-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pushInstance
+
+2013-01-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds at: and at:put: primitives
+
+2013-01-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block invoke
+
+2013-01-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes indentation
+
+2013-01-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes merge
+
+2013-01-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes blockInvoke
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Optimizes self
+
+2013-01-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Implements smallint primitives with llvm API
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes doPrimitive
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes doPrimitive
+
+2013-01-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes primitive functions' mapping
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Comments out some traces
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendMessage
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes createArray
+
+2013-01-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes runtime init code
+
+2013-01-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes EE initialization
+
+2013-01-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes rethrow BB
+
+2013-01-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor fixes
+
+2013-01-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes trailing spaces
+
+2013-01-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes indentation
+
+2013-01-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds blockInvoke
+
+2013-01-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds small int primitives
+
+2013-01-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds bulkReplace primitive
+
+2013-01-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes getSlotSize()
+
+2013-01-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds primitive code; removes trailing spaces
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor fixes
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes blockReturn
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes branch instructions
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes branching
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes scanForBlockReturn
+
+2013-01-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes landingpad clause. Fixes CFG
+
+2013-01-20  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes CFG
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes logic errors
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes landing pad
+
+2013-01-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds scanForBlockReturn, fixes logic. Not debugged yet
+
+2013-01-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors typeInfo acquiring code
+
+2013-01-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes assignInstance
+
+2013-01-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds checkRoot() API interface; refactors TJITContext
+
+2013-01-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendMessage; some cleanup
+
+2013-01-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Renames landing pad
+
+2013-01-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2013-01-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small fixes
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds exception aware code to the sendMessage
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds exception aware code to the sendBinary
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds landing pad code
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes stupid code
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Inlines smallInt literals directly as consts
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes naming
+
+2013-01-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some names
+
+2013-01-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds writeLandingpadBB stub
+
+2013-01-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes ST loop test
+
+2013-01-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2013-01-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes globals mapping
+
+2013-01-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendBinary
+
+2013-01-15  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds block test
+
+2013-01-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds JITRuntime::initializeRuntimeAPI()
+
+2013-01-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves m_functionPassManager init to method
+
+2013-01-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small cleanup
+
+2013-01-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes m_compiledFunctions
+
+2013-01-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pushBlock
+
+2013-01-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds blockReturn code
+
+2013-01-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Interfaces createBlock() and emitBlockReturn() to the JIT
+
+2013-01-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds emitBlockReturn()
+
+2013-01-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds createBlock
+
+2013-01-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds llvm stub: C++ exception handling
+
+2013-01-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds function pass manager code; some more simple tests
+
+2013-01-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes runtime
+
+2013-01-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes function preamble
+
+2013-01-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds testing code
+
+2013-01-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pointers
+
+2013-01-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes runtime
+
+2013-01-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds runtime test
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds scanForBranches pass for blocks
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes scanForBranches
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes compiler. Now compiles valid module
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes branching
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes compiler types
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes message arguments and function prototypes
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes compiler
+
+2013-01-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes compiler. Adds test method LLVMTest>>test1. See init.txt
+
+2013-01-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes compiler
+
+2013-01-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more twines
+
+2013-01-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes naming and args array manipulation
+
+2013-01-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendUnary, sendMessage and other stuff. Now compiles
+
+2013-01-11  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Monkey patching: block preamble
+
+2013-01-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block creation code
+
+2013-01-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more compiler refactoring
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes markArguments
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors runtime API methods
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors doSpecial
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors names
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Moves IRBuilder<> to TJITContext
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Moves TInstruction to TJITContext
+
+2013-01-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors MethodCompiler
+
+2013-01-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes preamble
+
+2013-01-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes branchIf*
+
+2013-01-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Prettifies globals
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleanup
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pushConstant
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes conditional branches
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds sendMessage bindings to bytecode compiler
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more sendMessage code
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds sendMessage stubs
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Code cleanup
+
+2013-01-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes writePreamble
+
+2013-01-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes build.sh
+
+2013-01-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small fixes in the image sources
+
+2013-01-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Reverts image source
+
+2013-01-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2013-01-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Updates sendUnary opcode
+
+2013-01-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes typo
+
+2013-01-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes cmake script
+
+2013-01-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds error reporting
+
+2013-01-08  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves TGlobals structure to llvm_types.ll
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds global objects mapping to the JIT module
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    humbug -> llvm
+
+2013-01-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds llvm stub: globals
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes JITRuntime initialization
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds wrapper type stubs
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds wrappers for newObject functions
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes cmake script. Now compiles correctly
+
+2013-01-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds module verifier. Small fixes
+
+2013-01-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves test_llvm_types.cpp to llvm_stub
+
+2013-01-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds missing Interpreter.h
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds JIT init code and simple test
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds sendUnary stub
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds conditional branching code
+
+2013-01-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds branching code for MethodCompiler, dumb build script
+
+2013-01-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds llvm stub: changing function on the fly
+
+2013-01-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some thoughts on branching
+
+2013-01-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Updates imageSource.st
+
+2013-01-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Code refactoring and cleanup
+
+2013-01-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds LLVM bindings to cmake script (not working yet)
+
+2013-01-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor fixes
+
+2013-01-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds IR getField functions
+
+2013-01-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes Context.arguments GEP. Fixes selfReturn
+
+2013-01-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small typo fixes
+
+2013-01-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes
+
+2013-01-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds IR getIntegerValue() function
+
+2013-01-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes sendBinary stub
+
+2013-01-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds sendBinary instruction stub
+
+2013-01-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2013-01-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes assign instructions
+
+2013-01-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds markArguments instruction
+
+2013-01-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more instructions
+
+2013-01-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors MethodCompiler, adds comments
+
+2013-01-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors compiler
+
+2013-01-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds more stub for method compiler
+
+2013-01-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds stub for the method compiler
+
+2013-01-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds jit.h
+
+2013-01-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds LLVM Memory Manager
+
+2013-01-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds comments to llvm types
+
+2013-01-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds llvm types
+
+2012-12-31  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up code
+
+2012-12-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors Collection>>sort
+
+2012-12-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes Collection>>sort
+
+2012-12-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes Collection>>sort
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hptr<>
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors hptr<>
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors VM code (minor fixes)
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Added tag v 0.1 for changeset 0c8089e4a8ed
+
+2012-12-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Refactors onCollectionOccured as Observer pattern. Cleanups code
+
+[v_0.1]
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Style fixes
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds licensing information
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2012-12-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes unnecessary stuff, changes the declaration of execute() method.
+
+2012-12-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small cosmetic fixes
+
+2012-12-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes test from main
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes the primitive code
+
+2012-12-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Cleans up the code
+
+2012-12-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds imageBuilder from lst5 and updates testImage
+
+2012-12-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some benchmarks, cleans up the code
+
+2012-12-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    ST -> IR code stub
+
+2012-12-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Collection>>sort: and sort benchmark
+
+2012-12-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds timer routines
+
+2012-12-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up code, adds more stats
+
+2012-12-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes bulkReplace; minor changes in the test image
+
+2012-12-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Modifies LoopTest. Adds new info about Array>>allMethods failure
+
+2012-12-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST PrimitiveTest
+
+2012-12-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST ContextTest
+
+2012-12-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Backout 0e3c1e476091
+
+2012-12-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes
+
+2012-12-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes process rootStack due to hptr.
+
+2012-12-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Changes format of method #error:.
+
+2012-12-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Temp
+
+2012-12-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds some ST tests
+
+2012-12-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes unneeded hptrs
+
+2012-12-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes invalid stack issue in sendMessage vs GC
+
+2012-12-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more info in #badIndex
+
+2012-12-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds tail call optimization in the sendMessage
+
+2012-12-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor fixes
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes doSendMessage() so it correctly handles the #doesNotUnderstand: case
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes blockInvoke
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small fixes
+
+2012-12-19  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes segfault
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors GC code
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up the code
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes GC
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small fixes for VM vs Process
+
+2012-12-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes test
+
+2012-12-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors moveObject
+
+2012-12-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    temp
+
+2012-12-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds new moveObject stub
+
+2012-12-16  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Addss some tests
+
+2012-12-16  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds test of GC fail
+
+2012-12-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes imageSource
+
+2012-12-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes string test
+
+2012-12-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small fixes in VM
+
+2012-12-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds Array test stub. Fixes context args
+
+2012-12-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Cosmetic fixes
+
+2012-12-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds small fix to bulkReplace
+
+2012-12-14  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds newObject() specializations; small fixes
+
+2012-12-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes method cache, adds VM statistics
+
+2012-12-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes bulkReplace && TInteger
+
+2012-12-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes typos
+
+2012-12-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds comment to the hptr<>
+
+2012-12-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds classdoc comments in types.h
+
+2012-12-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes push/pop process
+
+2012-12-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes string concat
+
+2012-12-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds comments
+
+2012-12-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes error primitive crash
+
+2012-12-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes tests typo
+
+2012-12-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes process stack. Now exits normally.
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes loopup error message, comments out GC traces
+
+2012-12-11  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small image fixes: Test classes, runAll.
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes GC (at last)
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds trace messages to GC
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes bulkReplace
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds error reporting; code cleanup
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds missing *failed = true
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes call to newBinaryObject()
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor fixes
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes process
+
+2012-12-11  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes crash
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes backTrace
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cosmetic fixes
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes at:put: and bulkReplace:
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes static heap initialization
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-12-10  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes static roots
+
+2012-12-10  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ST tests: SmallInt, Compare, Branch, Loop, String, Method lookup. 4171 objects
+
+2012-12-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds failPrimitive stub. Primitive fails on opcode error(19)
+
+2012-12-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds image source. Removes gui init from main. The image contains 3891 objects
+
+2012-12-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Parses argv[1] as image filename
+
+2012-12-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds GC info messages
+
+2012-12-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hptr<>
+
+2012-12-09  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes GC
+
+2012-12-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pointer safety
+
+2012-12-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes new(Ord|B)inaryObject
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes redundant hptr<>
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes unused variables
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendToSuper
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors rootStack to be part of TVMExecutionContext
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Cleans up and comments the code
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds isInStaticHeap() body
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes newPointer()
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hptr registration
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hptr<> constructor
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hptr<>
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds bulkReplace logic
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Code cleanup
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes crash
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds primitive numbers to code comments
+
+2012-12-07  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes runtime bugs
+
+2012-12-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes bulkReplace logic.
+
+2012-12-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Inserts bulkReplace into doPrimitive
+
+2012-12-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more memory management code
+
+2012-12-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors VM code by applying hptr<> to critical pointers
+
+2012-12-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some more thoughts on hptr<>
+
+2012-12-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Bulk replace todos
+
+2012-12-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    BulkReplace fix
+
+2012-12-05  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes TArray
+
+2012-12-05  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds bulkReplace stub
+
+2012-12-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes hptr<>::operator[]
+
+2012-12-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-12-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some research on hptr<>
+
+2012-12-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds extrenal pointers support code
+
+2012-12-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds newObject<TBlock>()
+
+2012-12-04  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Implements sendBinary. Adds default primitive stub
+
+2012-12-04  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Temp
+
+2012-12-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Refactors code. Fixes blockReturn
+
+2012-12-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds GC status flags
+
+2012-12-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes backtrace
+
+2012-12-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors sendUnary to a function
+
+2012-12-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds TVMExecutionContext and refactors execution routines
+
+2012-12-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    GC fails. FIXME
+
+2012-12-03  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds backtrace printing method
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block invoke (reverts previousContext)
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes merge
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block invokation, adds stub for in:at:put:
+
+2012-12-02  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes stackReturn and selfReturn. Other little fixes
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Number>>to:do: disasm
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    More disasm comments
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    More comments
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    More comments
+
+2012-12-02  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds init sequence disassembly
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block invoke
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds error reporting in sendMessage
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes block invocation flow
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors doExecutePrimitive
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes runtime
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors pushBlock. Adds comments, throws stupid code away
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Renames context to currentContext in execute
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds pushBlock opcode
+
+2012-12-01  Roman Proskuryakov  <humbug@deeptown.org>
+
+    doPrimitive opcode fix. Adds comments
+
+2012-11-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-12-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds error reporting
+
+2012-11-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendMessage
+
+2012-11-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes readObject() ints
+
+2012-11-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-11-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendMessage
+
+2012-11-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Runtime fixes
+
+2012-11-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes object size vs slot size issue
+
+2012-11-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    FIXME
+
+2012-11-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds comments
+
+2012-11-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds sendMessage opcode stub
+
+2012-11-30  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Replaces a lot of magic numbers to enum constants
+
+2012-11-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Small fixes
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors object instantination code
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes runtime
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small fixes
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes memory GC vs VM issues
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds logo
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Finor mixes
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    More refactoring
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactoring and a lot of code style fixes
+
+2012-11-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-11-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes goto
+
+2012-11-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds BlockReturn opcode
+
+2012-11-29  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Renames variables. Adds comments
+
+2012-11-29  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some baker init code
+
+2012-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds sendBinary stub. Adds fixme's
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes linking issues
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor fixes
+
+2012-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds ByteArray alloc stub
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds heap initialization code
+
+2012-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix. Adds ByteObject clone stub.
+
+2012-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes minor issues. Almost ready for execution\!
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    More mm refactoring
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors memory interface and class struct
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Forgets about .kdev4 files
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes typo
+
+2012-11-28  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes typos
+
+2012-11-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more notes to Baker desc
+
+2012-11-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds advanced Baker description
+
+2012-11-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Baker doc
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Replaces failPrimitive patterns.
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix. Adds failPrimitive.
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds String:at, String:at:put
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds Array:at
+
+2012-11-27  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix
+
+2012-11-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes minor issues in Baker MM
+
+2012-11-27  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes sendUnary
+
+2012-11-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Backs out ptr<> template stuff
+
+2012-11-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds some more template magic
+
+2012-11-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds template typedefs
+
+2012-11-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds ptr<> template
+
+2012-11-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds #Array:at:put stub
+
+2012-11-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds sendUnary opcode
+
+2012-11-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves SmallInt opcodes into function doSmallInt(...)
+
+2012-11-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    + opcode bit shift
+
+2012-11-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes some warnings
+
+2012-11-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds collectGarbage() method. Baker GC is almost done
+
+2012-11-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes vptr doc
+
+2012-11-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds vptr<> spec to the docs
+
+2012-11-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Baker garbage collection code (moveObject part)
+
+2012-11-25  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Baker MM stub
+
+2012-11-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    A little fix
+
+2012-11-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds some primitive opcodes. Fixes some unsinged+signed comparisons' warnings.
+
+2012-11-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fix. Now links.
+
+2012-11-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves templated method template<class T> T* SmalltalkVM::newObject(...) to .h
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds startup code stubs
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds draft memory interface
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fix
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    More fixes in primitive code
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes primitives code
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors doSpecial handler
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactored doSpecial to a separate function
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes unnececary trace messages
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small type fixes; Adds more classdoc
+
+2012-11-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    + opcodes:
+     1) specials
+     2) a little bit of primitives
+
+2012-11-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes the merge. Now it works.
+
+2012-11-23  Roman Proskuryakov  <humbug@deeptown.org>
+
+    + hgignore
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Removes unnececary type casts
+
+2012-11-24  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors TArray as a template class
+
+2012-11-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes a lot of bugs. Image seems to be working and corrent now
+
+2012-11-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Some more fixes and testing code
+
+2012-11-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes readObject()
+
+2012-11-23  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes image loading code, adds some debug logs
+
+2012-11-22  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes a lot of errors. Now compiles
+
+2012-11-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    + opcode templates
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes cmake and some of the compilation erors
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes pointer vs reference issue
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Small code refactoring and fixes
+
+2012-11-21  Roman Proskuryakov  <humbug@deeptown.org>
+
+    fix typo
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Image::closeImageFile()
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds image loading code
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds initial image loading code
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds smalltalk syntax highlighting scheme
+
+2012-11-21  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds draft prototype of exception handling mechanism
+
+2012-11-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds Image source
+
+2012-11-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Refactors objects logic, adds more VM and Image methods
+
+2012-11-20  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Minor changes
+
+2012-11-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds lookupMethodInCache
+
+2012-11-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more VM logic
+
+2012-11-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more VM logic
+
+2012-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds VM methods (execute)
+
+2012-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds lookupMethod stub
+
+2012-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds more types; initial VM code
+
+2012-11-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Initial commit. Adds basic types
+
