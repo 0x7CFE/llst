@@ -457,7 +457,7 @@ void JITRuntime::patchHotMethods()
 
         // Cleaning up the function
         m_executionEngine->freeMachineCodeForFunction(methodFunction);
-        methodFunction->getBasicBlockList().clear();
+        methodFunction->deleteBody();
 
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";

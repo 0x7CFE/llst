@@ -35,6 +35,7 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
+#include <cstdlib>
 
 #include <vm.h>
 #include <args.h>
@@ -67,7 +68,7 @@ int main(int argc, char **argv) {
     memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
 
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
-    smalltalkImage->loadImage(llstArgs.imagePath.c_str());
+    smalltalkImage->loadImage(llstArgs.imagePath);
 
     {
         Image::ImageWriter writer;

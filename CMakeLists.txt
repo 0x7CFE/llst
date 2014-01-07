@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.4)
 
 project(llst-project)
 
@@ -26,7 +26,7 @@ if (LLVM)
     add_definitions(-DLLVM)
 endif()
 
-set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} -Wall -fexceptions -frtti -Wno-cast-qual")
+set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} -Wall -fexceptions -frtti -Wno-pedantic -Wno-cast-qual")
 set (CMAKE_CXX_FLAGS_DEBUG "-g -ggdb -O0")
 set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 

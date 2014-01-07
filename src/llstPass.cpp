@@ -113,7 +113,7 @@ bool LLSTPass::isPotentialGCFunction(Function* F)
     if (F->isIntrinsic())
         return false;
 
-    if ( F->getGC() )
+    if ( F->hasGC() )
         return true;
     return false;
 }
