@@ -78,22 +78,35 @@ add_custom_command(
     WORKING_DIRECTORY ${IMAGE_DIR}
     COMMENT "Building image"
 )
-
 add_custom_target(image ALL DEPENDS ${IMAGE_DIR}/LittleSmalltalk.image)
+
+add_custom_command(
+    OUTPUT changelog.gz
+    COMMAND gzip -9c ${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog > changelog.gz
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog
+    COMMENT "Compressing changelog"
+)
+add_custom_target(compress_changelog ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/changelog.gz)
 
 install(TARGETS llst DESTINATION bin)
 install(FILES LICENSE DESTINATION share/doc/${PROJECT_NAME} RENAME copyright)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/changelog.gz DESTINATION share/doc/${PROJECT_NAME})
 install(FILES doc/llst.1.en.gz DESTINATION share/man/man1/ RENAME llst.1.gz)
+install(FILES misc/bash-completion.sh DESTINATION share/bash-completion/completions RENAME llst)
 
 
 set (CPACK_PACKAGE_DESCRIPTION_SUMMARY "LLVM powered Little Smalltalk")
+set (CPACK_DEBIAN_PACKAGE_DESCRIPTION # The format of Description: http://www.debian.org/doc/debian-policy/ch-controlfields.html#s-f-Description
+"LLVM powered Little Smalltalk
+ LLST is a virtual machine with integrated JIT.
+")
 set (CPACK_PACKAGE_CONTACT "info@llst.org")
 set (CPACK_PACKAGE_VERSION_MAJOR "0")
 set (CPACK_PACKAGE_VERSION_MINOR "2")
-set (CPACK_PACKAGE_VERSION_PATCH "0")
+set (CPACK_PACKAGE_VERSION_PATCH "1")
 set (CPACK_RESOURCE_FILE_LICENSE "${CMAKE_CURRENT_SOURCE_DIR}/LICENSE")
 set (CPACK_SOURCE_GENERATOR "TGZ")
-set (CPACK_SOURCE_IGNORE_FILES "build/;\\\\.kdev4.*;\\\\.git/;\\\\.hgignore")
+set (CPACK_SOURCE_IGNORE_FILES "build/;\\\\.kdev.*;\\\\.git.*;\\\\.hgignore;.*\\\\.image")
 set (CPACK_STRIP_FILES "llst")
 
 
