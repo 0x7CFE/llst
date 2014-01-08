@@ -32,6 +32,9 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#if !defined(LLST_COMPLETION_ENGINE_H)
+#define LLST_COMPLETION_ENGINE_H
+
 #include <radix_tree/radix_tree.hpp>
 #include <memory>
 
@@ -69,3 +72,5 @@ public:
     bool readline(const std::string& prompt, std::string& result);
     void addHistory(const std::string& line);
 };
+
+#endif
