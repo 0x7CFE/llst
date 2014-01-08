@@ -38,12 +38,11 @@
 #include <iostream>
 #include <cassert>
 #include <cstring>
-#include <readline/readline.h>
-#include <readline/history.h>
 
 #include <opcodes.h>
 #include <primitives.h>
 #include <vm.h>
+#include <CompletionEngine.h>
 
 #if defined(LLVM)
     #include <jit.h>
@@ -780,17 +779,15 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TString* prompt = ec.stackPop<TString>();
             std::string strPrompt(reinterpret_cast<const char*>(prompt->getBytes()), prompt->getSize());
 
-            char* input = readline(strPrompt.c_str());
-            if (input) {
-                uint32_t inputSize = std::strlen(input);
+            std::string input;
+            bool userInsertedAnything = CompletionEngine::Instance()->readline(strPrompt, input);
 
-                if (inputSize > 0)
-                    add_history(input);
+            if ( userInsertedAnything ) {
+                if ( !input.empty() )
+                    CompletionEngine::Instance()->addHistory(input);
 
-                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, inputSize) );
-                std::memcpy(result->getBytes(), input, inputSize);
-
-                std::free(input);
+                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, input.size()) );
+                std::memcpy(result->getBytes(), input.c_str(), input.size());
                 return result;
             } else
                 return globals.nilObject;

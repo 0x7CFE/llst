@@ -33,11 +33,18 @@
  */
 
 #include <cstdio>
-#include <readline/readline.h>
+#include <CompletionEngine.h>
+#include <cstring>
+#include <cstdlib>
 
 #include <CompletionEngine.h>
 
 std::auto_ptr<CompletionEngine> CompletionEngine::s_instance(new CompletionEngine);
+
+#if defined(USE_READLINE)
+
+#include <readline/readline.h>
+#include <readline/history.h>
 
 static char* smalltalk_generator(const char* text, int state) {
     CompletionEngine* completionEngine = CompletionEngine::Instance();
@@ -106,3 +113,40 @@ void CompletionEngine::initialize(TDictionary* globals)
         }
     }
 }
+
+bool CompletionEngine::readline(const std::string& prompt, std::string& result) {
+    char* input = ::readline(prompt.c_str());
+    if (input) {
+        uint32_t inputSize = std::strlen(input);
+        result = std::string(input, inputSize);
+        std::free(input);
+        return true;
+    }
+    return false;
+}
+
+void CompletionEngine::addHistory(const std::string& line) {
+    add_history( line.c_str() );
+}
+
+#else // USE_READLINE -- undefined
+
+#include <string>
+#include <iostream>
+
+// Here we providing stub implementation that just provides
+// an interface for readling a string from input without any
+// advanced features such as completion or history
+
+static void initializeReadline() { }
+void CompletionEngine::initialize(TDictionary*) {
+    initializeReadline(); // to suppress warnings '-Wunused-function'
+}
+bool CompletionEngine::readline(const std::string& prompt, std::string& result) {
+    std::cout << prompt << std::flush;
+    return std::getline(std::cin, result);
+}
+
+void CompletionEngine::addHistory(const std::string&) { }
+
+#endif
