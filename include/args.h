@@ -43,10 +43,11 @@ struct args
     std::size_t heapSize;
     std::size_t maxHeapSize;
     std::string imagePath;
+    std::string memoryManagerType;
     int         showHelp;
     int         showVersion;
     args() :
-        heapSize(0), maxHeapSize(0), showHelp(false), showVersion(false)
+        heapSize(0), maxHeapSize(0), memoryManagerType(), showHelp(false), showVersion(false)
     {
     }
     void parse(int argc, char **argv);

@@ -126,9 +126,9 @@ void GenerationalMemoryManager::collectGarbage()
     gettimeofday(&tv2, NULL);
 
     // Calculating total microseconds spent in the garbage collection procedure
-    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+    m_memoryInfo.totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
 
-    m_collectionsCount++;
+    m_memoryInfo.collectionsCount++;
 }
 
 void GenerationalMemoryManager::collectLeftToRight(bool fullCollect /*= false*/)

@@ -35,6 +35,7 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
+#include <tr1/memory>
 #include <cstdlib>
 
 #include <vm.h>
@@ -79,13 +80,27 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-#if defined(LLVM)
-    std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
-#else
-    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-#endif
+    IMemoryManager* mm;
+    if(llstArgs.memoryManagerType == "nc") {
+        mm = new NonCollectMemoryManager();
+    }
+    else if(llstArgs.memoryManagerType == "" || llstArgs.memoryManagerType == "copy") {
+        #if defined(LLVM)
+            mm = new LLVMMemoryManager();
+        #else
+            mm = new BakerMemoryManager();
+        #endif
+    }
+    else{
+        std::cout << "error: wrong option --mm_type=" << llstArgs.memoryManagerType << ";\n"
+                  << "defined options for memory manager type:\n"
+                  << "\"copy\" (default) - copying garbage collector;\n"
+                  << "\"nc\" - non-collecting memory manager.\n";
+        return EXIT_FAILURE;
+    }
+    std::auto_ptr<IMemoryManager> memoryManager(mm);
     memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
-
+    memoryManager->setLogger(std::tr1::shared_ptr<IGCLogger>(new GCLogger("gc.log")));
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     smalltalkImage->loadImage(llstArgs.imagePath);
 

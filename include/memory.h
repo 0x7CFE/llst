@@ -37,10 +37,80 @@
 
 #include <cstddef>
 #include <stdint.h>
+#include <tr1/memory>
 #include <types.h>
 #include <vector>
 #include <list>
 #include <fstream>
+#include "Timer.h"
+
+
+
+struct TMemoryManagerHeapEvent {
+    const std::string eventName;
+    TDuration<TSec> timeDiff;
+    uint32_t usedHeapSizeBeforeCollect;
+    uint32_t usedHeapSizeAfterCollect;
+    uint32_t totalHeapSize;
+    TMemoryManagerHeapEvent() : eventName(), timeDiff(),
+    usedHeapSizeBeforeCollect(0), usedHeapSizeAfterCollect(0), totalHeapSize(0) {}
+    TMemoryManagerHeapEvent(std::string name) : eventName(name), timeDiff(),
+    usedHeapSizeBeforeCollect(0), usedHeapSizeAfterCollect(0), totalHeapSize(0) {}
+};
+
+struct TMemoryManagerHeapInfo {
+    uint32_t usedHeapSizeBeforeCollect;
+    uint32_t usedHeapSizeAfterCollect;
+    uint32_t totalHeapSize;
+    std::list<TMemoryManagerHeapEvent> heapEvents;
+    TMemoryManagerHeapInfo() :
+        usedHeapSizeBeforeCollect(0),
+        usedHeapSizeAfterCollect(0),
+        totalHeapSize(0),
+        heapEvents()
+        {}
+    bool empty() const {
+        return usedHeapSizeBeforeCollect == 0 &&
+                usedHeapSizeAfterCollect == 0 &&
+                totalHeapSize == 0 &&
+                heapEvents.empty();
+    }
+};
+
+//represent three kinds of events in garbage collection log:
+//just event, event which takes some time, event which interacting with a heap
+struct TMemoryManagerEvent {
+    const std::string eventName;
+    TDuration<TSec> begin; //time spent from program start to event begin
+    TDuration<TSec> timeDiff; //maybe null
+    TMemoryManagerHeapInfo heapInfo; //maybe empty
+    TMemoryManagerEvent(const std::string name): eventName(name), begin(), timeDiff(), heapInfo() {}
+};
+
+class IGCLogger {
+public:
+    virtual void writeLogLine(TMemoryManagerEvent event) = 0;
+    virtual ~IGCLogger() {};
+};
+
+class GCLogger : public IGCLogger {
+private:
+    std::ofstream m_logFile;
+public:
+    GCLogger(const char* fileName);
+    virtual ~GCLogger();
+    virtual void writeLogLine(TMemoryManagerEvent event);
+};
+
+class EmptyGCLogger : public IGCLogger
+{
+public:
+    EmptyGCLogger(){}
+    virtual void writeLogLine(TMemoryManagerEvent){}
+    virtual ~EmptyGCLogger() {}
+};
+
+
 
 
 // Memory manager statics is held
@@ -53,6 +123,11 @@ struct TMemoryManagerInfo {
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
     uint64_t rightCollectionDelay;
+    Timer timer;
+    std::list<TMemoryManagerEvent> events;
+    TMemoryManagerInfo():collectionsCount(0), allocationsCount(0), totalCollectionDelay(0),
+    leftToRightCollections(0), rightToLeftCollections(0), rightCollectionDelay(0),
+    timer(), events(){}
 };
 
 struct object_ptr {
@@ -69,7 +144,14 @@ private:
 // Custom implementations such as BakerMemoryManager
 // implement this interface.
 class IMemoryManager {
+protected:
+    std::tr1::shared_ptr<IGCLogger> m_gcLogger;
+    IMemoryManager(): m_gcLogger(new EmptyGCLogger()){}
 public:
+    virtual void setLogger(std::tr1::shared_ptr<IGCLogger> logger){
+        m_gcLogger = logger;
+    }
+
     virtual bool initializeHeap(std::size_t heapSize, std::size_t maxSize = 0) = 0;
     virtual bool initializeStaticHeap(std::size_t staticHeapSize) = 0;
 
@@ -194,10 +276,7 @@ public:
 class BakerMemoryManager : public IMemoryManager
 {
 protected:
-    uint32_t  m_collectionsCount;
-    uint32_t  m_allocationsCount;
-    uint64_t  m_totalCollectionDelay;
-
+    TMemoryManagerInfo m_memoryInfo;
     std::size_t m_heapSize;
     std::size_t m_maxHeapSize;
 
@@ -213,6 +292,7 @@ protected:
     std::size_t m_staticHeapSize;
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
+
 
     struct TRootPointers {
         uint32_t size;
@@ -272,7 +352,7 @@ public:
 
     // Returns amount of allocations that were done after last GC
     // May be used as a flag that GC had just took place
-    virtual uint32_t allocsBeyondCollection() { return m_allocationsCount; }
+    virtual uint32_t allocsBeyondCollection() { return m_memoryInfo.allocationsCount; }
 
     virtual TMemoryManagerInfo getStat();
 };
@@ -309,6 +389,9 @@ public:
 class NonCollectMemoryManager : public IMemoryManager
 {
 protected:
+    TMemoryManagerInfo m_memoryInfo;
+    std::auto_ptr<IGCLogger> m_gcLogger;
+
     size_t    m_heapSize;
     uint8_t*  m_heapBase;
     uint8_t*  m_heapPointer;
@@ -339,7 +422,7 @@ public:
     virtual void  releaseExternalHeapPointer(object_ptr& /*pointer*/) {}
     virtual bool  checkRoot(TObject* /*value*/, TObject** /*objectSlot*/) { return false; }
     virtual uint32_t allocsBeyondCollection() { return 0; }
-    virtual TMemoryManagerInfo getStat() { return TMemoryManagerInfo(); }
+    virtual TMemoryManagerInfo getStat();
 };
 
 class LLVMMemoryManager : public BakerMemoryManager {
@@ -440,3 +523,4 @@ public:
 };
 
 #endif
+
