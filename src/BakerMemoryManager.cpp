@@ -72,20 +72,20 @@ BakerMemoryManager::~BakerMemoryManager()
 //}
 
 void BakerMemoryManager::writeLogLine(TMemoryManagerEvent *event){
-    m_logFile << event->time.tv_sec << "." << event->time.tv_usec 
+    m_logFile << event->time.tv_sec << "." << event->time.tv_usec/1000
               << ": [" << event->eventName << ": ";
     if(event->heapInfo != NULL){
         TMemoryManagerHeapInfo *eh = event->heapInfo;
-        m_logFile << eh->usedHeapSizeBeforeCollect << "K -> "
+        m_logFile << eh->usedHeapSizeBeforeCollect << "K->"
                   << eh->usedHeapSizeAfterCollect << "K("
-                  << eh->totalHeapSize << "K) ";
+                  << eh->totalHeapSize << "K)";
         for(std::list<TMemoryManagerHeapEvent*>::iterator i = eh->heapEvents.begin(); i != eh->heapEvents.end(); i++){
             m_logFile << "[" << (*i)->eventName << ": "
-                      << (*i)->usedHeapSizeBeforeCollect << "K -> "
+                      << (*i)->usedHeapSizeBeforeCollect << "K->"
                       << (*i)->usedHeapSizeAfterCollect << "K("
-                      << (*i)->totalHeapSize << "K) ";
+                      << (*i)->totalHeapSize << "K)";
             if((*i)->timeDiff.tv_sec != 0 || (*i)->timeDiff.tv_usec != 0){
-                m_logFile << ", " << (*i)->timeDiff.tv_sec << "." << (*i)->timeDiff.tv_usec << " secs";
+                m_logFile << ", " << (*i)->timeDiff.tv_sec << "." << (*i)->timeDiff.tv_usec/1000 << " secs";
             }
             m_logFile << "] ";
         }
