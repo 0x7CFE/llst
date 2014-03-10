@@ -42,6 +42,31 @@
 #include <list>
 #include <fstream>
 
+struct TMemoryManagerHeapEvent{
+    const char* eventName;
+    //timeval time; //unusual value
+    timeval timeDiff;
+    uint32_t usedHeapSizeBeforeCollect;
+    uint32_t usedHeapSizeAfterCollect;
+    uint32_t totalHeapSize;
+};
+
+struct TMemoryManagerHeapInfo{
+    uint32_t usedHeapSizeBeforeCollect;
+    uint32_t usedHeapSizeAfterCollect;
+    uint32_t totalHeapSize;
+    std::list<TMemoryManagerHeapEvent*> heapEvents;
+};
+
+//represent three kinds of events in garbage collection log:
+//just event, event which takes some time, event which interacting with a heap
+struct TMemoryManagerEvent{
+    const char* eventName;
+    timeval time;
+    timeval timeDiff; //maybe null
+    TMemoryManagerHeapInfo* heapInfo; //maybe null
+};
+
 
 // Memory manager statics is held
 // in the following structure
@@ -53,6 +78,8 @@ struct TMemoryManagerInfo {
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
     uint64_t rightCollectionDelay;
+    timeval timeBegin;
+    std::list<TMemoryManagerEvent*> events;
 };
 
 struct object_ptr {
@@ -213,6 +240,11 @@ protected:
     std::size_t m_staticHeapSize;
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
+
+    //FIXME delete from memory meneger. initize somewhere else 
+    std::fstream       m_logFile;
+    TMemoryManagerInfo m_memoryInfo;
+    void writeLogLine(TMemoryManagerEvent *event);
 
     struct TRootPointers {
         uint32_t size;
@@ -440,3 +472,4 @@ public:
 };
 
 #endif
+

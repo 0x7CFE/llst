@@ -52,15 +52,48 @@ BakerMemoryManager::BakerMemoryManager() :
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
     m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
+    // TODO set everything in m_memoryInfo to 0
+    gettimeofday(&(m_memoryInfo.timeBegin), NULL);
+    m_logFile.open("gc.log", std::fstream::out);
     // Nothing to be done here
 }
 
 BakerMemoryManager::~BakerMemoryManager()
 {
     // TODO Reset the external pointers to catch the null pointers if something goes wrong
+    m_logFile.close();
     std::free(m_staticHeapBase);
     std::free(m_heapOne);
     std::free(m_heapTwo);
+}
+
+//void BakerMemoryManager::writeLogEnd(TMemoryManagerEvent *event){
+//
+//}
+
+void BakerMemoryManager::writeLogLine(TMemoryManagerEvent *event){
+    m_logFile << event->time.tv_sec << "." << event->time.tv_usec 
+              << ": [" << event->eventName << ": ";
+    if(event->heapInfo != NULL){
+        TMemoryManagerHeapInfo *eh = event->heapInfo;
+        m_logFile << eh->usedHeapSizeBeforeCollect << "K -> "
+                  << eh->usedHeapSizeAfterCollect << "K("
+                  << eh->totalHeapSize << "K) ";
+        for(std::list<TMemoryManagerHeapEvent*>::iterator i = eh->heapEvents.begin(); i != eh->heapEvents.end(); i++){
+            m_logFile << "[" << (*i)->eventName << ": "
+                      << (*i)->usedHeapSizeBeforeCollect << "K -> "
+                      << (*i)->usedHeapSizeAfterCollect << "K("
+                      << (*i)->totalHeapSize << "K) ";
+            if((*i)->timeDiff.tv_sec != 0 || (*i)->timeDiff.tv_usec != 0){
+                m_logFile << ", " << (*i)->timeDiff.tv_sec << "." << (*i)->timeDiff.tv_usec << " secs";
+            }
+            m_logFile << "] ";
+        }
+    }
+    if(event->timeDiff.tv_sec != 0 || event->timeDiff.tv_usec != 0){
+        m_logFile << ", " << event->timeDiff.tv_sec << "." << event->timeDiff.tv_usec << " secs";
+    }
+    m_logFile << "]\n";
 }
 
 bool BakerMemoryManager::initializeStaticHeap(std::size_t heapSize)
@@ -379,10 +412,21 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
     }
 }
 
+
 void BakerMemoryManager::collectGarbage()
 {
+    //get statistic before collect
     m_collectionsCount++;
-
+    TMemoryManagerEvent* event = new TMemoryManagerEvent();
+    event->eventName = "GC";
+    gettimeofday(&(event->time), NULL);
+    long tempTimeDiff = (event->time.tv_sec - m_memoryInfo.timeBegin.tv_sec)*1000000
+                      + event->time.tv_usec - m_memoryInfo.timeBegin.tv_usec;
+    event->time.tv_sec = tempTimeDiff / 1000000;
+    event->time.tv_usec = tempTimeDiff - event->time.tv_sec * 1000000;
+    event->heapInfo = new TMemoryManagerHeapInfo;
+    event->heapInfo->usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event->heapInfo->totalHeapSize = m_heapSize/1024;
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
@@ -417,6 +461,11 @@ void BakerMemoryManager::collectGarbage()
 
     // Calculating total microseconds spent in the garbage collection procedure
     m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+    event->heapInfo->usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event->timeDiff.tv_sec = m_totalCollectionDelay/1000000;
+    event->timeDiff.tv_usec = m_totalCollectionDelay - event->timeDiff.tv_sec*1000000;
+    m_memoryInfo.events.push_front(event);
+    writeLogLine(event);
 }
 
 void BakerMemoryManager::moveObjects()
@@ -529,11 +578,13 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
 
 TMemoryManagerInfo BakerMemoryManager::getStat()
 {
-    TMemoryManagerInfo info;
-    std::memset(&info, 0, sizeof(info));
-
-    info.allocationsCount     = m_allocationsCount;
-    info.collectionsCount     = m_collectionsCount;
-    info.totalCollectionDelay = m_totalCollectionDelay;
-    return info;
+    //FIXME collect statistic
+    m_memoryInfo.leftToRightCollections = 0;
+    m_memoryInfo.rightToLeftCollections = 0;
+    m_memoryInfo.rightCollectionDelay   = 0;
+    m_memoryInfo.allocationsCount       = m_allocationsCount;
+    m_memoryInfo.collectionsCount       = m_collectionsCount;
+    m_memoryInfo.totalCollectionDelay   = m_totalCollectionDelay;
+    return m_memoryInfo;
 }
+
