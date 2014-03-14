@@ -42,6 +42,17 @@
 #include <list>
 #include <fstream>
 
+
+class Timer{
+private:
+    timeval timeCreate;
+public:
+    Timer();
+    ~Timer(){}
+    timeval getTimeLost();
+    long getTimeLostms();
+};
+
 struct TMemoryManagerHeapEvent{
     const char* eventName;
     //timeval time; //unusual value
@@ -55,7 +66,7 @@ struct TMemoryManagerHeapInfo{
     uint32_t usedHeapSizeBeforeCollect;
     uint32_t usedHeapSizeAfterCollect;
     uint32_t totalHeapSize;
-    std::list<TMemoryManagerHeapEvent*> heapEvents;
+    std::list<TMemoryManagerHeapEvent> heapEvents;
 };
 
 //represent three kinds of events in garbage collection log:
@@ -78,8 +89,8 @@ struct TMemoryManagerInfo {
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
     uint64_t rightCollectionDelay;
-    timeval timeBegin;
-    std::list<TMemoryManagerEvent*> events;
+    Timer timer;
+    std::list<TMemoryManagerEvent> events;
 };
 
 struct object_ptr {
@@ -91,6 +102,7 @@ struct object_ptr {
 private:
     object_ptr(const object_ptr& value);
 };
+
 
 // Generic interface to a memory manager.
 // Custom implementations such as BakerMemoryManager
@@ -244,7 +256,7 @@ protected:
     //FIXME delete from memory meneger. initize somewhere else 
     std::fstream       m_logFile;
     TMemoryManagerInfo m_memoryInfo;
-    void writeLogLine(TMemoryManagerEvent *event);
+    void writeLogLine(TMemoryManagerEvent event);
 
     struct TRootPointers {
         uint32_t size;
