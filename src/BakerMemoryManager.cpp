@@ -37,6 +37,24 @@
 #include <cstdlib>
 #include <sys/time.h>
 
+Timer::Timer(){
+    gettimeofday(&timeCreate, NULL);
+}
+
+long Timer::getTimeLostms(){
+    timeval current;
+    gettimeofday(&current, NULL);
+    return (current.tv_sec - timeCreate.tv_sec) * 1000000 + (current.tv_usec - timeCreate.tv_usec);
+}
+
+timeval Timer::getTimeLost(){
+    timeval diff;
+    long msdiff = getTimeLostms();
+    diff.tv_sec = msdiff/1000000;
+    diff.tv_usec = msdiff - diff.tv_sec*1000000;
+    return diff;
+}
+
 BakerMemoryManager::BakerMemoryManager() :
     m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),
     m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
@@ -45,7 +63,7 @@ BakerMemoryManager::BakerMemoryManager() :
     m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
     // TODO set everything in m_memoryInfo to 0
-    gettimeofday(&(m_memoryInfo.timeBegin), NULL);
+
     m_logFile.open("gc.log", std::fstream::out);
     // Nothing to be done here
 }
@@ -63,27 +81,27 @@ BakerMemoryManager::~BakerMemoryManager()
 //
 //}
 
-void BakerMemoryManager::writeLogLine(TMemoryManagerEvent *event){
-    m_logFile << event->time.tv_sec << "." << event->time.tv_usec/1000
-              << ": [" << event->eventName << ": ";
-    if(event->heapInfo != NULL){
-        TMemoryManagerHeapInfo *eh = event->heapInfo;
+void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
+    m_logFile << event.time.tv_sec << "." << event.time.tv_usec/1000
+              << ": [" << event.eventName << ": ";
+    if(event.heapInfo != NULL){
+        TMemoryManagerHeapInfo *eh = event.heapInfo;
         m_logFile << eh->usedHeapSizeBeforeCollect << "K->"
                   << eh->usedHeapSizeAfterCollect << "K("
                   << eh->totalHeapSize << "K)";
-        for(std::list<TMemoryManagerHeapEvent*>::iterator i = eh->heapEvents.begin(); i != eh->heapEvents.end(); i++){
-            m_logFile << "[" << (*i)->eventName << ": "
-                      << (*i)->usedHeapSizeBeforeCollect << "K->"
-                      << (*i)->usedHeapSizeAfterCollect << "K("
-                      << (*i)->totalHeapSize << "K)";
-            if((*i)->timeDiff.tv_sec != 0 || (*i)->timeDiff.tv_usec != 0){
-                m_logFile << ", " << (*i)->timeDiff.tv_sec << "." << (*i)->timeDiff.tv_usec/1000 << " secs";
+        for(std::list<TMemoryManagerHeapEvent>::iterator i = eh->heapEvents.begin(); i != eh->heapEvents.end(); i++){
+            m_logFile << "[" << i->eventName << ": "
+                      << i->usedHeapSizeBeforeCollect << "K->"
+                      << i->usedHeapSizeAfterCollect << "K("
+                      << i->totalHeapSize << "K)";
+            if(i->timeDiff.tv_sec != 0 || i->timeDiff.tv_usec != 0){
+                m_logFile << ", " << i->timeDiff.tv_sec << "." << i->timeDiff.tv_usec/1000 << " secs";
             }
             m_logFile << "] ";
         }
     }
-    if(event->timeDiff.tv_sec != 0 || event->timeDiff.tv_usec != 0){
-        m_logFile << ", " << event->timeDiff.tv_sec << "." << event->timeDiff.tv_usec << " secs";
+    if(event.timeDiff.tv_sec != 0 || event.timeDiff.tv_usec != 0){
+        m_logFile << ", " << event.timeDiff.tv_sec << "." << event.timeDiff.tv_usec << " secs";
     }
     m_logFile << "]\n";
 }
@@ -388,16 +406,12 @@ void BakerMemoryManager::collectGarbage()
 {
     //get statistic before collect
     m_collectionsCount++;
-    TMemoryManagerEvent* event = new TMemoryManagerEvent();
-    event->eventName = "GC";
-    gettimeofday(&(event->time), NULL);
-    long tempTimeDiff = (event->time.tv_sec - m_memoryInfo.timeBegin.tv_sec)*1000000
-                      + event->time.tv_usec - m_memoryInfo.timeBegin.tv_usec;
-    event->time.tv_sec = tempTimeDiff / 1000000;
-    event->time.tv_usec = tempTimeDiff - event->time.tv_sec * 1000000;
-    event->heapInfo = new TMemoryManagerHeapInfo;
-    event->heapInfo->usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
-    event->heapInfo->totalHeapSize = m_heapSize/1024;
+    TMemoryManagerEvent event;
+    event.eventName = "GC";
+    event.time = m_memoryInfo.timer.getTimeLost();
+    event.heapInfo = new TMemoryManagerHeapInfo;
+    event.heapInfo->usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event.heapInfo->totalHeapSize = m_heapSize/1024;
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
@@ -417,24 +431,18 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects.
     // Then moving them to the new active heap.
 
-    // Storing timestamp on start
-    timeval tv1;
-    gettimeofday(&tv1, NULL);
+    Timer collectTimer;
 
     // Moving the live objects in the new heap
     moveObjects();
 
-    // Storing timestamp of the end
-    timeval tv2;
-    gettimeofday(&tv2, NULL);
 
     std::memset(m_inactiveHeapBase, 0, m_heapSize / 2);
 
     // Calculating total microseconds spent in the garbage collection procedure
-    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
-    event->heapInfo->usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
-    event->timeDiff.tv_sec = m_totalCollectionDelay/1000000;
-    event->timeDiff.tv_usec = m_totalCollectionDelay - event->timeDiff.tv_sec*1000000;
+    m_totalCollectionDelay += collectTimer.getTimeLostms();
+    event.heapInfo->usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event.timeDiff = collectTimer.getTimeLost();
     m_memoryInfo.events.push_front(event);
     writeLogLine(event);
 }
