@@ -66,6 +66,8 @@ set(CPP_FILES
     src/TInstruction.cpp
     src/TSymbol.cpp
     src/vm.cpp
+
+    src/TSmalltalkInstruction.cpp
 )
 
 if (LLVM)
