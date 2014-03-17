@@ -68,6 +68,7 @@ set(CPP_FILES
     src/vm.cpp
 
     src/TSmalltalkInstruction.cpp
+    src/ParsedMethod.cpp
 )
 
 if (LLVM)
