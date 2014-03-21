@@ -617,7 +617,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 
             case opcode::pushLiteral:       doPushLiteral(jit);     break;
             case opcode::pushConstant:      doPushConstant(jit);    break;
 
-            case opcode::pushBlock:         doPushBlock(currentOffset, jit); break;
+            case opcode::pushBlock:         doPushBlock(jit); break;
 
             case opcode::assignTemporary:   doAssignTemporary(jit); break;
             case opcode::assignInstance:    doAssignInstance(jit);  break;
@@ -737,7 +737,7 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
     jit.pushValue(constantValue);
 }
 
-void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
+void MethodCompiler::doPushBlock(TJITContext& jit)
 {
     TByteObject& byteCodes = * jit.method->byteCodes;
     uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
