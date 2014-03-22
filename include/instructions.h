@@ -138,6 +138,50 @@ private:
     TOffsetToBasicBlockMap m_offsetToBasicBlock;
 };
 
+class BasicBlockVisitor {
+public:
+    BasicBlockVisitor(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod) { }
+    virtual ~BasicBlockVisitor() { }
+
+    virtual bool visitBlock(BasicBlock& basicBlock) { return true; }
+
+    void run() {
+        ParsedMethod::iterator iBlock = m_parsedMethod->begin();
+        const ParsedMethod::iterator iEnd = m_parsedMethod->end();
+
+        while (iBlock != iEnd) {
+            if (! visitBlock(** iBlock))
+                break;
+
+            ++iBlock;
+        }
+    }
+
+private:
+    ParsedMethod* m_parsedMethod;
+};
+
+class InstructionVisitor : public BasicBlockVisitor {
+public:
+    InstructionVisitor(ParsedMethod* parsedMethod) : BasicBlockVisitor(parsedMethod) { }
+    virtual bool visitInstruction(const TSmalltalkInstruction& instruction) { return true; }
+
+protected:
+    virtual bool visitBlock(BasicBlock& basicBlock) {
+        BasicBlock::iterator iInstruction = basicBlock.begin();
+        const BasicBlock::iterator iEnd   = basicBlock.end();
+
+        while (iInstruction != iEnd) {
+            if (! visitInstruction(* iInstruction))
+                return false;
+
+            ++iInstruction;
+        }
+
+        return true;
+    }
+};
+
 } // namespace st
 
 #endif
