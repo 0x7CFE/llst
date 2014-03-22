@@ -101,7 +101,11 @@ public:
         return newBlock;
     }
 
+    uint16_t getOffset() const { return m_offset; }
+
+    BasicBlock(uint16_t blockOffset = 0) : m_offset(blockOffset) { }
 private:
+    uint16_t m_offset;
     TInstructionVector m_instructions;
 };
 
@@ -112,8 +116,8 @@ public:
     iterator begin() { return m_basicBlocks.begin(); }
     iterator end() { return m_basicBlocks.end(); }
 
-    BasicBlock* createBasicBlock() {
-        m_basicBlocks.push_back(new BasicBlock);
+    BasicBlock* createBasicBlock(uint16_t blockOffset = 0) {
+        m_basicBlocks.push_back(new BasicBlock(blockOffset));
         return m_basicBlocks.back();
     }
 

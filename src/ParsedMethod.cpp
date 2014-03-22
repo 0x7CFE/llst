@@ -38,7 +38,7 @@ void ParsedMethod::parse(TMethod* method) {
                 if (m_offsetToBasicBlock.find(targetOffset) == m_offsetToBasicBlock.end()) {
                     // Creating the referred basic block and inserting it into the function
                     // Later it will be filled with instructions and linked to other blocks
-                    BasicBlock* targetBasicBlock = createBasicBlock();
+                    BasicBlock* targetBasicBlock = createBasicBlock(bytePointer);
                     m_offsetToBasicBlock[targetOffset] = targetBasicBlock;
                 }
             } break;
@@ -50,7 +50,7 @@ void ParsedMethod::parse(TMethod* method) {
 
     // If no branch site points to 0 offset then we create block ourselves
     if (! currentBasicBlock) {
-        m_offsetToBasicBlock[0] = currentBasicBlock = new BasicBlock;
+        m_offsetToBasicBlock[0] = currentBasicBlock = new BasicBlock(0);
 
         // Pushing block from the beginning to comply it's position
         m_basicBlocks.push_front(currentBasicBlock);
