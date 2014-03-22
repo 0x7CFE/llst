@@ -66,6 +66,10 @@ public:
     iterator begin() { return iterator(m_instructions.begin()); }
     iterator end() { return iterator(m_instructions.end()); }
 
+    const TSmalltalkInstruction operator[](const std::size_t index) const {
+        return TSmalltalkInstruction(m_instructions[index]);
+    }
+
     // Append instruction to the end of basic block
     void append(TSmalltalkInstruction instruction) {
         m_instructions.push_back(instruction.serialize());
