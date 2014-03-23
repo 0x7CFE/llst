@@ -136,6 +136,14 @@ public:
     // Returns actual method object which was parsed
     TMethod* getOrigin() const { return m_origin; }
 
+    BasicBlock* getBasicBlockByOffset(uint16_t offset) {
+        TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(offset);
+        if (iBlock != m_offsetToBasicBlock.end())
+            return iBlock->second;
+        else
+            return 0;
+    }
+
 protected:
     ParsedBytecode(TMethod* method) : m_origin(method) { }
     void parse(uint16_t startOffset = 0, uint16_t stopOffset = 0);
@@ -156,19 +164,38 @@ class ParsedMethod : public ParsedBytecode {
     friend class ParsedBlock; // for addParsedBlock()
 
 public:
+    typedef std::list<ParsedBlock*> TParsedBlockList;
+
     ParsedMethod(TMethod* method) : ParsedBytecode(method) {
         assert(method);
         parse();
+    }
+
+    virtual ~ParsedMethod();
+
+    typedef TParsedBlockList::iterator block_iterator;
+    block_iterator blockBegin() { return m_parsedBlocks.begin(); }
+    block_iterator blockEnd() { return m_parsedBlocks.end(); }
+
+    ParsedBlock* getParsedBlockByOffset(uint16_t startOffset) {
+        TOffsetToParsedBlockMap::iterator iBlock = m_offsetToParsedBlock.find(startOffset);
+        if (iBlock != m_offsetToParsedBlock.end())
+            return iBlock->second;
+        else
+            return 0;
     }
 
 protected:
     virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
 
     void addParsedBlock(uint16_t offset, ParsedBlock* parsedBlock) {
+        m_parsedBlocks.push_back(parsedBlock);
         m_offsetToParsedBlock[offset] = parsedBlock;
     }
 
 protected:
+    TParsedBlockList m_parsedBlocks;
+
     typedef std::map<uint16_t, ParsedBlock*> TOffsetToParsedBlockMap;
     TOffsetToParsedBlockMap m_offsetToParsedBlock;
 };
@@ -219,7 +246,7 @@ public:
         }
     }
 
-private:
+protected:
     ParsedBytecode* m_parsedBytecode;
 };
 

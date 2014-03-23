@@ -8,3 +8,11 @@ void ParsedMethod::parseBlock(uint16_t startOffset, uint16_t stopOffset) {
     ParsedBlock* parsedBlock = new ParsedBlock(this, startOffset, stopOffset);
     m_offsetToParsedBlock[startOffset] = parsedBlock;
 }
+
+ParsedMethod::~ParsedMethod() {
+    for (TParsedBlockList::iterator iBlock = m_parsedBlocks.begin(),
+        end = m_parsedBlocks.end(); iBlock != end; ++iBlock)
+    {
+        delete * iBlock;
+    }
+}
