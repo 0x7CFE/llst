@@ -271,6 +271,30 @@ protected:
     }
 };
 
+class ParsedBlockVisitor {
+public:
+    ParsedBlockVisitor(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod) { }
+    virtual ~ParsedBlockVisitor() { }
+
+    void run() {
+        ParsedMethod::block_iterator iBlock = m_parsedMethod->blockBegin();
+        const ParsedMethod::block_iterator iEnd = m_parsedMethod->blockEnd();
+
+        while (iBlock != iEnd) {
+            if (! visitBlock(** iBlock))
+                break;
+
+            ++iBlock;
+        }
+    }
+
+protected:
+    virtual bool visitBlock(ParsedBlock& parsedBlock) { return true; }
+
+private:
+    ParsedMethod* m_parsedMethod;
+};
+
 } // namespace st
 
 #endif
