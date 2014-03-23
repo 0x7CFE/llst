@@ -2,14 +2,20 @@
 
 using namespace st;
 
-void ParsedMethod::parse(TMethod* method) {
-    assert(method);
-    assert(method->byteCodes);
+void ParsedMethod::parseBlock(uint16_t startOffset, uint16_t stopOffset) {
+    // Following instruction belong to the nested code block
+    // ParsedBlock will decode all of it's instructions and nested blocks
+    ParsedBlock* parsedBlock = new ParsedBlock(this, startOffset, stopOffset);
+    m_offsetToParsedBlock[startOffset] = parsedBlock;
+}
 
-    uint16_t bytePointer = 0;
+void ParsedMethod::parse(uint16_t startOffset, uint16_t stopOffset) {
+    assert(m_origin && m_origin->byteCodes);
 
-    TByteObject&   byteCodes   = * method->byteCodes;
-    const uint16_t stopPointer = byteCodes.getSize();
+    uint16_t bytePointer = startOffset;
+
+    TByteObject&   byteCodes   = * m_origin->byteCodes;
+    const uint16_t stopPointer = stopOffset ? stopOffset : byteCodes.getSize();
 
     // Scaning the method's bytecodes for branch sites and collecting branch targets.
     // Creating target basic blocks beforehand and collecting them in a map.
@@ -18,9 +24,19 @@ void ParsedMethod::parse(TMethod* method) {
         TSmalltalkInstruction instruction(byteCodes, bytePointer);
 
         if (instruction.getOpcode() == opcode::pushBlock) {
+            // Preserving the start block's offset
+            const uint16_t startOffset = bytePointer;
+            // Extra holds the bytecode offset right after the block
+            const uint16_t stopOffset  = instruction.getExtra();
+
+            // Parsing block. This operation depends on
+            // whether we're in a method or in a block.
+            // Nested blocks are registered in the
+            // container method, not the outer block.
+            parseBlock(startOffset, stopOffset);
+
             // Skipping the nested block's bytecodes
-            // Extra holds the new bytecode offset
-            bytePointer = instruction.getExtra();
+            bytePointer = stopOffset;
             continue;
         }
 
@@ -46,11 +62,11 @@ void ParsedMethod::parse(TMethod* method) {
     }
 
     // Populating previously created basic blocks with actual instructions
-    BasicBlock* currentBasicBlock = m_offsetToBasicBlock[0];
+    BasicBlock* currentBasicBlock = m_offsetToBasicBlock[startOffset];
 
-    // If no branch site points to 0 offset then we create block ourselves
+    // If no branch site points to start offset then we create block ourselves
     if (! currentBasicBlock) {
-        m_offsetToBasicBlock[0] = currentBasicBlock = new BasicBlock(0);
+        m_offsetToBasicBlock[startOffset] = currentBasicBlock = new BasicBlock(startOffset);
 
         // Pushing block from the beginning to comply it's position
         m_basicBlocks.push_front(currentBasicBlock);

@@ -101,6 +101,7 @@ public:
         return newBlock;
     }
 
+    // Offset of first instruction of this basic block within the method's bytecodes
     uint16_t getOffset() const { return m_offset; }
 
     BasicBlock(uint16_t blockOffset = 0) : m_offset(blockOffset) { }
@@ -109,7 +110,9 @@ private:
     TInstructionVector m_instructions;
 };
 
+class ParsedBlock;
 class ParsedMethod {
+    friend class ParsedBlock;
 public:
     typedef std::list<BasicBlock*> TBasicBlockList;
     typedef TBasicBlockList::iterator iterator;
@@ -121,8 +124,13 @@ public:
         return m_basicBlocks.back();
     }
 
-    ParsedMethod(TMethod* method);
     ParsedMethod() {}
+    ParsedMethod(TMethod* method) : m_origin(method) {
+        assert(method);
+        parse();
+    }
+
+    TMethod* getOrigin() const { return m_origin; }
 
     ~ParsedMethod() {
         for (TBasicBlockList::iterator iBlock = m_basicBlocks.begin(),
@@ -132,14 +140,55 @@ public:
         }
     }
 
-private:
-    void parse(TMethod* method);
+protected:
+    // Protected constructor for ParsedBlock
+    ParsedMethod(TMethod* method, bool parseBytecodes = true)
+        : m_origin(method)
+    {
+        assert(method);
+        if (parseBytecodes)
+            parse();
+    }
 
-private:
+    void parse(uint16_t startOffset = 0, uint16_t stopOffset = 0);
+    virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
+    void addParsedBlock(uint16_t offset, ParsedBlock* parsedBlock) {
+        m_offsetToParsedBlock[offset] = parsedBlock;
+    }
+
+    TMethod* m_origin;
     TBasicBlockList m_basicBlocks;
 
     typedef std::map<uint16_t, BasicBlock*> TOffsetToBasicBlockMap;
     TOffsetToBasicBlockMap m_offsetToBasicBlock;
+
+    typedef std::map<uint16_t, ParsedBlock*> TOffsetToParsedBlockMap;
+    TOffsetToParsedBlockMap m_offsetToParsedBlock;
+};
+
+class ParsedBlock : public ParsedMethod {
+public:
+    ParsedBlock(ParsedMethod* parsedMethod, uint16_t startOffset, uint16_t stopOffset)
+        : ParsedMethod(parsedMethod->getOrigin(), false), m_startOffset(startOffset), m_stopOffset(stopOffset)
+    {
+        parse(startOffset, stopOffset);
+    }
+
+    // Parsed method encapsulating the block's bytecodes
+    ParsedMethod* getContainer() const { return m_containerMethod; }
+
+    // First instruction offset within method's bytecodes
+    uint16_t getStartOffset() const { return m_startOffset; }
+
+    // Instruction offset after the last block's instruction
+    uint16_t getStopOffset() const { return m_stopOffset; }
+
+protected:
+    virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
+
+    ParsedMethod* m_containerMethod;
+    uint16_t m_startOffset;
+    uint16_t m_stopOffset;
 };
 
 class BasicBlockVisitor {
