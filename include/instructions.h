@@ -110,9 +110,10 @@ private:
     TInstructionVector m_instructions;
 };
 
-class ParsedBlock;
-class ParsedMethod {
-    friend class ParsedBlock;
+// This is a base class for ParsedMethod and ParsedBlock
+// Provides common interface for iterating basic blocks and
+// instructions which is used by corresponding visitors
+class ParsedBytecode {
 public:
     typedef std::list<BasicBlock*> TBasicBlockList;
     typedef TBasicBlockList::iterator iterator;
@@ -124,15 +125,7 @@ public:
         return m_basicBlocks.back();
     }
 
-    ParsedMethod() {}
-    ParsedMethod(TMethod* method) : m_origin(method) {
-        assert(method);
-        parse();
-    }
-
-    TMethod* getOrigin() const { return m_origin; }
-
-    ~ParsedMethod() {
+    virtual ~ParsedBytecode() {
         for (TBasicBlockList::iterator iBlock = m_basicBlocks.begin(),
             end = m_basicBlocks.end(); iBlock != end; ++iBlock)
         {
@@ -140,36 +133,51 @@ public:
         }
     }
 
+    // Returns actual method object which was parsed
+    TMethod* getOrigin() const { return m_origin; }
+
 protected:
-    // Protected constructor for ParsedBlock
-    ParsedMethod(TMethod* method, bool parseBytecodes = true)
-        : m_origin(method)
-    {
-        assert(method);
-        if (parseBytecodes)
-            parse();
-    }
-
+    ParsedBytecode(TMethod* method) : m_origin(method) { }
     void parse(uint16_t startOffset = 0, uint16_t stopOffset = 0);
-    virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
-    void addParsedBlock(uint16_t offset, ParsedBlock* parsedBlock) {
-        m_offsetToParsedBlock[offset] = parsedBlock;
-    }
 
+    // Descendants should override this method to provide block handling
+    virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset) = 0;
+
+protected:
     TMethod* m_origin;
     TBasicBlockList m_basicBlocks;
 
     typedef std::map<uint16_t, BasicBlock*> TOffsetToBasicBlockMap;
     TOffsetToBasicBlockMap m_offsetToBasicBlock;
+};
 
+class ParsedBlock;
+class ParsedMethod : public ParsedBytecode {
+    friend class ParsedBlock; // for addParsedBlock()
+
+public:
+    ParsedMethod(TMethod* method) : ParsedBytecode(method) {
+        assert(method);
+        parse();
+    }
+
+protected:
+    virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
+
+    void addParsedBlock(uint16_t offset, ParsedBlock* parsedBlock) {
+        m_offsetToParsedBlock[offset] = parsedBlock;
+    }
+
+protected:
     typedef std::map<uint16_t, ParsedBlock*> TOffsetToParsedBlockMap;
     TOffsetToParsedBlockMap m_offsetToParsedBlock;
 };
 
-class ParsedBlock : public ParsedMethod {
+class ParsedBlock : public ParsedBytecode {
 public:
     ParsedBlock(ParsedMethod* parsedMethod, uint16_t startOffset, uint16_t stopOffset)
-        : ParsedMethod(parsedMethod->getOrigin(), false), m_startOffset(startOffset), m_stopOffset(stopOffset)
+        : ParsedBytecode(parsedMethod->getOrigin()), m_containerMethod(parsedMethod),
+          m_startOffset(startOffset), m_stopOffset(stopOffset)
     {
         parse(startOffset, stopOffset);
     }
@@ -186,6 +194,7 @@ public:
 protected:
     virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
 
+protected:
     ParsedMethod* m_containerMethod;
     uint16_t m_startOffset;
     uint16_t m_stopOffset;
@@ -193,14 +202,14 @@ protected:
 
 class BasicBlockVisitor {
 public:
-    BasicBlockVisitor(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod) { }
+    BasicBlockVisitor(ParsedBytecode* parsedBytecode) : m_parsedBytecode(parsedBytecode) { }
     virtual ~BasicBlockVisitor() { }
 
     virtual bool visitBlock(BasicBlock& basicBlock) { return true; }
 
     void run() {
-        ParsedMethod::iterator iBlock = m_parsedMethod->begin();
-        const ParsedMethod::iterator iEnd = m_parsedMethod->end();
+        ParsedBytecode::iterator iBlock = m_parsedBytecode->begin();
+        const ParsedBytecode::iterator iEnd = m_parsedBytecode->end();
 
         while (iBlock != iEnd) {
             if (! visitBlock(** iBlock))
@@ -211,12 +220,12 @@ public:
     }
 
 private:
-    ParsedMethod* m_parsedMethod;
+    ParsedBytecode* m_parsedBytecode;
 };
 
 class InstructionVisitor : public BasicBlockVisitor {
 public:
-    InstructionVisitor(ParsedMethod* parsedMethod) : BasicBlockVisitor(parsedMethod) { }
+    InstructionVisitor(ParsedBytecode* parsedBytecode) : BasicBlockVisitor(parsedBytecode) { }
     virtual bool visitInstruction(const TSmalltalkInstruction& instruction) { return true; }
 
 protected:
