@@ -29,10 +29,6 @@ struct TSmalltalkInstruction {
         m_extra    = static_cast<TExtra>((bytecode >> 16) & 0xFF);
     }
 
-    // Decode instruction from method bytecode
-    // Shifts bytePointer to the next instruction
-    TSmalltalkInstruction(const TByteObject& byteCodes, uint16_t& bytePointer);
-
     TOpcode getOpcode() const { return m_opcode; }
     TArgument getArgument() const { return m_argument; }
     TExtra getExtra() const { return m_extra; }

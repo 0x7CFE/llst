@@ -67,7 +67,6 @@ set(CPP_FILES
     src/TSymbol.cpp
     src/vm.cpp
 
-    src/TSmalltalkInstruction.cpp
     src/InstructionDecoder.cpp
     src/ParsedMethod.cpp
     src/ParsedBytecode.cpp
