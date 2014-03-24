@@ -37,6 +37,14 @@
 #include <cstdlib>
 #include <sys/time.h>
 
+#include <cassert>
+bool is_aligned_properly(void *p) {
+    return uint32_t(p) % sizeof(void*) == 0;
+}
+bool is_aligned_properly(uint32_t x) {
+    return x % sizeof(void*) == 0;
+}
+
 BakerMemoryManager::BakerMemoryManager() :
     m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),
     m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
@@ -103,6 +111,8 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
 {
     // Stage1. Growing inactive heap
     uint32_t newHeapSize = correctPadding(requestedSize + m_heapSize + m_heapSize / 2);
+    while( !is_aligned_properly(newHeapSize/2) )
+        newHeapSize = correctPadding(newHeapSize+1);
 
     std::printf("MM: Growing heap to %d\n", newHeapSize);
 
@@ -146,6 +156,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
 
 void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
+    assert(requestedSize == correctPadding(requestedSize));
     if (gcOccured)
         *gcOccured = false;
 
@@ -167,6 +178,7 @@ void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*
 
         m_activeHeapPointer -= requestedSize;
         void* result = m_activeHeapPointer;
+        assert( is_aligned_properly(result) );
 
         if (gcOccured && !*gcOccured)
             m_allocationsCount++;
