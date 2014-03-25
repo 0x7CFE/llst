@@ -220,6 +220,8 @@ public:
     // This structure contains working data which is
     // used during the compilation process.
     struct TJITContext {
+        st::ParsedMethod    parsedMethod; // Parsed smalltalk method we're currently processing
+
         TMethod*            method;       // Smalltalk method we're currently processing
         uint32_t            bytePointer;
 
@@ -251,7 +253,7 @@ public:
         void pushValue(TStackValue* value);
 
         TJITContext(MethodCompiler* compiler, TMethod* method)
-            : method(method), bytePointer(0), function(0), builder(0),
+            : parsedMethod(method), method(method), bytePointer(0), function(0), builder(0),
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
