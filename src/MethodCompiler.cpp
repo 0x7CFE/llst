@@ -379,64 +379,31 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 
 void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*/)
 {
-    // First analyzing pass. Scans the bytecode for the branch sites and
-    // collects branch targets. Creates target basic blocks beforehand.
-    // Target blocks are collected in the m_targetToBlockMap map with
-    // target bytecode offset as a key.
+    // Iterating over method's basic blocks and creating their representation in LLVM
+    // Created blocks are collected in the m_targetToBlockMap map with bytecode offset as a key
 
-    uint32_t previousBytePointer = jit.bytePointer;
+    class Visitor : public st::BasicBlockVisitor {
+    public:
+        Visitor(TJITContext& jit) : BasicBlockVisitor(&jit.parsedMethod), m_jit(jit) { }
 
-    TByteObject& byteCodes   = * jit.method->byteCodes;
-    uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
+    private:
+        virtual bool visitBlock(st::BasicBlock& basicBlock) {
+            MethodCompiler* compiler = m_jit.compiler; // self reference
+            llvm::BasicBlock* newBlock = llvm::BasicBlock::Create(
+                compiler->m_JITModule->getContext(),   // creating context
+                "branch.",                             // new block's name
+                m_jit.function                         // method's function
+            );
 
-    // Processing the method's bytecodes
-    while (jit.bytePointer < stopPointer) {
-        // Decoding the pending instruction (TODO move to a function)
-        TInstruction instruction;
-        instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
-        instruction.high >>= 4;
-        if (instruction.high == opcode::extended) {
-            instruction.high = instruction.low;
-            instruction.low  = byteCodes[jit.bytePointer++];
+            compiler->m_targetToBlockMap[basicBlock.getOffset()] = newBlock;
+            return true;
         }
 
-        if (instruction.high == opcode::pushBlock) {
-            // Skipping the nested block's bytecodes
-            uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-            jit.bytePointer = newBytePointer;
-            continue;
-        }
+        TJITContext& m_jit;
+    };
 
-        if (instruction.high == opcode::doPrimitive) {
-            jit.bytePointer++; // skipping primitive number
-            continue;
-        }
-
-        // We're now looking only for branch bytecodes
-        if (instruction.high != opcode::doSpecial)
-            continue;
-
-        switch (instruction.low) {
-            case special::branch:
-            case special::branchIfTrue:
-            case special::branchIfFalse: {
-                // Loading branch target bytecode offset
-                uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-                jit.bytePointer += 2; // skipping the branch offset data
-
-                if (m_targetToBlockMap.find(targetOffset) == m_targetToBlockMap.end()) {
-                    // Creating the referred basic block and inserting it into the function
-                    // Later it will be filled with instructions and linked to other blocks
-                    BasicBlock* targetBasicBlock = BasicBlock::Create(m_JITModule->getContext(), "branch.", jit.function);
-                    m_targetToBlockMap[targetOffset] = targetBasicBlock;
-
-                }
-            } break;
-        }
-    }
-
-    // Resetting bytePointer to an old value
-    jit.bytePointer = previousBytePointer;
+    Visitor visitor(jit);
+    visitor.run();
 }
 
 Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
@@ -490,19 +457,21 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     if (jit.methodHasBlockReturn)
         writeLandingPad(jit);
 
-    // Switching builder context to the body's basic block from the preamble
-    BasicBlock* body = BasicBlock::Create(m_JITModule->getContext(), "body", jit.function);
-    jit.builder->SetInsertPoint(jit.preamble);
-    jit.builder->CreateBr(body);
-
-    // Resetting the builder to the body
-    jit.builder->SetInsertPoint(body);
-
     // Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with
     // target bytecode offset as a key.
     scanForBranches(jit);
+
+    // Switching builder context to the first basic block from the preamble
+    BasicBlock* body = m_targetToBlockMap[0];
+    body->setName("body.");
+
+    jit.builder->SetInsertPoint(jit.preamble);
+    jit.builder->CreateBr(body);
+
+    // Resetting the builder to the body
+    jit.builder->SetInsertPoint(body);
 
     // Processing the method's bytecodes
     writeFunctionBody(jit);
