@@ -1,5 +1,7 @@
 #ifdef WINDOWS
 #include <time.h>
+#else
+#include <sys/time.h>
 #endif
 
 struct TTime{

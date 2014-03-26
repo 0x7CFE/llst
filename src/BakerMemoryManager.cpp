@@ -83,7 +83,7 @@ void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
             m_logFile << "] ";
         }
     }
-    if(event.timeDiff.tv_sec != 0 || event.timeDiff.tv_usec != 0){
+    if(event.timeDiff.sec != 0 || event.timeDiff.msec != 0){
         m_logFile << ", " << event.timeDiff.sec << "." << event.timeDiff.msec << " secs";
     }
     m_logFile << "]\n";
