@@ -41,17 +41,9 @@
 #include <vector>
 #include <list>
 #include <fstream>
+#include "timer.h"
 
 
-class Timer{
-private:
-    timeval timeCreate;
-public:
-    Timer();
-    ~Timer(){}
-    timeval getTimeLost();
-    long getTimeLostms();
-};
 
 struct TMemoryManagerHeapEvent{
     const char* eventName;
