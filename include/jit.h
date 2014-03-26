@@ -221,12 +221,12 @@ public:
     // used during the compilation process.
     struct TJITContext {
         st::ParsedMethod    parsedMethod; // Parsed smalltalk method we're currently processing
+        st::TSmalltalkInstruction instruction;  // currently processed instruction
 
         TMethod*            method;       // Smalltalk method we're currently processing
-        uint32_t            bytePointer;
+        uint16_t            bytePointer;
 
         llvm::Function*     function;     // LLVM function that is created based on method
-        TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
 
         llvm::BasicBlock*   preamble;
@@ -253,7 +253,7 @@ public:
         void pushValue(TStackValue* value);
 
         TJITContext(MethodCompiler* compiler, TMethod* method)
-            : parsedMethod(method), method(method), bytePointer(0), function(0), builder(0),
+            : parsedMethod(method), instruction(opcode::extended), method(method), bytePointer(0), function(0), builder(0),
             preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
             contextHolder(0), selfHolder(0)
         {
@@ -301,6 +301,7 @@ private:
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
+    void writeInstruction(TJITContext& jit);
     void writeLandingPad(TJITContext& jit);
 
     void doPushInstance(TJITContext& jit);
@@ -308,7 +309,7 @@ private:
     void doPushTemporary(TJITContext& jit);
     void doPushLiteral(TJITContext& jit);
     void doPushConstant(TJITContext& jit);
-    void doPushBlock(uint32_t currentOffset, TJITContext& jit);
+    void doPushBlock(TJITContext& jit);
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
     void doMarkArguments(TJITContext& jit);

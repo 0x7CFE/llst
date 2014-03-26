@@ -485,74 +485,79 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
 void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 0*/)
 {
-    TByteObject& byteCodes   = * jit.method->byteCodes;
-    uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
+    class Visitor : public st::InstructionVisitor {
+    public:
+        Visitor(TJITContext& jit) : InstructionVisitor(&jit.parsedMethod), m_jit(jit) { }
 
-    while (jit.bytePointer < stopPointer) {
-        uint32_t currentOffset = jit.bytePointer;
+    private:
+        virtual bool visitBlock(st::BasicBlock& basicBlock) {
+            // A new basic block had just been started
+            // Switching context to it and linking blocks if necessary
 
-        if (m_targetToBlockMap.find(currentOffset) != m_targetToBlockMap.end()) {
-            // Somewhere in the code we have a branch instruction that
-            // points to the current offset. We need to end the current
-            // basic block and start a new one, linking previous
-            // basic block to a new one.
+            llvm::BasicBlock* newBlock = m_jit.compiler->m_targetToBlockMap[basicBlock.getOffset()];
 
-            BasicBlock* newBlock = m_targetToBlockMap.find(currentOffset)->second; // Picking a basic block
             //If the current BB does not have a terminator, we create a br to newBlock
-            if (! jit.builder->GetInsertBlock()->getTerminator() ) {
-                jit.builder->CreateBr(newBlock); // Linking current block to a new one
-                // Updating the block referers
+            if (! m_jit.builder->GetInsertBlock()->getTerminator() ) {
+                m_jit.builder->CreateBr(newBlock); // Linking current block to a new one
 
                 // Inserting current block as a referer to the newly created one
                 // Popping the value may result in popping the referer's stack
                 // or even generation of phi function if there are several referers
-                jit.basicBlockContexts[newBlock].referers.insert(jit.builder->GetInsertBlock());
+                m_jit.basicBlockContexts[newBlock].referers.insert(m_jit.builder->GetInsertBlock());
             }
 
-            newBlock->moveAfter(jit.builder->GetInsertBlock()); //for a pretty sequenced BB output
-            jit.builder->SetInsertPoint(newBlock); // and switching builder to a new block
+            newBlock->moveAfter(m_jit.builder->GetInsertBlock()); // for a pretty sequenced BB output
+            m_jit.builder->SetInsertPoint(newBlock);
+
+            return InstructionVisitor::visitBlock(basicBlock);
         }
 
-        // First of all decoding the pending instruction
-        jit.instruction.low = (jit.instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
-        jit.instruction.high >>= 4;
-        if (jit.instruction.high == opcode::extended) {
-            jit.instruction.high =  jit.instruction.low;
-            jit.instruction.low  =  byteCodes[jit.bytePointer++];
+        virtual bool visitInstruction(const st::TSmalltalkInstruction& instruction) {
+            // Processing instruction
+            m_jit.instruction = instruction;
+            m_jit.compiler->writeInstruction(m_jit);
+
+            return true;
         }
 
-        // Then writing the code
-        switch (jit.instruction.high) {
-            // TODO Boundary checks against container's real size
-            case opcode::pushInstance:      doPushInstance(jit);    break;
-            case opcode::pushArgument:      doPushArgument(jit);    break;
-            case opcode::pushTemporary:     doPushTemporary(jit);   break;
-            case opcode::pushLiteral:       doPushLiteral(jit);     break;
-            case opcode::pushConstant:      doPushConstant(jit);    break;
+        TJITContext& m_jit;
+    };
 
-            case opcode::pushBlock:         doPushBlock(currentOffset, jit); break;
+    Visitor visitor(jit);
+    visitor.run();
+}
 
-            case opcode::assignTemporary:   doAssignTemporary(jit); break;
-            case opcode::assignInstance:    doAssignInstance(jit);  break;
+void MethodCompiler::writeInstruction(TJITContext& jit) {
+    switch (jit.instruction.getOpcode()) {
+        // TODO Boundary checks against container's real size
+        case opcode::pushInstance:      doPushInstance(jit);    break;
+        case opcode::pushArgument:      doPushArgument(jit);    break;
+        case opcode::pushTemporary:     doPushTemporary(jit);   break;
+        case opcode::pushLiteral:       doPushLiteral(jit);     break;
+        case opcode::pushConstant:      doPushConstant(jit);    break;
 
-            case opcode::markArguments:     doMarkArguments(jit);   break;
-            case opcode::sendUnary:         doSendUnary(jit);       break;
-            case opcode::sendBinary:        doSendBinary(jit);      break;
-            case opcode::sendMessage:       doSendMessage(jit);     break;
+        case opcode::pushBlock:         doPushBlock(jit);       break;
 
-            case opcode::doSpecial:         doSpecial(jit);         break;
-            case opcode::doPrimitive:       doPrimitive(jit);       break;
+        case opcode::assignTemporary:   doAssignTemporary(jit); break;
+        case opcode::assignInstance:    doAssignInstance(jit);  break;
 
-            // Treating opcode 0 as NOP command
-            // This is a temporary hack to solve bug #26
-            // It is triggered by malformed method code
-            // compiled by in-image soft compiler
-            case 0: break;
+        case opcode::markArguments:     doMarkArguments(jit);   break;
+        case opcode::sendUnary:         doSendUnary(jit);       break;
+        case opcode::sendBinary:        doSendBinary(jit);      break;
+        case opcode::sendMessage:       doSendMessage(jit);     break;
 
-            default:
-                std::fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
-                        jit.instruction.high, jit.bytePointer, jit.method->name->toString().c_str());
-        }
+        case opcode::doSpecial:         doSpecial(jit);         break;
+        case opcode::doPrimitive:       doPrimitive(jit);       break;
+
+        // Treating opcode 0 as NOP command
+        // This is a temporary hack to solve bug #26
+        // It is triggered by malformed method code
+        // compiled by in-image soft compiler
+        case 0: break;
+
+        default:
+            std::fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
+                         jit.instruction.getOpcode(), jit.bytePointer, jit.method->name->toString().c_str());
     }
 }
 
@@ -593,31 +598,31 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Self is interpreted as object array.
     // Array elements are instance variables
 
-    uint8_t index = jit.instruction.low;
+    uint8_t index = jit.instruction.getArgument();
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
-    uint8_t index = jit.instruction.low;
+    uint8_t index = jit.instruction.getArgument();
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
-    uint8_t index = jit.instruction.low;
+    uint8_t index = jit.instruction.getArgument();
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
-    uint8_t index = jit.instruction.low;
+    uint8_t index = jit.instruction.getArgument();
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
 {
-    const uint32_t constant = jit.instruction.low;
+    const uint32_t constant = jit.instruction.getArgument();
     Value* constantValue   = 0;
 
     switch (constant) {
@@ -650,11 +655,9 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
     jit.pushValue(constantValue);
 }
 
-void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
+void MethodCompiler::doPushBlock(TJITContext& jit)
 {
-    TByteObject& byteCodes = * jit.method->byteCodes;
-    uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-    jit.bytePointer += 2;
+    const uint16_t newBytePointer = jit.instruction.getExtra();
 
     TJITContext blockContext(this, jit.method);
     blockContext.bytePointer = jit.bytePointer;
@@ -662,7 +665,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     // Creating block function named Class>>method@offset
     const uint16_t blockOffset = jit.bytePointer;
     std::ostringstream ss;
-    ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << blockOffset; //currentOffset;
+    ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
     std::vector<Type*> blockParams;
@@ -700,7 +703,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
     // Create block object and fill it with context information
     Value* args[] = {
         jit.getCurrentContext(),                   // creatingContext
-        jit.builder->getInt8(jit.instruction.low), // arg offset
+        jit.builder->getInt8(jit.instruction.getArgument()), // arg offset
         jit.builder->getInt16(blockOffset)         // bytePointer
     };
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
@@ -714,7 +717,7 @@ void MethodCompiler::doPushBlock(uint32_t currentOffset, TJITContext& jit)
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
-    uint8_t index = jit.instruction.low;
+    uint8_t index = jit.instruction.getArgument();
     Value*  value = jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
@@ -726,7 +729,7 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
-    uint8_t index = jit.instruction.low;
+    uint8_t index = jit.instruction.getArgument();
     Value*  value = jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
@@ -741,7 +744,7 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
 void MethodCompiler::doMarkArguments(TJITContext& jit)
 {
     // Here we need to create the arguments array from the values on the stack
-    uint8_t argumentsCount = jit.instruction.low;
+    uint8_t argumentsCount = jit.instruction.getArgument();
 
     // FIXME Probably we may unroll the arguments array and pass the values directly.
     //       However, in some cases this may lead to additional architectural problems.
@@ -765,12 +768,12 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
     Value* value     = jit.popValue();
     Value* condition = 0;
 
-    switch ( static_cast<unaryBuiltIns::Opcode>(jit.instruction.low) ) {
+    switch ( static_cast<unaryBuiltIns::Opcode>(jit.instruction.getArgument()) ) {
         case unaryBuiltIns::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
         case unaryBuiltIns::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
 
         default:
-            std::fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.low);
+            std::fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.instruction.getArgument());
     }
 
     Value* result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
@@ -780,7 +783,7 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
     // 0, 1 or 2 for '<', '<=' or '+' respectively
-    binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.instruction.low);
+    binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.instruction.getArgument());
 
     Value* rightValue = jit.popValue();
     Value* leftValue  = jit.popValue();
@@ -856,7 +859,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value* argumentsArray    = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
     Value* sendMessageArgs[] = {
         jit.getCurrentContext(), // calling context
-        m_globals.binarySelectors[jit.instruction.low],
+        m_globals.binarySelectors[jit.instruction.getArgument()],
         argumentsArray,
 
         // default receiver class
@@ -897,11 +900,11 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* arguments = jit.popValue();
 
     // First of all we need to get the actual message selector
-    Value* selectorObject  = jit.getLiteral(jit.instruction.low);
+    Value* selectorObject  = jit.getLiteral(jit.instruction.getArgument());
     Value* messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
 
     std::ostringstream ss;
-    ss << "#" << jit.method->literals->getField(jit.instruction.low)->toString() << ".";
+    ss << "#" << jit.method->literals->getField(jit.instruction.getArgument())->toString() << ".";
     messageSelector->setName(ss.str());
 
     // Forming a message parameters
@@ -940,8 +943,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
 void MethodCompiler::doSpecial(TJITContext& jit)
 {
-    TByteObject& byteCodes = * jit.method->byteCodes;
-    uint8_t opcode = jit.instruction.low;
+    const uint8_t opcode = jit.instruction.getArgument();
 
     BasicBlock::iterator iPreviousInst = jit.builder->GetInsertPoint();
     if (iPreviousInst != jit.builder->GetInsertBlock()->begin())
@@ -1001,8 +1003,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
         case special::branch: {
             // Loading branch target bytecode offset
-            uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-            jit.bytePointer += 2; // skipping the branch offset data
+            uint32_t targetOffset = jit.instruction.getExtra();
 
             if (!iPreviousInst->isTerminator()) {
                 // Finding appropriate branch target
@@ -1018,8 +1019,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         case special::branchIfTrue:
         case special::branchIfFalse: {
             // Loading branch target bytecode offset
-            uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-            jit.bytePointer += 2; // skipping the branch offset data
+            uint32_t targetOffset = jit.instruction.getExtra();
 
             if (!iPreviousInst->isTerminator()) {
                 // Finding appropriate branch target
@@ -1049,7 +1049,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             Value* argsObject        = jit.popValue();
             Value* arguments         = jit.builder->CreateBitCast(argsObject, m_baseTypes.objectArray->getPointerTo());
 
-            uint32_t literalIndex    = byteCodes[jit.bytePointer++];
+            uint32_t literalIndex    = jit.instruction.getExtra();
             Value*   selectorObject  = jit.getLiteral(literalIndex);
             Value*   messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
 
@@ -1078,7 +1078,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
-    uint32_t opcode = jit.method->byteCodes->getByte(jit.bytePointer++);
+    uint32_t opcode = jit.instruction.getArgument();
 
     Value* primitiveResult = 0;
     Value* primitiveFailed = jit.builder->getFalse();
@@ -1243,7 +1243,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             Value* object = jit.popValue();
             Value* block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
 
-            int32_t argCount = jit.instruction.low - 1;
+            int32_t argCount = jit.instruction.getArgument() - 1;
 
             Value* blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
             Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
@@ -1459,7 +1459,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
         default: {
             // Here we need to create the arguments array from the values on the stack
-            uint8_t argumentsCount = jit.instruction.low;
+            uint8_t argumentsCount = jit.instruction.getArgument();
             Value* argumentsObject    = createArray(jit, argumentsCount);
 
             // Filling object with contents

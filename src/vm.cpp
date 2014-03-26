@@ -305,8 +305,6 @@ SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
 
 void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
 {
-    TByteObject&  byteCodes  = * ec.currentContext->method->byteCodes;
-
     // Block objects are usually inlined in the wrapping method code
     // pushBlock operation creates a block object initialized
     // with the proper bytecode, stack, arguments and the wrapping context.
@@ -536,7 +534,6 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
 
 SmalltalkVM::TExecuteResult SmalltalkVM::doSpecial(hptr<TProcess>& process, TVMExecutionContext& ec)
 {
-    TByteObject&  byteCodes  = * ec.currentContext->method->byteCodes;
     TObjectArray& arguments  = * ec.currentContext->arguments;
     TSymbolArray& literals   = * ec.currentContext->method->literals;
 
