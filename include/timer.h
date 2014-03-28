@@ -4,6 +4,12 @@
 #include <sys/time.h>
 #endif
 
+#ifdef WINDOWS
+    typedef clock_t timeValue;
+#else
+    typedef timeval timeValue;
+#endif
+
 struct TTime{
     int sec;
     int msec;
@@ -11,11 +17,7 @@ struct TTime{
 
 class Timer{
 private:
-#ifdef WINDOWS
-    clock_t timeCreate;
-#else
-    timeval timeCreate;
-#endif
+    timeValue timeCreate;
     TTime timeDiff; 
 public:
     Timer();

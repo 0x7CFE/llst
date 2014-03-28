@@ -65,14 +65,14 @@ BakerMemoryManager::~BakerMemoryManager()
 //}
 
 void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
-    m_logFile << event.time.sec << "." << event.time.msec/1000
+    m_logFile << event.begin.sec << "." << event.begin.msec/1000
               << ": [" << event.eventName << ": ";
-    if(event.heapInfo != NULL){
-        TMemoryManagerHeapInfo *eh = event.heapInfo;
-        m_logFile << eh->usedHeapSizeBeforeCollect << "K->"
-                  << eh->usedHeapSizeAfterCollect << "K("
-                  << eh->totalHeapSize << "K)";
-        for(std::list<TMemoryManagerHeapEvent>::iterator i = eh->heapEvents.begin(); i != eh->heapEvents.end(); i++){
+    if(!event.heapInfo.empty()){
+        TMemoryManagerHeapInfo eh = event.heapInfo;
+        m_logFile << eh.usedHeapSizeBeforeCollect << "K->"
+                  << eh.usedHeapSizeAfterCollect << "K("
+                  << eh.totalHeapSize << "K)";
+        for(std::list<TMemoryManagerHeapEvent>::iterator i = eh.heapEvents.begin(); i != eh.heapEvents.end(); i++){
             m_logFile << "[" << i->eventName << ": "
                       << i->usedHeapSizeBeforeCollect << "K->"
                       << i->usedHeapSizeAfterCollect << "K("
@@ -391,10 +391,9 @@ void BakerMemoryManager::collectGarbage()
     m_collectionsCount++;
     TMemoryManagerEvent event;
     event.eventName = "GC";
-    event.time = m_memoryInfo.timer.update()->getTime();
-    event.heapInfo = new TMemoryManagerHeapInfo;
-    event.heapInfo->usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
-    event.heapInfo->totalHeapSize = m_heapSize/1024;
+    event.begin = m_memoryInfo.timer.update()->getTime();
+    event.heapInfo.usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event.heapInfo.totalHeapSize = m_heapSize/1024;
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
@@ -423,7 +422,7 @@ void BakerMemoryManager::collectGarbage()
     std::memset(m_inactiveHeapBase, 0, m_heapSize / 2);
 
     // Calculating total microseconds spent in the garbage collection procedure
-    event.heapInfo->usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event.heapInfo.usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
     event.timeDiff = collectTimer.update()->getTime();
     m_totalCollectionDelay += event.timeDiff.sec*1000 + event.timeDiff.msec;
     m_memoryInfo.events.push_front(event);
