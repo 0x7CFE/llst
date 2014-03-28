@@ -59,16 +59,29 @@ struct TMemoryManagerHeapInfo{
     uint32_t usedHeapSizeAfterCollect;
     uint32_t totalHeapSize;
     std::list<TMemoryManagerHeapEvent> heapEvents;
+    TMemoryManagerHeapInfo() :
+        usedHeapSizeBeforeCollect(0),
+        usedHeapSizeAfterCollect(0),
+        totalHeapSize(0)
+        {}
+    bool empty() const {
+        return usedHeapSizeBeforeCollect == 0 &&
+                usedHeapSizeAfterCollect == 0 &&
+                totalHeapSize == 0 &&
+                heapEvents.empty();
+    }
 };
 
 //represent three kinds of events in garbage collection log:
 //just event, event which takes some time, event which interacting with a heap
 struct TMemoryManagerEvent{
     const char* eventName;
-    TTime time;
+    TTime begin; //time lost from program start to event begin
     TTime timeDiff; //maybe null
-    TMemoryManagerHeapInfo* heapInfo; //maybe null
+    TMemoryManagerHeapInfo heapInfo; //maybe empty
 };
+
+
 
 
 // Memory manager statics is held
