@@ -31,3 +31,35 @@ Timer* Timer::update(){
 TTime Timer::getTime(){
     return timeDiff;
 }
+
+
+
+TDuraton::TDuraton(TTime duration){
+    
+}
+
+template <class RATIO2> RATIO2 convertTo()
+{
+    
+}
+char* toString()
+{
+    
+}
+TTime getValue()
+{
+    
+}
+
+template <class RATIO> extern
+std::ostream& operator<<(std::ostream& os, const TDuraton<RATIO>& obj);
+
+template <class RATIO, class RATIO2> extern
+inline bool operator< (const TDuraton<RATIO>& lhs, const TDuraton<RATIO2>& rhs);
+template <class RATIO, class RATIO2> extern
+inline bool operator> (const TDuraton<RATIO>& lhs, const TDuraton<RATIO2>& rhs){return  operator< (rhs,lhs);}
+
+template <class RATIO, class RATIO2> extern
+inline TDuraton<RATIO> operator+(TDuraton<RATIO> lhs, const TDuraton<RATIO2>& rhs);
+template <class RATIO, class RATIO2> extern
+inline TDuraton<RATIO> operator-(TDuraton<RATIO> lhs, const TDuraton<RATIO2>& rhs);
