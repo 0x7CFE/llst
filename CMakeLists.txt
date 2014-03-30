@@ -71,6 +71,8 @@ set(CPP_FILES
     src/ParsedMethod.cpp
     src/ParsedBytecode.cpp
     src/ParsedBlock.cpp
+
+    src/ControlGraph.cpp
 )
 
 if (LLVM)
