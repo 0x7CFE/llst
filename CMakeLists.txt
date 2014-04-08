@@ -9,9 +9,12 @@ find_package(Threads REQUIRED QUIET)
 find_package(READLINE)
 find_package(TINFO)
 find_package(LLVM 3.1 EXACT)
+find_package(POD2MAN)
+find_package(GZIP REQUIRED)
 
 option(USE_READLINE "Should we use the GNU readline and history libraries?" ON)
 option(USE_LLVM "Should we use LLVM to build JIT?" OFF)
+option(USE_POD2MAN "Should we use pod2man to build the documentation (we will create empty docs otherwise)?" ON)
 
 if (USE_LLVM)
     if (LLVM_FOUND)
@@ -50,6 +53,25 @@ else()
     message(STATUS "Readline library is disabled")
     unset(READLINE_LIBS_TO_LINK)
 endif()
+
+if (USE_POD2MAN)
+    if (POD2MAN_FOUND)
+        message(STATUS "Using pod2man to build the documentation")
+    else()
+        message(FATAL_ERROR "\npod2man is not found.\nYou may configure with -DUSE_POD2MAN=OFF.")
+    endif()
+    function(get_pod2man_cmd OUT)
+        get_pod2man_cmd_wrapper(CMD ${ARGN})
+        set("${OUT}" "${CMD}" PARENT_SCOPE)
+    endfunction()
+else()
+    message(STATUS "Pod2man is disabled")
+    function(get_pod2man_cmd OUT)
+        get_pod2man_cmd_wrapper(CMD ${ARGN} STUB)
+        set("${OUT}" "${CMD}" PARENT_SCOPE)
+    endfunction()
+endif()
+
 
 add_subdirectory(src)
 add_subdirectory(include)
@@ -96,18 +118,30 @@ add_custom_command(
 )
 add_custom_target(image ALL DEPENDS ${IMAGE_DIR}/LittleSmalltalk.image)
 
-add_custom_command(
-    OUTPUT changelog.gz
-    COMMAND gzip -9c ${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog > changelog.gz
-    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog
-    COMMENT "Compressing changelog"
+set (DOC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/doc)
+set (POD_LLST_EN ${DOC_DIR}/llst.1.en.pod)
+set (MAN_LLST_EN ${CMAKE_CURRENT_BINARY_DIR}/llst.1.en)
+set (MAN_LLST_EN_GZ ${CMAKE_CURRENT_BINARY_DIR}/llst.1.en.gz)
+
+get_pod2man_cmd(MAN_LLST_EN_CMD FROM ${POD_LLST_EN} TO ${MAN_LLST_EN}
+    SECTION 1 CENTER "LLST Documentation"
+    RELEASE 0.2.1
+    NAME llst
 )
-add_custom_target(compress_changelog ALL DEPENDS ${CMAKE_CURRENT_BINARY_DIR}/changelog.gz)
+add_custom_command(
+    OUTPUT ${MAN_LLST_EN}
+    COMMAND ${MAN_LLST_EN_CMD}
+    DEPENDS ${POD_LLST_EN}
+)
+add_custom_target(man_llst_en ALL DEPENDS ${MAN_LLST_EN})
+
+gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
+gzip_compress("compress_man_llst_en" ${MAN_LLST_EN} ${MAN_LLST_EN_GZ} man_llst_en)
 
 install(TARGETS llst DESTINATION bin)
 install(FILES LICENSE DESTINATION share/doc/${PROJECT_NAME} RENAME copyright)
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/changelog.gz DESTINATION share/doc/${PROJECT_NAME})
-install(FILES doc/llst.1.en.gz DESTINATION share/man/man1/ RENAME llst.1.gz)
+install(FILES ${MAN_LLST_EN_GZ} DESTINATION share/man/man1/ RENAME llst.1.gz)
 install(FILES misc/bash-completion.sh DESTINATION share/bash-completion/completions RENAME llst)
 
 
