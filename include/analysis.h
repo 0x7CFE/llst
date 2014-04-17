@@ -62,8 +62,9 @@ private:
 
 class ControlDomain;
 class ControlNode;
-typedef std::set<ControlNode*>   TNodeSet;
-typedef std::set<ControlDomain*> TDomainSet;
+typedef std::vector<ControlNode*> TNodeList;
+typedef std::set<ControlNode*>    TNodeSet;
+typedef std::set<ControlDomain*>  TDomainSet;
 
 // ControlNode is a base class for elements of ControlGraph.
 // Elements of a graph represent various types of relations
@@ -78,6 +79,7 @@ public:
         ntTau          // virtual node linkinig variable types from assignment sites
     };
 
+    ControlNode() : m_domain(0) { }
     virtual ~ControlNode() { }
     virtual TNodeType getNodeType() const = 0;
 
@@ -111,7 +113,7 @@ public:
     virtual TNodeType getNodeType() const { return ntInstruction; }
 
     void setInstruction(TSmalltalkInstruction instruction) { m_instruction = instruction; }
-    TSmalltalkInstruction getInstruction() const { return m_instruction; }
+    const TSmalltalkInstruction& getInstruction() const { return m_instruction; }
 
     ControlNode* getArgument(const std::size_t index) const {
         assert(index >= 0 && index < m_arguments.size());
@@ -178,17 +180,61 @@ public:
     void addNode(ControlNode* node) { m_nodes.insert(node); }
     void removeNode(ControlNode* node) { m_nodes.erase(node); }
 
+    InstructionNode* getEntryPoint() const { return m_entryPoint; }
+    void setEntryPoint(InstructionNode* value) { m_entryPoint = value; }
+
+    InstructionNode* getTerminator() const { return m_terminator; }
+    void setTerminator(InstructionNode* value) { m_terminator = value; }
+
     BasicBlock* getBasicBlock() const { return m_basicBlock; }
     void setBasicBlock(BasicBlock* value) { m_basicBlock = value; }
 
+    void pushValue(ControlNode* value) {
+        m_localStack.push_back(value);
+    }
+
+    ControlNode* popValue() {
+        assert(! m_localStack.empty());
+
+        ControlNode* value = m_localStack.back();
+        m_localStack.pop_back();
+        return value;
+    }
+
+    void requestArgument(uint32_t index, InstructionNode* forNode) {
+        if (! m_localStack.empty()) {
+            ControlNode* argument = popValue();
+            argument->addEdge(forNode);
+            forNode->setArgument(index, argument);
+        } else {
+            m_reqestedArguments.push_back((TArgumentRequest){index, forNode});
+        }
+    }
+
+    struct TArgumentRequest {
+        uint32_t index;
+        InstructionNode* requestingNode;
+    };
+    typedef std::vector<TArgumentRequest> TRequestList;
+
+    const TRequestList& getRequestedArguments() const { return m_reqestedArguments; }
+    const TNodeList& getLocalStack() const { return m_localStack; }
+
+    ControlDomain() : m_entryPoint(0), m_terminator(0), m_basicBlock(0) { }
 private:
-    TNodeSet    m_nodes;
-    BasicBlock* m_basicBlock;
+    TNodeSet         m_nodes;
+    InstructionNode* m_entryPoint;
+    InstructionNode* m_terminator;
+    BasicBlock*      m_basicBlock;
+
+    TNodeList        m_localStack;
+    TRequestList     m_reqestedArguments;
 };
 
 class ControlGraph {
 public:
     ControlGraph(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod) { }
+    ParsedMethod* getParsedMethod() const { return m_parsedMethod; }
 
     typedef TDomainSet::iterator iterator;
     iterator begin() { return m_domains.begin(); }
@@ -233,12 +279,30 @@ public:
             delete * iNode++;
     }
 
+    void buildGraph();
+
+    ControlDomain* getDomainFor(BasicBlock* basicBlock) {
+        TDomainMap::iterator iDomain = m_blocksToDomains.find(basicBlock);
+        if (iDomain == m_blocksToDomains.end()) {
+            ControlDomain* const domain = newDomain();
+            domain->setBasicBlock(basicBlock);
+            m_blocksToDomains[basicBlock] = domain;
+            return domain;
+        }
+
+        assert(iDomain->second);
+        return iDomain->second;
+    }
+
 private:
     ParsedMethod* m_parsedMethod;
     TDomainSet    m_domains;
 
     typedef std::list<ControlNode*> TNodeList;
     TNodeList     m_nodes;
+
+    typedef std::map<BasicBlock*, ControlDomain*> TDomainMap;
+    TDomainMap m_blocksToDomains;
 };
 
 template<> InstructionNode* ControlGraph::newNode<InstructionNode>();
