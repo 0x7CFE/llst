@@ -6,6 +6,7 @@
 #include <vector>
 #include <list>
 #include <map>
+#include <set>
 
 #include <types.h>
 #include <opcodes.h>
@@ -41,6 +42,39 @@ struct TSmalltalkInstruction {
         return static_cast<uint8_t>(m_opcode) | (m_argument << 8) | (m_extra << 16);
     }
 
+    bool isTerminator() const {
+        if (m_opcode != opcode::doSpecial)
+            return false;
+
+        if (isBranch())
+            return true;
+
+        switch (m_argument) {
+            case special::stackReturn:
+            case special::selfReturn:
+            case special::blockReturn:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
+    bool isBranch() const {
+        if (m_opcode != opcode::doSpecial)
+            return false;
+
+        switch (m_argument) {
+            case special::stackReturn:
+            case special::selfReturn:
+            case special::blockReturn:
+                return true;
+
+            default:
+                return false;
+        }
+    }
+
 private:
     TOpcode   m_opcode;
     TArgument m_argument;
@@ -50,6 +84,7 @@ private:
 class BasicBlock {
 public:
     typedef std::vector<TSmalltalkInstruction::TUnpackedBytecode> TInstructionVector;
+    typedef std::set<BasicBlock*> TBasicBlockSet;
 
     class iterator : public TInstructionVector::iterator {
     public:
@@ -65,6 +100,8 @@ public:
 
     iterator begin() { return iterator(m_instructions.begin()); }
     iterator end() { return iterator(m_instructions.end()); }
+
+    std::size_t size() const { return m_instructions.size(); }
 
     const TSmalltalkInstruction operator[](const std::size_t index) const {
         return TSmalltalkInstruction(m_instructions[index]);
@@ -108,10 +145,24 @@ public:
     // Offset of first instruction of this basic block within the method's bytecodes
     uint16_t getOffset() const { return m_offset; }
 
+    // Set of basic blocks that are referencing current block by [conditionally] jumping into it
+    TBasicBlockSet& getReferers() { return m_referers; }
+
+    bool getTerminator(TSmalltalkInstruction& out) const {
+        TSmalltalkInstruction result(m_instructions.back());
+        if (result.isTerminator()) {
+            out = result;
+            return true;
+        }
+
+        return false;
+    }
+
     BasicBlock(uint16_t blockOffset = 0) : m_offset(blockOffset) { }
 private:
     uint16_t m_offset;
     TInstructionVector m_instructions;
+    TBasicBlockSet     m_referers;
 };
 
 // This is a base class for ParsedMethod and ParsedBlock
