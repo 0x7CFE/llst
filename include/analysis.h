@@ -309,6 +309,29 @@ template<> InstructionNode* ControlGraph::newNode<InstructionNode>();
 template<> PhiNode* ControlGraph::newNode<PhiNode>();
 template<> TauNode* ControlGraph::newNode<TauNode>();
 
+class DomainVisitor {
+public:
+    DomainVisitor(ControlGraph* graph) : m_graph(graph) { }
+    virtual ~DomainVisitor() { }
+
+    virtual bool visitDomain(ControlDomain& domain) { return true; }
+
+    void run() {
+        ControlGraph::iterator iDomain = m_graph->begin();
+        const ControlGraph::iterator iEnd = m_graph->end();
+
+        while (iDomain != iEnd) {
+            if (! visitDomain(** iDomain))
+                break;
+
+            ++iDomain;
+        }
+    }
+
+protected:
+    ControlGraph* m_graph;
+};
+
 } // namespace st
 
 #endif
