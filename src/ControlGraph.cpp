@@ -175,12 +175,68 @@ void GraphConstructor::processPrimitives(InstructionNode* node)
     }
 }
 
+class GraphLinker : public DomainVisitor {
+public:
+    GraphLinker(ControlGraph* graph) : DomainVisitor(graph) { }
+
+    virtual bool visitDomain(ControlDomain& domain) {
+        m_currentDomain = &domain;
+
+        const ControlDomain::TRequestList& requestList = domain.getRequestedArguments();
+        for (std::size_t index = 0; index < requestList.size(); index++)
+            processArgumentRequest(index, requestList[index]);
+
+        return true;
+    }
+
+private:
+    void processArgumentRequest(std::size_t index, const ControlDomain::TArgumentRequest& request);
+
+    ControlDomain* m_currentDomain;
+};
+
+void GraphLinker::processArgumentRequest(std::size_t index, const ControlDomain::TArgumentRequest& request)
+{
+    const BasicBlock::TBasicBlockSet& refererBlocks = m_currentDomain->getBasicBlock()->getReferers();
+
+    // In case of exactly one referer we may link values directly
+    const bool singleReferer = (refererBlocks.size() == 1);
+
+    // Otherwise we should iterate through all referers and aggregate values using phi node
+    PhiNode* const phiNode = singleReferer ? 0 : m_graph->newNode<PhiNode>();
+
+    BasicBlock::TBasicBlockSet::iterator iBlock = refererBlocks.begin();
+    for (; iBlock != refererBlocks.end(); ++iBlock) {
+        ControlDomain* const refererDomain = m_graph->getDomainFor(* iBlock);
+        const TNodeList&     refererStack  = refererDomain->getLocalStack();
+        const std::size_t    refererStackSize = refererStack.size();
+
+        if (index > refererStackSize - 1) {
+            // TODO Referer block do not have enough values on it's stack.
+            //      We need to go deeper and process it's referers in turn.
+        } else {
+            const std::size_t valueIndex = refererStackSize - 1 - index;
+            ControlNode* value = refererStack[valueIndex];
+
+            if (singleReferer)
+                value->addEdge(request.requestingNode);
+            else
+                value->addEdge(phiNode);
+        }
+    }
+
+    if (! singleReferer)
+        request.requestingNode->setArgument(request.index, phiNode);
+}
+
 void ControlGraph::buildGraph()
 {
     // Iterating through basic blocks of parsed method and constructing node domains
     GraphConstructor constructor(this);
     constructor.run();
 
-    // TODO Linking nodes that requested argument during previous stage.
-    //      Typically they're linked using phi nodes or a direct link if possible.
+    // Linking nodes that requested argument during previous stage.
+    // They're linked using phi nodes or a direct link if possible.
+    GraphLinker linker(this);
+    linker.run();
 }
