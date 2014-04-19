@@ -68,6 +68,7 @@ set(CPP_FILES
     src/vm.cpp
 
     src/TSmalltalkInstruction.cpp
+    src/InstructionDecoder.cpp
     src/ParsedMethod.cpp
     src/ParsedBytecode.cpp
     src/ParsedBlock.cpp

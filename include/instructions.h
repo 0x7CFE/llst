@@ -81,6 +81,27 @@ private:
     TExtra    m_extra;
 };
 
+class InstructionDecoder {
+public:
+    InstructionDecoder(const TByteObject& byteCodes, uint16_t bytePointer = 0)
+        : m_byteCodes(byteCodes), m_bytePointer(bytePointer) {}
+
+    uint16_t getBytePointer() const { return m_bytePointer; }
+    void setBytePointer(uint16_t value) {
+        assert(value < m_byteCodes.getSize());
+        m_bytePointer = value;
+    }
+
+    const TSmalltalkInstruction decodeAndShiftPointer() {
+        return decodeAndShiftPointer(m_byteCodes, m_bytePointer);
+    }
+
+    static const TSmalltalkInstruction decodeAndShiftPointer(const TByteObject& byteCodes, uint16_t& bytePointer);
+private:
+    const TByteObject& m_byteCodes;
+    uint16_t m_bytePointer;
+};
+
 class BasicBlock {
 public:
     typedef std::vector<TSmalltalkInstruction::TUnpackedBytecode> TInstructionVector;
