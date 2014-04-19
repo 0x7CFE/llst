@@ -332,6 +332,27 @@ protected:
     ControlGraph* m_graph;
 };
 
+class NodeVisitor : public DomainVisitor {
+public:
+    NodeVisitor(ControlGraph* graph) : DomainVisitor(graph) { }
+    virtual bool visitNode(const ControlNode& node) { return true; }
+
+protected:
+    virtual bool visitDomain(ControlDomain& domain) {
+        ControlDomain::iterator iNode = domain.begin();
+        const ControlDomain::iterator iEnd = domain.end();
+
+        while (iNode != iEnd) {
+            if (! visitNode(** iNode))
+                return false;
+
+            ++iNode;
+        }
+
+        return true;
+    }
+};
+
 } // namespace st
 
 #endif
