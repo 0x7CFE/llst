@@ -12,6 +12,7 @@ public:
 
     virtual bool visitBlock(BasicBlock& basicBlock) {
         m_currentDomain = m_graph->getDomainFor(&basicBlock);
+        m_currentDomain->setBasicBlock(&basicBlock);
         return InstructionVisitor::visitBlock(basicBlock);
     }
 
@@ -182,20 +183,41 @@ public:
     virtual bool visitDomain(ControlDomain& domain) {
         m_currentDomain = &domain;
 
-        const ControlDomain::TRequestList& requestList = domain.getRequestedArguments();
-        for (std::size_t index = 0; index < requestList.size(); index++)
-            processArgumentRequest(index, requestList[index]);
+        processBranching();
+        processArgumentRequests();
 
         return true;
     }
 
 private:
-    void processArgumentRequest(std::size_t index, const ControlDomain::TArgumentRequest& request);
+    void processBranching() {
+        // Current domain's entry point should be linked to the terminators of referring domains
+        InstructionNode* const entryPoint = m_currentDomain->getEntryPoint();
+        assert(entryPoint);
+
+        const BasicBlock::TBasicBlockSet& referers = m_currentDomain->getBasicBlock()->getReferers();
+        BasicBlock::TBasicBlockSet::iterator iReferer = referers.begin();
+        for (; iReferer != referers.end(); ++iReferer) {
+            ControlDomain* const refererDomain = m_graph->getDomainFor(*iReferer);
+            InstructionNode* const  terminator = refererDomain->getTerminator();
+            assert(terminator && terminator->getInstruction().isBranch());
+
+            terminator->addEdge(entryPoint);
+        }
+    }
+
+    void processArgumentRequests() {
+        const ControlDomain::TRequestList& requestList = m_currentDomain->getRequestedArguments();
+        for (std::size_t index = 0; index < requestList.size(); index++)
+            processRequest(index, requestList[index]);
+    }
+
+    void processRequest(std::size_t index, const ControlDomain::TArgumentRequest& request);
 
     ControlDomain* m_currentDomain;
 };
 
-void GraphLinker::processArgumentRequest(std::size_t index, const ControlDomain::TArgumentRequest& request)
+void GraphLinker::processRequest(std::size_t index, const ControlDomain::TArgumentRequest& request)
 {
     const BasicBlock::TBasicBlockSet& refererBlocks = m_currentDomain->getBasicBlock()->getReferers();
 
@@ -225,8 +247,11 @@ void GraphLinker::processArgumentRequest(std::size_t index, const ControlDomain:
         }
     }
 
-    if (! singleReferer)
+    if (! singleReferer) {
+        phiNode->setIndex(index);
+        phiNode->addEdge(request.requestingNode);
         request.requestingNode->setArgument(request.index, phiNode);
+    }
 }
 
 void ControlGraph::buildGraph()
@@ -237,6 +262,8 @@ void ControlGraph::buildGraph()
 
     // Linking nodes that requested argument during previous stage.
     // They're linked using phi nodes or a direct link if possible.
+    // Also branching edges are added so graph remains linked even if
+    // no stack relations exist.
     GraphLinker linker(this);
     linker.run();
 }
