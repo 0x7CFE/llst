@@ -5,20 +5,19 @@ using namespace st;
 void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
     assert(m_origin && m_origin->byteCodes);
 
-    uint16_t bytePointer = startOffset;
+    InstructionDecoder decoder(*m_origin->byteCodes, startOffset);
 
     TByteObject&   byteCodes   = * m_origin->byteCodes;
     const uint16_t stopPointer = stopOffset ? stopOffset : byteCodes.getSize();
 
     // Scaning the method's bytecodes for branch sites and collecting branch targets.
     // Creating target basic blocks beforehand and collecting them in a map.
-    while (bytePointer < stopPointer) {
-        // Decoding instruction and shifting byte pointer to the next one
-        TSmalltalkInstruction instruction(byteCodes, bytePointer);
+    while (decoder.getBytePointer() < stopPointer) {
+        TSmalltalkInstruction instruction = decoder.decodeAndShiftPointer();
 
         if (instruction.getOpcode() == opcode::pushBlock) {
             // Preserving the start block's offset
-            const uint16_t startOffset = bytePointer;
+            const uint16_t startOffset = decoder.getBytePointer();
             // Extra holds the bytecode offset right after the block
             const uint16_t stopOffset  = instruction.getExtra();
 
@@ -29,7 +28,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             parseBlock(startOffset, stopOffset);
 
             // Skipping the nested block's bytecodes
-            bytePointer = stopOffset;
+            decoder.setBytePointer(stopOffset);
             continue;
         }
 
@@ -47,7 +46,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
                 if (m_offsetToBasicBlock.find(targetOffset) == m_offsetToBasicBlock.end()) {
                     // Creating the referred basic block and inserting it into the function
                     // Later it will be filled with instructions and linked to other blocks
-                    BasicBlock* targetBasicBlock = createBasicBlock(bytePointer);
+                    BasicBlock* targetBasicBlock = createBasicBlock(decoder.getBytePointer());
                     m_offsetToBasicBlock[targetOffset] = targetBasicBlock;
                 }
             } break;
@@ -65,9 +64,10 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
         m_basicBlocks.push_front(currentBasicBlock);
     }
 
-    while (bytePointer < stopPointer) {
+    decoder.setBytePointer(startOffset);
+    while (decoder.getBytePointer() < stopPointer) {
         // Switching basic block if current offset is a branch target
-        const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(bytePointer);
+        const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(decoder.getBytePointer());
         if (iBlock != m_offsetToBasicBlock.end()) {
             BasicBlock* const nextBlock = iBlock->second;
 
@@ -76,7 +76,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             TSmalltalkInstruction terminator(opcode::extended);
             if (currentBasicBlock->getTerminator(terminator)) {
                 if (terminator.isBranch()) {
-                    if (terminator.getExtra() == bytePointer) {
+                    if (terminator.getExtra() == decoder.getBytePointer()) {
                         // Unconditional branch case
                         assert(terminator.getArgument() == special::branch);
                         nextBlock->getReferers().insert(currentBasicBlock);
@@ -100,7 +100,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
                 }
             } else {
                 // Adding branch instruction to link blocks
-                currentBasicBlock->append(TSmalltalkInstruction(opcode::doSpecial, special::branch, bytePointer));
+                currentBasicBlock->append(TSmalltalkInstruction(opcode::doSpecial, special::branch, decoder.getBytePointer()));
                 nextBlock->getReferers().insert(currentBasicBlock);
             }
 
@@ -109,7 +109,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
         }
 
         // Fetching instruction and appending it to the current basic block
-        TSmalltalkInstruction instruction(byteCodes, bytePointer);
+        TSmalltalkInstruction instruction = decoder.decodeAndShiftPointer();
         currentBasicBlock->append(instruction);
 
         // Final check
