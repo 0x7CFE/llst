@@ -62,9 +62,16 @@ private:
 
 class ControlDomain;
 class ControlNode;
+
 typedef std::vector<ControlNode*> TNodeList;
-typedef std::set<ControlNode*>    TNodeSet;
 typedef std::set<ControlDomain*>  TDomainSet;
+
+class NodeIndexCompare {
+public:
+    bool operator() (const ControlNode* a, const ControlNode* b);
+};
+
+typedef std::set<ControlNode*, NodeIndexCompare> TNodeSet;
 
 // ControlNode is a base class for elements of ControlGraph.
 // Elements of a graph represent various types of relations
@@ -79,9 +86,11 @@ public:
         ntTau          // virtual node linkinig variable types from assignment sites
     };
 
-    ControlNode() : m_domain(0) { }
+    ControlNode(uint32_t index) : m_index(index), m_domain(0) { }
     virtual ~ControlNode() { }
     virtual TNodeType getNodeType() const = 0;
+
+    uint32_t getIndex() const { return m_index; }
 
     ControlDomain* getDomain() const { return m_domain; }
     void setDomain(ControlDomain* value) { m_domain = value; }
@@ -99,6 +108,7 @@ public:
         to->getInEdges().erase(this);
     }
 private:
+    uint32_t       m_index;
     TNodeType      m_type;
     TNodeSet       m_inEdges;
     TNodeSet       m_outEdges;
@@ -109,7 +119,7 @@ private:
 // Instruction node represents a signle VM instruction and it's relations in code.
 class InstructionNode : public ControlNode {
 public:
-    InstructionNode() : m_instruction(opcode::extended) { }
+    InstructionNode(uint32_t index) : ControlNode(index), m_instruction(opcode::extended) { }
     virtual TNodeType getNodeType() const { return ntInstruction; }
 
     void setInstruction(TSmalltalkInstruction instruction) { m_instruction = instruction; }
@@ -154,18 +164,20 @@ private:
 // to a node having a phi node as it's agrument.
 class PhiNode : public ControlNode {
 public:
+    PhiNode(uint32_t index) : ControlNode(index) { }
     virtual TNodeType getNodeType() const { return ntPhi; }
-    uint32_t getIndex() const { return m_index; }
-    void setIndex(uint32_t value) { m_index = value; }
+    uint32_t getPhiIndex() const { return m_phiIndex; }
+    void setPhiIndex(uint32_t value) { m_phiIndex = value; }
 
 private:
-    uint32_t m_index;
+    uint32_t m_phiIndex;
 };
 
 // Tau node is reserved for further use in type inference subsystem.
 // It will link variable type transitions across a method.
 class TauNode : public ControlNode {
 public:
+    TauNode(uint32_t index) : ControlNode(index) { }
     virtual TNodeType getNodeType() const { return ntTau; }
 };
 
@@ -233,7 +245,7 @@ private:
 
 class ControlGraph {
 public:
-    ControlGraph(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod) { }
+    ControlGraph(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod), m_lastNodeIndex(0) { }
     ParsedMethod* getParsedMethod() const { return m_parsedMethod; }
 
     typedef TDomainSet::iterator iterator;
@@ -245,17 +257,19 @@ public:
 
         switch (type) {
             case ControlNode::ntInstruction:
-                node = new InstructionNode();
+                node = new InstructionNode(m_lastNodeIndex);
                 break;
 
             case ControlNode::ntPhi:
-                node = new PhiNode();
+                node = new PhiNode(m_lastNodeIndex);
                 break;
 
             case ControlNode::ntTau:
-                node = new TauNode();
+                node = new TauNode(m_lastNodeIndex);
                 break;
         }
+
+        m_lastNodeIndex++;
 
         m_nodes.push_back(node);
         return node;
@@ -300,6 +314,7 @@ private:
 
     typedef std::list<ControlNode*> TNodeList;
     TNodeList     m_nodes;
+    uint32_t      m_lastNodeIndex;
 
     typedef std::map<BasicBlock*, ControlDomain*> TDomainMap;
     TDomainMap m_blocksToDomains;
