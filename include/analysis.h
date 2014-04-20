@@ -350,7 +350,7 @@ protected:
 class NodeVisitor : public DomainVisitor {
 public:
     NodeVisitor(ControlGraph* graph) : DomainVisitor(graph) { }
-    virtual bool visitNode(const ControlNode& node) { return true; }
+    virtual bool visitNode(ControlNode& node) { return true; }
 
 protected:
     virtual bool visitDomain(ControlDomain& domain) {

@@ -181,9 +181,9 @@ void GraphConstructor::processPrimitives(InstructionNode* node)
     }
 }
 
-class GraphLinker : public DomainVisitor {
+class GraphLinker : public NodeVisitor {
 public:
-    GraphLinker(ControlGraph* graph) : DomainVisitor(graph) { }
+    GraphLinker(ControlGraph* graph) : NodeVisitor(graph), m_currentDomain(0), m_nodeToLink(0) { }
 
     virtual bool visitDomain(ControlDomain& domain) {
         m_currentDomain = &domain;
@@ -191,10 +191,45 @@ public:
         processBranching();
         processArgumentRequests();
 
+        return NodeVisitor::visitDomain(domain);
+    }
+
+    virtual bool visitNode(ControlNode& node) {
+        // Some nodes within a domain are not linked by out edges
+        // to the rest of the domain nodes with higher indices.
+
+        processNode(node);
         return true;
     }
 
 private:
+    void processNode(ControlNode& node) {
+        // In order to keep graph strongly connected, we link
+        // node to the next one. This edge would be interpreted
+        // as a control flow edge, not the stack value flow edge.
+
+        // Linking pending node
+        if (m_nodeToLink) {
+            m_nodeToLink->addEdge(&node);
+            m_nodeToLink = 0;
+        }
+
+        TNodeSet& outEdges = node.getOutEdges();
+        TNodeSet::iterator iNode = outEdges.begin();
+        bool isNodeLinked = false;
+        for (; iNode != outEdges.end(); ++iNode) {
+            // Checking for connectivity
+            if ((*iNode)->getDomain() == node.getDomain() && (*iNode)->getIndex() > node.getIndex()) {
+                // Node is linked. No need to worry.
+                isNodeLinked = true;
+                break;
+            }
+        }
+
+        if (! isNodeLinked)
+            m_nodeToLink = &node;
+    }
+
     void processBranching() {
         // Current domain's entry point should be linked to the terminators of referring domains
         InstructionNode* const entryPoint = m_currentDomain->getEntryPoint();
@@ -220,6 +255,7 @@ private:
     void processRequest(std::size_t index, const ControlDomain::TArgumentRequest& request);
 
     ControlDomain* m_currentDomain;
+    ControlNode*   m_nodeToLink;
 };
 
 void GraphLinker::processRequest(std::size_t index, const ControlDomain::TArgumentRequest& request)
