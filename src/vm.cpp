@@ -317,13 +317,13 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     // such as sendMessage to a receiver with our block as a parameter or something similar.
 
     // New byte pointer that points to the code right after the inline block
-    uint16_t newBytePointer = ec.instruction.getExtra();
+    const uint16_t newBytePointer = ec.instruction.getExtra();
 
     // Creating block object
     hptr<TBlock> newBlock = newObject<TBlock>();
 
     // Allocating block's stack
-    uint32_t stackSize = ec.currentContext->method->stackSize;
+    const uint32_t stackSize = ec.currentContext->method->stackSize;
     newBlock->stack    = newObject<TObjectArray>(stackSize/*, false*/);
 
     newBlock->argumentLocation = ec.instruction.getArgument();
@@ -653,7 +653,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
 
 SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TVMExecutionContext& ec)
 {
-    uint8_t opcode = ec.instruction.getArgument();
+    uint8_t opcode = ec.instruction.getExtra();
 
     // First of all, executing the primitive
     // If primitive succeeds then stop execution of the current method

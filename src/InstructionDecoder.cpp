@@ -32,11 +32,9 @@ const TSmalltalkInstruction InstructionDecoder::decodeAndShiftPointer(const TByt
             break;
 
         case opcode::doPrimitive:
-            // Primitive number do not fit into lower 4 bits of opcode byte.
-            // So it is stored in a separate byte right after. Technically,
-            // this value is an argument for instruction so it would be logical
-            // to hold it in the argument field.
-            argument = byteCodes[bytePointer++];
+            // The index number of the primitive number does not fit 4 lower bits of the opcode.
+            // So it is stored in a separate byte right after 'argument'.
+            extra = byteCodes[bytePointer++];
             break;
 
         case opcode::doSpecial:
