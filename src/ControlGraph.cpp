@@ -249,24 +249,29 @@ private:
     void processArgumentRequests() {
         const ControlDomain::TRequestList& requestList = m_currentDomain->getRequestedArguments();
         for (std::size_t index = 0; index < requestList.size(); index++)
-            processRequest(index, requestList[index]);
+            processRequest(m_currentDomain, index, requestList[index]);
     }
 
-    void processRequest(std::size_t index, const ControlDomain::TArgumentRequest& request);
+    void processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request) {
+        ControlNode* node = getRequestedNode(domain, argumentIndex);
+        node->addEdge(request.requestingNode);
+        request.requestingNode->setArgument(request.index, node);
+    }
+
+    ControlNode* getRequestedNode(ControlDomain* domain, std::size_t index);
 
     ControlDomain* m_currentDomain;
     ControlNode*   m_nodeToLink;
 };
 
-void GraphLinker::processRequest(std::size_t index, const ControlDomain::TArgumentRequest& request)
+ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t argumentIndex)
 {
-    const BasicBlock::TBasicBlockSet& refererBlocks = m_currentDomain->getBasicBlock()->getReferers();
+    const BasicBlock::TBasicBlockSet& refererBlocks = domain->getBasicBlock()->getReferers();
 
     // In case of exactly one referer we may link values directly
-    const bool singleReferer = (refererBlocks.size() == 1);
-
     // Otherwise we should iterate through all referers and aggregate values using phi node
-    PhiNode* const phiNode = singleReferer ? 0 : m_graph->newNode<PhiNode>();
+    const bool singleReferer = (refererBlocks.size() == 1);
+    ControlNode* result = singleReferer ? 0 : m_graph->newNode<PhiNode>();
 
     BasicBlock::TBasicBlockSet::iterator iBlock = refererBlocks.begin();
     for (; iBlock != refererBlocks.end(); ++iBlock) {
@@ -274,25 +279,29 @@ void GraphLinker::processRequest(std::size_t index, const ControlDomain::TArgume
         const TNodeList&     refererStack  = refererDomain->getLocalStack();
         const std::size_t    refererStackSize = refererStack.size();
 
-        if (index > refererStackSize - 1) {
-            // TODO Referer block do not have enough values on it's stack.
-            //      We need to go deeper and process it's referers in turn.
-        } else {
-            const std::size_t valueIndex = refererStackSize - 1 - index;
-            ControlNode* value = refererStack[valueIndex];
+        if (argumentIndex > refererStackSize - 1) {
+            // Referer block do not have enough values on it's stack.
+            // We need to go deeper and process it's referers in turn.
+            ControlNode* refererValue = getRequestedNode(refererDomain, argumentIndex);
 
             if (singleReferer)
-                value->addEdge(request.requestingNode);
+                result = refererValue;
             else
-                value->addEdge(phiNode);
+                refererValue->addEdge(result);
+
+        } else {
+            const std::size_t valueIndex = refererStackSize - 1 - argumentIndex;
+            ControlNode* stackValue = refererStack[valueIndex];
+
+            if (singleReferer)
+                result = stackValue;
+            else
+                stackValue->addEdge(result);
         }
     }
 
-    if (! singleReferer) {
-        phiNode->setPhiIndex(index);
-        phiNode->addEdge(request.requestingNode);
-        request.requestingNode->setArgument(request.index, phiNode);
-    }
+    assert(result);
+    return result;
 }
 
 void ControlGraph::buildGraph()
