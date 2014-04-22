@@ -1,60 +1,70 @@
-/*
- *    TInstruction.cpp
- *
- *    Helper functions for TInstruction class
- *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
- *
- *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
- *
- *    LLST is based on the LittleSmalltalk which is
- *        Copyright (C) 1987-2005 by Timothy A. Budd
- *        Copyright (C) 2007 by Charles R. Childers
- *        Copyright (C) 2005-2007 by Danny Reinhold
- *
- *    Original license of LittleSmalltalk may be found in the LICENSE file.
- *
- *
- *    This file is part of LLST.
- *    LLST is free software: you can redistribute it and/or modify
- *    it under the terms of the GNU General Public License as published by
- *    the Free Software Foundation, either version 3 of the License, or
- *    (at your option) any later version.
- *
- *    LLST is distributed in the hope that it will be useful,
- *    but WITHOUT ANY WARRANTY; without even the implied warranty of
- *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *    GNU General Public License for more details.
- *
- *    You should have received a copy of the GNU General Public License
- *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-#include <types.h>
-#include <opcodes.h>
+#include <instructions.h>
 #include <stdexcept>
 
-std::string TInstruction::toString()
+bool st::TSmalltalkInstruction::isTerminator() const
+{
+    if (m_opcode != opcode::doSpecial)
+        return false;
+
+    if (isBranch())
+        return true;
+
+    switch (m_argument) {
+        case special::stackReturn:
+        case special::selfReturn:
+        case special::blockReturn:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+bool st::TSmalltalkInstruction::isBranch() const
+{
+    if (m_opcode != opcode::doSpecial)
+        return false;
+
+    switch (m_argument) {
+        case special::branch:
+        case special::branchIfFalse:
+        case special::branchIfTrue:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
+std::string st::TSmalltalkInstruction::toString() const
 {
     std::ostringstream ss;
 
-    int iHigh = high;
-    int iLow  = low;
+    int argument = m_argument; // They should be ints to be displayed
+    int extra = m_extra; // correctly by stringstream
 
     std::ostringstream errSs;
-    errSs << "Unknown instrunction {" << iHigh << ", " << iLow << "}";
+    errSs << "Unknown instrunction {" << m_opcode << ", " << argument << ", " << extra << "}";
 
-    switch(high)
+    switch(m_opcode)
     {
-        case opcode::pushInstance:    ss << "PushInstance " << iLow;  break;
-        case opcode::pushArgument:    ss << "PushArgument " << iLow;  break;
-        case opcode::pushTemporary:   ss << "PushTemporary " << iLow; break;
-        case opcode::pushLiteral:     ss << "PushLiteral " << iLow;   break;
+        case opcode::pushInstance:    ss << "PushInstance " << argument;      break;
+        case opcode::pushArgument:    ss << "PushArgument " << argument;      break;
+        case opcode::pushTemporary:   ss << "PushTemporary " << argument;     break;
+        case opcode::pushLiteral:     ss << "PushLiteral " << argument;       break;
+        case opcode::pushBlock:       ss << "PushBlock " << argument;         break;
+        case opcode::assignTemporary: ss << "AssignTemporary " << argument;   break;
+        case opcode::assignInstance:  ss << "AssignInstance " << argument;    break;
+        case opcode::markArguments:   ss << "MarkArguments " << argument;     break;
+        case opcode::sendMessage:     ss << "SendMessage ";                   break;
+
+        case opcode::doPrimitive: {
+            ss << "Primitive " << extra << " (" << argument << " arguments)";
+        } break;
+
         case opcode::pushConstant: {
             ss << "PushConstant ";
-            switch(low) {
+            switch(argument) {
                 case 0:
                 case 1:
                 case 2:
@@ -65,7 +75,7 @@ std::string TInstruction::toString()
                 case 7:
                 case 8:
                 case 9:
-                    ss << iLow;
+                    ss << argument;
                     break;
                 case pushConstants::nil:         ss << "nil";   break;
                 case pushConstants::trueObject:  ss << "true";  break;
@@ -75,16 +85,9 @@ std::string TInstruction::toString()
                 }
             }
         } break;
-        case opcode::pushBlock:       ss << "PushBlock " << iLow;       break;
-
-        case opcode::assignTemporary: ss << "AssignTemporary " << iLow; break;
-        case opcode::assignInstance:  ss << "AssignInstance " << iLow;  break;
-
-        case opcode::markArguments:   ss << "MarkArguments " << iLow;   break;
-
         case opcode::sendUnary: {
             ss << "SendUnary ";
-            switch(low) {
+            switch(argument) {
                 case unaryBuiltIns::isNil:  ss << "isNil";    break;
                 case unaryBuiltIns::notNil: ss << "isNotNil"; break;
                 default: {
@@ -94,7 +97,7 @@ std::string TInstruction::toString()
         } break;
         case opcode::sendBinary: {
             ss << "SendBinary ";
-            switch(low) {
+            switch(argument) {
                 case binaryBuiltIns::operatorPlus:     ss << "+";  break;
                 case binaryBuiltIns::operatorLess:     ss << "<";  break;
                 case binaryBuiltIns::operatorLessOrEq: ss << "<="; break;
@@ -103,11 +106,9 @@ std::string TInstruction::toString()
                 }
             }
         } break;
-        case opcode::sendMessage: ss << "SendMessage "; break;
-
         case opcode::doSpecial: {
             ss << "Special ";
-            switch(low) {
+            switch(argument) {
                 case special::selfReturn:       ss << "selfReturn";     break;
                 case special::stackReturn:      ss << "stackReturn";    break;
                 case special::blockReturn:      ss << "blockReturn";    break;
@@ -122,7 +123,6 @@ std::string TInstruction::toString()
                 }
             }
         } break;
-        case opcode::doPrimitive: ss << "Primitive"; break;
 
         default: {
             throw std::runtime_error(errSs.str());

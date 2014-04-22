@@ -376,13 +376,4 @@ struct TProcess : public TObject {
     static const char* InstanceClassName() { return "Process"; }
 };
 
-// TInstruction represents one decoded Smalltalk instruction.
-// Actual meaning of parts is determined during the execution.
-struct TInstruction {
-    uint8_t low;
-    uint8_t high;
-
-    std::string toString();
-};
-
 #endif

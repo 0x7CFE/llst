@@ -40,40 +40,9 @@ struct TSmalltalkInstruction {
             static_cast<TUnpackedBytecode>(m_argument) << 8 |
             static_cast<TUnpackedBytecode>(m_extra) << 16;
     }
-
-    bool isTerminator() const {
-        if (m_opcode != opcode::doSpecial)
-            return false;
-
-        if (isBranch())
-            return true;
-
-        switch (m_argument) {
-            case special::stackReturn:
-            case special::selfReturn:
-            case special::blockReturn:
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
-    bool isBranch() const {
-        if (m_opcode != opcode::doSpecial)
-            return false;
-
-        switch (m_argument) {
-            case special::branch:
-            case special::branchIfFalse:
-            case special::branchIfTrue:
-                return true;
-
-            default:
-                return false;
-        }
-    }
-
+    bool isTerminator() const;
+    bool isBranch() const;
+    std::string toString() const;
 private:
     TOpcode   m_opcode;
     TArgument m_argument;
