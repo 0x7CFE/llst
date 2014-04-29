@@ -17,3 +17,5 @@ macro(cxx_test pretty_name bin_name sources libs)
 endmacro()
 
 include_directories(${CMAKE_SOURCE_DIR}/include)
+
+cxx_test(TSmalltalkInstruction test_tsmalltalk_instruction "${CMAKE_CURRENT_SOURCE_DIR}/tsmalltalk_instruction.cpp" "stapi;-pthread")
