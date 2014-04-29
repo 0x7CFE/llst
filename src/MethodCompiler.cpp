@@ -39,6 +39,7 @@
 #include <iostream>
 #include <sstream>
 #include <opcodes.h>
+#include <analysis.h>
 
 using namespace llvm;
 
@@ -362,75 +363,18 @@ Value* MethodCompiler::TJITContext::getSelf()
 
 bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
 {
-    // This pass is used to find out whether method code contains block return instruction.
+    // Here we trying to find out whether method code contains block return instruction.
     // This instruction is handled in a very different way than the usual opcodes.
     // Thus requires special handling. Block return is done by trowing an exception out of
     // the block containing it. Then it's catched by the method's code to perform a return.
     // In order not to bloat the code with unused try-catch code we're previously scanning
     // the method's code to ensure that try-catch is really needed. If it is not, we simply
-    // skip its generation. Note that we need to scan not only the actual method code but
-    // also every nested block, because typically block return is located there.
+    // skip its generation.
 
-    uint32_t previousBytePointer = jit.bytePointer;
+    st::BlockReturnDetector detector(&jit.parsedMethod);
+    detector.run();
 
-    TByteObject& byteCodes   = * jit.method->byteCodes;
-    uint32_t     stopPointer = jit.bytePointer + (byteCount ? byteCount : byteCodes.getSize());
-
-    // Processing the method's bytecodes
-    while (jit.bytePointer < stopPointer) {
-        // Decoding the pending instruction (TODO move to a function)
-        TInstruction instruction;
-        instruction.low = (instruction.high = byteCodes[jit.bytePointer++]) & 0x0F;
-        instruction.high >>= 4;
-        if (instruction.high == opcode::extended) {
-            instruction.high = instruction.low;
-            instruction.low  = byteCodes[jit.bytePointer++];
-        }
-
-        if (instruction.high == opcode::pushBlock) {
-            uint16_t newBytePointer = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-            jit.bytePointer += 2;
-
-            // Recursively processing the nested block
-            if (scanForBlockReturn(jit, newBytePointer - jit.bytePointer)) {
-                // Resetting bytePointer to an old value
-                jit.bytePointer = previousBytePointer;
-                return true;
-            }
-
-            // Skipping block's bytecodes
-            jit.bytePointer = newBytePointer;
-        }
-
-        if (instruction.high == opcode::doPrimitive) {
-            jit.bytePointer++; // skipping primitive number
-            continue;
-        }
-
-        // We're now looking only for branch bytecodes
-        if (instruction.high != opcode::doSpecial)
-            continue;
-
-        switch (instruction.low) {
-            case special::blockReturn:
-                // outs() << "Found a block return at offset " << currentOffset << "\n";
-
-                // Resetting bytePointer to an old value
-                jit.bytePointer = previousBytePointer;
-                return true;
-
-            case special::branch:
-            case special::branchIfFalse:
-            case special::branchIfTrue:
-                //uint32_t targetOffset  = byteCodes[jit.bytePointer] | (byteCodes[jit.bytePointer+1] << 8);
-                jit.bytePointer += 2; // skipping the branch offset data
-                continue;
-        }
-    }
-
-    // Resetting bytePointer to an old value
-    jit.bytePointer = previousBytePointer;
-    return false;
+    return detector.isBlockReturnFound();
 }
 
 void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*/)
