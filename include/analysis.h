@@ -136,7 +136,7 @@ public:
         m_arguments[index] = value;
     }
 
-    uint32_t addArgument(ControlNode* value) {
+    std::size_t addArgument(ControlNode* value) {
         m_arguments.push_back(value);
         return m_arguments.size() - 1;
     }
@@ -213,7 +213,7 @@ public:
         return value;
     }
 
-    void requestArgument(uint32_t index, InstructionNode* forNode) {
+    void requestArgument(std::size_t index, InstructionNode* forNode) {
         if (! m_localStack.empty()) {
             ControlNode* argument = popValue();
             argument->addEdge(forNode);
@@ -224,7 +224,7 @@ public:
     }
 
     struct TArgumentRequest {
-        uint32_t index;
+        std::size_t index;
         InstructionNode* requestingNode;
     };
     typedef std::vector<TArgumentRequest> TRequestList;
