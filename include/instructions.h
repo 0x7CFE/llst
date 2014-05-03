@@ -35,7 +35,10 @@ struct TSmalltalkInstruction {
 
     // Return fixed width representation of bytecode suitable for storing in arrays
     TUnpackedBytecode serialize() const {
-        return static_cast<uint8_t>(m_opcode) | (m_argument << 8) | (m_extra << 16);
+        return
+            static_cast<TUnpackedBytecode>(m_opcode) |
+            static_cast<TUnpackedBytecode>(m_argument) << 8 |
+            static_cast<TUnpackedBytecode>(m_extra) << 16;
     }
 
     bool isTerminator() const {
