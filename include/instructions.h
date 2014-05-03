@@ -64,9 +64,9 @@ struct TSmalltalkInstruction {
             return false;
 
         switch (m_argument) {
-            case special::stackReturn:
-            case special::selfReturn:
-            case special::blockReturn:
+            case special::branch:
+            case special::branchIfFalse:
+            case special::branchIfTrue:
                 return true;
 
             default:
