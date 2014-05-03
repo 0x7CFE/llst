@@ -66,46 +66,48 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
 
     decoder.setBytePointer(startOffset);
     while (decoder.getBytePointer() < stopPointer) {
-        // Switching basic block if current offset is a branch target
-        const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(decoder.getBytePointer());
-        if (iBlock != m_offsetToBasicBlock.end()) {
-            BasicBlock* const nextBlock = iBlock->second;
+        if (decoder.getBytePointer()) {
+            // Switching basic block if current offset is a branch target
+            const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(decoder.getBytePointer());
+            if (iBlock != m_offsetToBasicBlock.end()) {
+                BasicBlock* const nextBlock = iBlock->second;
 
-            // Checking if previous block referred current block
-            // by jumping into it and adding reference if needed
-            TSmalltalkInstruction terminator(opcode::extended);
-            if (currentBasicBlock->getTerminator(terminator)) {
-                if (terminator.isBranch()) {
-                    if (terminator.getExtra() == decoder.getBytePointer()) {
-                        // Unconditional branch case
-                        assert(terminator.getArgument() == special::branch);
-                        nextBlock->getReferers().insert(currentBasicBlock);
-                    } else {
-                        // Previous block referred some other block instead.
-                        // Terminator is one of conditional branch instructions.
-                        // We need to refer both of branch targets here.
-                        assert(terminator.getArgument() == special::branchIfTrue
-                            || terminator.getArgument() == special::branchIfFalse);
+                // Checking if previous block referred current block
+                // by jumping into it and adding reference if needed
+                TSmalltalkInstruction terminator(opcode::extended);
+                if (currentBasicBlock->getTerminator(terminator)) {
+                    if (terminator.isBranch()) {
+                        if (terminator.getExtra() == decoder.getBytePointer()) {
+                            // Unconditional branch case
+                            assert(terminator.getArgument() == special::branch);
+                            nextBlock->getReferers().insert(currentBasicBlock);
+                        } else {
+                            // Previous block referred some other block instead.
+                            // Terminator is one of conditional branch instructions.
+                            // We need to refer both of branch targets here.
+                            assert(terminator.getArgument() == special::branchIfTrue
+                                || terminator.getArgument() == special::branchIfFalse);
 
-                        // Case when branch condition is not met
-                        nextBlock->getReferers().insert(currentBasicBlock);
+                            // Case when branch condition is not met
+                            nextBlock->getReferers().insert(currentBasicBlock);
 
-                        // Case when branch condition is met
-                        const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
-                        if (iTargetBlock != m_offsetToBasicBlock.end())
-                            iTargetBlock->second->getReferers().insert(currentBasicBlock);
-                        else
-                            assert(false);
+                            // Case when branch condition is met
+                            const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
+                            if (iTargetBlock != m_offsetToBasicBlock.end())
+                                iTargetBlock->second->getReferers().insert(currentBasicBlock);
+                            else
+                                assert(false);
+                        }
                     }
+                } else {
+                    // Adding branch instruction to link blocks
+                    currentBasicBlock->append(TSmalltalkInstruction(opcode::doSpecial, special::branch, decoder.getBytePointer()));
+                    nextBlock->getReferers().insert(currentBasicBlock);
                 }
-            } else {
-                // Adding branch instruction to link blocks
-                currentBasicBlock->append(TSmalltalkInstruction(opcode::doSpecial, special::branch, decoder.getBytePointer()));
-                nextBlock->getReferers().insert(currentBasicBlock);
-            }
 
-            // Switching to a new block
-            currentBasicBlock = nextBlock;
+                // Switching to a new block
+                currentBasicBlock = nextBlock;
+            }
         }
 
         // Fetching instruction and appending it to the current basic block
