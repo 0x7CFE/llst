@@ -169,6 +169,9 @@ public:
     TBasicBlockSet& getReferers() { return m_referers; }
 
     bool getTerminator(TSmalltalkInstruction& out) const {
+        if (m_instructions.empty())
+            return false;
+
         TSmalltalkInstruction result(m_instructions.back());
         if (result.isTerminator()) {
             out = result;
