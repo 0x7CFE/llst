@@ -13,15 +13,20 @@ template<> TauNode* ControlGraph::newNode<TauNode>() { return static_cast<TauNod
 
 class GraphConstructor : public InstructionVisitor {
 public:
-    GraphConstructor(ControlGraph* graph) : InstructionVisitor(graph->getParsedMethod()), m_graph(graph) { }
+    GraphConstructor(ControlGraph* graph)
+        : InstructionVisitor(graph->getParsedMethod()), m_graph(graph), m_skipStubInstructions(false) { }
 
     virtual bool visitBlock(BasicBlock& basicBlock) {
         m_currentDomain = m_graph->getDomainFor(&basicBlock);
         m_currentDomain->setBasicBlock(&basicBlock);
+        m_skipStubInstructions = false;
         return InstructionVisitor::visitBlock(basicBlock);
     }
 
     virtual bool visitInstruction(const TSmalltalkInstruction& instruction) {
+        if (m_skipStubInstructions)
+            return true;
+
         // Initializing instruction node
         InstructionNode* newNode = m_graph->newNode<InstructionNode>();
         newNode->setInstruction(instruction);
@@ -41,6 +46,7 @@ private:
 
     ControlGraph*  m_graph;
     ControlDomain* m_currentDomain;
+    bool m_skipStubInstructions;
 };
 
 void GraphConstructor::processNode(InstructionNode* node)
@@ -117,6 +123,11 @@ void GraphConstructor::processSpecials(InstructionNode* node)
         case special::branch:
             assert(! m_currentDomain->getTerminator());
             m_currentDomain->setTerminator(node);
+
+            // All instructions that go after terminator within current block
+            // are stubs that were added by the image builder. Control flow
+            // will never reach such instructions, so they may be ignored safely.
+            m_skipStubInstructions = true;
             break;
     }
 }
