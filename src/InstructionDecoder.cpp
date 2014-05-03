@@ -53,8 +53,8 @@ const TSmalltalkInstruction InstructionDecoder::decodeAndShiftPointer(const TByt
             }
             break;
 
-                default: // Nothing to do here
-                    break;
+        default: // Nothing to do here
+            break;
     }
 
     return TSmalltalkInstruction(opcode, argument, extra);
