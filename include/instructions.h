@@ -25,8 +25,8 @@ struct TSmalltalkInstruction {
     // Initialize instruction from the unpacked value
     TSmalltalkInstruction(TUnpackedBytecode bytecode) {
         m_opcode   = static_cast<TOpcode>(bytecode & 0xFF);
-        m_argument = static_cast<TArgument>((bytecode >> 8) & 0xFF);
-        m_extra    = static_cast<TExtra>((bytecode >> 16) & 0xFF);
+        m_argument = static_cast<TArgument>(bytecode >> 8);
+        m_extra    = static_cast<TExtra>(bytecode >> 16);
     }
 
     TOpcode getOpcode() const { return m_opcode; }
