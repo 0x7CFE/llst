@@ -90,6 +90,10 @@ public:
     virtual ~ControlNode() { }
     virtual TNodeType getNodeType() const = 0;
 
+    // Dynamically cast node to a specified type.
+    // If type does not match null is returned.
+    template<class T> T* cast();
+
     uint32_t getIndex() const { return m_index; }
 
     ControlDomain* getDomain() const { return m_domain; }
@@ -319,6 +323,10 @@ private:
     typedef std::map<BasicBlock*, ControlDomain*> TDomainMap;
     TDomainMap m_blocksToDomains;
 };
+
+template<> InstructionNode* ControlNode::cast<InstructionNode>();
+template<> PhiNode* ControlNode::cast<PhiNode>();
+template<> TauNode* ControlNode::cast<TauNode>();
 
 template<> InstructionNode* ControlGraph::newNode<InstructionNode>();
 template<> PhiNode* ControlGraph::newNode<PhiNode>();
