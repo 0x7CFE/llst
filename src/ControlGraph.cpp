@@ -1,3 +1,4 @@
+#include <cstdio>
 #include <analysis.h>
 
 using namespace st;
@@ -24,6 +25,8 @@ public:
         m_currentDomain = m_graph->getDomainFor(&basicBlock);
         m_currentDomain->setBasicBlock(&basicBlock);
         m_skipStubInstructions = false;
+
+        std::printf("GraphConstructor::visitBlock : block %p (%.2u), domain %p\n", &basicBlock, basicBlock.getOffset(), m_currentDomain);
         return InstructionVisitor::visitBlock(basicBlock);
     }
 
@@ -38,6 +41,11 @@ public:
         m_currentDomain->addNode(newNode);
 
         // Processing instruction by adding references
+        std::printf("GraphConstructor::visitInstruction : processing node %.2u %s%s \n",
+                    newNode->getIndex(),
+                    newNode->getInstruction().isBranch() ? "^" : "",
+                    newNode->getInstruction().isTerminator() ? "!" : ""
+                   );
         processNode(newNode);
 
         return true;
@@ -72,19 +80,27 @@ void GraphConstructor::processNode(InstructionNode* node)
 
         case opcode::assignTemporary: // TODO Link with tau node
         case opcode::assignInstance:
+            // FIXME should not pop/push the stack
+            m_currentDomain->requestArgument(0, node);
+            m_currentDomain->pushValue(node);
+            break;
+
         case opcode::sendUnary:
         case opcode::sendMessage:
             m_currentDomain->requestArgument(0, node);
+            m_currentDomain->pushValue(node);
             break;
 
         case opcode::sendBinary:
             m_currentDomain->requestArgument(1, node);
             m_currentDomain->requestArgument(0, node);
+            m_currentDomain->pushValue(node);
             break;
 
         case opcode::markArguments:
             for (uint32_t index = instruction.getArgument(); index > 0; )
                 m_currentDomain->requestArgument(--index, node);
+            m_currentDomain->pushValue(node);
             break;
 
         case opcode::doSpecial:
@@ -93,6 +109,7 @@ void GraphConstructor::processNode(InstructionNode* node)
 
         case opcode::doPrimitive:
             processPrimitives(node);
+            m_currentDomain->pushValue(node);
             break;
 
         default:
@@ -109,6 +126,14 @@ void GraphConstructor::processSpecials(InstructionNode* node)
         case special::blockReturn:
         case special::sendToSuper:
             m_currentDomain->requestArgument(0, node);
+
+            assert(! m_currentDomain->getTerminator());
+            m_currentDomain->setTerminator(node);
+
+            // All instructions that go after terminator within current block
+            // are stubs that were added by the image builder. Control flow
+            // will never reach such instructions, so they may be ignored safely.
+            m_skipStubInstructions = true;
             break;
 
         case special::duplicate:
@@ -202,6 +227,18 @@ public:
 
     virtual bool visitDomain(ControlDomain& domain) {
         m_currentDomain = &domain;
+
+        std::printf("GraphLinker::visitDomain : processing domain %p, block offset %.2u, referrers %u, local stack %u, requested args %.2u\n",
+                    &domain,
+                    domain.getBasicBlock()->getOffset(),
+                    domain.getBasicBlock()->getReferers().size(),
+                    domain.getLocalStack().size(),
+                    domain.getRequestedArguments().size()
+                   );
+
+        for (std::size_t index = 0; index < domain.getRequestedArguments().size(); index++)
+            std::printf("GraphLinker::visitDomain : arg request %u, node index %.2u\n",
+                        index, domain.getRequestedArguments()[index].requestingNode->getIndex());
 
         processBranching();
         processArgumentRequests();
@@ -322,6 +359,7 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
 void ControlGraph::buildGraph()
 {
     // Iterating through basic blocks of parsed method and constructing node domains
+    std::printf("Phase 1. Constructing control graph\n");
     GraphConstructor constructor(this);
     constructor.run();
 
@@ -329,6 +367,7 @@ void ControlGraph::buildGraph()
     // They're linked using phi nodes or a direct link if possible.
     // Also branching edges are added so graph remains linked even if
     // no stack relations exist.
+    std::printf("Phase 2. Linking control graph\n");
     GraphLinker linker(this);
     linker.run();
 }
