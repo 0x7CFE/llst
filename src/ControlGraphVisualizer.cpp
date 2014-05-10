@@ -1,6 +1,11 @@
 
 #include <visualization.h>
 
+#include <ogdf/layered/SugiyamaLayout.h>
+#include <ogdf/layered/OptimalRanking.h>
+#include <ogdf/layered/MedianHeuristic.h>
+#include <ogdf/layered/OptimalHierarchyLayout.h>
+
 bool ControlGraphVisualizer::visitDomain(st::ControlDomain& domain) {
     // TODO Create domain frame
 
@@ -38,6 +43,56 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
     return st::NodeVisitor::visitNode(node);
 }
 
+void ControlGraphVisualizer::setNodeProperties(st::ControlNode* node, ogdf::NodeElement* element) {
+    // Setting basic attributes
+    m_ogdfAttributes->shapeNode(element) = ogdf::GraphAttributes::oval;
+    m_ogdfAttributes->width(element)  = 32;
+    m_ogdfAttributes->height(element) = 32;
+
+    // Calculating node position
+    uint32_t newX = 0;
+    uint32_t newY = 0;
+
+    // We do not want to apply complex layout because our graph is pretty straighforward.
+    // So placing nodes in natural order but stacking argument nodes where possible.
+    if (node->getInEdges().size()) {
+        // Shifting to the next colon
+        newX = m_lastX + 64;
+        newY = 0;
+    } else {
+        // Stacking it with previous one.
+        newX = m_lastX;
+        newY = m_lastY + 64;
+    }
+
+    m_ogdfAttributes->x(element) = newX;
+    m_ogdfAttributes->y(element) = newY;
+
+    m_lastX = newX;
+    m_lastY = newY;
+
+    // Setting node label
+    ogdf::String& label = m_ogdfAttributes->labelNode(element);
+    switch (node->getNodeType()) {
+        case st::ControlNode::ntPhi:
+            label = "Phi";
+            m_ogdfAttributes->colorNode(element) = "grey";
+            break;
+
+        case st::ControlNode::ntTau:
+            label = "Tau";
+            m_ogdfAttributes->colorNode(element) = "green";
+            break;
+
+        case st::ControlNode::ntInstruction:
+            //label = node.cast<st::InstructionNode>()->getInstruction().toString();
+            m_ogdfAttributes->colorNode(element) = "blue";
+
+        default:
+            label = node->getIndex();
+    }
+}
+
 ogdf::NodeElement* ControlGraphVisualizer::getNodeFor(st::ControlNode* node) {
     TNodeMap::iterator iNode = m_nodes.find(node);
 
@@ -45,30 +100,7 @@ ogdf::NodeElement* ControlGraphVisualizer::getNodeFor(st::ControlNode* node) {
         return iNode->second;
 
     ogdf::NodeElement* element = m_ogdfGraph->newNode(node->getIndex());
-    m_ogdfAttributes->shapeNode(element) = ogdf::GraphAttributes::oval;
-    m_ogdfAttributes->width(element)  = 32;
-    m_ogdfAttributes->height(element) = 32;
-
-    ogdf::String& label = m_ogdfAttributes->labelNode(element);
-
-    switch (node->getNodeType()) {
-         case st::ControlNode::ntPhi:
-             label = "Phi";
-             m_ogdfAttributes->colorNode(element) = "grey";
-             break;
-
-         case st::ControlNode::ntTau:
-             label = "Tau";
-             m_ogdfAttributes->colorNode(element) = "green";
-             break;
-
-         case st::ControlNode::ntInstruction:
-             //label = node.cast<st::InstructionNode>()->getInstruction().toString();
-             m_ogdfAttributes->colorNode(element) = "blue";
-
-         default:
-             label = node->getIndex();
-    }
+    setNodeProperties(node, element);
 
     m_nodes[node] = element;
     return element;
@@ -97,6 +129,20 @@ void ControlGraphVisualizer::addEdge(st::ControlNode* from, st::ControlNode* to)
 
     if (to->getNodeType() == st::ControlNode::ntPhi)
         m_ogdfAttributes->colorEdge(edge) = "grey";
+}
+
+void ControlGraphVisualizer::applyLayout() {
+    ogdf::SugiyamaLayout SL;
+    SL.setRanking(new ogdf::OptimalRanking);
+    SL.setCrossMin(new ogdf::MedianHeuristic);
+
+//     ogdf::OptimalHierarchyLayout* ohl = new ogdf::OptimalHierarchyLayout;
+//     ohl->layerDistance(30.0);
+//     ohl->nodeDistance(25.0);
+//     ohl->weightBalancing(0.8);
+//     SL.setLayout(ohl);
+
+    SL.call(*m_ogdfAttributes);
 }
 
 void ControlGraphVisualizer::writeGraphTo(const std::string& fileName) {

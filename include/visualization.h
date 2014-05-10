@@ -4,8 +4,8 @@
 #include <map>
 #include <analysis.h>
 
-#include <../ogdf/ogdf/basic/Graph.h>
-#include <../ogdf/ogdf/basic/GraphAttributes.h>
+#include <ogdf/basic/Graph.h>
+#include <ogdf/basic/GraphAttributes.h>
 
 class ControlGraphVisualizer : public st::NodeVisitor {
 public:
@@ -20,6 +20,8 @@ public:
 private:
     ogdf::NodeElement* getNodeFor(st::ControlNode*);
     void addEdge(st::ControlNode* from, st::ControlNode* to);
+    void applyLayout();
+    void setNodeProperties(st::ControlNode* node, ogdf::NodeElement* element);
 
 private:
     ogdf::Graph* m_ogdfGraph;
@@ -27,6 +29,9 @@ private:
 
     typedef std::map<st::ControlNode*, ogdf::NodeElement*> TNodeMap;
     TNodeMap m_nodes;
+
+    uint32_t m_lastX;
+    uint32_t m_lastY;
 };
 
 #endif
