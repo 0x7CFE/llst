@@ -159,7 +159,8 @@ public:
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
 
-    template<typename T> T* cast() const { return static_cast<T*>(this); }
+    template<typename T> T* cast() { return static_cast<T*>(this); }
+    template<typename T> const T* cast() const { return static_cast<const T*>(this); }
 
     // Helper constant for template instantination
     enum { InstancesAreBinary = false };
