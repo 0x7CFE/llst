@@ -198,10 +198,7 @@ public:
     iterator begin() { return m_basicBlocks.begin(); }
     iterator end() { return m_basicBlocks.end(); }
 
-    BasicBlock* createBasicBlock(uint16_t blockOffset = 0) {
-        m_basicBlocks.push_back(new BasicBlock(blockOffset));
-        return m_basicBlocks.back();
-    }
+    BasicBlock* createBasicBlock(uint16_t blockOffset);
 
     virtual ~ParsedBytecode() {
         for (TBasicBlockList::iterator iBlock = m_basicBlocks.begin(),
@@ -235,6 +232,9 @@ protected:
 
     typedef std::map<uint16_t, BasicBlock*> TOffsetToBasicBlockMap;
     TOffsetToBasicBlockMap m_offsetToBasicBlock;
+
+private:
+    void updateReferences(BasicBlock* currentBasicBlock, BasicBlock* nextBlock, InstructionDecoder& decoder);
 };
 
 class ParsedBlock;

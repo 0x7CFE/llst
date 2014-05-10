@@ -45,32 +45,16 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             case special::branchIfTrue:
             case special::branchIfFalse: {
                 // Processing skip block
-                const uint16_t skipOffset = decoder.getBytePointer();
-
-                // Checking whether current branch target is already known
-                if (m_offsetToBasicBlock.find(skipOffset) == m_offsetToBasicBlock.end()) {
-                    // Creating the referred basic block and inserting it into the function
-                    // Later it will be filled with instructions and linked to other blocks
-                    BasicBlock* skipBasicBlock = createBasicBlock(skipOffset);
-                    m_offsetToBasicBlock[skipOffset] = skipBasicBlock;
-
-                    std::printf("%.4u : branch to skip block %p (%u)\n", currentBytePointer, skipBasicBlock, skipOffset);
-                }
-
+                const uint16_t skipOffset  = decoder.getBytePointer();
+                BasicBlock* skipBasicBlock = createBasicBlock(skipOffset);
+                std::printf("%.4u : branch to skip block %p (%u)\n", currentBytePointer, skipBasicBlock, skipOffset);
             } // no break here
 
             case special::branch: {
-                const uint16_t targetOffset = instruction.getExtra();
-
-                // Checking whether current branch target is already known
-                if (m_offsetToBasicBlock.find(targetOffset) == m_offsetToBasicBlock.end()) {
-                    // Creating the referred basic block and inserting it into the function
-                    // Later it will be filled with instructions and linked to other blocks
-                    BasicBlock* targetBasicBlock = createBasicBlock(targetOffset);
-                    m_offsetToBasicBlock[targetOffset] = targetBasicBlock;
-
-                    std::printf("%.4u : branch to target block %p (%u)\n", currentBytePointer, targetBasicBlock, targetOffset);
-                }
+                // Processing target block
+                const uint16_t targetOffset  = instruction.getExtra();
+                BasicBlock* targetBasicBlock = createBasicBlock(targetOffset);
+                std::printf("%.4u : branch to target block %p (%u)\n", currentBytePointer, targetBasicBlock, targetOffset);
             } break;
         }
     }
@@ -101,42 +85,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
 
                 // Checking if previous block referred current block
                 // by jumping into it and adding reference if needed
-                TSmalltalkInstruction terminator(opcode::extended);
-                if (currentBasicBlock->getTerminator(terminator)) {
-                    if (terminator.isBranch()) {
-                        if (terminator.getExtra() == decoder.getBytePointer()) {
-                            // Unconditional branch case
-                            assert(terminator.getArgument() == special::branch);
-
-                            std::printf("%.4u : block reference %p (%u) -> %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
-                            nextBlock->getReferers().insert(currentBasicBlock);
-                        } else {
-                            // Previous block referred some other block instead.
-                            // Terminator is one of conditional branch instructions.
-                            // We need to refer both of branch targets here.
-                            assert(terminator.getArgument() == special::branchIfTrue
-                                || terminator.getArgument() == special::branchIfFalse);
-
-                            // Case when branch condition is not met
-                            std::printf("%.4u : block reference %p (%u) ->F %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
-                            nextBlock->getReferers().insert(currentBasicBlock);
-
-                            // Case when branch condition is met
-                            const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
-                            if (iTargetBlock != m_offsetToBasicBlock.end()) {
-                                std::printf("%.4u : block reference %p (%u) ->T %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
-                                iTargetBlock->second->getReferers().insert(currentBasicBlock);
-                            } else
-                                assert(false);
-                        }
-                    }
-                } else {
-                    // Adding branch instruction to link blocks
-                    currentBasicBlock->append(TSmalltalkInstruction(opcode::doSpecial, special::branch, decoder.getBytePointer()));
-                    nextBlock->getReferers().insert(currentBasicBlock);
-
-                    std::printf("%.4u : linking blocks %p (%u) ->  %p (%u) with branch instruction\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
-                }
+                updateReferences(currentBasicBlock, nextBlock, decoder);
 
                 // Switching to a new block
                 currentBasicBlock = nextBlock;
@@ -163,5 +112,59 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             } else
                 assert(false);
         }
+    }
+}
+
+BasicBlock* ParsedBytecode::createBasicBlock(uint16_t blockOffset) {
+    // Checking whether current branch target is already known
+    TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(blockOffset);
+    if (iBlock != m_offsetToBasicBlock.end())
+        return iBlock->second;
+
+    // Creating the referred basic block and inserting it into the function
+    // Later it will be filled with instructions and linked to other blocks
+    BasicBlock* newBasicBlock = new BasicBlock(blockOffset);
+    m_offsetToBasicBlock[blockOffset] = newBasicBlock;
+    m_basicBlocks.push_back(newBasicBlock);
+
+    return newBasicBlock;
+}
+
+void ParsedBytecode::updateReferences(BasicBlock* currentBasicBlock, BasicBlock* nextBlock, InstructionDecoder& decoder) {
+    TSmalltalkInstruction terminator(opcode::extended);
+    if (currentBasicBlock->getTerminator(terminator)) {
+        if (terminator.isBranch()) {
+            if (terminator.getExtra() == decoder.getBytePointer()) {
+                // Unconditional branch case
+                assert(terminator.getArgument() == special::branch);
+
+                std::printf("%.4u : block reference %p (%u) -> %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
+                nextBlock->getReferers().insert(currentBasicBlock);
+            } else {
+                // Previous block referred some other block instead.
+                // Terminator is one of conditional branch instructions.
+                // We need to refer both of branch targets here.
+                assert(terminator.getArgument() == special::branchIfTrue
+                || terminator.getArgument() == special::branchIfFalse);
+
+                // Case when branch condition is not met
+                std::printf("%.4u : block reference %p (%u) ->F %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
+                nextBlock->getReferers().insert(currentBasicBlock);
+
+                // Case when branch condition is met
+                const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
+                if (iTargetBlock != m_offsetToBasicBlock.end()) {
+                    std::printf("%.4u : block reference %p (%u) ->T %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+                    iTargetBlock->second->getReferers().insert(currentBasicBlock);
+                } else
+                    assert(false);
+            }
+        }
+    } else {
+        // Adding branch instruction to link blocks
+        currentBasicBlock->append(TSmalltalkInstruction(opcode::doSpecial, special::branch, decoder.getBytePointer()));
+        nextBlock->getReferers().insert(currentBasicBlock);
+
+        std::printf("%.4u : linking blocks %p (%u) ->  %p (%u) with branch instruction\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
     }
 }
