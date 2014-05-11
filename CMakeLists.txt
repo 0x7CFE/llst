@@ -51,7 +51,6 @@ set (CMAKE_CXX_FLAGS_RELEASE "-O3")
 add_subdirectory(src)
 add_subdirectory(include)
 include_directories(include)
-include_directories(ogdf)
 
 # Base set of sources needed in every build
 set(CPP_FILES
@@ -89,8 +88,7 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-set_target_properties(llst PROPERTIES LINK_FLAGS "-L../ogdf/_release")
-target_link_libraries(llst ${LLVM_LIBS} ${READLINE_LIB} ${LLVM_LD_FLAGS} OGDF)
+target_link_libraries(llst ${LLVM_LIBS} ${READLINE_LIB} ${LLVM_LD_FLAGS})
 
 if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
     # this is a 64-bit OS
