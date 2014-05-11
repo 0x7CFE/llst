@@ -64,14 +64,19 @@ class ControlDomain;
 class ControlNode;
 
 typedef std::vector<ControlNode*> TNodeList;
-typedef std::set<ControlDomain*>  TDomainSet;
 
 class NodeIndexCompare {
 public:
     bool operator() (const ControlNode* a, const ControlNode* b);
 };
 
+class DomainOffsetCompare {
+public:
+    bool operator() (const ControlDomain* a, const ControlDomain* b);
+};
+
 typedef std::set<ControlNode*, NodeIndexCompare> TNodeSet;
+typedef std::set<ControlDomain*, DomainOffsetCompare>  TDomainSet;
 
 // ControlNode is a base class for elements of ControlGraph.
 // Elements of a graph represent various types of relations
@@ -236,7 +241,7 @@ public:
     const TRequestList& getRequestedArguments() const { return m_reqestedArguments; }
     const TNodeList& getLocalStack() const { return m_localStack; }
 
-    ControlDomain() : m_entryPoint(0), m_terminator(0), m_basicBlock(0) { }
+    ControlDomain(BasicBlock* basicBlock) : m_entryPoint(0), m_terminator(0), m_basicBlock(basicBlock) { }
 private:
     TNodeSet         m_nodes;
     InstructionNode* m_entryPoint;
@@ -281,8 +286,8 @@ public:
 
     template<class T> T* newNode();
 
-    ControlDomain* newDomain() {
-        ControlDomain* domain = new ControlDomain;
+    ControlDomain* newDomain(BasicBlock* basicBlock) {
+        ControlDomain* domain = new ControlDomain(basicBlock);
         m_domains.insert(domain);
         return domain;
     }
@@ -302,8 +307,7 @@ public:
     ControlDomain* getDomainFor(BasicBlock* basicBlock) {
         TDomainMap::iterator iDomain = m_blocksToDomains.find(basicBlock);
         if (iDomain == m_blocksToDomains.end()) {
-            ControlDomain* const domain = newDomain();
-            domain->setBasicBlock(basicBlock);
+            ControlDomain* const domain = newDomain(basicBlock);
             m_blocksToDomains[basicBlock] = domain;
             return domain;
         }

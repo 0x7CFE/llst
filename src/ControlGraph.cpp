@@ -8,6 +8,10 @@ bool NodeIndexCompare::operator() (const ControlNode* a, const ControlNode* b)
     return a->getIndex() < b->getIndex();
 }
 
+bool DomainOffsetCompare::operator() (const ControlDomain* a, const ControlDomain* b) {
+    return a->getBasicBlock()->getOffset() < b->getBasicBlock()->getOffset();
+}
+
 template<> InstructionNode* ControlNode::cast<InstructionNode>() { return this->getNodeType() == ntInstruction ? static_cast<InstructionNode*>(this) : 0; }
 template<> PhiNode* ControlNode::cast<PhiNode>() { return this->getNodeType() == ntPhi ? static_cast<PhiNode*>(this) : 0; }
 template<> TauNode* ControlNode::cast<TauNode>() { return this->getNodeType() == ntTau ? static_cast<TauNode*>(this) : 0; }
