@@ -84,7 +84,7 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
             break;
 
         case st::ControlNode::ntInstruction:
-            //label = node.cast<st::InstructionNode>()->getInstruction().toString();
+            label = node->cast<st::InstructionNode>()->getInstruction().toString();
             if (node->cast<st::InstructionNode>()->getInstruction().isTerminator())
                 color = "red";
             break;
@@ -93,7 +93,8 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
             ;
     }
 
-    m_stream << "\t\t" << label << node->getIndex() << " [ color=\"" << color << "\"];\n";
+    m_stream << "\t\t " << node->getIndex() << "[shape=box label=\"" << node->getIndex() << " : " << label << "\" color=\"" << color << "\"];\n";
+//     m_stream << "\t\t " << node->getIndex() << "[label=\"" << node->getIndex() /*<< " : " << label */<< "\" color=\"" << color << "\"];\n";
     m_processedNodes[node] = true;
 }
 
