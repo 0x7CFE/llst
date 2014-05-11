@@ -252,6 +252,7 @@ private:
 
         // Linking pending node
         if (m_nodeToLink) {
+            std::printf("GraphLinker::processNode : fallback linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
             m_nodeToLink->addEdge(&node);
             m_nodeToLink = 0;
         }
@@ -288,6 +289,7 @@ private:
             InstructionNode* const  terminator = refererDomain->getTerminator();
             assert(terminator && terminator->getInstruction().isBranch());
 
+            std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", terminator->getIndex(), entryPoint->getIndex());
             terminator->addEdge(entryPoint);
         }
     }
@@ -300,6 +302,8 @@ private:
 
     void processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request) {
         ControlNode* node = getRequestedNode(domain, argumentIndex);
+
+        std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", node->getIndex(), request.requestingNode->getIndex());
         node->addEdge(request.requestingNode);
         request.requestingNode->setArgument(request.index, node);
     }
