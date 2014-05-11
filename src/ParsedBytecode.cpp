@@ -157,12 +157,15 @@ void ParsedBytecode::updateReferences(BasicBlock* currentBasicBlock, BasicBlock*
     TSmalltalkInstruction terminator(opcode::extended);
     if (currentBasicBlock->getTerminator(terminator)) {
         if (terminator.isBranch()) {
-            if (terminator.getExtra() == decoder.getBytePointer()) {
+            if (terminator.getArgument() == special::branch) {
                 // Unconditional branch case
-                assert(terminator.getArgument() == special::branch);
-
-                std::printf("%.4u : block reference %p (%u) -> %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), nextBlock, nextBlock->getOffset());
-                nextBlock->getReferers().insert(currentBasicBlock);
+                const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
+                if (iTargetBlock != m_offsetToBasicBlock.end()) {
+                    std::printf("%.4u : block reference %p (%u) -> %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+                    iTargetBlock->second->getReferers().insert(currentBasicBlock);
+                } else {
+                    assert(false);
+                }
             } else {
                 // Previous block referred some other block instead.
                 // Terminator is one of conditional branch instructions.
@@ -179,8 +182,9 @@ void ParsedBytecode::updateReferences(BasicBlock* currentBasicBlock, BasicBlock*
                 if (iTargetBlock != m_offsetToBasicBlock.end()) {
                     std::printf("%.4u : block reference %p (%u) ->T %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
                     iTargetBlock->second->getReferers().insert(currentBasicBlock);
-                } else
+                } else {
                     assert(false);
+                }
             }
         }
     } else {
