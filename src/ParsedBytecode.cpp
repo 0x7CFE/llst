@@ -75,11 +75,18 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
 
     std::printf("Initial block is %p offset %u\n", currentBasicBlock, currentBasicBlock->getOffset());
 
+    // Instructions in a basic block that follow a terminator instruction
+    // will never be executed because control flow will never reach them.
+    // We need to skip such instructions because they may distort the actual
+    // control flow by introducing fake block dependencies.
+    bool terminatorEncoded = false;
+
     decoder.setBytePointer(startOffset);
     while (decoder.getBytePointer() < stopPointer) {
-        if (decoder.getBytePointer()) {
+        const uint16_t currentBytePointer = decoder.getBytePointer();
+        if (currentBytePointer) {
             // Switching basic block if current offset is a branch target
-            const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(decoder.getBytePointer());
+            const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(currentBytePointer);
             if (iBlock != m_offsetToBasicBlock.end()) {
                 BasicBlock* const nextBlock = iBlock->second;
 
@@ -89,13 +96,16 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
 
                 // Switching to a new block
                 currentBasicBlock = nextBlock;
-                std::printf("%.4u : now working on block %p offset %u\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset());
+
+                // Resetting the terminator flag
+                terminatorEncoded = false;
+
+                std::printf("%.4u : now working on block %p offset %u\n", currentBytePointer, currentBasicBlock, currentBasicBlock->getOffset());
             }
         }
 
         // Fetching instruction and appending it to the current basic block
         TSmalltalkInstruction instruction = decoder.decodeAndShiftPointer();
-        currentBasicBlock->append(instruction);
 
         // Skipping nested smalltalk block bytecodes
         if (instruction.getOpcode() == opcode::pushBlock) {
@@ -103,12 +113,25 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             continue;
         }
 
+        // Skipping dead code
+        if (terminatorEncoded) {
+            std::printf("%.4u : skipping dead code\n", currentBytePointer);
+            continue;
+        } else {
+            currentBasicBlock->append(instruction);
+        }
+
+        if (instruction.isTerminator()) {
+            std::printf("%.4u : terminator encoded\n", currentBytePointer);
+            terminatorEncoded = true;
+        }
+
         // Final check for the last instruction of the method
         if (decoder.getBytePointer() >= stopPointer && instruction.isBranch()) {
             const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(instruction.getExtra());
             if (iTargetBlock != m_offsetToBasicBlock.end()) {
                 iTargetBlock->second->getReferers().insert(currentBasicBlock);
-                std::printf("%.4u : block reference %p (%u) ->? %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+                std::printf("%.4u : block reference %p (%u) ->? %p (%u)\n", currentBytePointer, currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
             } else
                 assert(false);
         }
