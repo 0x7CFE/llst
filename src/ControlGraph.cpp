@@ -256,6 +256,10 @@ private:
             m_nodeToLink = 0;
         }
 
+        InstructionNode* instruction = node.cast<InstructionNode>();
+        if (instruction && instruction->getInstruction().isTerminator())
+            return; // terminator nodes will take care of themselves
+
         TNodeSet& outEdges = node.getOutEdges();
         TNodeSet::iterator iNode = outEdges.begin();
         bool isNodeLinked = false;
