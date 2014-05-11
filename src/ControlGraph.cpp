@@ -19,21 +19,17 @@ template<> TauNode* ControlGraph::newNode<TauNode>() { return static_cast<TauNod
 class GraphConstructor : public InstructionVisitor {
 public:
     GraphConstructor(ControlGraph* graph)
-        : InstructionVisitor(graph->getParsedMethod()), m_graph(graph), m_skipStubInstructions(false) { }
+        : InstructionVisitor(graph->getParsedMethod()), m_graph(graph) { }
 
     virtual bool visitBlock(BasicBlock& basicBlock) {
         m_currentDomain = m_graph->getDomainFor(&basicBlock);
         m_currentDomain->setBasicBlock(&basicBlock);
-        m_skipStubInstructions = false;
 
         std::printf("GraphConstructor::visitBlock : block %p (%.2u), domain %p\n", &basicBlock, basicBlock.getOffset(), m_currentDomain);
         return InstructionVisitor::visitBlock(basicBlock);
     }
 
     virtual bool visitInstruction(const TSmalltalkInstruction& instruction) {
-        if (m_skipStubInstructions)
-            return true;
-
         // Initializing instruction node
         InstructionNode* newNode = m_graph->newNode<InstructionNode>();
         newNode->setInstruction(instruction);
@@ -129,11 +125,6 @@ void GraphConstructor::processSpecials(InstructionNode* node)
 
             assert(! m_currentDomain->getTerminator());
             m_currentDomain->setTerminator(node);
-
-            // All instructions that go after terminator within current block
-            // are stubs that were added by the image builder. Control flow
-            // will never reach such instructions, so they may be ignored safely.
-            m_skipStubInstructions = true;
             break;
 
         case special::duplicate:
@@ -152,11 +143,6 @@ void GraphConstructor::processSpecials(InstructionNode* node)
         case special::branch:
             assert(! m_currentDomain->getTerminator());
             m_currentDomain->setTerminator(node);
-
-            // All instructions that go after terminator within current block
-            // are stubs that were added by the image builder. Control flow
-            // will never reach such instructions, so they may be ignored safely.
-            m_skipStubInstructions = true;
             break;
     }
 }
