@@ -5,6 +5,7 @@ set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 project(llst-project)
 
+find_package(Threads REQUIRED QUIET)
 find_package(READLINE)
 find_package(TINFO)
 find_package(LLVM 3.1 EXACT)
@@ -82,7 +83,7 @@ if (USE_LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS_TO_LINK} ${READLINE_LIBS_TO_LINK} pthread ${CMAKE_DL_LIBS})
+target_link_libraries(llst ${LLVM_LIBS_TO_LINK} ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 add_dependencies(llst image)
 
 set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
