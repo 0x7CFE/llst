@@ -7,31 +7,29 @@ project(llst-project)
 
 find_package(READLINE)
 find_package(TINFO)
+find_package(LLVM 3.1 EXACT)
 
 option(USE_READLINE "Should we use the GNU readline and history libraries?" ON)
+option(USE_LLVM "Should we use LLVM to build JIT?" OFF)
 
-if (LLVM)
-    if(LLVM_VERSION)
-        set (CONFIG_COMMAND "llvm-config-${LLVM_VERSION}")
+if (USE_LLVM)
+    if (LLVM_FOUND)
+        message(STATUS "Using LLVM ${LLVM_VERSION}")
+        set (CMAKE_C_FLAGS "${LLVM_C_FLAGS} ${CMAKE_C_FLAGS}")
+        set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
+        set (CMAKE_EXE_LINKER_FLAGS "${LLVM_LD_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
+
+        # LLVM generates loads of warnings...
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-cast-qual -Wno-unused-parameter")
+
+        set (LLVM_LIBS_TO_LINK ${LLVM_LIBS})
+        add_definitions(-DLLVM)
     else()
-        set (CONFIG_COMMAND "llvm-config")
+        message(FATAL_ERROR "\nInstall llvm-3.1-dev:i386 and try again.")
     endif()
-
-    # TODO Check that llvm-config is found and working
-
-    execute_process(COMMAND ${CONFIG_COMMAND} --cxxflags
-                    OUTPUT_STRIP_TRAILING_WHITESPACE
-                    OUTPUT_VARIABLE LLVM_CXX_FLAGS)
-
-    execute_process(COMMAND ${CONFIG_COMMAND} --ldflags
-                    OUTPUT_STRIP_TRAILING_WHITESPACE
-                    OUTPUT_VARIABLE LLVM_LD_FLAGS)
-
-    execute_process(COMMAND ${CONFIG_COMMAND} --libs all
-                    OUTPUT_STRIP_TRAILING_WHITESPACE
-                    OUTPUT_VARIABLE LLVM_LIBS)
-
-    add_definitions(-DLLVM)
+else()
+    message(STATUS "LLVM is disabled")
+    unset(LLVM_LIBS_TO_LINK)
 endif()
 
 if (USE_READLINE)
@@ -51,9 +49,6 @@ else()
     message(STATUS "Readline library is disabled")
     unset(READLINE_LIBS_TO_LINK)
 endif()
-
-set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
-set (CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${LLVM_LD_FLAGS}")
 
 add_subdirectory(src)
 add_subdirectory(include)
@@ -75,7 +70,7 @@ set(CPP_FILES
     src/vm.cpp
 )
 
-if (LLVM)
+if (USE_LLVM)
     # LLVM specific sources
     list(APPEND CPP_FILES
         src/LLVMMemoryManager.cpp
@@ -87,7 +82,7 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} ${READLINE_LIBS_TO_LINK} pthread ${CMAKE_DL_LIBS})
+target_link_libraries(llst ${LLVM_LIBS_TO_LINK} ${READLINE_LIBS_TO_LINK} pthread ${CMAKE_DL_LIBS})
 add_dependencies(llst image)
 
 set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
