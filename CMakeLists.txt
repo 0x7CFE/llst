@@ -5,6 +5,11 @@ set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 project(llst-project)
 
+find_package(READLINE)
+find_package(TINFO)
+
+option(USE_READLINE "Should we use the GNU readline and history libraries?" ON)
+
 if (LLVM)
     if(LLVM_VERSION)
         set (CONFIG_COMMAND "llvm-config-${LLVM_VERSION}")
@@ -29,22 +34,22 @@ if (LLVM)
     add_definitions(-DLLVM)
 endif()
 
-if (DEFINED READLINE)
-    set(USE_READLINE ${READLINE})
-else()
-    # Readline is a very common library and is supported on
-    # a wide variaty of platforms except redmond, so we're
-    # defaulting variable to true.
-    set(USE_READLINE "TRUE")
-endif()
-
 if (USE_READLINE)
-    message(STATUS "Using readline library")
-    set_source_files_properties(src/CompletionEngine.cpp PROPERTIES COMPILE_DEFINITIONS USE_READLINE)
-    set (READLINE_LIB "readline")
+    if (READLINE_FOUND AND TINFO_FOUND)
+        message(STATUS "Using readline library")
+        set_source_files_properties(src/CompletionEngine.cpp PROPERTIES COMPILE_DEFINITIONS USE_READLINE)
+        set (READLINE_LIBS_TO_LINK ${READLINE_LIBRARIES} ${TINFO_LIBRARIES})
+    else()
+        if(NOT TINFO_FOUND)
+            message(SEND_ERROR "Library readline depends on tinfo.\nYou may configure with -DUSE_READLINE=OFF.")
+        endif()
+        if(NOT READLINE_FOUND)
+            message(SEND_ERROR "Library readline is not found.\nYou may configure with -DUSE_READLINE=OFF.")
+        endif()
+    endif()
 else()
     message(STATUS "Readline library is disabled")
-    set (READLINE_LIB "")
+    unset(READLINE_LIBS_TO_LINK)
 endif()
 
 set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
@@ -82,7 +87,7 @@ if (LLVM)
 endif()
 
 add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS} ${READLINE_LIB} pthread ${CMAKE_DL_LIBS})
+target_link_libraries(llst ${LLVM_LIBS} ${READLINE_LIBS_TO_LINK} pthread ${CMAKE_DL_LIBS})
 add_dependencies(llst image)
 
 set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
