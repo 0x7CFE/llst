@@ -73,6 +73,8 @@ else()
 endif()
 
 
+add_subdirectory(doc)
+add_subdirectory(image)
 add_subdirectory(src)
 add_subdirectory(include)
 include_directories(include)
@@ -108,40 +110,12 @@ add_executable(llst ${CPP_FILES})
 target_link_libraries(llst ${LLVM_LIBS_TO_LINK} ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 add_dependencies(llst image)
 
-set (IMAGE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/image)
-add_custom_command(
-    OUTPUT  ${IMAGE_DIR}/LittleSmalltalk.image
-    COMMAND ${IMAGE_DIR}/imageBuilder
-    DEPENDS ${IMAGE_DIR}/imageSource.st
-    WORKING_DIRECTORY ${IMAGE_DIR}
-    COMMENT "Building image"
-)
-add_custom_target(image ALL DEPENDS ${IMAGE_DIR}/LittleSmalltalk.image)
-
-set (DOC_DIR ${CMAKE_CURRENT_SOURCE_DIR}/doc)
-set (POD_LLST_EN ${DOC_DIR}/llst.1.en.pod)
-set (MAN_LLST_EN ${CMAKE_CURRENT_BINARY_DIR}/llst.1.en)
-set (MAN_LLST_EN_GZ ${CMAKE_CURRENT_BINARY_DIR}/llst.1.en.gz)
-
-get_pod2man_cmd(MAN_LLST_EN_CMD FROM ${POD_LLST_EN} TO ${MAN_LLST_EN}
-    SECTION 1 CENTER "LLST Documentation"
-    RELEASE 0.2.1
-    NAME llst
-)
-add_custom_command(
-    OUTPUT ${MAN_LLST_EN}
-    COMMAND ${MAN_LLST_EN_CMD}
-    DEPENDS ${POD_LLST_EN}
-)
-add_custom_target(man_llst_en ALL DEPENDS ${MAN_LLST_EN})
-
-gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
-gzip_compress("compress_man_llst_en" ${MAN_LLST_EN} ${MAN_LLST_EN_GZ} man_llst_en)
+set(changelog_compressed "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
+gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" ${changelog_compressed})
 
 install(TARGETS llst DESTINATION bin)
 install(FILES LICENSE DESTINATION share/doc/${PROJECT_NAME} RENAME copyright)
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/changelog.gz DESTINATION share/doc/${PROJECT_NAME})
-install(FILES ${MAN_LLST_EN_GZ} DESTINATION share/man/man1/ RENAME llst.1.gz)
+install(FILES ${changelog_compressed} DESTINATION share/doc/${PROJECT_NAME})
 install(FILES misc/bash-completion.sh DESTINATION share/bash-completion/completions RENAME llst)
 
 
