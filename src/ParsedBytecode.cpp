@@ -30,7 +30,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             // Nested blocks are registered in the
             // container method, not the outer block.
             std::printf("%.4u : Parsing smalltalk block in interval [%u:%u)\n", currentBytePointer, startOffset, stopOffset);
-            //parseBlock(startOffset, stopOffset);
+            parseBlock(startOffset, stopOffset);
 
             // Skipping the nested block's bytecodes
             decoder.setBytePointer(stopOffset);
@@ -107,18 +107,18 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
         // Fetching instruction and appending it to the current basic block
         TSmalltalkInstruction instruction = decoder.decodeAndShiftPointer();
 
-        // Skipping nested smalltalk block bytecodes
-        if (instruction.getOpcode() == opcode::pushBlock) {
-            decoder.setBytePointer(instruction.getExtra());
-            continue;
-        }
-
         // Skipping dead code
         if (terminatorEncoded) {
             std::printf("%.4u : skipping dead code\n", currentBytePointer);
             continue;
         } else {
             currentBasicBlock->append(instruction);
+        }
+
+        // Skipping nested smalltalk block bytecodes
+        if (instruction.getOpcode() == opcode::pushBlock) {
+            decoder.setBytePointer(instruction.getExtra());
+            continue;
         }
 
         if (instruction.isTerminator()) {
