@@ -36,6 +36,48 @@ bool st::TSmalltalkInstruction::isBranch() const
     }
 }
 
+bool st::TSmalltalkInstruction::isValueProvider() const {
+    switch (m_opcode) {
+        case opcode::pushInstance:
+        case opcode::pushArgument:
+        case opcode::pushTemporary:
+        case opcode::pushLiteral:
+        case opcode::pushBlock:
+        case opcode::pushConstant:
+        case opcode::markArguments:
+        case opcode::sendMessage:
+        case opcode::sendUnary:
+        case opcode::sendBinary:
+            return true;
+
+        case opcode::assignTemporary:
+        case opcode::assignInstance:
+        case opcode::doPrimitive: // ?
+            return false;
+
+        case opcode::doSpecial:
+            switch (m_argument) {
+                case special::duplicate:
+                case special::sendToSuper:
+                    return true;
+
+                case special::selfReturn:
+                case special::stackReturn:
+                case special::blockReturn:
+                case special::popTop:
+                case special::branch:
+                case special::branchIfTrue:
+                case special::branchIfFalse:
+                    return false;
+            }
+    }
+}
+
+bool st::TSmalltalkInstruction::isValueConsumer() const {
+    assert(false); // TODO
+    return false;
+}
+
 std::string st::TSmalltalkInstruction::toString() const
 {
     std::ostringstream ss;

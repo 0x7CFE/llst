@@ -40,8 +40,18 @@ struct TSmalltalkInstruction {
             static_cast<TUnpackedBytecode>(m_argument) << 8 |
             static_cast<TUnpackedBytecode>(m_extra) << 16;
     }
+
+    bool operator ==(const TSmalltalkInstruction& instruction) const {
+        return
+            m_opcode   == instruction.m_opcode &&
+            m_argument == instruction.m_argument &&
+            m_extra    == instruction.m_extra;
+    }
+
     bool isTerminator() const;
     bool isBranch() const;
+    bool isValueProvider() const;
+    bool isValueConsumer() const;
     std::string toString() const;
 private:
     TOpcode   m_opcode;
