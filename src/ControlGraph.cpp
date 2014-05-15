@@ -354,6 +354,70 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
     return result;
 }
 
+class GraphOptimizer : public NodeVisitor {
+public:
+    GraphOptimizer(ControlGraph* graph) : NodeVisitor(graph) {}
+
+    virtual bool visitDomain(ControlDomain& domain) {
+        m_currentDomain = &domain;
+        return NodeVisitor::visitDomain(domain);
+    }
+
+    virtual bool visitNode(ControlNode& node) {
+        // If node pushes value on the stack but this value is not consumed
+        // by another node, or the only consumer is a popTop instruction
+        // then we may remove such node (or a node pair)
+
+        if (InstructionNode* instruction = node.cast<InstructionNode>()) {
+            if (! instruction->getInstruction().isValueProvider())
+                return NodeVisitor::visitNode(node);
+
+            TNodeSet consumers;
+            if (!getConsumers(instruction, consumers)) {
+                std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
+                m_nodesToDelete.push_back(instruction);
+            } else if (consumers.size() == 1) {
+                if (InstructionNode* consumer = (*consumers.begin())->cast<InstructionNode>()) {
+                    const TSmalltalkInstruction& consumerInstruction = consumer->getInstruction();
+                    if (consumerInstruction == TSmalltalkInstruction(opcode::doSpecial, special::popTop)) {
+                        std::printf("GraphOptimizer::visitNode : node %u is consumed only by popTop %u and may be removed\n",
+                                    instruction->getIndex(),
+                                    consumer->getIndex());
+
+                        m_nodesToDelete.push_back(consumer);
+                        m_nodesToDelete.push_back(instruction);
+                    }
+                }
+            }
+        }
+
+        return NodeVisitor::visitNode(node);
+    }
+
+private:
+    bool getConsumers(InstructionNode* node, TNodeSet& consumers) {
+        consumers.clear();
+
+        const TNodeSet& outEdges = node->getOutEdges();
+        TNodeSet::iterator iEdge = outEdges.begin();
+        for (; iEdge != outEdges.end(); ++iEdge) {
+            if (InstructionNode* instruction = (*iEdge)->cast<InstructionNode>()) {
+                const std::size_t argsCount = instruction->getArgumentsCount();
+                for (std::size_t index = 0; index < argsCount; index++) {
+                    if (instruction->getArgument(index) == node)
+                        consumers.insert(instruction);
+                }
+            }
+        }
+
+        return !consumers.empty();
+    }
+
+private:
+    TNodeList      m_nodesToDelete;
+    ControlDomain* m_currentDomain;
+};
+
 void ControlGraph::buildGraph()
 {
     // Iterating through basic blocks of parsed method and constructing node domains
@@ -368,4 +432,9 @@ void ControlGraph::buildGraph()
     std::printf("Phase 2. Linking control graph\n");
     GraphLinker linker(this);
     linker.run();
+
+    // Optimizing graph by removing stalled nodes and merging linear branch sequences
+    std::printf("Phase 3. Optimizing control graph\n");
+    GraphOptimizer optimizer(this);
+    optimizer.run();
 }
