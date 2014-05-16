@@ -35,7 +35,7 @@ public:
 
     virtual bool visitInstruction(const TSmalltalkInstruction& instruction) {
         // Initializing instruction node
-        InstructionNode* newNode = m_graph->newNode<InstructionNode>();
+        InstructionNode* const newNode = m_graph->newNode<InstructionNode>();
         newNode->setInstruction(instruction);
         newNode->setDomain(m_currentDomain);
         m_currentDomain->addNode(newNode);
@@ -257,7 +257,7 @@ private:
             m_nodeToLink = 0;
         }
 
-        InstructionNode* instruction = node.cast<InstructionNode>();
+        InstructionNode* const instruction = node.cast<InstructionNode>();
         if (instruction && instruction->getInstruction().isTerminator())
             return; // terminator nodes will take care of themselves
 
@@ -301,7 +301,7 @@ private:
     }
 
     void processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request) {
-        ControlNode* node = getRequestedNode(domain, argumentIndex);
+        ControlNode* const node = getRequestedNode(domain, argumentIndex);
 
         std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", node->getIndex(), request.requestingNode->getIndex());
         node->addEdge(request.requestingNode);
@@ -332,7 +332,7 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
         if (!refererStackSize || argumentIndex > refererStackSize - 1) {
             // Referer block do not have enough values on it's stack.
             // We need to go deeper and process it's referers in turn.
-            ControlNode* refererValue = getRequestedNode(refererDomain, argumentIndex);
+            ControlNode* const refererValue = getRequestedNode(refererDomain, argumentIndex);
 
             if (singleReferer)
                 result = refererValue;
@@ -340,8 +340,8 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
                 refererValue->addEdge(result);
 
         } else {
-            const std::size_t valueIndex = refererStackSize - 1 - argumentIndex;
-            ControlNode* stackValue = refererStack[valueIndex];
+            const std::size_t  valueIndex = refererStackSize - 1 - argumentIndex;
+            ControlNode* const stackValue = refererStack[valueIndex];
 
             if (singleReferer)
                 result = stackValue;
@@ -368,16 +368,16 @@ public:
         // by another node, or the only consumer is a popTop instruction
         // then we may remove such node (or a node pair)
 
-        if (InstructionNode* instruction = node.cast<InstructionNode>()) {
+        if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
             if (! instruction->getInstruction().isValueProvider())
                 return NodeVisitor::visitNode(node);
 
             TNodeSet consumers;
-            if (!getConsumers(instruction, consumers)) {
+            if (! getConsumers(instruction, consumers)) {
                 std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
                 m_nodesToDelete.push_back(instruction);
             } else if (consumers.size() == 1) {
-                if (InstructionNode* consumer = (*consumers.begin())->cast<InstructionNode>()) {
+                if (InstructionNode* const consumer = (*consumers.begin())->cast<InstructionNode>()) {
                     const TSmalltalkInstruction& consumerInstruction = consumer->getInstruction();
                     if (consumerInstruction == TSmalltalkInstruction(opcode::doSpecial, special::popTop)) {
                         std::printf("GraphOptimizer::visitNode : node %u is consumed only by popTop %u and may be removed\n",
@@ -401,7 +401,7 @@ private:
         const TNodeSet& outEdges = node->getOutEdges();
         TNodeSet::iterator iEdge = outEdges.begin();
         for (; iEdge != outEdges.end(); ++iEdge) {
-            if (InstructionNode* instruction = (*iEdge)->cast<InstructionNode>()) {
+            if (InstructionNode* const instruction = (*iEdge)->cast<InstructionNode>()) {
                 const std::size_t argsCount = instruction->getArgumentsCount();
                 for (std::size_t index = 0; index < argsCount; index++) {
                     if (instruction->getArgument(index) == node)
