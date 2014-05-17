@@ -83,17 +83,26 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
             color = "green";
             break;
 
-        case st::ControlNode::ntInstruction:
-            label = node->cast<st::InstructionNode>()->getInstruction().toString();
-            if (node->cast<st::InstructionNode>()->getInstruction().isTerminator())
+        case st::ControlNode::ntInstruction: {
+            st::InstructionNode* instruction = node->cast<st::InstructionNode>();
+            label = instruction->getInstruction().toString();
+
+            const bool isTerminator = instruction->getInstruction().isTerminator();
+            const bool isEntryPoint = (instruction == instruction->getDomain()->getEntryPoint());
+
+            if (isTerminator && isEntryPoint)
+                color = "green3;red";
+            else if (isEntryPoint)
+                color = "green3";
+            else if (isTerminator)
                 color = "red";
-            break;
+        } break;
 
         default:
             ;
     }
 
-    m_stream << "\t\t " << node->getIndex() << "[shape=box label=\"" << node->getIndex() << " : " << label << "\" color=\"" << color << "\"];\n";
+    m_stream << "\t\t" << node->getIndex() << " [shape=box label=\"" << node->getDomain()->getBasicBlock()->getOffset() << "." << node->getIndex() << " : " << label << "\" color=\"" << color << "\"];\n";
 //     m_stream << "\t\t " << node->getIndex() << "[label=\"" << node->getIndex() /*<< " : " << label */<< "\" color=\"" << color << "\"];\n";
     m_processedNodes[node] = true;
 }
