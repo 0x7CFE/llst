@@ -342,16 +342,21 @@ public:
     virtual ~DomainVisitor() { }
 
     virtual bool visitDomain(ControlDomain& domain) { return true; }
+    virtual void domainsVisited() { }
 
     void run() {
         ControlGraph::iterator iDomain = m_graph->begin();
         const ControlGraph::iterator iEnd = m_graph->end();
 
-        while (iDomain != iEnd) {
-            if (! visitDomain(** iDomain))
-                break;
+        if (iDomain != iEnd) {
+            while (iDomain != iEnd) {
+                if (! visitDomain(** iDomain))
+                    break;
 
-            ++iDomain;
+                ++iDomain;
+            }
+
+            domainsVisited();
         }
     }
 
@@ -363,17 +368,22 @@ class NodeVisitor : public DomainVisitor {
 public:
     NodeVisitor(ControlGraph* graph) : DomainVisitor(graph) { }
     virtual bool visitNode(ControlNode& node) { return true; }
+    virtual void nodesVisited() { }
 
 protected:
     virtual bool visitDomain(ControlDomain& domain) {
         ControlDomain::iterator iNode = domain.begin();
         const ControlDomain::iterator iEnd = domain.end();
 
-        while (iNode != iEnd) {
-            if (! visitNode(** iNode))
-                return false;
+        if (iNode != iEnd) {
+            while (iNode != iEnd) {
+                if (! visitNode(** iNode))
+                    return false;
 
-            ++iNode;
+                ++iNode;
+            }
+
+            nodesVisited();
         }
 
         return true;
