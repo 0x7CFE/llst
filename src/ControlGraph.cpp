@@ -369,13 +369,14 @@ public:
         // then we may remove such node (or a node pair)
 
         if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
-            if (! instruction->getInstruction().isValueProvider())
+            const TSmalltalkInstruction& nodeInstruction = instruction->getInstruction();
+            if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
                 return NodeVisitor::visitNode(node);
 
             TNodeSet consumers;
             if (! getConsumers(instruction, consumers)) {
                 std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
-                m_nodesToDelete.push_back(instruction);
+                m_nodesToRemove.push_back(instruction);
             } else if (consumers.size() == 1) {
                 if (InstructionNode* const consumer = (*consumers.begin())->cast<InstructionNode>()) {
                     const TSmalltalkInstruction& consumerInstruction = consumer->getInstruction();
@@ -384,8 +385,8 @@ public:
                                     instruction->getIndex(),
                                     consumer->getIndex());
 
-                        m_nodesToDelete.push_back(consumer);
-                        m_nodesToDelete.push_back(instruction);
+                        m_nodesToRemove.push_back(consumer);
+                        m_nodesToRemove.push_back(instruction);
                     }
                 }
             }
@@ -394,6 +395,11 @@ public:
         return NodeVisitor::visitNode(node);
     }
 
+    virtual void domainsVisited() {
+        TNodeList::iterator iNode = m_nodesToRemove.begin();
+        for (; iNode != m_nodesToRemove.end(); ++iNode)
+            removeNode(*iNode);
+    }
 private:
     bool getConsumers(InstructionNode* node, TNodeSet& consumers) {
         consumers.clear();
@@ -413,8 +419,12 @@ private:
         return !consumers.empty();
     }
 
+    void removeNode(ControlNode* node) {
+        // TODO
+    }
+
 private:
-    TNodeList      m_nodesToDelete;
+    TNodeList      m_nodesToRemove;
     ControlDomain* m_currentDomain;
 };
 
