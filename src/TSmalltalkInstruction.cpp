@@ -70,6 +70,12 @@ bool st::TSmalltalkInstruction::isValueProvider() const {
                 case special::branchIfFalse:
                     return false;
             }
+
+        case opcode::extended:
+            assert(false);
+    }
+
+    return false;
 }
 
 bool st::TSmalltalkInstruction::isTrivial() const {
