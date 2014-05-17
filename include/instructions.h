@@ -48,10 +48,12 @@ struct TSmalltalkInstruction {
             m_extra    == instruction.m_extra;
     }
 
+    bool isTrivial() const;
     bool isTerminator() const;
     bool isBranch() const;
     bool isValueProvider() const;
     bool isValueConsumer() const;
+
     std::string toString() const;
 private:
     TOpcode   m_opcode;

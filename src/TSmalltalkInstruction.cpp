@@ -70,6 +70,27 @@ bool st::TSmalltalkInstruction::isValueProvider() const {
                 case special::branchIfFalse:
                     return false;
             }
+}
+
+bool st::TSmalltalkInstruction::isTrivial() const {
+    switch (m_opcode) {
+        case opcode::pushInstance:
+        case opcode::pushArgument:
+        case opcode::pushTemporary:
+        case opcode::pushLiteral:
+        case opcode::pushConstant:
+        case opcode::pushBlock:
+        case opcode::markArguments:
+            return true;
+
+        case opcode::doSpecial:
+            switch (m_argument) {
+                case special::duplicate:
+                    return true;
+            }
+
+        default:
+            return false;
     }
 }
 
