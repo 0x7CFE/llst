@@ -162,6 +162,20 @@ private:
     TArgumentList         m_arguments;
 };
 
+// PushBlockNode represents a single PushBlock instruction.
+// It provides pointer to the associated ParsedBlock object.
+// In all cases it may be safely treated as InstructionNode.
+class PushBlockNode : public InstructionNode {
+public:
+    PushBlockNode(uint32_t index) : InstructionNode(index) {}
+
+    void setParsedBlock(ParsedBlock* block) { m_parsedBlock = block; }
+    ParsedBlock* getParsedBlock() const { return m_parsedBlock; }
+
+private:
+    ParsedBlock* m_parsedBlock;
+};
+
 // Phi node act as a value aggregator from several domains.
 // When value is pushed on the stack in one basic block and
 // popped in another we say that actual values have a stack relation.
@@ -335,6 +349,9 @@ template<> TauNode* ControlNode::cast<TauNode>();
 template<> InstructionNode* ControlGraph::newNode<InstructionNode>();
 template<> PhiNode* ControlGraph::newNode<PhiNode>();
 template<> TauNode* ControlGraph::newNode<TauNode>();
+
+template<> PushBlockNode* ControlNode::cast<PushBlockNode>();
+template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>();
 
 class DomainVisitor {
 public:

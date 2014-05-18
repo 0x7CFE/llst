@@ -20,6 +20,23 @@ template<> InstructionNode* ControlGraph::newNode<InstructionNode>() { return st
 template<> PhiNode* ControlGraph::newNode<PhiNode>() { return static_cast<PhiNode*>(newNode(ControlNode::ntPhi)); }
 template<> TauNode* ControlGraph::newNode<TauNode>() { return static_cast<TauNode*>(newNode(ControlNode::ntTau)); }
 
+template<> PushBlockNode* ControlNode::cast<PushBlockNode>() {
+    if (this->getNodeType() != ntInstruction)
+        return 0;
+
+    InstructionNode* const node = static_cast<InstructionNode*>(this);
+    if (node->getInstruction().getOpcode() != opcode::pushBlock)
+        return 0;
+
+    return static_cast<PushBlockNode*>(this);
+}
+
+template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>() {
+    PushBlockNode* node = new PushBlockNode(m_lastNodeIndex++);
+    m_nodes.push_back(node);
+    return static_cast<PushBlockNode*>(node);
+}
+
 class GraphConstructor : public InstructionVisitor {
 public:
     GraphConstructor(ControlGraph* graph)
@@ -35,7 +52,7 @@ public:
 
     virtual bool visitInstruction(const TSmalltalkInstruction& instruction) {
         // Initializing instruction node
-        InstructionNode* const newNode = m_graph->newNode<InstructionNode>();
+        InstructionNode* const newNode = createNode(instruction);
         newNode->setInstruction(instruction);
         newNode->setDomain(m_currentDomain);
         m_currentDomain->addNode(newNode);
@@ -52,6 +69,7 @@ public:
     }
 
 private:
+    InstructionNode* createNode(const TSmalltalkInstruction& instruction);
     void processNode(InstructionNode* node);
     void processSpecials(InstructionNode* node);
     void processPrimitives(InstructionNode* node);
@@ -60,6 +78,14 @@ private:
     ControlDomain* m_currentDomain;
     bool m_skipStubInstructions;
 };
+
+InstructionNode* GraphConstructor::createNode(const TSmalltalkInstruction& instruction)
+{
+    if (instruction.getOpcode() == opcode::pushBlock)
+        return m_graph->newNode<PushBlockNode>();
+    else
+        return m_graph->newNode<InstructionNode>();
+}
 
 void GraphConstructor::processNode(InstructionNode* node)
 {
@@ -74,9 +100,14 @@ void GraphConstructor::processNode(InstructionNode* node)
         case opcode::pushArgument:
         case opcode::pushTemporary:   // TODO Link with tau node
         case opcode::pushInstance:
-        case opcode::pushBlock:
+        case opcode::pushBlock: {
+            const uint16_t blockEndOffset    = node->getInstruction().getExtra();
+            ParsedMethod* const parsedMethod = m_graph->getParsedMethod();
+            ParsedBlock*  const parsedBlock  = parsedMethod->getParsedBlockByEndOffset(blockEndOffset);
+
+            node->cast<PushBlockNode>()->setParsedBlock(parsedBlock);
             m_currentDomain->pushValue(node);
-            break;
+        } break;
 
         case opcode::assignTemporary: // TODO Link with tau node
         case opcode::assignInstance:
