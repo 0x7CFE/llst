@@ -244,19 +244,24 @@ public:
             return 0;
     }
 
+    ParsedBlock* getParsedBlockByEndOffset(uint16_t endOffset) {
+        TOffsetToParsedBlockMap::iterator iBlock = m_endOffsetToParsedBlock.find(endOffset);
+        if (iBlock != m_endOffsetToParsedBlock.end())
+            return iBlock->second;
+        else
+            return 0;
+    }
+
 protected:
     virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
-
-    void addParsedBlock(uint16_t offset, ParsedBlock* parsedBlock) {
-        m_parsedBlocks.push_back(parsedBlock);
-        m_offsetToParsedBlock[offset] = parsedBlock;
-    }
+    void addParsedBlock(ParsedBlock* parsedBlock);
 
 protected:
     TParsedBlockList m_parsedBlocks;
 
     typedef std::map<uint16_t, ParsedBlock*> TOffsetToParsedBlockMap;
     TOffsetToParsedBlockMap m_offsetToParsedBlock;
+    TOffsetToParsedBlockMap m_endOffsetToParsedBlock;
 };
 
 class ParsedBlock : public ParsedBytecode {

@@ -9,6 +9,15 @@ void ParsedMethod::parseBlock(uint16_t startOffset, uint16_t stopOffset) {
     m_offsetToParsedBlock[startOffset] = parsedBlock;
 }
 
+void ParsedMethod::addParsedBlock(ParsedBlock* parsedBlock) {
+    m_parsedBlocks.push_back(parsedBlock);
+
+    const uint16_t startOffset = parsedBlock->getStartOffset();
+    const uint16_t stopOffset  = parsedBlock->getStopOffset();
+    m_offsetToParsedBlock[startOffset]   = parsedBlock;
+    m_endOffsetToParsedBlock[stopOffset] = parsedBlock;
+}
+
 ParsedMethod::~ParsedMethod() {
     for (TParsedBlockList::iterator iBlock = m_parsedBlocks.begin(),
         end = m_parsedBlocks.end(); iBlock != end; ++iBlock)
