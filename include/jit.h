@@ -34,6 +34,7 @@
 
 #include <types.h>
 #include "vm.h"
+#include "analysis.h"
 
 #include <typeinfo>
 
@@ -220,8 +221,9 @@ public:
     // This structure contains working data which is
     // used during the compilation process.
     struct TJITContext {
-        st::ParsedMethod    parsedMethod; // Parsed smalltalk method we're currently processing
-        st::TSmalltalkInstruction instruction;  // currently processed instruction
+        st::ParsedMethod     parsedMethod; // Parsed smalltalk method we're currently processing
+        st::ControlGraph     controlGraph;
+        st::InstructionNode* currentNode;
 
         TMethod*            method;       // Smalltalk method we're currently processing
         uint16_t            bytePointer;
@@ -253,11 +255,12 @@ public:
         void pushValue(TStackValue* value);
 
         TJITContext(MethodCompiler* compiler, TMethod* method)
-            : parsedMethod(method), instruction(opcode::extended), method(method), bytePointer(0), function(0), builder(0),
-            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
-            contextHolder(0), selfHolder(0)
+        : parsedMethod(method), controlGraph(&parsedMethod), currentNode(0),
+          method(method), bytePointer(0), function(0), builder(0),
+          preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
+          contextHolder(0), selfHolder(0)
         {
-
+            controlGraph.buildGraph();
         };
 
         ~TJITContext() {
