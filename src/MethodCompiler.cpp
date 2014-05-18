@@ -483,7 +483,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     return jit.function;
 }
 
-void MethodCompiler::writeFunctionBody(TJITContext& jit, uint32_t byteCount /*= 0*/)
+void MethodCompiler::writeFunctionBody(TJITContext& jit)
 {
     class Visitor : public st::NodeVisitor {
     public:
@@ -522,7 +522,7 @@ void MethodCompiler::writeInstruction(TJITContext& jit) {
         case opcode::pushLiteral:       doPushLiteral(jit);     break;
         case opcode::pushConstant:      doPushConstant(jit);    break;
 
-        case opcode::pushBlock:         doPushBlock(jit);       break;
+        case opcode::pushBlock:         doPushBlock(jit);       break; // FIXME
 
         case opcode::assignTemporary:   doAssignTemporary(jit); break;
         case opcode::assignInstance:    doAssignInstance(jit);  break;
@@ -644,15 +644,12 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
 
 void MethodCompiler::doPushBlock(TJITContext& jit)
 {
-    const uint16_t newBytePointer = jit.currentNode->getInstruction().getExtra();
-
-    TJITContext blockContext(this, jit.method);
-    blockContext.bytePointer = jit.bytePointer;
+    TJITContext blockContext(this, jit.method); // FIXME
 
     // Creating block function named Class>>method@offset
-    const uint16_t blockOffset = jit.currentNode->getIndex(); //jit.bytePointer;
+    const uint16_t nodeIndex = jit.currentNode->getIndex();
     std::ostringstream ss;
-    ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << blockOffset;
+    ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << nodeIndex;
     std::string blockFunctionName = ss.str();
 
     std::vector<Type*> blockParams;
@@ -675,13 +672,13 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
         blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
         blockContext.builder = new IRBuilder<>(blockContext.preamble);
         writePreamble(blockContext, /*isBlock*/ true);
-        scanForBranches(blockContext, newBytePointer - jit.bytePointer);
+        scanForBranches(blockContext);
 
         BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
         blockContext.builder->CreateBr(blockBody);
         blockContext.builder->SetInsertPoint(blockBody);
 
-        writeFunctionBody(blockContext, newBytePointer - jit.bytePointer);
+        writeFunctionBody(blockContext);
 
         // Running optimization passes on a block function
         JITRuntime::Instance()->optimizeFunction(blockContext.function);
@@ -691,12 +688,11 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     Value* args[] = {
         jit.getCurrentContext(),                   // creatingContext
         jit.builder->getInt8(jit.currentNode->getInstruction().getArgument()), // arg offset
-        jit.builder->getInt16(blockOffset)         // bytePointer
+        jit.builder->getInt16(nodeIndex)
     };
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
     blockObject = jit.builder->CreateBitCast(blockObject, m_baseTypes.object->getPointerTo());
     blockObject->setName("block.");
-    jit.bytePointer = newBytePointer;
 
     Value* blockHolder = protectPointer(jit, blockObject);
     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));

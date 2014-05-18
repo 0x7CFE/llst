@@ -226,7 +226,6 @@ public:
         st::InstructionNode* currentNode;
 
         TMethod*            method;       // Smalltalk method we're currently processing
-        uint16_t            bytePointer;
 
         llvm::Function*     function;     // LLVM function that is created based on method
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
@@ -256,7 +255,7 @@ public:
 
         TJITContext(MethodCompiler* compiler, TMethod* method)
         : parsedMethod(method), controlGraph(&parsedMethod), currentNode(0),
-          method(method), bytePointer(0), function(0), builder(0),
+          method(method), function(0), builder(0),
           preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
           contextHolder(0), selfHolder(0)
         {
@@ -303,7 +302,7 @@ private:
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
-    void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
+    void writeFunctionBody(TJITContext& jit);
     void writeInstruction(TJITContext& jit);
     void writeLandingPad(TJITContext& jit);
 
