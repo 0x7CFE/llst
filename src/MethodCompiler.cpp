@@ -542,8 +542,9 @@ void MethodCompiler::writeInstruction(TJITContext& jit) {
         case 0: break;
 
         default:
-            std::fprintf(stderr, "JIT: Invalid opcode %d at offset %d in method %s\n",
-                         jit.currentNode->getInstruction().getOpcode(), jit.bytePointer, jit.method->name->toString().c_str());
+            std::fprintf(stderr, "JIT: Invalid opcode %d at node %d in method %s\n",
+                         jit.currentNode->getInstruction().getOpcode(),
+                         jit.currentNode->getIndex(), jit.method->name->toString().c_str());
     }
 }
 
@@ -649,7 +650,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     blockContext.bytePointer = jit.bytePointer;
 
     // Creating block function named Class>>method@offset
-    const uint16_t blockOffset = jit.bytePointer;
+    const uint16_t blockOffset = jit.currentNode->getIndex(); //jit.bytePointer;
     std::ostringstream ss;
     ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
@@ -850,9 +851,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
-        /*jit.builder->getInt32(m_callSiteIndex) // */jit.builder->getInt32(jit.bytePointer) // call site offset
+        jit.builder->getInt32(jit.currentNode->getIndex()) // call site index
     };
-    m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
+    m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
     // Now performing a message call
     Value* sendMessageResult = 0;
@@ -901,9 +902,9 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
         // default receiver class
         ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()),
-        /*jit.builder->getInt32(m_callSiteIndex) //*/ jit.builder->getInt32(jit.bytePointer) // call site offset
+        jit.builder->getInt32(jit.currentNode->getIndex()) // call site index
     };
-    m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
+    m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
     Value* result = 0;
     if (jit.methodHasBlockReturn) {
@@ -1048,9 +1049,9 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 messageSelector, // selector
                 arguments,       // message arguments
                 parentClass,     // receiver class
-                /*jit.builder->getInt32(m_callSiteIndex) //*/ jit.builder->getInt32(jit.bytePointer) // call site offset
+                jit.builder->getInt32(jit.currentNode->getIndex()) // call site index
             };
-            m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
+            m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
             Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
             Value* resultHolder = protectPointer(jit, result);
@@ -1419,9 +1420,9 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 args,
                 // default receiver class
                 ConstantPointerNull::get(m_baseTypes.klass->getPointerTo()), //inttoptr 0 works fine too
-                /*jit.builder->getInt32(m_callSiteIndex) //*/ jit.builder->getInt32(jit.bytePointer) // call site offset
+                jit.builder->getInt32(jit.currentNode->getIndex()) // call site index
             };
-            m_callSiteIndexToOffset[m_callSiteIndex++] = jit.bytePointer;
+            m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
             // Now performing a message call
             Value* sendMessageResult = 0;
