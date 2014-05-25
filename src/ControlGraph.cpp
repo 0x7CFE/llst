@@ -100,6 +100,9 @@ void GraphConstructor::processNode(InstructionNode* node)
         case opcode::pushArgument:
         case opcode::pushTemporary:   // TODO Link with tau node
         case opcode::pushInstance:
+            m_currentDomain->pushValue(node);
+            break;
+
         case opcode::pushBlock: {
             const uint16_t blockEndOffset    = node->getInstruction().getExtra();
             ParsedMethod* const parsedMethod = m_graph->getParsedMethod();
