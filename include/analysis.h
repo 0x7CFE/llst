@@ -268,8 +268,20 @@ private:
 
 class ControlGraph {
 public:
-    ControlGraph(ParsedMethod* parsedMethod) : m_parsedMethod(parsedMethod), m_lastNodeIndex(0) { }
+    ControlGraph(ParsedMethod* parsedMethod)
+        : m_parsedMethod(parsedMethod), m_lastNodeIndex(0), m_parsedBlock(0) { }
+
+    ControlGraph(ParsedMethod* parsedMethod, ParsedBlock* parsedBlock)
+        : m_parsedMethod(parsedMethod), m_parsedBlock(parsedBlock), m_lastNodeIndex(0) { }
+
     ParsedMethod* getParsedMethod() const { return m_parsedMethod; }
+
+    ParsedBytecode* getParsedBytecode() const {
+        if (m_parsedBlock)
+            return m_parsedBlock;
+        else
+            return m_parsedMethod;
+    }
 
     typedef TDomainSet::iterator iterator;
     iterator begin() { return m_domains.begin(); }
@@ -332,6 +344,7 @@ public:
 
 private:
     ParsedMethod* m_parsedMethod;
+    ParsedBlock*  m_parsedBlock;
     TDomainSet    m_domains;
 
     typedef std::list<ControlNode*> TNodeList;

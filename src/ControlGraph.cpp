@@ -40,7 +40,7 @@ template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>() {
 class GraphConstructor : public InstructionVisitor {
 public:
     GraphConstructor(ControlGraph* graph)
-        : InstructionVisitor(graph->getParsedMethod()), m_graph(graph) { }
+        : InstructionVisitor(graph->getParsedBytecode()), m_graph(graph) { }
 
     virtual bool visitBlock(BasicBlock& basicBlock) {
         m_currentDomain = m_graph->getDomainFor(&basicBlock);
