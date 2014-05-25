@@ -218,14 +218,12 @@ public:
         TRefererSet referers;
     };
 
-    // This structure contains working data which is
-    // used during the compilation process.
     struct TJITContext {
-        st::ParsedMethod     parsedMethod; // Parsed smalltalk method we're currently processing
-        st::ControlGraph     controlGraph;
+        st::ParsedMethod*    parsedMethod;
+        st::ControlGraph*    controlGraph;
         st::InstructionNode* currentNode;
 
-        TMethod*            method;       // Smalltalk method we're currently processing
+        TMethod*            originMethod; // Smalltalk method we're currently processing
 
         llvm::Function*     function;     // LLVM function that is created based on method
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
@@ -253,16 +251,21 @@ public:
 
         void pushValue(TStackValue* value);
 
-        TJITContext(MethodCompiler* compiler, TMethod* method)
-        : parsedMethod(method), controlGraph(&parsedMethod), currentNode(0),
-          method(method), function(0), builder(0),
+        TJITContext(MethodCompiler* compiler, TMethod* method, bool parse = true)
+        : currentNode(0), originMethod(method), function(0), builder(0),
           preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
           contextHolder(0), selfHolder(0)
         {
-            controlGraph.buildGraph();
+            if (parse) {
+                parsedMethod = new st::ParsedMethod(method);
+                controlGraph = new st::ControlGraph(parsedMethod);
+                controlGraph->buildGraph();
+            }
         };
 
         ~TJITContext() {
+            delete controlGraph;
+
             if (! basicBlockContexts.empty()) {
                 TBlockContextMap::iterator iContext = basicBlockContexts.begin();
                 while (iContext != basicBlockContexts.end()) {
@@ -283,6 +286,28 @@ public:
             delete builder;
         }
     };
+
+    struct TJITBlockContext : public TJITContext {
+        st::ParsedBlock* parsedBlock;
+
+        TJITBlockContext(
+            MethodCompiler*   compiler,
+            st::ParsedMethod* method,
+            st::ParsedBlock*  block
+        )
+            : TJITContext(compiler, 0, false), parsedBlock(block)
+        {
+            parsedMethod = method;
+            originMethod = parsedMethod->getOrigin();
+            controlGraph = new st::ControlGraph(method, block);
+            controlGraph->buildGraph();
+        }
+
+        ~TJITBlockContext() {
+            parsedMethod = 0; // We do not want TJITContext to delete this
+        }
+    };
+
 
 private:
     llvm::Module* m_JITModule;

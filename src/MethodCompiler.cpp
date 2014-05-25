@@ -90,7 +90,7 @@ Value* TDeferredValue::get()
         } break;
 
         case loadLiteral: {
-            TMethod* method  = m_jit->method;
+            TMethod* method  = m_jit->originMethod;
             TObject* literal = method->literals->getField(m_index);
 
             Value* literalValue = builder.CreateIntToPtr(
@@ -371,7 +371,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
     // the method's code to ensure that try-catch is really needed. If it is not, we simply
     // skip its generation.
 
-    st::BlockReturnDetector detector(&jit.parsedMethod);
+    st::BlockReturnDetector detector(jit.parsedMethod);
     detector.run();
 
     return detector.isBlockReturnFound();
@@ -384,7 +384,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
 
     class Visitor : public st::BasicBlockVisitor {
     public:
-        Visitor(TJITContext& jit) : BasicBlockVisitor(&jit.parsedMethod), m_jit(jit) { }
+        Visitor(TJITContext& jit) : BasicBlockVisitor(jit.parsedMethod), m_jit(jit) { }
 
     private:
         virtual bool visitBlock(st::BasicBlock& basicBlock) {
@@ -487,7 +487,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
 {
     class Visitor : public st::NodeVisitor {
     public:
-        Visitor(TJITContext& jit) : st::NodeVisitor(&jit.controlGraph), m_jit(jit) { }
+        Visitor(TJITContext& jit) : st::NodeVisitor(jit.controlGraph), m_jit(jit) { }
 
     private:
         virtual bool visitDomain(st::ControlDomain& domain) {
@@ -500,9 +500,10 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
         }
 
         virtual bool visitNode(st::ControlNode& node) {
-            m_jit.currentNode = (&node)->cast<st::InstructionNode>();
-            m_jit.compiler->writeInstruction(m_jit);
+            m_jit.currentNode = node.cast<st::InstructionNode>();
+            assert(m_jit.currentNode);
 
+            m_jit.compiler->writeInstruction(m_jit);
             return NodeVisitor::visitNode(node);
         }
 
@@ -544,7 +545,7 @@ void MethodCompiler::writeInstruction(TJITContext& jit) {
         default:
             std::fprintf(stderr, "JIT: Invalid opcode %d at node %d in method %s\n",
                          jit.currentNode->getInstruction().getOpcode(),
-                         jit.currentNode->getIndex(), jit.method->name->toString().c_str());
+                         jit.currentNode->getIndex(), jit.originMethod->name->toString().c_str());
     }
 }
 
@@ -644,12 +645,15 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
 
 void MethodCompiler::doPushBlock(TJITContext& jit)
 {
-    TJITContext blockContext(this, jit.method); // FIXME
+    st::PushBlockNode* pushBlockNode = jit.currentNode->cast<st::PushBlockNode>();
+    st::ParsedBlock*   parsedBlock   = pushBlockNode->getParsedBlock();
+
+    TJITBlockContext blockContext(this, jit.parsedMethod, parsedBlock);
 
     // Creating block function named Class>>method@offset
-    const uint16_t nodeIndex = jit.currentNode->getIndex();
+    const uint16_t blockOffset = parsedBlock->getStartOffset();
     std::ostringstream ss;
-    ss << jit.method->klass->name->toString() + ">>" + jit.method->name->toString() << "@" << nodeIndex;
+    ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
     std::vector<Type*> blockParams;
@@ -688,7 +692,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     Value* args[] = {
         jit.getCurrentContext(),                   // creatingContext
         jit.builder->getInt8(jit.currentNode->getInstruction().getArgument()), // arg offset
-        jit.builder->getInt16(nodeIndex)
+        jit.builder->getInt16(blockOffset)
     };
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
     blockObject = jit.builder->CreateBitCast(blockObject, m_baseTypes.object->getPointerTo());
@@ -887,7 +891,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
 
     std::ostringstream ss;
-    ss << "#" << jit.method->literals->getField(jit.currentNode->getInstruction().getArgument())->toString() << ".";
+    ss << "#" << jit.originMethod->literals->getField(jit.currentNode->getInstruction().getArgument())->toString() << ".";
     messageSelector->setName(ss.str());
 
     // Forming a message parameters
