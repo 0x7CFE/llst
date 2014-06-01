@@ -705,7 +705,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value*  value = jit.lastValue();
+    Value*  value = jit.currentNode->getArgument()->getValue(); //jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
     Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
@@ -717,7 +717,7 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value*  value = jit.lastValue();
+    Value*  value = jit.currentNode->getArgument()->getValue(); // jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
     Value* self  = jit.getSelf();
@@ -739,8 +739,9 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
 
     // Filling object with contents
     uint8_t index = argumentsCount;
+    assert(argumentsCount == jit.currentNode->getArgumentsCount());
     while (index > 0) {
-        Value* value = jit.popValue();
+        Value* value = getArgument(jit, index - 1); // jit.popValue();
         jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), value);
     }
 
@@ -752,7 +753,7 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
 {
-    Value* value     = jit.popValue();
+    Value* value     = getArgument(jit); // jit.popValue();
     Value* condition = 0;
 
     switch ( static_cast<unaryBuiltIns::Opcode>(jit.currentNode->getInstruction().getArgument()) ) {
@@ -764,7 +765,75 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
     }
 
     Value* result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
-    jit.pushValue(result);
+    setNodeValue(jit.currentNode, result);
+    //jit.pushValue(result);
+}
+
+llvm::Value* MethodCompiler::processLeafNode(st::InstructionNode* instruction)
+{
+
+}
+
+llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* = 0*/) {
+    return getNodeValue(jit, jit.currentNode->getArgument(index));
+}
+
+Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node)
+{
+    Value* value = node->getValue();
+    if (value)
+        return value;
+
+    const std::size_t inEdgesCount = node->getInEdges().size();
+    if (st::InstructionNode* instruction = node->cast<st::InstructionNode>()) {
+        // If node is a leaf from the same domain we may encode it locally.
+        // If not, creating a dummy value wich will be replaced by real value later.
+
+        if (!inEdgesCount && instruction->getDomain() == jit.currentNode->getDomain())
+            value = processLeafNode(instruction);
+        else
+            value = UndefValue::get(jit.builder->getVoidTy());
+
+    } else if (st::PhiNode* phiNode = node->cast<st::PhiNode>()) {
+        BasicBlock* const insertBlock = jit.builder->GetInsertBlock();
+        const BasicBlock::iterator storedInsertionPoint = jit.builder->GetInsertPoint();
+        const BasicBlock::iterator firstInsertionPoint  = insertBlock->getFirstInsertionPt();
+        jit.builder->SetInsertPoint(insertBlock, firstInsertionPoint);
+
+        PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object, inEdgesCount);
+
+        st::TNodeSet::iterator iNode = phiNode->getInEdges().begin();
+        for (; iNode != phiNode->getInEdges().end(); ++iNode) {
+            st::ControlNode* const inNode = *iNode;
+            BasicBlock* const inBlock = m_targetToBlockMap[inNode->getDomain()->getBasicBlock()->getOffset()];
+            assert(inBlock);
+
+            phiValue->addIncoming(getNodeValue(jit, inNode), inBlock);
+        }
+
+        phiNode->setValue(phiValue);
+        jit.builder->SetInsertPoint(insertBlock, storedInsertionPoint);
+
+        value = phiValue;
+    }
+
+    assert(value);
+    return value;
+}
+
+void MethodCompiler::setNodeValue(st::ControlNode* node, llvm::Value* value)
+{
+    assert(value);
+
+    Value* oldValue = node->getValue();
+    if (oldValue) {
+        if (isa<UndefValue>(oldValue))
+            oldValue->replaceAllUsesWith(value);
+        else
+            assert(false);
+    }
+
+    node->setValue(value);
 }
 
 void MethodCompiler::doSendBinary(TJITContext& jit)
@@ -772,8 +841,8 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // 0, 1 or 2 for '<', '<=' or '+' respectively
     binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.currentNode->getInstruction().getArgument());
 
-    Value* rightValue = jit.popValue();
-    Value* leftValue  = jit.popValue();
+    Value* rightValue = getArgument(jit, 1); // jit.popValue();
+    Value* leftValue  = getArgument(jit, 0); // jit.popValue();
 
     // Checking if values are both small integers
     Value*    rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
@@ -796,7 +865,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     Value*    rightInt     = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
     Value*    leftInt      = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftValue);
 
-    Value* intResult       = 0;  // this will be an immediate operation result
+    Value* intResult       = 0; // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
     switch (opcode) {
         case binaryBuiltIns::operatorLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
@@ -879,12 +948,13 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
     Value* resultHolder = protectPointer(jit, phi);
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
+    setNodeValue(jit.currentNode, resultHolder);
+    //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
-    Value* arguments = jit.popValue();
+    Value* arguments = getArgument(jit); // jit.popValue();
 
     // First of all we need to get the actual message selector
     Value* selectorObject  = jit.getLiteral(jit.currentNode->getInstruction().getArgument());
@@ -944,13 +1014,13 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
         case special::stackReturn:
             if ( !iPreviousInst->isTerminator() && jit.hasValue() )
-                jit.builder->CreateRet(jit.popValue());
+                jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
             break;
 
         case special::blockReturn:
             if ( !iPreviousInst->isTerminator() && jit.hasValue()) {
                 // Peeking the return value from the stack
-                Value* value = jit.popValue();
+                Value* value = getArgument(jit); // jit.popValue();
 
                 // Loading the target context information
                 Value* blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), m_baseTypes.block->getPointerTo());
@@ -971,21 +1041,25 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 // We're popping the value from the stack to a temporary holder
                 // and then pushing two lazy stack values pointing to it.
 
-                Value* dupValue  = jit.popValue();
+                Value* dupValue  = getArgument(jit); // jit.popValue();
                 Value* dupHolder = protectPointer(jit, dupValue);
                 dupHolder->setName("pDup.");
 
                 // Two equal values are pushed on the stack
-                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
-                jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
+                jit.currentNode->setValue(dupHolder);
+
+                // jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
+                // jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
             }
 
             //jit.pushValue(jit.lastValue());
             break;
 
         case special::popTop:
-            if (jit.hasValue())
-                jit.popValue(0, true);
+            // This should be completely eliminated by graph constructor
+            assert(false);
+//             if (jit.hasValue())
+//                 jit.popValue(0, true);
             break;
 
         case special::branch: {
@@ -1019,7 +1093,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
                 // Creating condition check
                 Value* boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
-                Value* condition  = jit.popValue();
+                Value* condition  = getArgument(jit); // jit.popValue();
                 Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
                 jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
@@ -1033,7 +1107,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         } break;
 
         case special::sendToSuper: {
-            Value* argsObject        = jit.popValue();
+            Value* argsObject        = getArgument(jit); // jit.popValue();
             Value* arguments         = jit.builder->CreateBitCast(argsObject, m_baseTypes.objectArray->getPointerTo());
 
             uint32_t literalIndex    = jit.currentNode->getInstruction().getExtra();
@@ -1088,6 +1162,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.basicBlockContexts[primitiveFailedBB].referers.insert(jit.builder->GetInsertBlock());
 
     compilePrimitive(jit, opcode, primitiveResult, primitiveFailed, primitiveSucceededBB, primitiveFailedBB);
+    jit.currentNode->setValue(primitiveResult);
 
     // Linking pop chain
     jit.basicBlockContexts[primitiveSucceededBB].referers.insert(jit.builder->GetInsertBlock());
@@ -1111,8 +1186,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 {
     switch (opcode) {
         case primitive::objectsAreEqual: {
-            Value* object2 = jit.popValue();
-            Value* object1 = jit.popValue();
+            Value* object2 = getArgument(jit, 1); // jit.popValue();
+            Value* object1 = getArgument(jit, 0); // jit.popValue();
 
             Value* result    = jit.builder->CreateICmpEQ(object1, object2);
             Value* boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
@@ -1122,7 +1197,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
         // TODO ioGetchar
         case primitive::ioPutChar: {
-            Value* intObject = jit.popValue();
+            Value* intObject = getArgument(jit); // jit.popValue();
             Value* intValue  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, intObject);
             Value* charValue = jit.builder->CreateTrunc(intValue, jit.builder->getInt8Ty());
 
@@ -1133,12 +1208,12 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::getClass: {
-            Value* object = jit.popValue();
+            Value* object = getArgument(jit); // jit.popValue();
             Value* klass  = jit.builder->CreateCall(m_baseFunctions.getObjectClass, object, "class");
             primitiveResult = jit.builder->CreateBitCast(klass, m_baseTypes.object->getPointerTo());
         } break;
         case primitive::getSize: {
-            Value* object           = jit.popValue();
+            Value* object           = getArgument(jit); // jit.popValue();
             Value* objectIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, object, "isSmallInt");
 
             BasicBlock* asSmallInt = BasicBlock::Create(m_JITModule->getContext(), "asSmallInt", jit.function);
@@ -1155,8 +1230,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::startNewProcess: { // 6
-            /* ticks. unused */    jit.popValue();
-            Value* processObject = jit.popValue();
+            // /* ticks. unused */    jit.popValue();
+            Value* processObject = getArgument(jit, 1); // jit.popValue();
             Value* process       = jit.builder->CreateBitCast(processObject, m_baseTypes.process->getPointerTo());
 
             Function* executeProcess = m_JITModule->getFunction("executeProcess");
@@ -1166,8 +1241,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::allocateObject: { // 7
-            Value* sizeObject  = jit.popValue();
-            Value* klassObject = jit.popValue();
+            Value* sizeObject  = getArgument(jit, 1); // jit.popValue();
+            Value* klassObject = getArgument(jit, 0); // jit.popValue();
             Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
 
             Value* size        = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "size.");
@@ -1178,8 +1253,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::allocateByteArray: { // 20
-            Value* sizeObject  = jit.popValue();
-            Value* klassObject = jit.popValue();
+            Value* sizeObject  = getArgument(jit, 1); // jit.popValue();
+            Value* klassObject = getArgument(jit, 0); // jit.popValue();
 
             Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
             Value* dataSize    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "dataSize.");
@@ -1189,8 +1264,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::cloneByteObject: { // 23
-            Value* klassObject    = jit.popValue();
-            Value* original       = jit.popValue();
+            Value* klassObject    = getArgument(jit, 1); // jit.popValue();
+            Value* original       = getArgument(jit, 0); // jit.popValue();
             Value* originalHolder = protectPointer(jit, original);
 
             Value* klass    = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
@@ -1223,11 +1298,11 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::integerNew:
-            primitiveResult = jit.popValue(); // TODO long integers
+            primitiveResult = getArgument(jit); // jit.popValue(); // TODO long integers
             break;
 
         case primitive::blockInvoke: { // 8
-            Value* object = jit.popValue();
+            Value* object = getArgument(jit); // jit.popValue();
             Value* block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
 
             int32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
@@ -1258,7 +1333,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             {
                 // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
                 Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
-                Value* argument   = jit.popValue();
+                Value* argument   = getArgument(jit, index); // jit.popValue();
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, blockTemps, fieldIndex, argument);
             }
 
@@ -1290,9 +1365,10 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
         case primitive::arrayAt:       // 24
         case primitive::arrayAtPut: {  // 5
-            Value* indexObject = jit.popValue();
-            Value* arrayObject = jit.popValue();
-            Value* valueObejct = (opcode == primitive::arrayAtPut) ? jit.popValue() : 0;
+            std::size_t argIndex = (opcode == primitive::arrayAtPut) ? 2 : 1;
+            Value* indexObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* arrayObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* valueObejct = (opcode == primitive::arrayAtPut) ? getArgument(jit, argIndex--) : 0;
 
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
@@ -1326,9 +1402,10 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
         case primitive::stringAt:       // 21
         case primitive::stringAtPut: {  // 22
-            Value* indexObject  = jit.popValue();
-            Value* stringObject = jit.popValue();
-            Value* valueObejct  = (opcode == primitive::stringAtPut) ? jit.popValue() : 0;
+            std::size_t argIndex = (opcode == primitive::stringAtPut) ? 2 : 1;
+            Value* indexObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* stringObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* valueObejct = (opcode == primitive::stringAtPut) ? getArgument(jit, argIndex--) : 0;
 
             BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
@@ -1384,17 +1461,17 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         case primitive::smallIntBitOr:      // 36
         case primitive::smallIntBitAnd:     // 37
         case primitive::smallIntBitShift: { // 39
-            Value* rightObject = jit.popValue();
-            Value* leftObject  = jit.popValue();
+            Value* rightObject = getArgument(jit, 1); // jit.popValue();
+            Value* leftObject  = getArgument(jit, 0); // jit.popValue();
             compileSmallIntPrimitive(jit, opcode, leftObject, rightObject, primitiveResult, primitiveFailedBB);
         } break;
 
         case primitive::bulkReplace: {
-            Value* destination            = jit.popValue();
-            Value* sourceStartOffset      = jit.popValue();
-            Value* source                 = jit.popValue();
-            Value* destinationStopOffset  = jit.popValue();
-            Value* destinationStartOffset = jit.popValue();
+            Value* destination            = getArgument(jit, 4); // jit.popValue();
+            Value* sourceStartOffset      = getArgument(jit, 3); // jit.popValue();
+            Value* source                 = getArgument(jit, 2); // jit.popValue();
+            Value* destinationStopOffset  = getArgument(jit, 1); // jit.popValue();
+            Value* destinationStartOffset = getArgument(jit, 0); // jit.popValue();
 
             Value* arguments[]  = {
                 destination,

@@ -323,6 +323,11 @@ private:
     TExceptionAPI  m_exceptionAPI;
     TBaseFunctions m_baseFunctions;
 
+    llvm::Value* processLeafNode(st::InstructionNode* instruction);
+    llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node);
+    void setNodeValue(st::ControlNode* node, llvm::Value* value);
+    llvm::Value* getArgument(TJITContext& jit, std::size_t index = 0);
+
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
 

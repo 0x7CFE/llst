@@ -2,8 +2,11 @@
 #define LLST_ANALYSIS_INCLUDED
 
 #include <set>
-
 #include <instructions.h>
+
+namespace llvm {
+    class Value;
+}
 
 namespace st {
 
@@ -91,7 +94,7 @@ public:
         ntTau          // virtual node linkinig variable types from assignment sites
     };
 
-    ControlNode(uint32_t index) : m_index(index), m_domain(0) { }
+    ControlNode(uint32_t index) : m_index(index), m_domain(0), m_value(0) { }
     virtual ~ControlNode() { }
     virtual TNodeType getNodeType() const = 0;
 
@@ -116,13 +119,17 @@ public:
         m_outEdges.erase(to);
         to->getInEdges().erase(this);
     }
+
+    void setValue(llvm::Value* value) { m_value = value; }
+    llvm::Value* getValue() const { return m_value; }
 private:
     uint32_t       m_index;
     TNodeType      m_type;
     TNodeSet       m_inEdges;
     TNodeSet       m_outEdges;
-
     ControlDomain* m_domain;
+
+    llvm::Value*   m_value;
 };
 
 // Instruction node represents a signle VM instruction and it's relations in code.
@@ -134,7 +141,7 @@ public:
     void setInstruction(TSmalltalkInstruction instruction) { m_instruction = instruction; }
     const TSmalltalkInstruction& getInstruction() const { return m_instruction; }
 
-    ControlNode* getArgument(const std::size_t index) const {
+    ControlNode* getArgument(const std::size_t index = 0) const {
         assert(index >= 0 && index < m_arguments.size());
         return m_arguments[index];
     }
