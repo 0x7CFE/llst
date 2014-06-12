@@ -48,7 +48,7 @@
 struct TMemoryManagerHeapEvent{
     const char* eventName;
     //timeval time; //unusual value
-    TTime timeDiff;
+    TDuration<TSec> timeDiff;
     uint32_t usedHeapSizeBeforeCollect;
     uint32_t usedHeapSizeAfterCollect;
     uint32_t totalHeapSize;
@@ -76,8 +76,8 @@ struct TMemoryManagerHeapInfo{
 //just event, event which takes some time, event which interacting with a heap
 struct TMemoryManagerEvent{
     const char* eventName;
-    TTime begin; //time lost from program start to event begin
-    TTime timeDiff; //maybe null
+    TDuration<TSec> begin; //time lost from program start to event begin
+    TDuration<TSec> timeDiff; //maybe null
     TMemoryManagerHeapInfo heapInfo; //maybe empty
 };
 
