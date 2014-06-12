@@ -1,12 +1,13 @@
 
 #include <string>
 #include <sstream>
+#include <math.h> 
 using std::stringstream;
 #ifdef WINDOWS
-	#include <time.h>
+    #include <time.h>
     typedef clock_t systemTimeValue;
 #else
-	#include <sys/time.h>
+    #include <sys/time.h>
     typedef timeval systemTimeValue;
 #endif
 
@@ -29,71 +30,75 @@ typedef TRatio<1,1000000>    TMicrosec;
 typedef TRatio<1,1000000000> TNanosec;
 
 
-//!тип вне TDuration потому что получается много типов 
-//TDuration<RATIO>::SuffixMode что не логично
+//type used to show string representation of ratio
 enum SuffixMode {SNONE, SSHORT, SFULL};
 
 //analogue of c++11 duration
 template <typename RATIO>
 class TDuration{
 private:
-	double value;
+    double value;
 public:
-	//argument: duration in seconds
-	//FIXME should be a private member, but make conflict at convertTo() in such case
-	TDuration(double duration){
-		value = duration;
-	}
+    //argument: duration in seconds
+    TDuration(double duration){
+        value = duration;
+    }
+    
+    TDuration() {value = 0;}
+    
+    bool isEmpty() { return value == 0;}
+    
+    template <typename RATIO2> TDuration<RATIO2> convertTo(){
+        return TDuration<RATIO2>(value * (RATIO::num * RATIO2::den) / (double)(RATIO::den * RATIO2::num));
+    }
+    int toInt(){
+        return floor(value);
+    }
+    std::string toString(SuffixMode sMode = SNONE, int symbolsAfterPoint = 0,
+                                      const char* pointSymbol = ".", const char* spaceSymbol = " "){
+        stringstream ss; 
+        ss << floor(value);
+        if(symbolsAfterPoint)
+            ss << pointSymbol << floor((value - floor(value)) * pow(10.0, symbolsAfterPoint));
+        if(sMode != SNONE)
+            ss << spaceSymbol << getSuffix(sMode);
+        return ss.str();
+    }
+    std::string getSuffix(SuffixMode sMode);
+    
+    std::ostream& operator<<(std::ostream& os){
+        os << toString();
+        return os;
+    }
 
-	template <typename RATIO2> TDuration<RATIO2> convertTo(){
-		return TDuration<RATIO2>(value * (RATIO::num * RATIO2::den) / (double)(RATIO::den * RATIO2::num));
-	}
+    inline bool operator< (const TDuration<RATIO>& rhs){
+        return value < rhs.value;
+    }
 
-	std::string toString(SuffixMode sMode = SuffixMode::SNONE, int symbolsAfterPoint = 0,
-									  const char* pointSymbol = ".", const char* spaceSymbol = " "){
-		stringstream ss; 
-		ss << floor(value);
-		if(symbolsAfterPoint)
-			ss << pointSymbol << floor((value - floor(value)) * pow(10.0, symbolsAfterPoint));
-		if(sMode != SuffixMode::SNONE)
-			ss << spaceSymbol << getSuffix(sMode);
-		return ss.str();
-	}
-	std::string getSuffix(SuffixMode sMode);
-	
-	std::ostream& operator<<(std::ostream& os){
-		os << toString();
-		return os;
-	}
+    inline TDuration<RATIO> operator+(const TDuration<RATIO>& rhs){
+        return TDuration<RATIO>(value + rhs.value);
+    }
 
-	inline bool operator< (const TDuration<RATIO>& rhs){
-		return value < rhs.value;
-	}
+    inline TDuration<RATIO> operator-(const TDuration<RATIO>& rhs){
+        return TDuration<RATIO>(value - rhs.value);
+    }
 
-	inline TDuration<RATIO> operator+(const TDuration<RATIO>& rhs){
-		return TDuration<RATIO>(value + rhs.value);
-	}
+    inline bool operator> (const TDuration<RATIO>& rhs){return  !(operator< (rhs));}
 
-	inline TDuration<RATIO> operator-(const TDuration<RATIO>& rhs){
-		return TDuration<RATIO>(value - rhs.value);
-	}
-
-	inline bool operator> (const TDuration<RATIO>& rhs){return  !(operator< (rhs));}
-
-	friend class Timer;
+    friend class Timer;
 };
 
 
 class Timer{
 private:
     systemTimeValue timeCreate; 
-	double getDiffSec();
+    double getDiffSec();
 public:
-	Timer(){}
-	static Timer now() {Timer t; t.start(); return t;}
+    Timer(){}
+    static Timer now() {Timer t; t.start(); return t;}
     void start();
-	template <typename RATIO>
-	TDuration<RATIO> get(){
-		return TDuration<TSec>(getDiffSec()).convertTo<RATIO>();
-	}
+    template <typename RATIO>
+    TDuration<RATIO> get(){
+        return TDuration<TSec>(getDiffSec()).convertTo<RATIO>();
+    }
 };

@@ -46,7 +46,7 @@ BakerMemoryManager::BakerMemoryManager() :
     m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
     // TODO set everything in m_memoryInfo to 0
-
+    m_memoryInfo.timer.start();
     m_logFile.open("gc.log", std::fstream::out);
     // Nothing to be done here
 }
@@ -65,7 +65,7 @@ BakerMemoryManager::~BakerMemoryManager()
 //}
 
 void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
-    m_logFile << event.begin.sec << "." << event.begin.msec/1000
+    m_logFile << event.begin.toString(SNONE, 3)
               << ": [" << event.eventName << ": ";
     if(!event.heapInfo.empty()){
         TMemoryManagerHeapInfo eh = event.heapInfo;
@@ -77,16 +77,17 @@ void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
                       << i->usedHeapSizeBeforeCollect << "K->"
                       << i->usedHeapSizeAfterCollect << "K("
                       << i->totalHeapSize << "K)";
-            if(i->timeDiff.sec != 0 || i->timeDiff.msec != 0){
-                m_logFile << ", " << i->timeDiff.sec << "." << i->timeDiff.msec/1000 << " secs";
+            if(!i->timeDiff.isEmpty()){
+                m_logFile << ", " << i->timeDiff.toString(SSHORT, 3);
             }
             m_logFile << "] ";
         }
     }
-    if(event.timeDiff.sec != 0 || event.timeDiff.msec != 0){
-        m_logFile << ", " << event.timeDiff.sec << "." << event.timeDiff.msec << " secs";
+    if(!event.timeDiff.isEmpty()){
+        m_logFile << ", " << event.timeDiff.toString(SSHORT, 3);
     }
     m_logFile << "]\n";
+    m_logFile.flush();
 }
 
 bool BakerMemoryManager::initializeStaticHeap(std::size_t heapSize)
@@ -391,7 +392,7 @@ void BakerMemoryManager::collectGarbage()
     m_collectionsCount++;
     TMemoryManagerEvent event;
     event.eventName = "GC";
-    event.begin = m_memoryInfo.timer.update()->getTime();
+    event.begin = m_memoryInfo.timer.get<TSec>();
     event.heapInfo.usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
     event.heapInfo.totalHeapSize = m_heapSize/1024;
     // First of all swapping the spaces
@@ -413,8 +414,6 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects.
     // Then moving them to the new active heap.
 
-    Timer collectTimer;
-
     // Moving the live objects in the new heap
     moveObjects();
 
@@ -423,8 +422,8 @@ void BakerMemoryManager::collectGarbage()
 
     // Calculating total microseconds spent in the garbage collection procedure
     event.heapInfo.usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
-    event.timeDiff = collectTimer.update()->getTime();
-    m_totalCollectionDelay += event.timeDiff.sec*1000 + event.timeDiff.msec;
+    event.timeDiff = m_memoryInfo.timer.get<TSec>() - event.begin;
+    m_totalCollectionDelay += event.timeDiff.convertTo<TMillisec>().toInt();
     m_memoryInfo.events.push_front(event);
     writeLogLine(event);
 }
