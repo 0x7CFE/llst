@@ -139,136 +139,6 @@ Value* MethodCompiler::TJITContext::getMethodClass()
     return klass;
 }
 
-void MethodCompiler::TJITContext::pushValue(TStackValue* value)
-{
-    // Values are always pushed to the local stack
-    basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(value);
-}
-
-void MethodCompiler::TJITContext::pushValue(Value* value)
-{
-    // Values are always pushed to the local stack
-    basicBlockContexts[builder->GetInsertBlock()].valueStack.push_back(new TPlainValue(value));
-}
-
-Value* MethodCompiler::TJITContext::lastValue()
-{
-    TValueStack& valueStack = basicBlockContexts[builder->GetInsertBlock()].valueStack;
-
-    // Popping value from the referer's block
-    // and creating phi function if necessary
-    Value* value = popValue();
-
-    // Pushing the value locally (may be phi)
-    valueStack.push_back(new TPlainValue(value));
-
-    // Returning it as a last value
-    return value;
-}
-
-bool MethodCompiler::TJITContext::hasValue()
-{
-    TBasicBlockContext& blockContext = basicBlockContexts[builder->GetInsertBlock()];
-
-    // If local stack is not empty, then we definitly have some value
-    if (! blockContext.valueStack.empty())
-        return true;
-
-    // If not, checking the possible referers
-    if (blockContext.referers.empty())
-        return false; // no referers == no value
-
-    // FIXME This is not correct in a case of dummy transitive block with an only simple branch
-    //       Every referer should have equal number of values on the stack
-    //       so we may check any referer's stack to see if it has value
-    return ! basicBlockContexts[*blockContext.referers.begin()].valueStack.empty();
-}
-
-Value* MethodCompiler::TJITContext::popValue(BasicBlock* overrideBlock /* = 0*/, bool dropValue /*= false*/)
-{
-    TBasicBlockContext& blockContext = basicBlockContexts[overrideBlock ? overrideBlock : builder->GetInsertBlock()];
-    TValueStack& valueStack = blockContext.valueStack;
-
-    if (! valueStack.empty()) {
-        // If local stack is not empty
-        // then we simply pop the value from it
-        TStackValue* stackValue = valueStack.back();
-        Value* result = 0;
-
-        if (!dropValue) {
-            result = stackValue->get(); // NOTE May and probably will perform code injection
-        }
-
-        delete stackValue;
-        valueStack.pop_back();
-
-        return result;
-    } else {
-        // If value stack is empty then it means that we're dealing with
-        // a value pushed in the predcessor block (or a stack underflow)
-
-        // If there is a single predcessor, then we simply pop that value
-        // If there are several predcessors we need to create a phi function
-        switch (blockContext.referers.size()) {
-            case 0:
-                /* TODO no referers, empty local stack and pop operation = error */
-                outs() << "Value stack underflow\n";
-                std::exit(1);
-                return compiler->m_globals.nilObject;
-
-            case 1: {
-                // Recursively processing referer's block
-                BasicBlock* referer = *blockContext.referers.begin();
-                Value* value = popValue(referer, dropValue);
-                return value;
-            } break;
-
-            default: {
-                if (dropValue) {
-                    TRefererSet::iterator iReferer = blockContext.referers.begin();
-                    for (; iReferer != blockContext.referers.end(); ++iReferer)
-                        popValue(*iReferer, true);
-                    return 0;
-                }
-
-                // Storing current insert position for further use
-                BasicBlock* currentBasicBlock = builder->GetInsertBlock();
-                BasicBlock::iterator currentInsertPoint = builder->GetInsertPoint();
-
-                BasicBlock* insertBlock = overrideBlock ? overrideBlock : currentBasicBlock;
-                BasicBlock::iterator firstInsertionPoint = insertBlock->getFirstInsertionPt();
-
-                if (overrideBlock) {
-                    builder->SetInsertPoint(overrideBlock, firstInsertionPoint);
-                } else {
-                    if (firstInsertionPoint != insertBlock->end())
-                        builder->SetInsertPoint(currentBasicBlock, firstInsertionPoint);
-                }
-
-                // Creating a phi function at the beginning of the block
-                const uint32_t numReferers = blockContext.referers.size();
-                PHINode* phi = builder->CreatePHI(compiler->m_baseTypes.object->getPointerTo(), numReferers, "phi.");
-                Value* holder = compiler->protectPointer(*this, phi);
-
-                // Filling incoming nodes with values from the referer stacks
-                TRefererSet::iterator iReferer = blockContext.referers.begin();
-                for (; iReferer != blockContext.referers.end(); ++iReferer) {
-                    // FIXME non filled block will not yet have the value
-                    //       we need to store them to a special post processing list
-                    //       and update the current phi function when value will be available
-                    builder->SetInsertPoint((*iReferer)->getTerminator());
-                    Value* value = popValue(*iReferer);
-                    phi->addIncoming(value, *iReferer);
-                }
-
-                builder->SetInsertPoint(currentBasicBlock, currentInsertPoint);
-
-                return builder->CreateLoad(holder);
-            }
-        }
-    }
-}
-
 Function* MethodCompiler::createFunction(TMethod* method)
 {
     Type* methodParams[] = { m_baseTypes.context->getPointerTo() };
@@ -587,25 +457,28 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     // Array elements are instance variables
 
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
+
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
+
+    st::TNodeList consumers = jit.currentNode->getConsumers();
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -640,7 +513,7 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             std::fprintf(stderr, "JIT: unknown push constant %d\n", constant);
     }
 
-    jit.pushValue(constantValue);
+    jit.currentNode->setValue(constantValue);
 }
 
 void MethodCompiler::doPushBlock(TJITContext& jit)
@@ -699,7 +572,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     blockObject->setName("block.");
 
     Value* blockHolder = protectPointer(jit, blockObject);
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
 }
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
@@ -748,7 +621,7 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
     Value* argsHolder = protectPointer(jit, argumentsArray);
     argsHolder->setName("pArgs.");
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
@@ -995,7 +868,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     }
 
     Value* resultHolder = protectPointer(jit, result);
-    jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
+//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSpecial(TJITContext& jit)
@@ -1013,12 +886,12 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
 
         case special::stackReturn:
-            if ( !iPreviousInst->isTerminator() && jit.hasValue() )
+//             if ( !iPreviousInst->isTerminator() && jit.hasValue() )
                 jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
             break;
 
         case special::blockReturn:
-            if ( !iPreviousInst->isTerminator() && jit.hasValue()) {
+            /*if ( !iPreviousInst->isTerminator() && jit.hasValue())*/ {
                 // Peeking the return value from the stack
                 Value* value = getArgument(jit); // jit.popValue();
 
@@ -1129,7 +1002,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
             Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
             Value* resultHolder = protectPointer(jit, result);
-            jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
+//             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
 
         default:
@@ -1173,7 +1046,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.builder->CreateRet(primitiveResult);
     jit.builder->SetInsertPoint(primitiveFailedBB);
 
-    jit.pushValue(m_globals.nilObject);
+//     jit.pushValue(m_globals.nilObject);
 }
 
 
@@ -1487,8 +1360,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         } break;
 
         case primitive::LLVMsendMessage: {
-            Value* args     = jit.builder->CreateBitCast( jit.popValue(), m_baseTypes.objectArray->getPointerTo() );
-            Value* selector = jit.builder->CreateBitCast( jit.popValue(), m_baseTypes.symbol->getPointerTo() );
+            Value* args     = jit.builder->CreateBitCast( getArgument(jit, 1) /*jit.popValue()*/, m_baseTypes.objectArray->getPointerTo() );
+            Value* selector = jit.builder->CreateBitCast( getArgument(jit, 0) /*jit.popValue()*/, m_baseTypes.symbol->getPointerTo() );
             Value* context  = jit.getCurrentContext();
 
             Value* sendMessageArgs[] = {
@@ -1529,7 +1402,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             // Filling object with contents
             uint8_t index = argumentsCount;
             while (index > 0) {
-                Value* value = jit.popValue();
+                Value* value = getArgument(jit); // jit.popValue();
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), value);
             }
 

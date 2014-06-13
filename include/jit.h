@@ -236,10 +236,6 @@ public:
         TBlockContextMap basicBlockContexts;
 
         MethodCompiler* compiler; // link to outer class for variable access
-        bool hasValue();
-        void pushValue(llvm::Value* value);
-        llvm::Value* lastValue();
-        llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0, bool dropValue = false);
 
         llvm::Value* contextHolder;
         llvm::Value* selfHolder;
@@ -248,8 +244,6 @@ public:
         llvm::Value* getSelf();
         llvm::Value* getMethodClass();
         llvm::Value* getLiteral(uint32_t index);
-
-        void pushValue(TStackValue* value);
 
         TJITContext(MethodCompiler* compiler, TMethod* method, bool parse = true)
         : currentNode(0), originMethod(method), function(0), builder(0),
