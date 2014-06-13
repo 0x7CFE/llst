@@ -12,6 +12,23 @@ bool DomainOffsetCompare::operator() (const ControlDomain* a, const ControlDomai
     return a->getBasicBlock()->getOffset() < b->getBasicBlock()->getOffset();
 }
 
+TNodeList ControlNode::getConsumers() {
+    TNodeList consumers;
+
+    TNodeSet::iterator iNode = m_outEdges.begin();
+    for (; iNode != m_outEdges.end(); ++iNode) {
+        if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>()) {
+            for (std::size_t index = 0; index < instruction->getArgumentsCount(); index++)
+                if (instruction->getArgument(index) == this)
+                    consumers.push_back(instruction);
+        } else if (PhiNode* const phi = (*iNode)->cast<PhiNode>()) {
+            consumers.push_back(phi);
+        }
+    }
+
+    return consumers;
+}
+
 template<> InstructionNode* ControlNode::cast<InstructionNode>() { return this->getNodeType() == ntInstruction ? static_cast<InstructionNode*>(this) : 0; }
 template<> PhiNode* ControlNode::cast<PhiNode>() { return this->getNodeType() == ntPhi ? static_cast<PhiNode*>(this) : 0; }
 template<> TauNode* ControlNode::cast<TauNode>() { return this->getNodeType() == ntTau ? static_cast<TauNode*>(this) : 0; }

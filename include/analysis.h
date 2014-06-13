@@ -122,6 +122,9 @@ public:
 
     void setValue(llvm::Value* value) { m_value = value; }
     llvm::Value* getValue() const { return m_value; }
+
+    // Returns a list of nodes which refer current node as argument
+    TNodeList getConsumers();
 private:
     uint32_t       m_index;
     TNodeType      m_type;
