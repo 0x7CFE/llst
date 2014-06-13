@@ -383,7 +383,9 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
         if (!refererStackSize || argumentIndex > refererStackSize - 1) {
             // Referer block do not have enough values on it's stack.
             // We need to go deeper and process it's referers in turn.
-            ControlNode* const refererValue = getRequestedNode(refererDomain, argumentIndex);
+            const std::size_t newIndex = argumentIndex - refererStackSize;
+            assert(newIndex <= argumentIndex);
+            ControlNode* const refererValue = getRequestedNode(refererDomain, newIndex);
 
             if (singleReferer)
                 result = refererValue;
@@ -392,6 +394,7 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
 
         } else {
             const std::size_t  valueIndex = refererStackSize - 1 - argumentIndex;
+            assert(valueIndex < refererStackSize);
             ControlNode* const stackValue = refererStack[valueIndex];
 
             if (singleReferer)
