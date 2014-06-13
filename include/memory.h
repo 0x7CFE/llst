@@ -47,7 +47,6 @@
 
 struct TMemoryManagerHeapEvent{
     const char* eventName;
-    //timeval time; //unusual value
     TDuration<TSec> timeDiff;
     uint32_t usedHeapSizeBeforeCollect;
     uint32_t usedHeapSizeAfterCollect;

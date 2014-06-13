@@ -3,12 +3,14 @@
 #include <sstream>
 #include <math.h> 
 using std::stringstream;
-#ifdef WINDOWS
-    #include <time.h>
-    typedef clock_t systemTimeValue;
-#else
+#include <time.h>
+#include <iomanip>
+
+#ifdef UNIX
     #include <sys/time.h>
     typedef timeval systemTimeValue;
+#else
+    typedef clock_t systemTimeValue;
 #endif
 
 
@@ -39,7 +41,7 @@ class TDuration{
 private:
     double value;
 public:
-    //argument: duration in seconds
+    //argument: duration in target ratio value
     TDuration(double duration){
         value = duration;
     }
@@ -59,7 +61,8 @@ public:
         stringstream ss; 
         ss << floor(value);
         if(symbolsAfterPoint)
-            ss << pointSymbol << floor((value - floor(value)) * pow(10.0, symbolsAfterPoint));
+            ss << pointSymbol << std::setfill('0') << std::setw(symbolsAfterPoint) 
+               << floor((value - floor(value)) * pow(10.0, symbolsAfterPoint));
         if(sMode != SNONE)
             ss << spaceSymbol << getSuffix(sMode);
         return ss.str();
@@ -94,7 +97,10 @@ private:
     systemTimeValue timeCreate; 
     double getDiffSec();
 public:
-    Timer(){}
+    //timer which count time from specified unix-time.
+    Timer(time_t time);
+    //default constructor is implicit Timer::now()
+    Timer(){ this->start();}
     static Timer now() {Timer t; t.start(); return t;}
     void start();
     template <typename RATIO>
