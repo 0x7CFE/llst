@@ -4,15 +4,17 @@
 #include <sstream>
 using std::stringstream;
 
-#ifdef WINDOWS
-void Timer::start(){
-    timeCreate = clock();
+#ifdef UNIX
+Timer::Timer(time_t _time){
+    time_t current;
+    time(&current);
+    time_t diff = current - _time;
+    timeval cur_tv;
+    gettimeofday(&cur_tv);
+    timeval result = {cur_tv.tv_sec - diff, 0};
+    timeCreate = result;
 }
 
-double Timer::getDiffSec(){
-    return ((double)(clock() - timeCreate))/CLOCKS_PER_SEC;
-}
-#else
 void Timer::start(){
     gettimeofday(&timeCreate, 0);
 }
@@ -23,6 +25,22 @@ double Timer::getDiffSec(){
     double diff = current.tv_sec + current.tv_usec/(double)TMicrosec::den
                - (timeCreate.tv_sec + timeCreate.tv_usec/(double)TMicrosec::den);
     return diff;
+}
+#else
+Timer::Timer(time_t _time){
+    time_t current;
+    time(&current);
+    clock_t diff = (current - _time)*CLOCKS_PER_SEC;
+    timeCreate = clock() - diff;
+}
+
+
+void Timer::start(){
+    timeCreate = clock();
+}
+
+double Timer::getDiffSec(){
+    return ((double)(clock() - timeCreate))/CLOCKS_PER_SEC;
 }
 #endif
 

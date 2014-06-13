@@ -46,9 +46,7 @@ BakerMemoryManager::BakerMemoryManager() :
     m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
     // TODO set everything in m_memoryInfo to 0
-    m_memoryInfo.timer.start();
     m_logFile.open("gc.log", std::fstream::out);
-    // Nothing to be done here
 }
 
 BakerMemoryManager::~BakerMemoryManager()
@@ -60,13 +58,10 @@ BakerMemoryManager::~BakerMemoryManager()
     std::free(m_heapTwo);
 }
 
-//void BakerMemoryManager::writeLogEnd(TMemoryManagerEvent *event){
-//
-//}
 
 void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
     m_logFile << event.begin.toString(SNONE, 3)
-              << ": [" << event.eventName << ": ";
+              << ": [" << event.eventName << " ";
     if(!event.heapInfo.empty()){
         TMemoryManagerHeapInfo eh = event.heapInfo;
         m_logFile << eh.usedHeapSizeBeforeCollect << "K->"
@@ -78,13 +73,13 @@ void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
                       << i->usedHeapSizeAfterCollect << "K("
                       << i->totalHeapSize << "K)";
             if(!i->timeDiff.isEmpty()){
-                m_logFile << ", " << i->timeDiff.toString(SSHORT, 3);
+                m_logFile << ", " << i->timeDiff.toString(SSHORT, 6);
             }
             m_logFile << "] ";
         }
     }
     if(!event.timeDiff.isEmpty()){
-        m_logFile << ", " << event.timeDiff.toString(SSHORT, 3);
+        m_logFile << ", " << event.timeDiff.toString(SSHORT, 6);
     }
     m_logFile << "]\n";
     m_logFile.flush();
