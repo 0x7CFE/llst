@@ -123,8 +123,9 @@ public:
     void setValue(llvm::Value* value) { m_value = value; }
     llvm::Value* getValue() const { return m_value; }
 
-    // Returns a list of nodes which refer current node as argument
-    TNodeList getConsumers();
+    // Get a list of nodes which refer current node as argument
+    // Return true if at least one consumer is found
+    bool getConsumers(TNodeList& result);
 private:
     uint32_t       m_index;
     TNodeType      m_type;
