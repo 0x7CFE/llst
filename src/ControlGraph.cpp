@@ -427,8 +427,8 @@ public:
             if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
                 return NodeVisitor::visitNode(node);
 
-            TNodeSet consumers;
-            if (! getConsumers(instruction, consumers)) {
+            TNodeList consumers;
+            if (! instruction->getConsumers(consumers)) {
                 std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
                 m_nodesToRemove.push_back(instruction);
             } else if (consumers.size() == 1) {
@@ -455,24 +455,6 @@ public:
             removeNode(*iNode);
     }
 private:
-    bool getConsumers(InstructionNode* node, TNodeSet& consumers) {
-        consumers.clear();
-
-        const TNodeSet& outEdges = node->getOutEdges();
-        TNodeSet::iterator iEdge = outEdges.begin();
-        for (; iEdge != outEdges.end(); ++iEdge) {
-            if (InstructionNode* const instruction = (*iEdge)->cast<InstructionNode>()) {
-                const std::size_t argsCount = instruction->getArgumentsCount();
-                for (std::size_t index = 0; index < argsCount; index++) {
-                    if (instruction->getArgument(index) == node)
-                        consumers.insert(instruction);
-                }
-            }
-        }
-
-        return !consumers.empty();
-    }
-
     void removeNode(ControlNode* node) {
         // TODO
     }
