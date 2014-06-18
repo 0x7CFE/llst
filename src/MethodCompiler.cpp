@@ -453,38 +453,88 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
 
 void MethodCompiler::doPushInstance(TJITContext& jit)
 {
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+    Function* const getObjectField = m_JITModule->getFunction("getObjectField");
+
     // Self is interpreted as object array.
-    // Array elements are instance variables
+    // Array elements are instance variables.
+    Value* const self  = jit.getSelf();
+    Value* const field = jit.builder->CreateCall2(getObjectField, self, jit.builder->getInt32(index));
 
-    uint8_t index = jit.currentNode->getInstruction().getArgument();
+    std::ostringstream ss;
+    ss << "field" << index << ".";
+    field->setName(ss.str());
 
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadInstance, index));
+    Value* const holder = protectPointer(jit, field);
+    setNodeValue(jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
-    uint8_t index = jit.currentNode->getInstruction().getArgument();
+    /* st::TNodeList consumers;
+    if (!jit.currentNode->getConsumers(consumers)) {
+        assert(false);
+        return;
+    }
 
-    st::TNodeList consumers = jit.currentNode->getConsumers();
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadArgument, index));
+    // If we have only one consumer it's better to encode instruction near it.
+    // It would be consumer's responsibility to encode us before it's site.
+    if (consumers.size() == 1)
+        return; */
+
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+
+    Function* const getArgFromContext = m_JITModule->getFunction("getArgFromContext");
+    Value* const context  = jit.getCurrentContext();
+    Value* const argument = jit.builder->CreateCall2(getArgFromContext, context, jit.builder->getInt32(index));
+
+    std::ostringstream ss;
+    ss << "arg" << index << ".";
+    argument->setName(ss.str());
+
+    Value* const holder = protectPointer(jit, argument);
+    setNodeValue(jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
-    uint8_t index = jit.currentNode->getInstruction().getArgument();
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadTemporary, index));
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+
+    Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
+    Function* const getObjectField = m_JITModule->getFunction("getObjectField");
+
+    Value* const context   = jit.getCurrentContext();
+    Value* const temps     = jit.builder->CreateCall(getTempsFromContext, context);
+    Value* const temporary = jit.builder->CreateCall2(getObjectField, temps, jit.builder->getInt32(index));
+
+    std::ostringstream ss;
+    ss << "temp" << index << ".";
+    temporary->setName(ss.str());
+
+    Value* const holder = protectPointer(jit, temporary);
+    setNodeValue(jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
-    uint8_t index = jit.currentNode->getInstruction().getArgument();
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadLiteral, index));
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+
+    Function* const getLiteralFromContext = m_JITModule->getFunction("getLiteralFromContext");
+    Value* const context = jit.getCurrentContext();
+    Value* const literal = jit.builder->CreateCall2(getLiteralFromContext, context, jit.builder->getInt32(index));
+
+    std::ostringstream ss;
+    ss << "lit" << (uint32_t) index << ".";
+    literal->setName(ss.str());
+
+    Value* const holder = protectPointer(jit, literal);
+    setNodeValue(jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
 {
     const uint32_t constant = jit.currentNode->getInstruction().getArgument();
-    Value* constantValue   = 0;
+    Value* constantValue    = 0;
 
     switch (constant) {
         case 0:
@@ -497,8 +547,8 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
         case 7:
         case 8:
         case 9: {
-            Value* integerValue = jit.builder->getInt32( TInteger(constant).rawValue() );
-            constantValue       = jit.builder->CreateIntToPtr(integerValue, m_baseTypes.object->getPointerTo());
+            Value* const integerValue = jit.builder->getInt32( TInteger(constant).rawValue() );
+            constantValue = jit.builder->CreateIntToPtr(integerValue, m_baseTypes.object->getPointerTo());
 
             std::ostringstream ss;
             ss << "const" << constant << ".";
@@ -513,7 +563,7 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             std::fprintf(stderr, "JIT: unknown push constant %d\n", constant);
     }
 
-    jit.currentNode->setValue(constantValue);
+    setNodeValue(jit.currentNode, constantValue);
 }
 
 void MethodCompiler::doPushBlock(TJITContext& jit)
@@ -572,6 +622,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     blockObject->setName("block.");
 
     Value* blockHolder = protectPointer(jit, blockObject);
+    setNodeValue(jit.currentNode, blockHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
 }
 
@@ -654,8 +705,14 @@ llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* =
 Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node)
 {
     Value* value = node->getValue();
-    if (value)
-        return value;
+    if (value) {
+        // If value is a holder, reading stored value.
+        // Otherwise, returning as is.
+        if (isa<AllocaInst>(value))
+            return jit.builder->CreateLoad(value);
+        else
+            return value;
+    }
 
     const std::size_t inEdgesCount = node->getInEdges().size();
     if (st::InstructionNode* instruction = node->cast<st::InstructionNode>()) {
