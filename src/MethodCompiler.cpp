@@ -850,6 +850,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     }
 
     Value* resultHolder = protectPointer(jit, result);
+    setNodeValue(jit.currentNode, resultHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
@@ -977,6 +978,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
             Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
             Value* resultHolder = protectPointer(jit, result);
+            setNodeValue(jit.currentNode, resultHolder);
 //             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
 
