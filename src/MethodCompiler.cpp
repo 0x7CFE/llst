@@ -714,9 +714,6 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
     BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
 
-    // Linking pop-chain within the current logical block
-    jit.basicBlockContexts[resultBlock].referers.insert(jit.builder->GetInsertBlock());
-
     // Depending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
     jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
@@ -842,9 +839,6 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         // Creating basic block that will be branched to on normal invoke
         BasicBlock* nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
 
-        // Linking pop-chain within the current logical block
-        jit.basicBlockContexts[nextBlock].referers.insert(jit.builder->GetInsertBlock());
-
         // Performing a function invoke
         result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.exceptionLandingPad, sendMessageArgs);
 
@@ -932,9 +926,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 // from the previously stored basic blocks
                 BasicBlock* target = m_targetToBlockMap[targetOffset];
                 jit.builder->CreateBr(target);
-
-                // Updating block referers
-                jit.basicBlockContexts[target].referers.insert(jit.builder->GetInsertBlock());
             }
         } break;
 
@@ -957,10 +948,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* condition  = getArgument(jit); // jit.popValue();
                 Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
                 jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
-
-                // Updating referers
-                jit.basicBlockContexts[targetBlock].referers.insert(jit.builder->GetInsertBlock());
-                jit.basicBlockContexts[skipBlock].referers.insert(jit.builder->GetInsertBlock());
 
                 // Switching to a newly created block
                 jit.builder->SetInsertPoint(skipBlock);
@@ -1019,14 +1006,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     BasicBlock* primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceededBB", jit.function);
     BasicBlock* primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
 
-    // Linking pop chain
-    jit.basicBlockContexts[primitiveFailedBB].referers.insert(jit.builder->GetInsertBlock());
-
     compilePrimitive(jit, opcode, primitiveResult, primitiveFailed, primitiveSucceededBB, primitiveFailedBB);
     jit.currentNode->setValue(primitiveResult);
-
-    // Linking pop chain
-    jit.basicBlockContexts[primitiveSucceededBB].referers.insert(jit.builder->GetInsertBlock());
 
     jit.builder->CreateCondBr(primitiveFailed, primitiveFailedBB, primitiveSucceededBB);
     jit.builder->SetInsertPoint(primitiveSucceededBB);
@@ -1185,8 +1166,6 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
             Value* tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount);
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
-
-            jit.basicBlockContexts[tempsChecked].referers.insert(jit.builder->GetInsertBlock());
             jit.builder->SetInsertPoint(tempsChecked);
 
             // Storing values in the block's wrapping context

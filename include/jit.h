@@ -168,43 +168,8 @@ struct TBaseFunctions {
     }
 };
 
-// Value stack is used as a FIFO value holder during the compilation process.
-// Software VM uses object arrays to hold the values in dynamic.
-// Instead we're interpriting the push, pop and assign instructions
-// as a commands which values should be linked together. For example,
-// two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
-// will be linked together with effect of instanceVariables[2] = temporaries[1]
-//
-// TStackValue is a base class for stack values. Descendant value may contain either
-// raw value or a deferred command to be done when evaluation takes place.
-// Use get() method to get the stored value.
-//
-// NOTE: Depending on the actual implementation, invoking method get() may result in
-//       a code generation. This should be done in a known context.
-//
-// See also: TPlainValue and TDeferredValue
-struct TStackValue {
-    virtual ~TStackValue() { }
-    virtual llvm::Value* get() = 0;
-};
-
 class MethodCompiler {
 public:
-    // Some useful type aliases
-    typedef std::list<TStackValue*> TValueStack;
-    typedef std::set<llvm::BasicBlock*> TRefererSet;
-
-    // Block context is a logic encapsulation
-    // of Smalltalk's CFG and value transitions
-    struct TBasicBlockContext {
-        // Compile time stack of values that are
-        // produced as a result of opcode processing
-        TValueStack valueStack;
-
-        // Blocks that are referencing
-        // current block by branching to it
-        TRefererSet referers;
-    };
 
     struct TJITContext {
         st::ParsedMethod*    parsedMethod;
@@ -219,9 +184,6 @@ public:
         llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
-
-        typedef std::map<llvm::BasicBlock*, TBasicBlockContext> TBlockContextMap;
-        TBlockContextMap basicBlockContexts;
 
         MethodCompiler* compiler; // link to outer class for variable access
 
@@ -247,24 +209,6 @@ public:
 
         ~TJITContext() {
             delete controlGraph;
-
-            if (! basicBlockContexts.empty()) {
-                TBlockContextMap::iterator iContext = basicBlockContexts.begin();
-                while (iContext != basicBlockContexts.end()) {
-                    TValueStack& valueStack = iContext->second.valueStack;
-                    if (! valueStack.empty()) {
-                        TValueStack::iterator iStackValue = valueStack.begin();
-                        while (iStackValue != valueStack.end()) {
-                            delete *iStackValue;
-                            ++iStackValue;
-                        }
-                        valueStack.clear();
-                    }
-                    ++iContext;
-                }
-                basicBlockContexts.clear();
-            }
-
             delete builder;
         }
     };
