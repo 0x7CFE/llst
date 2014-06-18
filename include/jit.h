@@ -188,18 +188,6 @@ struct TStackValue {
     virtual llvm::Value* get() = 0;
 };
 
-// TPlainValue represents simple llvm::Value* holder which does not
-// perform any additional actions when get() is called. Only stored value is returned.
-struct TPlainValue : public TStackValue {
-private:
-    llvm::Value* m_value;
-public:
-    TPlainValue(llvm::Value* value) : m_value(value) {}
-    virtual ~TPlainValue() { }
-
-    virtual llvm::Value* get() { return m_value; }
-};
-
 class MethodCompiler {
 public:
     // Some useful type aliases
@@ -400,47 +388,6 @@ public:
         m_baseFunctions.initializeFromModule(JITModule);
     }
 };
-
-// TDeferredValue is used in cases when some particular actions should be done
-// when get() method is invoked. Typically this is used to pass an llvm Value*
-// to the later code ensuring that it will not be broken by a garbage collection.
-struct TDeferredValue : public TStackValue {
-    enum TOperation {
-        loadInstance,
-        loadArgument,
-        loadTemporary,
-        loadLiteral,
-
-        // result of message sent
-        // or pushed block
-        loadHolder
-    };
-
-private:
-    TOperation   m_operation;
-    uint32_t     m_index;
-    llvm::Value* m_argument;
-
-    MethodCompiler::TJITContext* m_jit;
-public:
-    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index) {
-        m_argument = 0;
-        m_operation = operation;
-        m_index = index;
-        m_jit = jit;
-    }
-
-    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument) {
-        m_operation = operation;
-        m_argument = argument;
-        m_index = 0;
-        m_jit = jit;
-    }
-
-    virtual ~TDeferredValue() { }
-    virtual llvm::Value* get();
-};
-
 
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
