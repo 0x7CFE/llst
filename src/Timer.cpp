@@ -4,13 +4,13 @@
 #include <sstream>
 using std::stringstream;
 
-#ifdef UNIX
+#if defined(unix) || defined(__unix__) || defined(__unix)
 Timer::Timer(time_t _time){
     time_t current;
     time(&current);
     time_t diff = current - _time;
     timeval cur_tv;
-    gettimeofday(&cur_tv);
+    gettimeofday(&cur_tv, 0);
     timeval result = {cur_tv.tv_sec - diff, 0};
     timeCreate = result;
 }

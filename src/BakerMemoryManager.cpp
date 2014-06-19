@@ -98,15 +98,16 @@ void BakerMemoryManager::writeLogLine(TMemoryManagerEvent event){
                       << i->usedHeapSizeBeforeCollect << "K->"
                       << i->usedHeapSizeAfterCollect << "K("
                       << i->totalHeapSize << "K)";
-            if(!i->timeDiff.isEmpty()){
+            if(!i->timeDiff.isEmpty())
                 m_logFile << ", " << i->timeDiff.toString(SSHORT, 6);
-            }
             m_logFile << "] ";
         }
     }
-    if(!event.timeDiff.isEmpty()){
+    if(!event.timeDiff.isEmpty())
         m_logFile << ", " << event.timeDiff.toString(SSHORT, 6);
-    }
+    //gc-viewer see error when no delay or delay is 0.0
+    else 
+	m_logFile << ", 0.000001 secs";
     m_logFile << "]\n";
     m_logFile.flush();
 }
