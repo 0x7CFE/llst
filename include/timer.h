@@ -10,7 +10,7 @@ using std::stringstream;
     #include <sys/time.h>
     typedef timeval systemTimeValue;
 #else
-    //typedef clock_t systemTimeValue;
+    typedef clock_t systemTimeValue;
 #endif
 
 
