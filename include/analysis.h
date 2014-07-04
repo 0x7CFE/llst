@@ -284,7 +284,7 @@ private:
 class ControlGraph {
 public:
     ControlGraph(ParsedMethod* parsedMethod)
-        : m_parsedMethod(parsedMethod), m_parsedBlock(0), m_lastNodeIndex(0)  { }
+        : m_parsedMethod(parsedMethod), m_parsedBlock(0), m_lastNodeIndex(0) { }
 
     ControlGraph(ParsedMethod* parsedMethod, ParsedBlock* parsedBlock)
         : m_parsedMethod(parsedMethod), m_parsedBlock(parsedBlock), m_lastNodeIndex(0) { }
@@ -380,7 +380,7 @@ private:
     uint32_t      m_lastNodeIndex;
 
     typedef std::map<BasicBlock*, ControlDomain*> TDomainMap;
-    TDomainMap m_blocksToDomains;
+    TDomainMap    m_blocksToDomains;
 };
 
 template<> InstructionNode* ControlNode::cast<InstructionNode>();
