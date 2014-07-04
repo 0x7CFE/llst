@@ -1,53 +1,32 @@
-#include <gtest/gtest.h>
-#include <instructions.h>
-#include <analysis.h>
+#include "patterns/DecodeBytecode.h"
 
-class ABAB : public ::testing::Test
-{
-protected:
-    TMethod* m_method;
-    st::ParsedMethod* m_parsedMethod;
-    st::ControlGraph* m_cfg;
-    virtual void SetUp()
-    {
-        m_method = (new ( calloc(4, sizeof(TMethod)) ) TObject(sizeof(TMethod) / sizeof(TObject*) - 2, 0))->cast<TMethod>();
-        static const uint8_t bytes[] =
-        {
-            33,         // 0000 PushArgument 1
-            248,        // 0001 DoSpecial branchIfFalse 8
-            8,
-            0,
-            81,         // 0004 PushConstant 1
-            246,        // 0005 DoSpecial branch 9
-            9,
-            0,
-            83,         // 0008 PushConstant 3
-            34,         // 0009 PushArgument 2
-            248,        // 0010 DoSpecial branchIfFalse 17
-            17,
-            0,
-            85,         // 0013 PushConstant 5
-            246,        // 0014 DoSpecial branch 18
-            18,
-            0,
-            87,         // 0017 PushConstant 7
-            178         // 0018 SendBinary +
-        };
-        TByteObject* bytecode = new ( calloc(4, 4096) ) TByteObject(sizeof(bytes)/sizeof(bytes[0]), static_cast<TClass*>(0));
-        memcpy(bytecode->getBytes(), bytes, bytecode->getSize());
-        m_method->byteCodes = bytecode;
-
-        m_parsedMethod = new st::ParsedMethod(m_method);
-        m_cfg = new st::ControlGraph(m_parsedMethod);
-        m_cfg->buildGraph();
-    }
-    virtual void TearDown() {
-        free(m_method->byteCodes);
-        free(m_method);
-        delete m_cfg;
-        delete m_parsedMethod;
-    }
+static const uint8_t ABABbytecode[] = {
+    33,         // 0000 PushArgument 1
+    248,        // 0001 DoSpecial branchIfFalse 8
+    8,
+    0,
+    81,         // 0004 PushConstant 1
+    246,        // 0005 DoSpecial branch 9
+    9,
+    0,
+    83,         // 0008 PushConstant 3
+    34,         // 0009 PushArgument 2
+    248,        // 0010 DoSpecial branchIfFalse 17
+    17,
+    0,
+    85,         // 0013 PushConstant 5
+    246,        // 0014 DoSpecial branch 18
+    18,
+    0,
+    87,         // 0017 PushConstant 7
+    178         // 0018 SendBinary +
 };
+
+INSTANTIATE_TEST_CASE_P(
+    testABAB,
+    P_DecodeBytecode,
+    ::testing::Values( std::tr1::make_tuple(std::string("Bytecode for ABAB"), std::string(reinterpret_cast<const char*>(ABABbytecode), sizeof(ABABbytecode))) )
+);
 
 void checkSendBinaryArg(st::ControlNode* arg)
 {
@@ -71,7 +50,7 @@ void checkSendBinaryArg(st::ControlNode* arg)
     }
 }
 
-TEST_F(ABAB, main)
+TEST_P(P_DecodeBytecode, ABAB)
 {
     class ABABProblem: public st::NodeVisitor
     {
