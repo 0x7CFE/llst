@@ -12,8 +12,8 @@ bool ControlGraphVisualizer::visitDomain(st::ControlDomain& domain) {
 }
 
 std::string edgeStyle(st::ControlNode* from, st::ControlNode* to) {
-    const st::InstructionNode* fromInstruction = from->cast<st::InstructionNode>();
-    const st::InstructionNode* toInstruction   = to->cast<st::InstructionNode>();
+    const st::InstructionNode* const fromInstruction = from->cast<st::InstructionNode>();
+	const st::InstructionNode* const toInstruction   = to->cast<st::InstructionNode>();
 
     if ((fromInstruction && fromInstruction->getInstruction().isBranch()) ||
         (toInstruction && toInstruction->getArgumentsCount() == 0))
@@ -47,7 +47,7 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
     }
 
     // Processing argument edges
-    if (const st::InstructionNode* instruction = node.cast<st::InstructionNode>()) {
+    if (const st::InstructionNode* const instruction = node.cast<st::InstructionNode>()) {
         const std::size_t argsCount = instruction->getArgumentsCount();
         for (std::size_t index = 0; index < argsCount; index++) {
             m_stream << "\t\t" << node.getIndex() << " -> " << instruction->getArgument(index)->getIndex() << " [";

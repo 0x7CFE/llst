@@ -91,7 +91,7 @@ private:
     void processSpecials(InstructionNode* node);
     void processPrimitives(InstructionNode* node);
 
-    ControlGraph*  m_graph;
+    ControlGraph*  const m_graph;
     ControlDomain* m_currentDomain;
     bool m_skipStubInstructions;
 };

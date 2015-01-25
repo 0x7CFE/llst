@@ -146,7 +146,7 @@ BasicBlock* ParsedBytecode::createBasicBlock(uint16_t blockOffset) {
 
     // Creating the referred basic block and inserting it into the function
     // Later it will be filled with instructions and linked to other blocks
-    BasicBlock* newBasicBlock = new BasicBlock(blockOffset);
+    BasicBlock* const newBasicBlock = new BasicBlock(blockOffset);
     m_offsetToBasicBlock[blockOffset] = newBasicBlock;
     m_basicBlocks.push_back(newBasicBlock);
 

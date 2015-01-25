@@ -126,6 +126,7 @@ public:
     // Get a list of nodes which refer current node as argument
     // Return true if at least one consumer is found
     bool getConsumers(TNodeList& result);
+
 private:
     uint32_t       m_index;
     TNodeType      m_type;
@@ -267,6 +268,7 @@ public:
     const TNodeList& getLocalStack() const { return m_localStack; }
 
     ControlDomain(BasicBlock* basicBlock) : m_entryPoint(0), m_terminator(0), m_basicBlock(basicBlock) { }
+
 private:
     TNodeSet         m_nodes;
     InstructionNode* m_entryPoint;
@@ -280,7 +282,7 @@ private:
 class ControlGraph {
 public:
     ControlGraph(ParsedMethod* parsedMethod)
-        : m_parsedMethod(parsedMethod), m_lastNodeIndex(0), m_parsedBlock(0) { }
+        : m_parsedMethod(parsedMethod), m_parsedBlock(0), m_lastNodeIndex(0)  { }
 
     ControlGraph(ParsedMethod* parsedMethod, ParsedBlock* parsedBlock)
         : m_parsedMethod(parsedMethod), m_parsedBlock(parsedBlock), m_lastNodeIndex(0) { }
@@ -313,6 +315,9 @@ public:
             case ControlNode::ntTau:
                 node = new TauNode(m_lastNodeIndex);
                 break;
+
+            default:
+                assert(false);
         }
 
         m_lastNodeIndex++;
@@ -324,7 +329,7 @@ public:
     template<class T> T* newNode();
 
     ControlDomain* newDomain(BasicBlock* basicBlock) {
-        ControlDomain* domain = new ControlDomain(basicBlock);
+        ControlDomain* const domain = new ControlDomain(basicBlock);
         m_domains.insert(domain);
         return domain;
     }
@@ -402,7 +407,7 @@ public:
     }
 
 protected:
-    ControlGraph* m_graph;
+    ControlGraph* const m_graph;
 };
 
 class NodeVisitor : public DomainVisitor {

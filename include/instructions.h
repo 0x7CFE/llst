@@ -55,6 +55,7 @@ struct TSmalltalkInstruction {
     bool isValueConsumer() const;
 
     std::string toString() const;
+
 private:
     TOpcode   m_opcode;
     TArgument m_argument;
@@ -77,6 +78,7 @@ public:
     }
 
     static const TSmalltalkInstruction decodeAndShiftPointer(const TByteObject& byteCodes, uint16_t& bytePointer);
+
 private:
     const TByteObject& m_byteCodes;
     uint16_t m_bytePointer;
@@ -136,7 +138,7 @@ public:
     // Current block will hold instructions prior to the cut position
     // Returned block will hold the rest
     BasicBlock* split(const iterator& position) {
-        BasicBlock* newBlock = new BasicBlock;
+        BasicBlock* const newBlock = new BasicBlock;
         std::copy(position.get(), m_instructions.end(), newBlock->m_instructions.begin());
         m_instructions.erase(position, m_instructions.end());
         // TODO insert jump instruction and add newBlock to the parsed method
@@ -163,6 +165,7 @@ public:
     }
 
     BasicBlock(uint16_t blockOffset = 0) : m_offset(blockOffset) { }
+
 private:
     uint16_t m_offset;
     TInstructionVector m_instructions;
@@ -208,7 +211,7 @@ protected:
     virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset) = 0;
 
 protected:
-    TMethod* m_origin;
+    TMethod* const  m_origin;
     TBasicBlockList m_basicBlocks;
 
     typedef std::map<uint16_t, BasicBlock*> TOffsetToBasicBlockMap;
@@ -286,7 +289,7 @@ protected:
     virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset);
 
 protected:
-    ParsedMethod* m_containerMethod;
+    ParsedMethod* const m_containerMethod;
     uint16_t m_startOffset;
     uint16_t m_stopOffset;
 };
@@ -311,7 +314,7 @@ public:
     }
 
 protected:
-    ParsedBytecode* m_parsedBytecode;
+    ParsedBytecode* const m_parsedBytecode;
 };
 
 class InstructionVisitor : public BasicBlockVisitor {
@@ -356,7 +359,7 @@ protected:
     virtual bool visitBlock(ParsedBlock& parsedBlock) { return true; }
 
 private:
-    ParsedMethod* m_parsedMethod;
+    ParsedMethod* const m_parsedMethod;
 };
 
 } // namespace st
