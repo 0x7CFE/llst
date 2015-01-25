@@ -87,6 +87,12 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
             st::InstructionNode* instruction = node->cast<st::InstructionNode>();
             label = instruction->getInstruction().toString();
 
+            if (instruction->getInstruction().getOpcode() == opcode::sendMessage) {
+                TSymbolArray* const literals = m_graph->getParsedMethod()->getOrigin()->literals;
+                TSymbol* const name = literals->getField(instruction->getInstruction().getArgument());
+                label += " " + name->toString();
+            }
+
             const bool isTerminator = instruction->getInstruction().isTerminator();
             const bool isEntryPoint = (instruction == instruction->getDomain()->getEntryPoint());
 
