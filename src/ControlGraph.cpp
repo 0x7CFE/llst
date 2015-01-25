@@ -303,7 +303,7 @@ private:
 
         // Linking pending node
         if (m_nodeToLink) {
-            std::printf("GraphLinker::processNode : fallback linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
+            std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
             m_nodeToLink->addEdge(&node);
             m_nodeToLink = 0;
         }
@@ -355,7 +355,12 @@ private:
         ControlNode* const node = getRequestedNode(domain, argumentIndex);
 
         std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", node->getIndex(), request.requestingNode->getIndex());
-        node->addEdge(request.requestingNode);
+
+        // We need to link the nodes only from the same domain
+        // Cross domain references are handled separately
+        if (node->getDomain() == request.requestingNode->getDomain())
+            node->addEdge(request.requestingNode);
+
         request.requestingNode->setArgument(request.index, node);
     }
 

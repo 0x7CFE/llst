@@ -251,7 +251,7 @@ public:
     void requestArgument(std::size_t index, InstructionNode* forNode) {
         if (! m_localStack.empty()) {
             ControlNode* argument = popValue();
-            argument->addEdge(forNode);
+            //argument->addEdge(forNode);
             forNode->setArgument(index, argument);
         } else {
             m_reqestedArguments.push_back((TArgumentRequest){index, forNode});
