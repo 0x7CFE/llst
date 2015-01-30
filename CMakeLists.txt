@@ -136,7 +136,7 @@ set (CPACK_STRIP_FILES "llst")
 
 set (CPACK_GENERATOR "DEB")
 set (CPACK_DEBIAN_PACKAGE_MAINTAINER "Team <info@llst.org>")
-set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6, libreadline6-dev")
+set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6")
 
 include(CPack)
 
