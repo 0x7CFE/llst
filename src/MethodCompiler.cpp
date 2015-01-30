@@ -34,8 +34,10 @@
  */
 
 #include <jit.h>
+
+#include <llvm/IR/Intrinsics.h>
+
 #include <stdarg.h>
-#include <llvm/Support/CFG.h>
 #include <iostream>
 #include <sstream>
 #include <opcodes.h>
@@ -281,8 +283,8 @@ Function* MethodCompiler::createFunction(TMethod* method)
     Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
-    function->addFnAttr(Attributes(Attribute::InlineHint));
-//     function->addFnAttr(Attributes(Attribute::AlwaysInline));
+    function->addFnAttr(Attribute::InlineHint);
+//     function->addFnAttr(Attribute::AlwaysInline);
     return function;
 }
 

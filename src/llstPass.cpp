@@ -36,6 +36,15 @@
 #define DEBUG_TYPE "llst"
 #include <llstPass.h>
 
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/ADT/Statistic.h>
+#include <set>
+
 STATISTIC(rootLoadsRemoved, "Number of removed loads from gc.root protected pointers                       <<<<<<");
 STATISTIC(rootsRemoved,     "Number of removed roots                                                       <<<<<<");
 

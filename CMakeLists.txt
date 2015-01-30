@@ -8,7 +8,7 @@ project(llst-project)
 find_package(Threads REQUIRED QUIET)
 find_package(READLINE)
 find_package(TINFO)
-find_package(LLVM 3.1 EXACT)
+find_package(LLVM 3.3 EXACT)
 find_package(POD2MAN)
 find_package(GZIP REQUIRED)
 
@@ -24,12 +24,12 @@ if (USE_LLVM)
         set (CMAKE_EXE_LINKER_FLAGS "${LLVM_LD_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
 
         # LLVM generates loads of warnings...
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-cast-qual -Wno-unused-parameter")
+        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
 
         set (LLVM_LIBS_TO_LINK ${LLVM_LIBS})
         add_definitions(-DLLVM)
     else()
-        message(FATAL_ERROR "\nInstall llvm-3.1-dev:i386 and try again.")
+        message(FATAL_ERROR "\nInstall llvm-3.3-dev:i386 and try again.")
     endif()
 else()
     message(STATUS "LLVM is disabled")
