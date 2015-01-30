@@ -110,13 +110,13 @@ bool BakerMemoryManager::initializeHeap(std::size_t heapSize, std::size_t maxHea
 void BakerMemoryManager::growHeap(uint32_t requestedSize)
 {
     // Stage1. Growing inactive heap
-    uint32_t newHeapSize = correctPadding(requestedSize + m_heapSize + m_heapSize / 2);
+    uint32_t newHeapSize = correctPadding(2 * requestedSize + m_heapSize + m_heapSize / 2);
     while( !is_aligned_properly(newHeapSize/2) )
         newHeapSize = correctPadding(newHeapSize+1);
 
     std::printf("MM: Growing heap to %d\n", newHeapSize);
 
-    uint32_t newMediane = newHeapSize / 2;
+    const uint32_t newMediane = newHeapSize / 2;
     uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
     uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
 
@@ -149,6 +149,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
             std::memset(*activeHeapBase, 0, newMediane);
         }
     }
+
     collectGarbage();
 
     m_heapSize = newHeapSize;
@@ -160,15 +161,31 @@ void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*
     if (gcOccured)
         *gcOccured = false;
 
+    // Quick check for the case when new object is
+    // considerably larger that the active heap space
+    if (requestedSize > m_heapSize / 2) {
+        const uint32_t newHeapSize = correctPadding(2 * requestedSize + m_heapSize + m_heapSize / 2);
+
+        if (newHeapSize < m_maxHeapSize) {
+            growHeap(requestedSize);
+        } else {
+            std::fprintf(stderr, "Could not allocate %u bytes because doing so would exceed heap limit %u\n", requestedSize, m_maxHeapSize);
+            return 0;
+        }
+
+        if (gcOccured)
+            *gcOccured = true;
+    }
+
     std::size_t attempts = 2;
     while (attempts-- > 0) {
         if (m_activeHeapPointer - requestedSize < m_activeHeapBase) {
             collectGarbage();
 
             // If even after collection there is too less space
-            // we may try to expand the heap
+            // we may try to expand the heap if limit is not yet reached
             const uintptr_t distance = m_activeHeapPointer - m_activeHeapBase;
-            if ((m_heapSize < m_maxHeapSize) && (distance < m_heapSize / 6))
+            if ((distance < m_heapSize / 16) && (m_heapSize < m_maxHeapSize))
                growHeap(requestedSize);
 
             if (gcOccured)
