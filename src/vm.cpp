@@ -54,7 +54,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, std::size_t slotSize)
     // so we need to protect the pointer
     hptr<TClass> pClass = newPointer(klass);
 
-    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
+    void* objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %u bytes\n", slotSize);
         return globals.nilObject;
@@ -85,9 +85,9 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
 
     // All binary objects are descendants of ByteObject
     // They could not have ordinary fields, so we may use it
-    uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
+    uint32_t slotSize = sizeof(TByteObject) + dataSize;
 
-    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
+    void* objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
         return static_cast<TByteObject*>(globals.nilObject);
