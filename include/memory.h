@@ -331,13 +331,13 @@ public:
     virtual bool  isInStaticHeap(void* location);
 
     virtual void  collectGarbage() {}
-    virtual void  addStaticRoot(TObject** pointer) {}
-    virtual void  removeStaticRoot(TObject** pointer) {}
-    virtual void  registerExternalPointer(TObject** pointer) {}
-    virtual void  releaseExternalPointer(TObject** pointer) {}
-    virtual void  registerExternalHeapPointer(object_ptr& pointer) {}
-    virtual void  releaseExternalHeapPointer(object_ptr& pointer) {}
-    virtual bool  checkRoot(TObject* value, TObject** objectSlot) { return false; }
+    virtual void  addStaticRoot(TObject** /*pointer*/) {}
+    virtual void  removeStaticRoot(TObject** /*pointer*/) {}
+    virtual void  registerExternalPointer(TObject** /*pointer*/) {}
+    virtual void  releaseExternalPointer(TObject** /*pointer*/) {}
+    virtual void  registerExternalHeapPointer(object_ptr& /*pointer*/) {}
+    virtual void  releaseExternalHeapPointer(object_ptr& /*pointer*/) {}
+    virtual bool  checkRoot(TObject* /*value*/, TObject** /*objectSlot*/) { return false; }
     virtual uint32_t allocsBeyondCollection() { return 0; }
     virtual TMemoryManagerInfo getStat() { return TMemoryManagerInfo(); }
 };

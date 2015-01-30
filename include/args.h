@@ -44,12 +44,14 @@ struct args
     std::size_t maxHeapSize;
     std::string imagePath;
     int         showHelp;
+    int         showVersion;
     args() :
-        heapSize(0), maxHeapSize(0), showHelp(false)
+        heapSize(0), maxHeapSize(0), showHelp(false), showVersion(false)
     {
     }
     void parse(int argc, char **argv);
     static std::string getHelp();
+    static std::string getVersion();
 };
 
 #endif

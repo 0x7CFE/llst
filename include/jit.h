@@ -306,7 +306,7 @@ private:
     void doPushTemporary(TJITContext& jit);
     void doPushLiteral(TJITContext& jit);
     void doPushConstant(TJITContext& jit);
-    void doPushBlock(uint32_t currentOffset, TJITContext& jit);
+    void doPushBlock(TJITContext& jit);
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
     void doMarkArguments(TJITContext& jit);

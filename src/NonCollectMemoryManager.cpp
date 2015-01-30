@@ -71,7 +71,7 @@ bool NonCollectMemoryManager::initializeStaticHeap(size_t staticHeapSize)
     return true;
 }
 
-bool NonCollectMemoryManager::initializeHeap(size_t heapSize, size_t maxSize)
+bool NonCollectMemoryManager::initializeHeap(size_t heapSize, size_t /*maxSize*/)
 {
     heapSize = correctPadding(heapSize);
     uint8_t* heap = static_cast<uint8_t*>( std::malloc(heapSize) );

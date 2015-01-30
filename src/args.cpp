@@ -42,6 +42,7 @@ void args::parse(int argc, char **argv)
 {
     enum {
         help = 'S',
+        version = 'V',
         image = 'i',
         heap_max = 'H',
         heap = 'h',
@@ -57,10 +58,11 @@ void args::parse(int argc, char **argv)
         {"heap",       required_argument, 0, heap},
         {"image",      required_argument, 0, image},
         {"help",       no_argument,       0, help},
+        {"version",    no_argument,       0, version},
         {0, 0, 0, 0}
     };
 
-    const char* short_options = "h:H:i:";
+    const char* short_options = "Vh:H:i:";
     int option_index = -1;
 
     while(true)
@@ -94,6 +96,9 @@ void args::parse(int argc, char **argv)
             case help: {
                 showHelp = true;
             } break;
+            case version: {
+                showVersion = true;
+            } break;
         }
         if (c == getopt_end) {
             //We are out of options. Now we have to take the last argument as the imagePath
@@ -112,5 +117,16 @@ std::string args::getHelp()
         "  -h, --heap <number>              Starting <number> of the heap in bytes\n"
         "  -H, --heap_max <number>          Maximum allowed heap size\n"
         "  -i, --image <path>               Path to image\n"
+        "  -V, --version                    Display the version number and copyrights of the invoked LLST\n"
         "      --help                       Display this information and quit";
+}
+
+std::string args::getVersion()
+{
+    return
+        "llst 0.2.1\n"
+        "Copyright (C) 2012-2014 by Dmitry Kashitsyn   <korvin@deeptown.org>\n"
+        "Copyright (C) 2012-2014 by Roman Proskuryakov <humbug@deeptown.org>\n"
+        "This is free software; see the source for copying conditions.  There is NO\n"
+        "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.";
 }

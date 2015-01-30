@@ -117,14 +117,14 @@ template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t d
     return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer)
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t /*dataSize*/, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
     TContext* instance = static_cast<TContext*>( newOrdinaryObject(klass, sizeof(TContext)) );
     return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer)
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t /*dataSize*/, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
     TBlock* instance = static_cast<TBlock*>( newOrdinaryObject(klass, sizeof(TBlock)) );
