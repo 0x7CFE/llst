@@ -24,4 +24,9 @@ ParsedMethod::~ParsedMethod() {
     {
         delete * iBlock;
     }
+    for (TOffsetToParsedBlockMap::iterator iBlock = m_offsetToParsedBlock.begin(),
+        end = m_offsetToParsedBlock.end(); iBlock != end; ++iBlock)
+    {
+        delete iBlock->second;
+    }
 }
