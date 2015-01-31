@@ -49,9 +49,7 @@ static const uint8_t bytecode[] =
     241
 };
 
-INSTANTIATE_TEST_CASE_P(
-    testCFG,
-    P_DecodeBytecode,
+INSTANTIATE_TEST_CASE_P(_, P_DecodeBytecode,
     ::testing::Values( std::tr1::make_tuple(std::string("Object>>isKindOf:"), std::string(reinterpret_cast<const char*>(bytecode), sizeof(bytecode))) )
 );
 

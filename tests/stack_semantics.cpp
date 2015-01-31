@@ -1,7 +1,6 @@
 #include "patterns/DecodeBytecode.h"
 
-static const uint8_t bytecode[] =
-{
+static const uint8_t bytecode[] = {
     81,         // 0000 PushConstant 1
     112,        // 0001 AssignTemporary 0
     245,        // 0002 DoSpecial popTop
@@ -21,13 +20,11 @@ static const uint8_t bytecode[] =
     178         // 0016 SendBinary +
 };
 
-INSTANTIATE_TEST_CASE_P(
-    testSemantics,
-    P_DecodeBytecode,
-    ::testing::Values( std::tr1::make_tuple(std::string("Bytecode for temps"), std::string(reinterpret_cast<const char*>(bytecode), sizeof(bytecode))) )
+INSTANTIATE_TEST_CASE_P(_, P_DecodeBytecode,
+    ::testing::Values( std::tr1::make_tuple(std::string("Bytecode"), std::string(reinterpret_cast<const char*>(bytecode), sizeof(bytecode))) )
 );
 
-TEST_F(P_DecodeBytecode, StackSemanticsTemps)
+TEST_P(P_DecodeBytecode, StackSemanticsTemps)
 {
     class TempsLoadInCorrectBB: public st::NodeVisitor
     {

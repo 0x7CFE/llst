@@ -22,9 +22,7 @@ static const uint8_t ABABbytecode[] = {
     178         // 0018 SendBinary +
 };
 
-INSTANTIATE_TEST_CASE_P(
-    testABAB,
-    P_DecodeBytecode,
+INSTANTIATE_TEST_CASE_P(_, P_DecodeBytecode,
     ::testing::Values( std::tr1::make_tuple(std::string("Bytecode for ABAB"), std::string(reinterpret_cast<const char*>(ABABbytecode), sizeof(ABABbytecode))) )
 );
 

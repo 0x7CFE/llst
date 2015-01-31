@@ -17,11 +17,19 @@ class P_DecodeBytecode : public ::testing::TestWithParam<std::tr1::tuple<std::st
 public:
     virtual ~P_DecodeBytecode() {}
     TMethod* m_method;
+    std::string m_method_name;
     st::ParsedMethod* m_parsedMethod;
     st::ControlGraph* m_cfg;
     virtual void SetUp()
     {
-        std::string bytecode = std::tr1::get<1>(GetParam());
+        bool is_parameterized_test = ::testing::UnitTest::GetInstance()->current_test_info()->value_param();
+        if (!is_parameterized_test) {
+            // Use TEST_P instead of TEST_F !
+            abort();
+        }
+        ParamType params = GetParam();
+        m_method_name = std::tr1::get<0>(params);
+        std::string bytecode = std::tr1::get<1>(params);
         m_method = (new ( calloc(4, sizeof(TMethod)) ) TObject(sizeof(TMethod) / sizeof(TObject*) - 2, 0))->cast<TMethod>();
         TByteObject* byteCodes = new ( calloc(4, 4096) ) TByteObject(bytecode.length(), static_cast<TClass*>(0));
         memcpy(byteCodes->getBytes(), bytecode.c_str() , byteCodes->getSize());
