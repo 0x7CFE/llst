@@ -124,8 +124,7 @@ public:
     llvm::Value* getValue() const { return m_value; }
 
     // Get a list of nodes which refer current node as argument
-    // Return true if at least one consumer is found
-    bool getConsumers(TNodeList& result);
+    TNodeList getConsumers() const;
 
 private:
     uint32_t       m_index;

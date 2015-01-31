@@ -12,8 +12,8 @@ bool DomainOffsetCompare::operator() (const ControlDomain* a, const ControlDomai
     return a->getBasicBlock()->getOffset() < b->getBasicBlock()->getOffset();
 }
 
-bool ControlNode::getConsumers(TNodeList& result) {
-    result.clear();
+TNodeList ControlNode::getConsumers() const {
+    TNodeList result;
 
     TNodeSet::iterator iNode = m_outEdges.begin();
     for (; iNode != m_outEdges.end(); ++iNode) {
@@ -26,7 +26,7 @@ bool ControlNode::getConsumers(TNodeList& result) {
         }
     }
 
-    return !result.empty();
+    return result;
 }
 
 template<> InstructionNode* ControlNode::cast<InstructionNode>() { return this->getNodeType() == ntInstruction ? static_cast<InstructionNode*>(this) : 0; }
@@ -432,8 +432,8 @@ public:
             if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
                 return NodeVisitor::visitNode(node);
 
-            TNodeList consumers;
-            if (! instruction->getConsumers(consumers)) {
+            const TNodeList& consumers = instruction->getConsumers();
+            if (consumers.empty()) {
                 std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
                 m_nodesToRemove.push_back(instruction);
             } else if (consumers.size() == 1) {

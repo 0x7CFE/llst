@@ -402,8 +402,8 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
-    /* st::TNodeList consumers;
-    if (!jit.currentNode->getConsumers(consumers)) {
+    /* const st::TNodeList& consumers = jit.currentNode->getConsumers();
+    if (consumers.empty()) {
         assert(false);
         return;
     }
