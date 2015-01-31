@@ -90,15 +90,16 @@ public:
     typedef std::set<BasicBlock*> TBasicBlockSet;
 
     class iterator : public TInstructionVector::iterator {
+        typedef TInstructionVector::iterator parent;
     public:
-        iterator(const TInstructionVector::iterator& copy) : TInstructionVector::iterator(copy) { }
+        iterator(const parent& copy) : parent(copy) { }
 
         const TSmalltalkInstruction operator *() const {
-            return TSmalltalkInstruction(TInstructionVector::iterator::operator*());
+            return TSmalltalkInstruction(parent::operator*());
         }
 
-        TInstructionVector::iterator& get() { return static_cast<TInstructionVector::iterator&>(*this); }
-        const TInstructionVector::iterator& get() const { return static_cast<const TInstructionVector::iterator&>(*this); }
+        parent& get() { return static_cast<parent&>(*this); }
+        const parent& get() const { return static_cast<const parent&>(*this); }
     };
 
     iterator begin() { return iterator(m_instructions.begin()); }
