@@ -334,6 +334,16 @@ public:
         return domain;
     }
 
+    void removeNode(ControlNode* node) {
+        // We allow to erase only orphan nodes
+        assert(node);
+        assert(!node->getInEdges().size());
+        assert(!node->getOutEdges().size());
+
+        m_nodes.remove(node);
+        delete node;
+    }
+
     ~ControlGraph() {
         TDomainSet::iterator iDomain = m_domains.begin();
         while (iDomain != m_domains.end())

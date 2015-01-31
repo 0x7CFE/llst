@@ -461,7 +461,47 @@ public:
     }
 private:
     void removeNode(ControlNode* node) {
-        // TODO
+        // Trivial instructions should have only one outgoing edge
+        assert(node->getOutEdges().size() == 1);
+
+        ControlNode* const nextNode = * node->getOutEdges().begin();
+        assert(nextNode && nextNode->getNodeType() == ControlNode::ntInstruction);
+
+        // Fixing domain entry point
+        ControlDomain* const domain = node->getDomain();
+        if (domain->getEntryPoint() == node)
+            domain->setEntryPoint(nextNode->cast<InstructionNode>());
+
+        // Fixing incoming edges by remapping them to the next node
+        TNodeSet::iterator iNode = node->getInEdges().begin();
+        for (; iNode != node->getInEdges().end(); ++iNode) {
+            ControlNode* const sourceNode = *iNode;
+
+            std::printf("Remapping node %.2u from %.2u to %.2u\n",
+                        sourceNode->getIndex(),
+                        node->getIndex(),
+                        nextNode->getIndex());
+
+            sourceNode->removeEdge(node);
+            sourceNode->addEdge(nextNode);
+        }
+
+        // Erasing outgoing edges
+        iNode = node->getOutEdges().begin();
+        for (; iNode != node->getOutEdges().end(); ++iNode)
+        {
+            ControlNode* const targetNode = *iNode;
+
+            std::printf("Erasing edge %.2u -> %.2u\n",
+                        node->getIndex(),
+                        targetNode->getIndex());
+
+            node->removeEdge(targetNode);
+        }
+
+        // Removing node from the graph
+        node->getDomain()->removeNode(node);
+        m_graph->removeNode(node);
     }
 
 private:
