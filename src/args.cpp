@@ -3,11 +3,11 @@
  *
  *    Helper functions for command line argument parsing
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -124,9 +124,9 @@ std::string args::getHelp()
 std::string args::getVersion()
 {
     return
-        "llst 0.2.1\n"
-        "Copyright (C) 2012-2014 by Dmitry Kashitsyn   <korvin@deeptown.org>\n"
-        "Copyright (C) 2012-2014 by Roman Proskuryakov <humbug@deeptown.org>\n"
+        "llst 0.3.0\n"
+        "Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>\n"
+        "Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>\n"
         "This is free software; see the source for copying conditions.  There is NO\n"
         "warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.";
 }
