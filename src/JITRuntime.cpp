@@ -35,14 +35,18 @@
 #include <jit.h>
 #include <primitives.h>
 
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/IRReader.h>
 #include <llvm/Support/InstIterator.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/CallSite.h>
+#include <llvm/Support/ManagedStatic.h>
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 
 #include <llvm/PassManager.h>
-#include <llvm/Target/TargetData.h>
+#include <llvm/ADT/Statistic.h>
 #include <llvm/LinkAllPasses.h>
 
 #include <llvm/CodeGen/GCs.h>
@@ -905,10 +909,6 @@ void JITRuntime::initializeGlobals() {
 void JITRuntime::initializePassManager() {
     m_functionPassManager = new FunctionPassManager(m_JITModule);
     m_modulePassManager   = new PassManager();
-    // Set up the optimizer pipeline.
-    // Start with registering info about how the
-    // target lays out data structures.
-    m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
 
     m_modulePassManager->add(createFunctionInliningPass());
 

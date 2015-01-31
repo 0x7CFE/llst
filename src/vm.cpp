@@ -54,7 +54,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, std::size_t slotSize)
     // so we need to protect the pointer
     hptr<TClass> pClass = newPointer(klass);
 
-    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
+    void* objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %u bytes\n", slotSize);
         return globals.nilObject;
@@ -85,9 +85,9 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
 
     // All binary objects are descendants of ByteObject
     // They could not have ordinary fields, so we may use it
-    uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
+    uint32_t slotSize = sizeof(TByteObject) + dataSize;
 
-    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
+    void* objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
         return static_cast<TByteObject*>(globals.nilObject);
@@ -117,14 +117,14 @@ template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t d
     return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer)
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t /*dataSize*/, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
     TContext* instance = static_cast<TContext*>( newOrdinaryObject(klass, sizeof(TContext)) );
     return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer)
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t /*dataSize*/, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
     TBlock* instance = static_cast<TBlock*>( newOrdinaryObject(klass, sizeof(TBlock)) );

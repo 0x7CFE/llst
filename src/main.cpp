@@ -60,6 +60,11 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
+    if (llstArgs.showVersion) {
+        std::cout << args::getVersion() << std::endl;
+        return EXIT_SUCCESS;
+    }
+
 #if defined(LLVM)
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
 #else

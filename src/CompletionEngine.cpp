@@ -58,7 +58,7 @@ static char* smalltalk_generator(const char* text, int state) {
         return 0;
 }
 
-static char** smalltalk_completion(const char* text, int start, int end) {
+static char** smalltalk_completion(const char* text, int /*start*/, int /*end*/) {
     return rl_completion_matches(text, smalltalk_generator);
 }
 
