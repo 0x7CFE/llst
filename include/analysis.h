@@ -250,8 +250,11 @@ public:
     void requestArgument(std::size_t index, InstructionNode* forNode) {
         if (! m_localStack.empty()) {
             ControlNode* argument = popValue();
-            //argument->addEdge(forNode);
             forNode->setArgument(index, argument);
+
+            if (argument->getNodeType() == ControlNode::ntPhi)
+                argument->addEdge(forNode);
+
         } else {
             m_reqestedArguments.push_back((TArgumentRequest){index, forNode});
         }
@@ -333,7 +336,7 @@ public:
         return domain;
     }
 
-    void removeNode(ControlNode* node) {
+    void eraseNode(ControlNode* node) {
         // We allow to erase only orphan nodes
         assert(node);
         assert(!node->getInEdges().size());

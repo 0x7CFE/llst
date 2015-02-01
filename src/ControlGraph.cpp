@@ -296,79 +296,105 @@ public:
     }
 
 private:
-    void processNode(ControlNode& node) {
-        // In order to keep graph strongly connected, we link
-        // node to the next one. This edge would be interpreted
-        // as a control flow edge, not the stack value flow edge.
+    void processNode(ControlNode& node);
+    void processBranching();
+    void processArgumentRequests();
+    void processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request);
 
-        // Linking pending node
-        if (m_nodeToLink) {
-            std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
-            m_nodeToLink->addEdge(&node);
-            m_nodeToLink = 0;
-        }
-
-        InstructionNode* const instruction = node.cast<InstructionNode>();
-        if (instruction && instruction->getInstruction().isTerminator())
-            return; // terminator nodes will take care of themselves
-
-        TNodeSet& outEdges = node.getOutEdges();
-        TNodeSet::iterator iNode = outEdges.begin();
-        bool isNodeLinked = false;
-        for (; iNode != outEdges.end(); ++iNode) {
-            // Checking for connectivity
-            if ((*iNode)->getDomain() == node.getDomain() && (*iNode)->getIndex() > node.getIndex()) {
-                // Node is linked. No need to worry.
-                isNodeLinked = true;
-                break;
-            }
-        }
-
-        if (! isNodeLinked)
-            m_nodeToLink = &node;
-    }
-
-    void processBranching() {
-        // Current domain's entry point should be linked to the terminators of referring domains
-        InstructionNode* const entryPoint = m_currentDomain->getEntryPoint();
-        assert(entryPoint);
-
-        const BasicBlock::TBasicBlockSet& referers = m_currentDomain->getBasicBlock()->getReferers();
-        BasicBlock::TBasicBlockSet::iterator iReferer = referers.begin();
-        for (; iReferer != referers.end(); ++iReferer) {
-            ControlDomain* const refererDomain = m_graph->getDomainFor(*iReferer);
-            InstructionNode* const  terminator = refererDomain->getTerminator();
-            assert(terminator && terminator->getInstruction().isBranch());
-
-            std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", terminator->getIndex(), entryPoint->getIndex());
-            terminator->addEdge(entryPoint);
-        }
-    }
-
-    void processArgumentRequests() {
-        const ControlDomain::TRequestList& requestList = m_currentDomain->getRequestedArguments();
-        for (std::size_t index = 0; index < requestList.size(); index++)
-            processRequest(m_currentDomain, index, requestList[index]);
-    }
-
-    void processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request) {
-        ControlNode* const node = getRequestedNode(domain, argumentIndex);
-
-        std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", node->getIndex(), request.requestingNode->getIndex());
-
-        // We need to link the nodes only from the same domain
-        // Cross domain references are handled separately
-        if (node->getDomain() == request.requestingNode->getDomain())
-            node->addEdge(request.requestingNode);
-
-        request.requestingNode->setArgument(request.index, node);
-    }
-
+    void mergePhi(PhiNode* source, PhiNode* target);
     ControlNode* getRequestedNode(ControlDomain* domain, std::size_t index);
 
     ControlDomain* m_currentDomain;
     ControlNode*   m_nodeToLink;
 };
+
+void GraphLinker::processNode(ControlNode& node)
+{
+    // In order to keep graph strongly connected, we link
+    // node to the next one. This edge would be interpreted
+    // as a control flow edge, not the stack value flow edge.
+
+    // Linking pending node
+    if (m_nodeToLink) {
+        std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
+        m_nodeToLink->addEdge(&node);
+        m_nodeToLink = 0;
+    }
+
+    InstructionNode* const instruction = node.cast<InstructionNode>();
+    if (instruction && instruction->getInstruction().isTerminator())
+        return; // terminator nodes will take care of themselves
+
+        TNodeSet& outEdges = node.getOutEdges();
+    TNodeSet::iterator iNode = outEdges.begin();
+    bool isNodeLinked = false;
+    for (; iNode != outEdges.end(); ++iNode) {
+        // Checking for connectivity
+        if ((*iNode)->getDomain() == node.getDomain() && (*iNode)->getIndex() > node.getIndex()) {
+            // Node is linked. No need to worry.
+            isNodeLinked = true;
+            break;
+        }
+    }
+
+    if (! isNodeLinked)
+        m_nodeToLink = &node;
+}
+
+void GraphLinker::processBranching()
+{
+    // Current domain's entry point should be linked to the terminators of referring domains
+    InstructionNode* const entryPoint = m_currentDomain->getEntryPoint();
+    assert(entryPoint);
+
+    const BasicBlock::TBasicBlockSet& referers = m_currentDomain->getBasicBlock()->getReferers();
+    BasicBlock::TBasicBlockSet::iterator iReferer = referers.begin();
+    for (; iReferer != referers.end(); ++iReferer) {
+        ControlDomain* const refererDomain = m_graph->getDomainFor(*iReferer);
+        InstructionNode* const  terminator = refererDomain->getTerminator();
+        assert(terminator && terminator->getInstruction().isBranch());
+
+        std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", terminator->getIndex(), entryPoint->getIndex());
+        terminator->addEdge(entryPoint);
+    }
+}
+
+void GraphLinker::processArgumentRequests()
+{
+    const ControlDomain::TRequestList& requestList = m_currentDomain->getRequestedArguments();
+    for (std::size_t index = 0; index < requestList.size(); index++)
+        processRequest(m_currentDomain, index, requestList[index]);
+}
+
+void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request)
+{
+    ControlNode* const argument = getRequestedNode(domain, argumentIndex);
+    const ControlNode::TNodeType argumentType = argument->getNodeType();
+
+    std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", argument->getIndex(), request.requestingNode->getIndex());
+
+    request.requestingNode->setArgument(request.index, argument);
+
+    // We need to link the nodes only from the same domain
+    // Cross domain references are handled separately
+    if (argument->getDomain() == request.requestingNode->getDomain() || argumentType == ControlNode::ntPhi)
+        argument->addEdge(request.requestingNode);
+}
+
+void GraphLinker::mergePhi(PhiNode* source, PhiNode* target)
+{
+    // All incoming edges of source node became incoming edges of target node.
+    TNodeSet::iterator iEdge = source->getInEdges().begin();
+    while (iEdge != source->getInEdges().end()) {
+        ControlNode* const argument = *iEdge++;
+
+        argument->removeEdge(source);
+        argument->addEdge(target);
+    }
+
+    // Deleting source node because it is no longer used
+    m_graph->eraseNode(source);
+}
 
 ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t argumentIndex)
 {
@@ -392,10 +418,15 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
             assert(newIndex <= argumentIndex);
             ControlNode* const refererValue = getRequestedNode(refererDomain, newIndex);
 
-            if (singleReferer)
+            if (singleReferer) {
                 result = refererValue;
-            else
-                refererValue->addEdge(result);
+            } else {
+                // Nested phi nodes should be merged together
+                if (PhiNode* const phi = refererValue->cast<PhiNode>())
+                    mergePhi(phi, static_cast<PhiNode*>(result));
+                else
+                    refererValue->addEdge(result);
+            }
 
         } else {
             const std::size_t  valueIndex = refererStackSize - 1 - argumentIndex;
@@ -415,7 +446,7 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
 
 class GraphOptimizer : public NodeVisitor {
 public:
-    GraphOptimizer(ControlGraph* graph) : NodeVisitor(graph) {}
+    GraphOptimizer(ControlGraph* graph) : NodeVisitor(graph), m_currentDomain(0) {}
 
     virtual bool visitDomain(ControlDomain& domain) {
         m_currentDomain = &domain;
@@ -455,10 +486,12 @@ public:
     }
 
     virtual void domainsVisited() {
+        // Removing nodes that were optimized out
         TNodeList::iterator iNode = m_nodesToRemove.begin();
         for (; iNode != m_nodesToRemove.end(); ++iNode)
             removeNode(*iNode);
     }
+
 private:
     void removeNode(ControlNode* node) {
         // Trivial instructions should have only one outgoing edge
@@ -474,8 +507,8 @@ private:
 
         // Fixing incoming edges by remapping them to the next node
         TNodeSet::iterator iNode = node->getInEdges().begin();
-        for (; iNode != node->getInEdges().end(); ++iNode) {
-            ControlNode* const sourceNode = *iNode;
+        while (iNode != node->getInEdges().end()) {
+            ControlNode* const sourceNode = *iNode++;
 
             std::printf("Remapping node %.2u from %.2u to %.2u\n",
                         sourceNode->getIndex(),
@@ -488,9 +521,9 @@ private:
 
         // Erasing outgoing edges
         iNode = node->getOutEdges().begin();
-        for (; iNode != node->getOutEdges().end(); ++iNode)
+        while (iNode != node->getOutEdges().end())
         {
-            ControlNode* const targetNode = *iNode;
+            ControlNode* const targetNode = *iNode++;
 
             std::printf("Erasing edge %.2u -> %.2u\n",
                         node->getIndex(),
@@ -501,7 +534,7 @@ private:
 
         // Removing node from the graph
         node->getDomain()->removeNode(node);
-        m_graph->removeNode(node);
+        m_graph->eraseNode(node);
     }
 
 private:
