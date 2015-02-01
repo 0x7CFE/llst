@@ -110,14 +110,14 @@ public:
     TNodeSet& getInEdges() { return m_inEdges; }
     TNodeSet& getOutEdges() { return m_outEdges; }
 
-    void addEdge(ControlNode* to) {
-        m_outEdges.insert(to);
-        to->getInEdges().insert(this);
+    void addEdge(ControlNode* dest) {
+        this->m_outEdges.insert(dest);
+        dest->m_inEdges.insert(this);
     }
 
-    void removeEdge(ControlNode* to) {
-        m_outEdges.erase(to);
-        to->getInEdges().erase(this);
+    void removeEdge(ControlNode* dest) {
+        this->m_outEdges.erase(dest);
+        dest->m_inEdges.erase(this);
     }
 
     void setValue(llvm::Value* value) { m_value = value; }
