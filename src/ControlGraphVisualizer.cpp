@@ -97,7 +97,7 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
             const bool isEntryPoint = (instruction == instruction->getDomain()->getEntryPoint());
 
             if (isTerminator && isEntryPoint)
-                color = "green3;red";
+                color = "red"; // color = "green3;red";
             else if (isEntryPoint)
                 color = "green3";
             else if (isTerminator)

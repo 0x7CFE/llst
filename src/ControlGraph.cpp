@@ -12,23 +12,6 @@ bool DomainOffsetCompare::operator() (const ControlDomain* a, const ControlDomai
     return a->getBasicBlock()->getOffset() < b->getBasicBlock()->getOffset();
 }
 
-TNodeList ControlNode::getConsumers() const {
-    TNodeList result;
-
-    TNodeSet::iterator iNode = m_outEdges.begin();
-    for (; iNode != m_outEdges.end(); ++iNode) {
-        if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>()) {
-            for (std::size_t index = 0; index < instruction->getArgumentsCount(); index++)
-                if (instruction->getArgument(index) == this)
-                    result.push_back(instruction);
-        } else if (PhiNode* const phi = (*iNode)->cast<PhiNode>()) {
-            result.push_back(phi);
-        }
-    }
-
-    return result;
-}
-
 template<> InstructionNode* ControlNode::cast<InstructionNode>() { return this->getNodeType() == ntInstruction ? static_cast<InstructionNode*>(this) : 0; }
 template<> PhiNode* ControlNode::cast<PhiNode>() { return this->getNodeType() == ntPhi ? static_cast<PhiNode*>(this) : 0; }
 template<> TauNode* ControlNode::cast<TauNode>() { return this->getNodeType() == ntTau ? static_cast<TauNode*>(this) : 0; }
@@ -325,7 +308,7 @@ void GraphLinker::processNode(ControlNode& node)
     if (instruction && instruction->getInstruction().isTerminator())
         return; // terminator nodes will take care of themselves
 
-        TNodeSet& outEdges = node.getOutEdges();
+    const TNodeSet& outEdges = node.getOutEdges();
     TNodeSet::iterator iNode = outEdges.begin();
     bool isNodeLinked = false;
     for (; iNode != outEdges.end(); ++iNode) {
@@ -374,6 +357,7 @@ void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentInde
     std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", argument->getIndex(), request.requestingNode->getIndex());
 
     request.requestingNode->setArgument(request.index, argument);
+    argument->addConsumer(request.requestingNode);
 
     // We need to link the nodes only from the same domain
     // Cross domain references are handled separately
@@ -463,7 +447,7 @@ public:
             if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
                 return NodeVisitor::visitNode(node);
 
-            const TNodeList& consumers = instruction->getConsumers();
+            const TNodeSet& consumers = instruction->getConsumers();
             if (consumers.empty()) {
                 std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
                 m_nodesToRemove.push_back(instruction);
@@ -533,6 +517,7 @@ private:
         }
 
         // Removing node from the graph
+        std::printf("Erasing node %.2u\n", node->getIndex());
         node->getDomain()->removeNode(node);
         m_graph->eraseNode(node);
     }

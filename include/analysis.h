@@ -65,6 +65,7 @@ private:
 
 class ControlDomain;
 class ControlNode;
+class InstructionNode;
 
 typedef std::vector<ControlNode*> TNodeList;
 
@@ -107,8 +108,8 @@ public:
     ControlDomain* getDomain() const { return m_domain; }
     void setDomain(ControlDomain* value) { m_domain = value; }
 
-    TNodeSet& getInEdges() { return m_inEdges; }
-    TNodeSet& getOutEdges() { return m_outEdges; }
+    const TNodeSet& getInEdges() const { return m_inEdges; }
+    const TNodeSet& getOutEdges() const { return m_outEdges; }
 
     void addEdge(ControlNode* dest) {
         this->m_outEdges.insert(dest);
@@ -124,7 +125,9 @@ public:
     llvm::Value* getValue() const { return m_value; }
 
     // Get a list of nodes which refer current node as argument
-    TNodeList getConsumers() const;
+    void addConsumer(ControlNode* consumer) { m_consumers.insert(consumer); }
+    void removeConsumer(ControlNode* consumer) { m_consumers.erase(consumer); }
+    const TNodeSet& getConsumers() const { return m_consumers; }
 
 private:
     uint32_t       m_index;
@@ -134,6 +137,7 @@ private:
     ControlDomain* m_domain;
 
     llvm::Value*   m_value;
+    TNodeSet       m_consumers;
 };
 
 // Instruction node represents a signle VM instruction and it's relations in code.
@@ -251,6 +255,7 @@ public:
         if (! m_localStack.empty()) {
             ControlNode* argument = popValue();
             forNode->setArgument(index, argument);
+            argument->addConsumer(forNode);
 
             if (argument->getNodeType() == ControlNode::ntPhi)
                 argument->addEdge(forNode);
