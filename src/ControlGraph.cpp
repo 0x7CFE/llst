@@ -361,8 +361,17 @@ void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentInde
 
     // We need to link the nodes only from the same domain
     // Cross domain references are handled separately
-    if (argument->getDomain() == request.requestingNode->getDomain() || argumentType == ControlNode::ntPhi)
+    if (argument->getDomain() == request.requestingNode->getDomain())
         argument->addEdge(request.requestingNode);
+
+    if (argumentType == ControlNode::ntPhi) {
+        argument->addEdge(request.requestingNode);
+
+        // Registering phi as a consumer for all input nodes
+        TNodeSet::iterator iNode = argument->getInEdges().begin();
+        for (; iNode != argument->getInEdges().end(); ++iNode)
+            (*iNode)->addConsumer(argument);
+    }
 }
 
 void GraphLinker::mergePhi(PhiNode* source, PhiNode* target)
