@@ -437,14 +437,9 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
     return result;
 }
 
-class GraphOptimizer : public NodeVisitor {
+class GraphOptimizer : public PlainNodeVisitor {
 public:
-    GraphOptimizer(ControlGraph* graph) : NodeVisitor(graph), m_currentDomain(0) {}
-
-    virtual bool visitDomain(ControlDomain& domain) {
-        m_currentDomain = &domain;
-        return NodeVisitor::visitDomain(domain);
-    }
+    GraphOptimizer(ControlGraph* graph) : PlainNodeVisitor(graph) {}
 
     virtual bool visitNode(ControlNode& node) {
         // If node pushes value on the stack but this value is not consumed
@@ -454,7 +449,7 @@ public:
         if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
             const TSmalltalkInstruction& nodeInstruction = instruction->getInstruction();
             if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
-                return NodeVisitor::visitNode(node);
+                return true;
 
             const TNodeSet& consumers = instruction->getConsumers();
             if (consumers.empty()) {
@@ -475,15 +470,15 @@ public:
             }
         } else if (PhiNode* const phi = node.cast<PhiNode>()) {
             if (phi->getInEdges().size() == 1) {
-                std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", instruction->getIndex());
+                std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", phi->getIndex());
                 m_nodesToRemove.push_back(phi);
             }
         }
 
-        return NodeVisitor::visitNode(node);
+        return true;
     }
 
-    virtual void domainsVisited() {
+    virtual void nodesVisited() {
         // Removing nodes that were optimized out
         TNodeList::iterator iNode = m_nodesToRemove.begin();
         for (; iNode != m_nodesToRemove.end(); ++iNode) {
@@ -563,8 +558,7 @@ private:
     }
 
 private:
-    TNodeList      m_nodesToRemove;
-    ControlDomain* m_currentDomain;
+    TNodeList m_nodesToRemove;
 };
 
 void ControlGraph::buildGraph()

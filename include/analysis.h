@@ -307,6 +307,11 @@ public:
     iterator begin() { return m_domains.begin(); }
     iterator end() { return m_domains.end(); }
 
+    typedef std::list<ControlNode*> TNodeList;
+    typedef TNodeList::iterator nodes_iterator;
+    nodes_iterator nodes_begin() { return m_nodes.begin(); }
+    nodes_iterator nodes_end() { return m_nodes.end(); }
+
     ControlNode* newNode(ControlNode::TNodeType type) {
         ControlNode* node = 0;
 
@@ -380,7 +385,6 @@ private:
     ParsedBlock*  m_parsedBlock;
     TDomainSet    m_domains;
 
-    typedef std::list<ControlNode*> TNodeList;
     TNodeList     m_nodes;
     uint32_t      m_lastNodeIndex;
 
@@ -451,6 +455,32 @@ protected:
 
         return true;
     }
+};
+
+class PlainNodeVisitor {
+public:
+    PlainNodeVisitor(ControlGraph* graph) : m_graph(graph) { }
+    virtual bool visitNode(ControlNode& node) { return true; }
+    virtual void nodesVisited() { }
+
+    void run() {
+        ControlGraph::nodes_iterator iNode = m_graph->nodes_begin();
+        const ControlGraph::nodes_iterator iEnd = m_graph->nodes_end();
+
+        if (iNode != iEnd) {
+            while (iNode != iEnd) {
+                if (! visitNode(** iNode))
+                    break;
+
+                ++iNode;
+            }
+
+            nodesVisited();
+        }
+    }
+
+protected:
+    ControlGraph* const m_graph;
 };
 
 } // namespace st
