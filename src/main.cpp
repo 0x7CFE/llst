@@ -65,11 +65,21 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
+    IMemoryManager* mm;
+    if(llstArgs.memoryManagerType == "nc") {
+        mm = new NonCollectMemoryManager();
+        std::cout << "GC: Non-collecting\n";
+    }
+    else {
 #if defined(LLVM)
-    std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
+    mm = new LLVMMemoryManager();
+    std::cout << "GC: Mark and sweep (LLVM)\n";
 #else
-    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
+        mm = new BakerMemoryManager();
+        std::cout << "GC: Mark and sweep\n";
 #endif
+    }
+    std::auto_ptr<IMemoryManager> memoryManager(mm);
     memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
 
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
@@ -154,11 +164,13 @@ int main(int argc, char **argv) {
     int averageAllocs = info.collectionsCount ? info.allocationsCount / info.collectionsCount : info.allocationsCount;
     std::printf("\nGC count: %d (%d/%d), average allocations per gc: %d, microseconds spent in GC: %d\n",
            info.collectionsCount, info.leftToRightCollections, info.rightToLeftCollections, averageAllocs, static_cast<uint32_t>(info.totalCollectionDelay));
+    std::printf("Heap size (Kb*s): %qi, Free heap size (Kb*s): %qi\n",
+            (long long) info.heapSize, (long long) info.freeHeapSize);
 
     vm.printVMStat();
 
 #if defined(LLVM)
-    runtime.printStat();
+    //runtime.printStat();
 #endif
 
     return EXIT_SUCCESS;

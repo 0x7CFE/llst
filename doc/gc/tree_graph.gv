@@ -1,0 +1,8 @@
+digraph g {
+	Root -> Left1;
+	Root -> Right1;
+	Left1 -> LLeft2;
+	Left1 -> LRight2;
+	Right1 -> RLeft2;
+	Right1 -> RRight2;
+}

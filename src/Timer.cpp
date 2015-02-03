@@ -4,6 +4,7 @@
 #include <sstream>
 using std::stringstream;
 
+
 #if defined(unix) || defined(__unix__) || defined(__unix)
 Timer::Timer(time_t _time){
     time_t current;
@@ -43,7 +44,6 @@ double Timer::getDiffSec(){
     return ((double)(clock() - timeCreate))/CLOCKS_PER_SEC;
 }
 #endif
-
 
 template <> std::string TDuration<TDay>::getSuffix(SuffixMode sMode){
     return sMode == SFULL ? "days" : sMode == SSHORT ? "days" : ""; }

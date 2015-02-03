@@ -71,6 +71,11 @@ BakerMemoryManager::BakerMemoryManager() :
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
     m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
 {
+    m_memoryInfo.heapSize = 0;
+    m_memoryInfo.freeHeapSize = 0;
+    m_memoryInfo.allocationTimer.start();
+    m_memoryInfo.heapIncreaseTimer.start();
+
     // TODO set everything in m_memoryInfo to 0
     m_logFile.open("gc.log", std::fstream::out);
 }
@@ -248,9 +253,17 @@ void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*
 
         if (gcOccured && !*gcOccured)
             m_allocationsCount++;
+        //TODO remove from this place or add compilation flag
+        m_memoryInfo.freeHeapSize += (m_heapSize/2 + m_activeHeapPointer - m_activeHeapBase)*
+                (m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+        m_memoryInfo.allocationTimer.start();
         return result;
     }
 
+    //TODO remove from this place or add compilation flag
+    m_memoryInfo.freeHeapSize += (m_heapSize/2 + m_activeHeapPointer - m_activeHeapBase)*
+            (m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    m_memoryInfo.allocationTimer.start();
     // TODO Grow the heap if object still not fits
 
     std::fprintf(stderr, "Could not allocate %u bytes in heap\n", requestedSize);
@@ -432,11 +445,13 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
 void BakerMemoryManager::collectGarbage()
 {
     //get statistic before collect
+    m_memoryInfo.heapSize += m_heapSize*(m_memoryInfo.heapIncreaseTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    m_memoryInfo.heapIncreaseTimer.start();
     m_collectionsCount++;
     TMemoryManagerEvent event;
     event.eventName = "GC";
     event.begin = m_memoryInfo.timer.get<TSec>();
-    event.heapInfo.usedHeapSizeBeforeCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event.heapInfo.usedHeapSizeBeforeCollect =  (m_heapSize/2 - (m_activeHeapPointer - m_activeHeapBase))/1024;
     event.heapInfo.totalHeapSize = m_heapSize/1024;
     // First of all swapping the spaces
     if (m_activeHeapOne)
@@ -464,9 +479,9 @@ void BakerMemoryManager::collectGarbage()
     std::memset(m_inactiveHeapBase, 0, m_heapSize / 2);
 
     // Calculating total microseconds spent in the garbage collection procedure
-    event.heapInfo.usedHeapSizeAfterCollect =  (m_heapSize - (m_activeHeapPointer - m_activeHeapBase))/1024;
+    event.heapInfo.usedHeapSizeAfterCollect =  (m_heapSize/2 - (m_activeHeapPointer - m_activeHeapBase))/1024;
     event.timeDiff = m_memoryInfo.timer.get<TSec>() - event.begin;
-    m_totalCollectionDelay += event.timeDiff.convertTo<TMillisec>().toInt();
+    m_totalCollectionDelay += event.timeDiff.convertTo<TMicrosec>().toInt();
     m_memoryInfo.events.push_front(event);
     writeLogLine(event);
 }
@@ -582,6 +597,9 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
 TMemoryManagerInfo BakerMemoryManager::getStat()
 {
     //FIXME collect statistic
+    m_memoryInfo.freeHeapSize += (m_heapSize/2 + m_activeHeapPointer - m_activeHeapBase)*
+            (m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    m_memoryInfo.heapSize += m_heapSize*(m_memoryInfo.heapIncreaseTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
     m_memoryInfo.leftToRightCollections = 0;
     m_memoryInfo.rightToLeftCollections = 0;
     m_memoryInfo.rightCollectionDelay   = 0;
