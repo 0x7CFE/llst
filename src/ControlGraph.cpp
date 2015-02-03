@@ -473,6 +473,11 @@ public:
                     }
                 }
             }
+        } else if (PhiNode* const phi = node.cast<PhiNode>()) {
+            if (phi->getInEdges().size() == 1) {
+                std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", instruction->getIndex());
+                m_nodesToRemove.push_back(phi);
+            }
         }
 
         return NodeVisitor::visitNode(node);
@@ -481,12 +486,38 @@ public:
     virtual void domainsVisited() {
         // Removing nodes that were optimized out
         TNodeList::iterator iNode = m_nodesToRemove.begin();
-        for (; iNode != m_nodesToRemove.end(); ++iNode)
-            removeNode(*iNode);
+        for (; iNode != m_nodesToRemove.end(); ++iNode) {
+            if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>())
+                removeInstruction(instruction);
+            else if (PhiNode* const phi = (*iNode)->cast<PhiNode>())
+                removePhi(phi);
+            else
+                assert(false);
+        }
     }
 
 private:
-    void removeNode(ControlNode* node) {
+    void removePhi(PhiNode* phi) {
+        assert(phi->getInEdges().size() == 1);
+
+        ControlNode* const valueSource = *phi->getInEdges().begin();
+        ControlNode* const valueTarget = *phi->getOutEdges().begin();
+
+        std::printf("Skipping phi node %.2u and remapping edges to link values directly: %.2u <-- %.2u\n",
+                    phi->getIndex(),
+                    valueSource->getIndex(),
+                    valueTarget->getIndex());
+
+        valueSource->removeEdge(phi);
+        phi->removeEdge(valueTarget);
+
+        valueSource->removeConsumer(phi);
+        valueSource->addConsumer(valueTarget);
+
+        m_graph->eraseNode(phi);
+    }
+
+    void removeInstruction(InstructionNode* node) {
         // Trivial instructions should have only one outgoing edge
         assert(node->getOutEdges().size() == 1);
 
