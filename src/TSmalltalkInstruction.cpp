@@ -101,7 +101,38 @@ bool st::TSmalltalkInstruction::isTrivial() const {
 }
 
 bool st::TSmalltalkInstruction::isValueConsumer() const {
-    assert(false); // TODO
+    switch (m_opcode) {
+        case opcode::pushInstance:
+        case opcode::pushArgument:
+        case opcode::pushTemporary:
+        case opcode::pushLiteral:
+        case opcode::pushConstant:
+        case opcode::pushBlock:
+            return false;
+
+        case opcode::assignTemporary:
+        case opcode::assignInstance:
+        case opcode::sendUnary:
+        case opcode::sendBinary:
+        case opcode::sendMessage:
+        case opcode::markArguments:
+            return true;
+
+        case opcode::doSpecial:
+            // All other specials consume a value
+            return m_argument != special::branch;
+
+        case opcode::doPrimitive:
+            // All system primitives consume a value
+            // TODO User defined primitives
+            return true;
+
+        case opcode::extended:
+        default:
+            assert(false);
+    }
+
+    assert(false);
     return false;
 }
 
