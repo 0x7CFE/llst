@@ -75,7 +75,7 @@ struct TMemoryManagerHeapInfo{
 //just event, event which takes some time, event which interacting with a heap
 struct TMemoryManagerEvent{
     const char* eventName;
-    TDuration<TSec> begin; //time lost from program start to event begin
+    TDuration<TSec> begin; //time spent from program start to event begin
     TDuration<TSec> timeDiff; //maybe null
     TMemoryManagerHeapInfo heapInfo; //maybe empty
     TMemoryManagerEvent():begin(), timeDiff(), heapInfo() {}
