@@ -45,8 +45,9 @@ TEST_P(P_DecodeBytecode, StackSemanticsTemps)
                     }
                     {
                         SCOPED_TRACE("First arg must be PushTemporary");
-                        EXPECT_EQ( secondArg->getNodeType(), st::ControlNode::ntInstruction );
-                        st::InstructionNode* pushTemp = secondArg->cast<st::InstructionNode>();
+                        EXPECT_EQ( firstArg->getNodeType(), st::ControlNode::ntInstruction );
+                        st::InstructionNode* pushTemp = firstArg->cast<st::InstructionNode>();
+                        EXPECT_TRUE(pushTemp);
                         EXPECT_EQ(pushTemp->getInstruction().getOpcode(), opcode::pushTemporary);
                     }
 
