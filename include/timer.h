@@ -6,7 +6,7 @@ using std::stringstream;
 #include <time.h>
 #include <iomanip>
 
-#ifdef UNIX
+#if defined(unix) || defined(__unix__) || defined(__unix)
     #include <sys/time.h>
     typedef timeval systemTimeValue;
 #else

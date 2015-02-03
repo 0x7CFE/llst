@@ -41,11 +41,19 @@
 #include <memory.h>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
 
 NonCollectMemoryManager::NonCollectMemoryManager() :
-    m_heapSize(0), m_heapBase(0), m_heapPointer(0),
+    m_heapSize(0), m_heapBase(0), m_heapPointer(0), m_memoryInfo(),
     m_staticHeapSize(0), m_staticHeapBase(0), m_staticHeapPointer(0)
 {
+    m_memoryInfo.heapSize = 0;
+    m_memoryInfo.freeHeapSize = 0;
+    m_memoryInfo.allocationTimer.start();
+    m_memoryInfo.heapIncreaseTimer.start();
+
+    // TODO set everything in m_memoryInfo to 0
+    m_logFile.open("gc.log", std::fstream::out);
 }
 
 NonCollectMemoryManager::~NonCollectMemoryManager()
@@ -54,6 +62,33 @@ NonCollectMemoryManager::~NonCollectMemoryManager()
     for(std::size_t i = 0; i < m_usedHeaps.size(); i++)
         free( m_usedHeaps[i] );
 }
+
+void NonCollectMemoryManager::writeLogLine(TMemoryManagerEvent event){
+    m_logFile << event.begin.toString(SNONE, 3)
+            << ": [" << event.eventName << " ";
+    if(!event.heapInfo.empty()){
+        TMemoryManagerHeapInfo eh = event.heapInfo;
+        m_logFile << eh.usedHeapSizeBeforeCollect << "K->"
+                << eh.usedHeapSizeAfterCollect << "K("
+                << eh.totalHeapSize << "K)";
+        for(std::list<TMemoryManagerHeapEvent>::iterator i = eh.heapEvents.begin(); i != eh.heapEvents.end(); i++){
+            m_logFile << "[" << i->eventName << ": "
+                    << i->usedHeapSizeBeforeCollect << "K->"
+                    << i->usedHeapSizeAfterCollect << "K("
+                    << i->totalHeapSize << "K)";
+            if(!i->timeDiff.isEmpty()){
+                m_logFile << ", " << i->timeDiff.toString(SSHORT, 6);
+            }
+            m_logFile << "] ";
+        }
+    }
+    if(!event.timeDiff.isEmpty()){
+        m_logFile << ", " << event.timeDiff.toString(SSHORT, 6);
+    }
+    m_logFile << "]\n";
+    m_logFile.flush();
+}
+
 
 bool NonCollectMemoryManager::initializeStaticHeap(size_t staticHeapSize)
 {
@@ -92,7 +127,14 @@ bool NonCollectMemoryManager::initializeHeap(size_t heapSize, size_t maxSize)
 
 void NonCollectMemoryManager::growHeap()
 {
-    uint8_t* heap = static_cast<uint8_t*>( std::malloc(m_heapSize) );
+    TMemoryManagerEvent event;
+    event.heapInfo.usedHeapSizeBeforeCollect = m_usedHeaps.size()*m_heapSize/1024;
+    m_memoryInfo.heapSize += m_usedHeaps.size()*m_heapSize*(m_memoryInfo.heapIncreaseTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    m_memoryInfo.heapIncreaseTimer.start();
+    m_memoryInfo.collectionsCount++;
+    event.eventName = "GC";
+    event.begin = m_memoryInfo.timer.get<TSec>();
+    uint8_t* heap = static_cast<uint8_t*>(std::malloc(m_heapSize));
     if (!heap) {
         std::printf("MM: Cannot allocate %zu bytes\n", m_heapSize);
         abort();
@@ -104,10 +146,25 @@ void NonCollectMemoryManager::growHeap()
     m_heapPointer = heap + m_heapSize;
 
     m_usedHeaps.push_back(heap);
+
+    //there is no collecting: after = before
+    event.heapInfo.usedHeapSizeAfterCollect = event.heapInfo.usedHeapSizeBeforeCollect;
+    event.heapInfo.totalHeapSize = m_usedHeaps.size()*m_heapSize/1024;
+    event.timeDiff = m_memoryInfo.timer.get<TSec>() - event.begin;
+    m_memoryInfo.totalCollectionDelay += event.timeDiff.convertTo<TMicrosec>().toInt();
+    m_memoryInfo.events.push_front(event);
+    writeLogLine(event);
 }
 
 void* NonCollectMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
+
+    //TODO remove from this place or add compilation flag
+    double temp = (m_heapPointer - requestedSize - m_heapBase)*
+            (m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    m_memoryInfo.freeHeapSize += temp;
+    //std::cout << "alloc " << m_memoryInfo.freeHeapSize << ' ' << temp << ' ' << m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0 << '\n';
+    m_memoryInfo.allocationTimer.start();
     if (gcOccured)
         *gcOccured = false;
 
@@ -119,6 +176,8 @@ void* NonCollectMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*
     }
 
     m_heapPointer -= requestedSize;
+
+    m_memoryInfo.allocationsCount++;
     return m_heapPointer;
 }
 
@@ -137,4 +196,12 @@ void* NonCollectMemoryManager::staticAllocate(size_t requestedSize)
 bool NonCollectMemoryManager::isInStaticHeap(void* location)
 {
     return (location >= m_staticHeapPointer) && (location < m_staticHeapBase + m_staticHeapSize);
+}
+
+TMemoryManagerInfo NonCollectMemoryManager::getStat() {
+    m_memoryInfo.heapSize += (m_usedHeaps.size()*m_heapSize/1024)*(m_memoryInfo.heapIncreaseTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    std::cout << m_memoryInfo.heapSize <<'\n';
+    m_memoryInfo.freeHeapSize += (m_heapPointer - m_heapBase)*
+            (m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
+    return m_memoryInfo;
 }

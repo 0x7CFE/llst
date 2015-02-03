@@ -43,6 +43,7 @@ struct args
     std::size_t heapSize;
     std::size_t maxHeapSize;
     std::string imagePath;
+    std::string memoryManagerType;
     int         showHelp;
     args() :
         heapSize(0), maxHeapSize(0), showHelp(false)

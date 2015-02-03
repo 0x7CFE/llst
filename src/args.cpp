@@ -45,6 +45,7 @@ void args::parse(int argc, char **argv)
         image = 'i',
         heap_max = 'H',
         heap = 'h',
+        mm_type = 'm',
 
         getopt_set_arg = 0,
         getopt_err = '?',
@@ -56,6 +57,7 @@ void args::parse(int argc, char **argv)
         {"heap_max",   required_argument, 0, heap_max},
         {"heap",       required_argument, 0, heap},
         {"image",      required_argument, 0, image},
+        {"mm_type",    required_argument, 0, mm_type},
         {"help",       no_argument,       0, help},
         {0, 0, 0, 0}
     };
@@ -74,6 +76,9 @@ void args::parse(int argc, char **argv)
 
             case image: {
                 imagePath = optarg;
+            } break;
+            case mm_type: {
+                memoryManagerType = optarg;
             } break;
             case heap: {
                 bool good_number = std::istringstream( optarg ) >> heapSize;

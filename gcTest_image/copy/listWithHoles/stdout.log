@@ -1,0 +1,16 @@
+GC: Mark and sweep
+Image read complete. Loaded 5892 objects
+->GCStressTest new listWithHoles
+MM: Growing heap to 1572948
+MM: Growing heap to 2359448
+MM: Growing heap to 3539256
+MM: Growing heap to 5308920
+MM: Growing heap to 7963464
+listWithHoles(items not changed after collect) OK
+nil
+->Exited normally
+
+GC count: 308 (0/0), average allocations per gc: 22789, microseconds spent in GC: 4805695
+Heap size (Kb*s): 100466, Free heap size (Kb*s): 52976
+2231514 messages sent, cache hits: 1649892, misses: 7253, hit ratio 99.56 %
+
