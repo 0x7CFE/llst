@@ -496,7 +496,8 @@ private:
         assert(phi->getInEdges().size() == 1);
 
         ControlNode* const valueSource = *phi->getInEdges().begin();
-        ControlNode* const valueTarget = *phi->getOutEdges().begin();
+        InstructionNode* const valueTarget = (*phi->getOutEdges().begin())->cast<InstructionNode>();
+        assert(valueTarget);
 
         std::printf("Skipping phi node %.2u and remapping edges to link values directly: %.2u <-- %.2u\n",
                     phi->getIndex(),
@@ -507,7 +508,9 @@ private:
         phi->removeEdge(valueTarget);
 
         valueSource->removeConsumer(phi);
+
         valueSource->addConsumer(valueTarget);
+        valueTarget->setArgument(phi->getPhiIndex(), valueSource);
 
         m_graph->eraseNode(phi);
     }
