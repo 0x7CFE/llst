@@ -158,13 +158,13 @@ void GraphConstructor::processSpecials(InstructionNode* node)
     switch (instruction.getArgument()) {
         case special::stackReturn:
         case special::blockReturn:
-        case special::sendToSuper:
             m_currentDomain->requestArgument(0, node);
 
             assert(! m_currentDomain->getTerminator());
             m_currentDomain->setTerminator(node);
             break;
 
+        case special::sendToSuper:
         case special::duplicate:
             m_currentDomain->requestArgument(0, node);
             m_currentDomain->pushValue(node);
