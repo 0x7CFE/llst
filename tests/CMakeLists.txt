@@ -23,3 +23,4 @@ cxx_test(InstructionDecoder test_instruction_decoder "${CMAKE_CURRENT_SOURCE_DIR
 cxx_test(ControlGraph test_control_graph "${CMAKE_CURRENT_SOURCE_DIR}/control_graph.cpp" "stapi;-pthread")
 cxx_test(ABABProblem test_abab_problem "${CMAKE_CURRENT_SOURCE_DIR}/abab_problem.cpp" "stapi;-pthread")
 cxx_test(StackSemantics test_stack_semantics "${CMAKE_CURRENT_SOURCE_DIR}/stack_semantics.cpp" "stapi;-pthread")
+cxx_test(DecodeAllMethods test_decode_all_methods "${CMAKE_CURRENT_SOURCE_DIR}/decode_all_methods.cpp" "stapi;memory_managers;standart_set;-pthread")
