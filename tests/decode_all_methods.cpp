@@ -1,11 +1,26 @@
 #include "patterns/DecodeBytecode.h"
+#include "helpers/ControlGraph.h"
 #include <vm.h>
 
 #include <memory>
 
 TEST_P(P_DecodeBytecode, DecodeMethod)
 {
-    // Do nothing, because the method has already been decoded
+    /* The method has already been decoded.
+     * Now we check the method for its correctness.
+     */
+    {
+        H_LastInstIsTerminator visitor(m_cfg->getParsedMethod());
+        visitor.run();
+    }
+    {
+        H_DomainHasTerminator visitor(m_cfg);
+        visitor.run();
+    }
+    {
+        H_AreBBsLinked visitor(m_cfg);
+        visitor.run();
+    }
 }
 
 typedef std::vector< std::tr1::tuple<std::string /*name*/, std::string /*bytecode*/> > MethodsT;
