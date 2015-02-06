@@ -73,6 +73,28 @@ class H_AreBBsLinked: public st::NodeVisitor
 {
 public:
     H_AreBBsLinked(st::ControlGraph* graph) : st::NodeVisitor(graph) {}
+    virtual bool visitDomain(st::ControlDomain& domain) {
+        st::BasicBlock* currentBB = domain.getBasicBlock();
+        if (currentBB->getOffset() != 0) {
+            std::stringstream ss;
+            ss << "BB offset: " << currentBB->getOffset();
+            SCOPED_TRACE(ss.str());
+            EXPECT_GT(currentBB->getReferers().size(), 0)
+                << "All BB but the 1st must have referrers";
+        }
+        st::ControlDomain::iterator iNode = domain.begin();
+        const st::ControlDomain::iterator iEnd = domain.end();
+
+        if (iNode != iEnd) {
+            while (iNode != iEnd) {
+                if (! visitNode(** iNode))
+                    return false;
+                ++iNode;
+            }
+        }
+
+        return true;
+    }
     virtual bool visitNode(st::ControlNode& node) {
         st::BasicBlock* currentBB = node.getDomain()->getBasicBlock();
         if (st::InstructionNode* inst = node.cast<st::InstructionNode>()) {
