@@ -160,6 +160,7 @@ void GraphConstructor::processSpecials(InstructionNode* node)
         case special::blockReturn:
             m_currentDomain->requestArgument(0, node);
 
+        case special::selfReturn:
             assert(! m_currentDomain->getTerminator());
             m_currentDomain->setTerminator(node);
             break;
