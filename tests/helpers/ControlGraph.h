@@ -113,10 +113,10 @@ public:
     }
 };
 
-class H_CorrectNumOfEdges: public st::NodeVisitor
+class H_CorrectNumOfEdges: public st::PlainNodeVisitor
 {
 public:
-    H_CorrectNumOfEdges(st::ControlGraph* graph) : st::NodeVisitor(graph) {}
+    H_CorrectNumOfEdges(st::ControlGraph* graph) : st::PlainNodeVisitor(graph) {}
     virtual bool visitNode(st::ControlNode& node) {
         if (st::InstructionNode* inst = node.cast<st::InstructionNode>())
         {
@@ -168,8 +168,8 @@ public:
         if (st::PhiNode* phi = node.cast<st::PhiNode>()) {
             const st::TNodeSet& inEdges = phi->getInEdges();
             const st::TNodeSet& outEdges = phi->getOutEdges();
-            EXPECT_GT(inEdges.size(), 0);
-            EXPECT_GT(outEdges.size(), 0);
+            EXPECT_GT(inEdges.size(), 0) << "The phi must consist of at least 1 incoming edge";
+            EXPECT_GE(outEdges.size(), 1) << "There must be a node using the given phi";
         }
         if (st::TauNode* tau = node.cast<st::TauNode>()) {
             EXPECT_TRUE(tau == NULL /* always fails */); // TODO
