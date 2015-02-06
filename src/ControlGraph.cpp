@@ -190,59 +190,18 @@ void GraphConstructor::processPrimitives(InstructionNode* node)
 {
     const TSmalltalkInstruction& instruction = node->getInstruction();
 
-    switch (instruction.getArgument()) {
-        case primitive::ioPutChar:
-        case primitive::getClass:
-        case primitive::getSize:
-        case primitive::integerNew:
-            m_currentDomain->requestArgument(0, node);
-            break;
-
-        case primitive::objectsAreEqual:
-        case primitive::startNewProcess:
-        case primitive::allocateObject:
-        case primitive::allocateByteArray:
-        case primitive::cloneByteObject:
-
-        case primitive::arrayAt:
-        case primitive::stringAt:
-
-        case primitive::smallIntAdd:
-        case primitive::smallIntDiv:
-        case primitive::smallIntMod:
-        case primitive::smallIntLess:
-        case primitive::smallIntEqual:
-        case primitive::smallIntMul:
-        case primitive::smallIntSub:
-        case primitive::smallIntBitOr:
-        case primitive::smallIntBitAnd:
-        case primitive::smallIntBitShift:
-
-        case primitive::LLVMsendMessage:
-            m_currentDomain->requestArgument(1, node);
-            m_currentDomain->requestArgument(0, node);
-            break;
-
-        case primitive::arrayAtPut:
-        case primitive::stringAtPut:
-            m_currentDomain->requestArgument(2, node);
-            m_currentDomain->requestArgument(1, node);
-            m_currentDomain->requestArgument(0, node);
-            break;
-
+    switch (instruction.getExtra()) {
         case primitive::blockInvoke:
             m_currentDomain->requestArgument(0, node); // block object
-            for (uint32_t index = instruction.getArgument() - 1; index > 0; index--) // FIXME
-                m_currentDomain->requestArgument(index - 1, node); // arguments
-            break;
-
-        case primitive::bulkReplace:
-            for (uint32_t index = 5; index > 0; )
-                m_currentDomain->requestArgument(--index, node);
+            for (uint32_t index = instruction.getArgument()-1; index > 0; index--) // FIXME
+                m_currentDomain->requestArgument(index, node); // arguments
             break;
 
         default:
-            ; //TODO
+            if (instruction.getArgument() > 0) {
+                for (int32_t index = instruction.getArgument()-1; index >= 0; index--)
+                    m_currentDomain->requestArgument(index, node);
+            }
     }
 }
 
