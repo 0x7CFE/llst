@@ -81,18 +81,25 @@ public:
                     EXPECT_EQ(outEdges.size(), 2);
                     if (outEdges.size() == 2) {
                         st::TNodeSet::const_iterator edgeIter = outEdges.begin();
-                        st::ControlNode* edge1 = *(edgeIter++);
-                        st::ControlNode* edge2 = *edgeIter;
-                        bool pointToFirst = edge1->getIndex() == branch.getExtra();
-                        bool pointToSecond = edge2->getIndex() == branch.getExtra();
-                        EXPECT_TRUE( pointToFirst || pointToSecond ) << "branchIf* must point to one of the edges";
-                        EXPECT_FALSE( pointToFirst && pointToSecond ) << "branchIf* must point to only one of the edges";
+                        st::ControlNode* target1 = *(edgeIter++);
+                        st::ControlNode* target2 = *edgeIter;
+                        st::ControlDomain* target1Domain = target1->getDomain();
+                        st::ControlDomain* target2Domain = target2->getDomain();
+                        EXPECT_EQ(target1, target1Domain->getEntryPoint());
+                        EXPECT_EQ(target2, target2Domain->getEntryPoint());
+                        uint16_t target1Offset = target1Domain->getBasicBlock()->getOffset();
+                        uint16_t target2Offset = target2Domain->getBasicBlock()->getOffset();
+
+                        bool pointToFirst = target1Offset == branch.getExtra();
+                        bool pointToSecond = target2Offset == branch.getExtra();
+                        EXPECT_TRUE( pointToFirst || pointToSecond ) << "branchIf* must point to one of the targets";
+                        EXPECT_FALSE( pointToFirst && pointToSecond ) << "branchIf* must point to only one of the targets";
 
                         {
-                            SCOPED_TRACE("The BB of outgoing edges must contait current BB");
-                            st::BasicBlock::TBasicBlockSet& referrers1 = edge1->getDomain()->getBasicBlock()->getReferers();
+                            SCOPED_TRACE("The referrers of outgoing edges must contain current BB");
+                            st::BasicBlock::TBasicBlockSet& referrers1 = target1->getDomain()->getBasicBlock()->getReferers();
                             EXPECT_NE(referrers1.end(), referrers1.find(currentBB));
-                            st::BasicBlock::TBasicBlockSet& referrers2 = edge2->getDomain()->getBasicBlock()->getReferers();
+                            st::BasicBlock::TBasicBlockSet& referrers2 = target2->getDomain()->getBasicBlock()->getReferers();
                             EXPECT_NE(referrers2.end(), referrers2.find(currentBB));
                         }
                     }
@@ -100,10 +107,13 @@ public:
                 if (branch.getArgument() == special::branch) {
                     EXPECT_EQ(outEdges.size(), 1);
                     if (outEdges.size() == 1) {
-                        st::ControlNode* edge = *(outEdges.begin());
-                        EXPECT_EQ(edge->getIndex(), branch.getExtra())
+                        st::ControlNode* target = *(outEdges.begin());
+                        st::ControlDomain* targetDomain = target->getDomain();
+                        EXPECT_EQ(target, targetDomain->getEntryPoint());
+                        uint16_t targetOffset = targetDomain->getBasicBlock()->getOffset();
+                        EXPECT_EQ(targetOffset, branch.getExtra())
                             << "Unconditional branch must point exactly to its the only one out edge";
-                        st::BasicBlock::TBasicBlockSet& referrers = edge->getDomain()->getBasicBlock()->getReferers();
+                        st::BasicBlock::TBasicBlockSet& referrers = target->getDomain()->getBasicBlock()->getReferers();
                         EXPECT_NE(referrers.end(), referrers.find(currentBB));
                     }
                 }
