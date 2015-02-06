@@ -168,6 +168,9 @@ public:
                             break;
                     }
                 } break;
+                case opcode::doPrimitive:
+                    EXPECT_EQ(inst->getInstruction().getArgument(), inst->getArgumentsCount());
+                    break;
                 default:
                     EXPECT_GE( inst->getArgumentsCount(), 1);
                     break;
