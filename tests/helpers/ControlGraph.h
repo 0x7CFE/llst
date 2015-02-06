@@ -5,6 +5,8 @@
 #include <instructions.h>
 #include <analysis.h>
 
+#include <algorithm>
+
 class H_LastInstIsTerminator: public st::BasicBlockVisitor
 {
 public:
@@ -188,6 +190,68 @@ public:
     }
 };
 
+class H_NoOrphans {
+    st::ControlGraph* m_cfg;
+public:
+    H_NoOrphans(st::ControlGraph* graph) : m_cfg(graph) {}
+    void check() {
+        st::TNodeSet linkedNodes = getLinkedNodes();
+        st::TNodeSet allNodes = getAllNodes();
+        typedef std::vector<st::ControlNode*> TOrphans;
+        TOrphans orphans;
+        std::set_difference(
+            linkedNodes.begin(), linkedNodes.end(),
+            allNodes.begin(), allNodes.end(),
+            std::back_inserter(orphans)
+        );
+        for (TOrphans::const_iterator it = orphans.begin(); it != orphans.end(); ++it) {
+            st::ControlNode* node = *it;
+            std::stringstream ss;
+            ss << "Orphan node index: " << node->getIndex()
+               << " from BB offset: " << node->getDomain()->getBasicBlock()->getOffset();
+            FAIL() << ss.str();
+        }
+    }
+private:
+    st::TNodeSet getLinkedNodes() const {
+        class LinkedNodesGetter : public st::NodeVisitor {
+        public:
+            st::TNodeSet& m_visitedNodes;
+            LinkedNodesGetter(st::ControlGraph* graph, st::TNodeSet& outResult)
+                : st::NodeVisitor(graph), m_visitedNodes(outResult) {}
+            virtual bool visitNode(st::ControlNode& node) {
+                m_visitedNodes.insert(&node);
+                st::TNodeSet outEdges = node.getOutEdges();
+                for(st::TNodeSet::const_iterator it = outEdges.begin(); it != outEdges.end(); ++it) {
+                    m_visitedNodes.insert(*it);
+                }
+                return true;
+            }
+        };
+        st::TNodeSet result;
+        LinkedNodesGetter getter(m_cfg, result);
+        getter.run();
+        return result;
+    }
+    st::TNodeSet getAllNodes() const {
+        class AllNodesGetter : public st::PlainNodeVisitor {
+        public:
+            st::TNodeSet& m_visitedNodes;
+            AllNodesGetter(st::ControlGraph* graph, st::TNodeSet& outResult)
+                : st::PlainNodeVisitor(graph), m_visitedNodes(outResult) {}
+            virtual bool visitNode(st::ControlNode& node) {
+                m_visitedNodes.insert(&node);
+                return true;
+            }
+        };
+        st::TNodeSet result;
+        AllNodesGetter getter(m_cfg, result);
+        getter.run();
+        return result;
+    }
+};
+
+
 void H_CheckCFGCorrect(st::ControlGraph* graph)
 {
     {
@@ -205,6 +269,10 @@ void H_CheckCFGCorrect(st::ControlGraph* graph)
     {
         H_CorrectNumOfEdges visitor(graph);
         visitor.run();
+    }
+    {
+        H_NoOrphans checker(graph);
+        checker.check();
     }
 }
 
