@@ -76,11 +76,9 @@ public:
     virtual bool visitDomain(st::ControlDomain& domain) {
         st::BasicBlock* currentBB = domain.getBasicBlock();
         if (currentBB->getOffset() != 0) {
-            std::stringstream ss;
-            ss << "BB offset: " << currentBB->getOffset();
-            SCOPED_TRACE(ss.str());
             EXPECT_GT(currentBB->getReferers().size(), 0)
-                << "All BB but the 1st must have referrers";
+                << "All BB but the 1st must have referrers. "
+                << "BB offset: " << currentBB->getOffset();
         }
         st::ControlDomain::iterator iNode = domain.begin();
         const st::ControlDomain::iterator iEnd = domain.end();
@@ -231,10 +229,8 @@ public:
         );
         for (TOrphans::const_iterator it = orphans.begin(); it != orphans.end(); ++it) {
             st::ControlNode* node = *it;
-            std::stringstream ss;
-            ss << "Orphan node index: " << node->getIndex()
+            FAIL() << "Orphan node index: " << node->getIndex()
                << " from BB offset: " << node->getDomain()->getBasicBlock()->getOffset();
-            FAIL() << ss.str();
         }
     }
 private:
