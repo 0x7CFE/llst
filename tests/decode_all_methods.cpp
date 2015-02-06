@@ -9,18 +9,7 @@ TEST_P(P_DecodeBytecode, DecodeMethod)
     /* The method has already been decoded.
      * Now we check the method for its correctness.
      */
-    {
-        H_LastInstIsTerminator visitor(m_cfg->getParsedMethod());
-        visitor.run();
-    }
-    {
-        H_DomainHasTerminator visitor(m_cfg);
-        visitor.run();
-    }
-    {
-        H_AreBBsLinked visitor(m_cfg);
-        visitor.run();
-    }
+    H_CheckCFGCorrect(m_cfg);
 }
 
 typedef std::vector< std::tr1::tuple<std::string /*name*/, std::string /*bytecode*/> > MethodsT;

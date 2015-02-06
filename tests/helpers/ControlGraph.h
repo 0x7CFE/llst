@@ -87,4 +87,89 @@ public:
     }
 };
 
+class H_CorrectNumOfEdges: public st::NodeVisitor
+{
+public:
+    H_CorrectNumOfEdges(st::ControlGraph* graph) : st::NodeVisitor(graph) {}
+    virtual bool visitNode(st::ControlNode& node) {
+        if (st::InstructionNode* inst = node.cast<st::InstructionNode>())
+        {
+            SCOPED_TRACE(inst->getInstruction().toString());
+            switch (inst->getInstruction().getOpcode()) {
+                case opcode::pushInstance:
+                case opcode::pushArgument:
+                case opcode::pushTemporary:
+                case opcode::pushLiteral:
+                case opcode::pushConstant:
+                case opcode::pushBlock:
+                    EXPECT_EQ( inst->getArgumentsCount(), 0);
+                    break;
+                case opcode::sendUnary:
+                case opcode::assignInstance:
+                case opcode::assignTemporary:
+                    EXPECT_EQ( inst->getArgumentsCount(), 1);
+                    break;
+                case opcode::sendBinary:
+                    EXPECT_EQ( inst->getArgumentsCount(), 2);
+                    break;
+                case opcode::doSpecial: {
+                    switch (inst->getInstruction().getArgument()) {
+                        case special::stackReturn:
+                        case special::blockReturn:
+                        case special::popTop:
+                        case special::branchIfTrue:
+                        case special::branchIfFalse:
+                        case special::duplicate:
+                            EXPECT_EQ( inst->getArgumentsCount(), 1);
+                            break;
+                        case special::branch:
+                            EXPECT_EQ( inst->getArgumentsCount(), 0);
+                            break;
+                        case special::sendToSuper:
+                            EXPECT_EQ( inst->getArgumentsCount(), 1);
+                            break;
+                    }
+                } break;
+                default:
+                    EXPECT_GE( inst->getArgumentsCount(), 1);
+                    break;
+            }
+            if (inst->getInstruction().isValueProvider()) {
+                const st::TNodeSet& consumers = inst->getConsumers();
+                EXPECT_GT(consumers.size(), 0);
+            }
+        }
+        if (st::PhiNode* phi = node.cast<st::PhiNode>()) {
+            const st::TNodeSet& inEdges = phi->getInEdges();
+            const st::TNodeSet& outEdges = phi->getOutEdges();
+            EXPECT_GT(inEdges.size(), 0);
+            EXPECT_GT(outEdges.size(), 0);
+        }
+        if (st::TauNode* tau = node.cast<st::TauNode>()) {
+            EXPECT_TRUE(tau == NULL /* always fails */); // TODO
+        }
+        return true;
+    }
+};
+
+void H_CheckCFGCorrect(st::ControlGraph* graph)
+{
+    {
+        H_LastInstIsTerminator visitor(graph->getParsedMethod());
+        visitor.run();
+    }
+    {
+        H_DomainHasTerminator visitor(graph);
+        visitor.run();
+    }
+    {
+        H_AreBBsLinked visitor(graph);
+        visitor.run();
+    }
+    {
+        H_CorrectNumOfEdges visitor(graph);
+        visitor.run();
+    }
+}
+
 #endif
