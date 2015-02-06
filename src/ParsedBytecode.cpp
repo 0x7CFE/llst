@@ -21,19 +21,19 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
 
         if (instruction.getOpcode() == opcode::pushBlock) {
             // Preserving the start block's offset
-            const uint16_t startOffset = decoder.getBytePointer();
+            const uint16_t blockStartOffset = decoder.getBytePointer();
             // Extra holds the bytecode offset right after the block
-            const uint16_t stopOffset  = instruction.getExtra();
+            const uint16_t blockStopOffset  = instruction.getExtra();
 
             // Parsing block. This operation depends on
             // whether we're in a method or in a block.
             // Nested blocks are registered in the
             // container method, not the outer block.
-            std::printf("%.4u : Parsing smalltalk block in interval [%u:%u)\n", currentBytePointer, startOffset, stopOffset);
-            parseBlock(startOffset, stopOffset);
+            std::printf("%.4u : Parsing smalltalk block in interval [%u:%u)\n", currentBytePointer, blockStartOffset, blockStopOffset);
+            parseBlock(blockStartOffset, blockStopOffset);
 
             // Skipping the nested block's bytecodes
-            decoder.setBytePointer(stopOffset);
+            decoder.setBytePointer(blockStopOffset);
             continue;
         }
 
@@ -84,7 +84,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
     decoder.setBytePointer(startOffset);
     while (decoder.getBytePointer() < stopPointer) {
         const uint16_t currentBytePointer = decoder.getBytePointer();
-        if (currentBytePointer) {
+        if (currentBytePointer != startOffset) {
             // Switching basic block if current offset is a branch target
             const TOffsetToBasicBlockMap::iterator iBlock = m_offsetToBasicBlock.find(currentBytePointer);
             if (iBlock != m_offsetToBasicBlock.end()) {
