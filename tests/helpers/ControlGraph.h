@@ -67,21 +67,47 @@ public:
     }
 };
 
-class H_AreBBsLinked: public st::DomainVisitor
+class H_AreBBsLinked: public st::NodeVisitor
 {
 public:
-    H_AreBBsLinked(st::ControlGraph* graph) : st::DomainVisitor(graph) {}
-    virtual bool visitDomain(st::ControlDomain& domain) {
-        st::BasicBlock::TBasicBlockSet referrers = domain.getBasicBlock()->getReferers();
+    H_AreBBsLinked(st::ControlGraph* graph) : st::NodeVisitor(graph) {}
+    virtual bool visitNode(st::ControlNode& node) {
+        st::BasicBlock* currentBB = node.getDomain()->getBasicBlock();
+        if (st::InstructionNode* inst = node.cast<st::InstructionNode>()) {
+            if (inst->getInstruction().isBranch()) {
+                st::TSmalltalkInstruction branch = inst->getInstruction();
+                const st::TNodeSet& outEdges = node.getOutEdges();
+                if (branch.getArgument() == special::branchIfTrue || branch.getArgument() == special::branchIfFalse) {
+                    EXPECT_EQ(outEdges.size(), 2);
+                    if (outEdges.size() == 2) {
+                        st::TNodeSet::const_iterator edgeIter = outEdges.begin();
+                        st::ControlNode* edge1 = *(edgeIter++);
+                        st::ControlNode* edge2 = *edgeIter;
+                        bool pointToFirst = edge1->getIndex() == branch.getExtra();
+                        bool pointToSecond = edge2->getIndex() == branch.getExtra();
+                        EXPECT_TRUE( pointToFirst || pointToSecond ) << "branchIf* must point to one of the edges";
+                        EXPECT_FALSE( pointToFirst && pointToSecond ) << "branchIf* must point to only one of the edges";
 
-        for(st::BasicBlock::TBasicBlockSet::const_iterator referrer = referrers.begin(); referrer != referrers.end(); ++referrer) {
-            st::TSmalltalkInstruction terminator(0);
-            bool referrerHasTerminator = (*referrer)->getTerminator(terminator);
-
-            EXPECT_TRUE(referrerHasTerminator);
-            EXPECT_TRUE(terminator.isBranch());
-            EXPECT_EQ( terminator.getExtra(), domain.getBasicBlock()->getOffset() )
-                << "The destination of terminator must be the offset of the first instruction of BB";
+                        {
+                            SCOPED_TRACE("The BB of outgoing edges must contait current BB");
+                            st::BasicBlock::TBasicBlockSet& referrers1 = edge1->getDomain()->getBasicBlock()->getReferers();
+                            EXPECT_NE(referrers1.end(), referrers1.find(currentBB));
+                            st::BasicBlock::TBasicBlockSet& referrers2 = edge2->getDomain()->getBasicBlock()->getReferers();
+                            EXPECT_NE(referrers2.end(), referrers2.find(currentBB));
+                        }
+                    }
+                }
+                if (branch.getArgument() == special::branch) {
+                    EXPECT_EQ(outEdges.size(), 1);
+                    if (outEdges.size() == 1) {
+                        st::ControlNode* edge = *(outEdges.begin());
+                        EXPECT_EQ(edge->getIndex(), branch.getExtra())
+                            << "Unconditional branch must point exactly to its the only one out edge";
+                        st::BasicBlock::TBasicBlockSet& referrers = edge->getDomain()->getBasicBlock()->getReferers();
+                        EXPECT_NE(referrers.end(), referrers.find(currentBB));
+                    }
+                }
+            }
         }
         return true;
     }
