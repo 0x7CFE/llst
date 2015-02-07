@@ -6,7 +6,7 @@ void ParsedMethod::parseBlock(uint16_t startOffset, uint16_t stopOffset) {
     // Following instruction belong to the nested code block
     // ParsedBlock will decode all of it's instructions and nested blocks
     ParsedBlock* const parsedBlock = new ParsedBlock(this, startOffset, stopOffset);
-    m_offsetToParsedBlock[startOffset] = parsedBlock;
+    addParsedBlock(parsedBlock);
 }
 
 void ParsedMethod::addParsedBlock(ParsedBlock* parsedBlock) {
@@ -23,10 +23,5 @@ ParsedMethod::~ParsedMethod() {
         end = m_parsedBlocks.end(); iBlock != end; ++iBlock)
     {
         delete * iBlock;
-    }
-    for (TOffsetToParsedBlockMap::iterator iBlock = m_offsetToParsedBlock.begin(),
-        end = m_offsetToParsedBlock.end(); iBlock != end; ++iBlock)
-    {
-        delete iBlock->second;
     }
 }

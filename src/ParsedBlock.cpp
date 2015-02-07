@@ -3,8 +3,8 @@
 using namespace st;
 
 void ParsedBlock::parseBlock(uint16_t startOffset, uint16_t stopOffset) {
-    ParsedMethod* container = getContainer();
+    ParsedMethod* const container   = getContainer();
+    ParsedBlock*  const nestedBlock = new ParsedBlock(container, startOffset, stopOffset);
 
-    ParsedBlock* nestedBlock = new ParsedBlock(container, startOffset, stopOffset);
     container->addParsedBlock(nestedBlock);
 }
