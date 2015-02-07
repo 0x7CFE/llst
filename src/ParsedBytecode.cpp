@@ -68,6 +68,7 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
     // If no branch site points to start offset then we create block ourselves
     if (! currentBasicBlock) {
         m_offsetToBasicBlock[startOffset] = currentBasicBlock = new BasicBlock(startOffset);
+//         std::printf("created start basic block %p (%u)\n", currentBasicBlock, startOffset);
 
         // Pushing block from the beginning to comply it's position
         m_basicBlocks.push_front(currentBasicBlock);
@@ -104,43 +105,11 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             }
         }
 
-        // If block does not have referers and do not start at
-        // offset 0 we treat it as completely unreachable code
-        if (currentBasicBlock->getReferers().empty() && currentBasicBlock->getOffset() != 0) {
-            std::printf("%.4u : skipping totally unreachable basic block\n", currentBytePointer);
-
-            // We need to find offset of the next basic block
-            uint16_t nextOffset = 0;
-            for (uint16_t offset = currentBytePointer + 1; offset < stopPointer; offset++) {
-                if (m_offsetToBasicBlock.find(offset) != m_offsetToBasicBlock.end()) {
-                    // Found next basic block's offset
-                    nextOffset = offset;
-                    std::printf("%.4u : found next block at %.4u\n", currentBytePointer, nextOffset);
-                    break;
-                }
-            }
-
-            // Erasing block info and stub
-            m_offsetToBasicBlock.erase(currentBasicBlock->getOffset());
-            m_basicBlocks.remove(currentBasicBlock);
-            delete currentBasicBlock;
-
-            // Switching to the next block
-            if (nextOffset) {
-                std::printf("%.4u : switching to the next block at %.4u\n", currentBytePointer, nextOffset);
-                decoder.setBytePointer(nextOffset);
-                continue;
-            } else {
-                std::printf("%.4u : unreachable block was the last one, nothing to parse here\n", currentBytePointer);
-                break;
-            }
-        }
-
         // Fetching instruction and appending it to the current basic block
         TSmalltalkInstruction instruction = decoder.decodeAndShiftPointer();
 
         // Skipping dead code
-        if (terminatorEncoded) {
+        if (terminatorEncoded) { // TODO In case of dead branches erase the target blocks
             std::printf("%.4u : skipping dead code\n", currentBytePointer);
             continue;
         } else {
@@ -168,7 +137,77 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
                 assert(false);
         }
     }
+
+    std::printf("Phase 3. Wiping out chains of unreachable blocks\n");
+
+    // At this stage all possible branches are encoded and block relations are registered in the referer sets.
+    // We may now iterate through the blocks and wipe out unreachable ones. We need to iterate several times
+    // because unreachable blocks may form a chain. Stil we may not guarantee, that all unreachable blocks will
+    // be removed because they may form a cycle where each block refers the other and all have at least 1 referer.
+    while (true) {
+        bool blockRemoved = false;
+
+        // Iterating through basic blocks to find blocks that have zero referers and do not start at startOffset
+        TBasicBlockList::iterator iBlock = m_basicBlocks.begin();
+        while (iBlock != m_basicBlocks.end()) {
+            BasicBlock* const block = *iBlock;
+
+            if (block->getReferers().empty() && block->getOffset() != startOffset) {
+                std::printf("block %p (%u) is not reachable, erasing and clearing references\n", block, block->getOffset());
+
+                TSmalltalkInstruction terminator(opcode::extended);
+                if (block->getTerminator(terminator) && terminator.isBranch()) {
+                    const uint16_t targetOffset = terminator.getExtra();
+                    const uint16_t skipOffset   = (terminator.getArgument() == special::branch) ? 0 : getNextBlockOffset(block, stopOffset);
+
+                    eraseReferer(targetOffset, block);
+                    if (skipOffset)
+                        eraseReferer(skipOffset, block);
+                }
+
+                TBasicBlockList::iterator currentBlock = iBlock++;
+                eraseBasicBlock(currentBlock);
+                blockRemoved = true;
+                continue;
+            }
+
+            ++iBlock;
+        }
+
+        // If no block was removed we need to stop
+        if (!blockRemoved)
+            break;
+    }
 }
+
+void ParsedBytecode::eraseBasicBlock(ParsedBytecode::iterator& iBlock)
+{
+    BasicBlock* const block = *iBlock;
+    m_offsetToBasicBlock.erase(block->getOffset());
+    m_basicBlocks.erase(iBlock);
+    delete block;
+}
+
+void ParsedBytecode::eraseReferer(uint16_t targetOffset, BasicBlock* referer) {
+    const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(targetOffset);
+    if (iTargetBlock != m_offsetToBasicBlock.end()) {
+        BasicBlock* const target = iTargetBlock->second;
+
+        std::printf("erasing reference %p (%u) -> %p (%u)\n", referer, referer->getOffset(), target, target->getOffset());
+        target->getReferers().erase(referer);
+    } else {
+        assert(false);
+    }
+}
+
+uint16_t ParsedBytecode::getNextBlockOffset(BasicBlock* currentBlock, uint16_t stopOffset) {
+    for (uint16_t offset = currentBlock->getOffset() + 1; offset < stopOffset; offset++)
+        if (m_offsetToBasicBlock.find(offset) != m_offsetToBasicBlock.end())
+            return offset;
+
+    return 0;
+}
+
 
 BasicBlock* ParsedBytecode::createBasicBlock(uint16_t blockOffset) {
     // Checking whether current branch target is already known
@@ -181,6 +220,8 @@ BasicBlock* ParsedBytecode::createBasicBlock(uint16_t blockOffset) {
     BasicBlock* const newBasicBlock = new BasicBlock(blockOffset);
     m_offsetToBasicBlock[blockOffset] = newBasicBlock;
     m_basicBlocks.push_back(newBasicBlock);
+
+//     std::printf("created new basic block %p (%u)\n", newBasicBlock, newBasicBlock->getOffset());
 
     return newBasicBlock;
 }

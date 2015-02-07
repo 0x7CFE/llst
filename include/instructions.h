@@ -207,6 +207,9 @@ public:
 protected:
     ParsedBytecode(TMethod* method) : m_origin(method) { }
     void parse(uint16_t startOffset = 0, uint16_t stopOffset = 0);
+    uint16_t getNextBlockOffset(BasicBlock* currentBlock, uint16_t stopOffset);
+    void eraseReferer(uint16_t targetOffset, BasicBlock* referer);
+    void eraseBasicBlock(iterator& iBlock);
 
     // Descendants should override this method to provide block handling
     virtual void parseBlock(uint16_t startOffset, uint16_t stopOffset) = 0;
