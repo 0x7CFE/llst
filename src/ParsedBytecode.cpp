@@ -104,6 +104,38 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
             }
         }
 
+        // If block does not have referers and do not start at
+        // offset 0 we treat it as completely unreachable code
+        if (currentBasicBlock->getReferers().empty() && currentBasicBlock->getOffset() != 0) {
+            std::printf("%.4u : skipping totally unreachable basic block\n", currentBytePointer);
+
+            // We need to find offset of the next basic block
+            uint16_t nextOffset = 0;
+            for (uint16_t offset = currentBytePointer + 1; offset < stopPointer; offset++) {
+                if (m_offsetToBasicBlock.find(offset) != m_offsetToBasicBlock.end()) {
+                    // Found next basic block's offset
+                    nextOffset = offset;
+                    std::printf("%.4u : found next block at %.4u\n", currentBytePointer, nextOffset);
+                    break;
+                }
+            }
+
+            // Erasing block info and stub
+            m_offsetToBasicBlock.erase(currentBasicBlock->getOffset());
+            m_basicBlocks.remove(currentBasicBlock);
+            delete currentBasicBlock;
+
+            // Switching to the next block
+            if (nextOffset) {
+                std::printf("%.4u : switching to the next block at %.4u\n", currentBytePointer, nextOffset);
+                decoder.setBytePointer(nextOffset);
+                continue;
+            } else {
+                std::printf("%.4u : unreachable block was the last one, nothing to parse here\n", currentBytePointer);
+                break;
+            }
+        }
+
         // Fetching instruction and appending it to the current basic block
         TSmalltalkInstruction instruction = decoder.decodeAndShiftPointer();
 
