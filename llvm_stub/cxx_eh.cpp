@@ -1,4 +1,4 @@
-//g++ cxx_eh.cpp `llvm-config-3.1 --cppflags --ldflags --libs all` -ldl -lffi
+//g++ cxx_eh.cpp `llvm-config-3.4 --cppflags --ldflags --libs all` -ldl -lffi -ltinfo -pthread -g3
 
 /* assume we have C++ code:
  *
@@ -20,21 +20,22 @@
  * We want to implement the same using llvm!
  */
 
-//TODO call void @__cxa_free_exception(i8*)
-
-#include "llvm/LLVMContext.h"
-#include "llvm/Module.h"
-#include "llvm/ExecutionEngine/JIT.h"
 #include "llvm/ExecutionEngine/GenericValue.h"
-#include "llvm/Support/TargetSelect.h"
+#include "llvm/ExecutionEngine/MCJIT.h"
+#include "llvm/ExecutionEngine/SectionMemoryManager.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/Instructions.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
 #include "llvm/Support/ManagedStatic.h"
-#include "llvm/Support/IRBuilder.h"
+#include <llvm/Support/DynamicLibrary.h>
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
-#include "llvm/Intrinsics.h"
+#include <llvm/Analysis/Verifier.h>
 
-#include "llvm/Analysis/Verifier.h"
-
-#include <typeinfo> // remove from release
+#include <typeinfo>
 
 using namespace llvm;
 
@@ -59,11 +60,44 @@ extern "C" {
     }
 }
 
+class MCJITMemoryManager : public SectionMemoryManager
+{
+  MCJITMemoryManager(const MCJITMemoryManager&) LLVM_DELETED_FUNCTION;
+  void operator=(const MCJITMemoryManager&) LLVM_DELETED_FUNCTION;
+  ExecutionEngine* E;
+public:
+  MCJITMemoryManager() : SectionMemoryManager(), E(0) {}
+  virtual ~MCJITMemoryManager() {}
+
+  virtual void  notifyObjectLoaded(ExecutionEngine *EE, const ObjectImage*);
+  virtual uint64_t getSymbolAddress(const std::string &Name);
+};
+
+void MCJITMemoryManager::notifyObjectLoaded(ExecutionEngine* EE, const ObjectImage*)
+{
+    E = EE;
+}
+
+uint64_t MCJITMemoryManager::getSymbolAddress(const std::string& Name)
+{
+    if (E) {
+      Function* f = E->FindFunctionNamed(Name.c_str());
+      if (f) {
+          void* addr = E->getPointerToGlobalIfAvailable(f);
+          if (addr) {
+              sys::DynamicLibrary::AddSymbol(Name, addr);
+              return reinterpret_cast<uint64_t>(addr);
+          }
+      }
+    }
+    return SectionMemoryManager::getSymbolAddress(Name);
+}
+
 int main() {
     InitializeNativeTarget();
+    InitializeNativeTargetAsmPrinter();
     LLVMContext& Context = getGlobalContext();
     Module *M = new Module("test C++ exception handling ", Context);
-
 
     StructType* MyStructType = StructType::create(Context, "struct.MyStruct");
     Type* MyStructFields[] = {
@@ -120,17 +154,18 @@ int main() {
     builder.CreateRet( result ); // << z.y
 
     TargetOptions Opts;
-    Opts.JITExceptionHandling = true; // DO NOT FORGET THIS OPTION !!!!!!11
-
-
     ExecutionEngine* EE = EngineBuilder(M)
                         .setEngineKind(EngineKind::JIT)
+                        .setUseMCJIT(true)
+                        .setMCJITMemoryManager(new MCJITMemoryManager())
                         .setTargetOptions(Opts)
                         .create();
 
+    //sys::DynamicLibrary::AddSymbol(throwFunc->getName(), reinterpret_cast<void*>(&throwMyStruct));
     EE->addGlobalMapping(throwFunc, reinterpret_cast<void*>(&throwMyStruct));
-    EE->addGlobalMapping(MyStructTypeInfo, MyStruct::getTypeInfo());
+    sys::DynamicLibrary::AddSymbol(MyStructTypeInfo->getName(), MyStruct::getTypeInfo());
 
+    EE->finalizeObject();
     verifyFunction(*testExceptions);
     outs() << *testExceptions;
 
