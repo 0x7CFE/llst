@@ -3,11 +3,11 @@
 *
 *    LLST Runtime environment
 *
-*    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+*    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
 *
 *    LLST is
-*        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
-*        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+*        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+*        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
 *
 *    LLST is based on the LittleSmalltalk which is
 *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -35,14 +35,18 @@
 #include <jit.h>
 #include <primitives.h>
 
+#include <llvm/IR/Intrinsics.h>
+#include <llvm/IRReader/IRReader.h>
 #include <llvm/Support/TargetSelect.h>
-#include <llvm/Support/IRReader.h>
 #include <llvm/Support/InstIterator.h>
+#include <llvm/Support/SourceMgr.h>
+#include <llvm/Support/CallSite.h>
+#include <llvm/Support/ManagedStatic.h>
 #include <llvm/Analysis/Verifier.h>
 #include <llvm/ExecutionEngine/GenericValue.h>
 
 #include <llvm/PassManager.h>
-#include <llvm/Target/TargetData.h>
+#include <llvm/ADT/Statistic.h>
 #include <llvm/LinkAllPasses.h>
 
 #include <llvm/CodeGen/GCs.h>
@@ -207,8 +211,8 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     // Creating new context object and inheriting context variables
     // NOTE We do not allocating stack because it's not used in LLVM
     hptr<TBlock> newBlock      = m_softVM->newObject<TBlock>();
-    newBlock->argumentLocation = newInteger(argLocation);
-    newBlock->blockBytePointer = newInteger(bytePointer);
+    newBlock->argumentLocation = argLocation;
+    newBlock->blockBytePointer = bytePointer;
     newBlock->method           = previousContext->method;
     newBlock->arguments        = previousContext->arguments;
     newBlock->temporaries      = previousContext->temporaries;
@@ -282,7 +286,7 @@ void JITRuntime::optimizeFunction(Function* function)
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 {
     // Guessing the block function name
-    const uint16_t blockOffset = getIntegerValue(block->blockBytePointer);
+    const uint16_t blockOffset = block->blockBytePointer;
 
     TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
 
@@ -379,7 +383,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         // initialization of various objects such as stackTop and bytePointer.
 
         // Creating context object and temporaries
-        hptr<TObjectArray> newTemps   = m_softVM->newObject<TObjectArray>(getIntegerValue(method->temporarySize));
+        hptr<TObjectArray> newTemps = m_softVM->newObject<TObjectArray>(method->temporarySize);
         newContext = m_softVM->newObject<TContext>();
 
         // Initializing context variables
@@ -457,7 +461,7 @@ void JITRuntime::patchHotMethods()
 
         // Cleaning up the function
         m_executionEngine->freeMachineCodeForFunction(methodFunction);
-        methodFunction->getBasicBlockList().clear();
+        methodFunction->deleteBody();
 
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
@@ -589,9 +593,9 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
         // Allocating context object and temporaries on the methodFunction's stack.
         // This operation does not affect garbage collector, so no pointer protection
         // is required. Moreover, this is operation is much faster than heap allocation.
-        const bool hasTemporaries  = getIntegerValue(directMethod->temporarySize) > 0;
+        const bool hasTemporaries  = directMethod->temporarySize > 0;
         const uint32_t contextSize = sizeof(TContext);
-        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * getIntegerValue(directMethod->temporarySize) : 0;
+        const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * directMethod->temporarySize : 0;
 
         // Allocating stack space for objects and registering GC protection holder
 
@@ -601,7 +605,7 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
 
         Value* tempsSlot = 0;
         if (hasTemporaries) {
-            MethodCompiler::TStackObject tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), getIntegerValue(directMethod->temporarySize));
+            MethodCompiler::TStackObject tempsPair = m_methodCompiler->allocateStackObject(builder, sizeof(TObjectArray), directMethod->temporarySize);
             tempsSlot = tempsPair.objectSlot;
             newBlock.tempsHolder = tempsPair.objectHolder;
         } else
@@ -905,10 +909,6 @@ void JITRuntime::initializeGlobals() {
 void JITRuntime::initializePassManager() {
     m_functionPassManager = new FunctionPassManager(m_JITModule);
     m_modulePassManager   = new PassManager();
-    // Set up the optimizer pipeline.
-    // Start with registering info about how the
-    // target lays out data structures.
-    m_functionPassManager->add(new TargetData(*m_executionEngine->getTargetData()));
 
     m_modulePassManager->add(createFunctionInliningPass());
 

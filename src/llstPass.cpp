@@ -4,11 +4,11 @@
  *    Optimizing LLVM pass for JIT code generator.
  *    Tries to remove redundant memory loads and roots.
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -35,6 +35,15 @@
 
 #define DEBUG_TYPE "llst"
 #include <llstPass.h>
+
+#include <llvm/IR/Function.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/Instructions.h>
+#include <llvm/IR/IntrinsicInst.h>
+#include <llvm/Support/Debug.h>
+#include <llvm/Support/raw_ostream.h>
+#include <llvm/ADT/Statistic.h>
+#include <set>
 
 STATISTIC(rootLoadsRemoved, "Number of removed loads from gc.root protected pointers                       <<<<<<");
 STATISTIC(rootsRemoved,     "Number of removed roots                                                       <<<<<<");
@@ -113,7 +122,7 @@ bool LLSTPass::isPotentialGCFunction(Function* F)
     if (F->isIntrinsic())
         return false;
 
-    if ( F->getGC() )
+    if ( F->hasGC() )
         return true;
     return false;
 }

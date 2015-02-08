@@ -3,11 +3,11 @@
  *
  *    LLVM related routines
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -42,17 +42,12 @@
 #include <set>
 #include <stdio.h>
 
-#include <llvm/Function.h>
-#include <llvm/LLVMContext.h>
-#include <llvm/Module.h>
-#include <llvm/Support/IRBuilder.h>
+#include <llvm/IR/Module.h>
+#include <llvm/IR/IRBuilder.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
 #include <llvm/ExecutionEngine/JIT.h>
-#include <llvm/Linker.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/PassManager.h>
-#include <llvm/Intrinsics.h>
-#include <llvm/Support/ManagedStatic.h>
 
 // These functions are used in the IR code
 // as a bindings between the VM and the object world
@@ -306,7 +301,7 @@ private:
     void doPushTemporary(TJITContext& jit);
     void doPushLiteral(TJITContext& jit);
     void doPushConstant(TJITContext& jit);
-    void doPushBlock(uint32_t currentOffset, TJITContext& jit);
+    void doPushBlock(TJITContext& jit);
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
     void doMarkArguments(TJITContext& jit);

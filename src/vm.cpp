@@ -3,11 +3,11 @@
  *
  *    Implementation of the virtual machine (SmalltalkVM class)
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -33,16 +33,16 @@
  */
 
 
-#include <iostream>
-#include <readline/readline.h>
-#include <readline/history.h>
-#include <cassert>
+#include <cstdio>
 #include <cstdlib>
+#include <iostream>
+#include <cassert>
 #include <cstring>
 
 #include <opcodes.h>
 #include <primitives.h>
 #include <vm.h>
+#include <CompletionEngine.h>
 
 #if defined(LLVM)
     #include <jit.h>
@@ -54,7 +54,7 @@ TObject* SmalltalkVM::newOrdinaryObject(TClass* klass, std::size_t slotSize)
     // so we need to protect the pointer
     hptr<TClass> pClass = newPointer(klass);
 
-    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
+    void* objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %u bytes\n", slotSize);
         return globals.nilObject;
@@ -85,9 +85,9 @@ TByteObject* SmalltalkVM::newBinaryObject(TClass* klass, std::size_t dataSize)
 
     // All binary objects are descendants of ByteObject
     // They could not have ordinary fields, so we may use it
-    uint32_t slotSize = sizeof(TByteObject) + correctPadding(dataSize);
+    uint32_t slotSize = sizeof(TByteObject) + dataSize;
 
-    void* objectSlot = m_memoryManager->allocate(slotSize, &m_lastGCOccured);
+    void* objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &m_lastGCOccured);
     if (!objectSlot) {
         std::fprintf(stderr, "VM: memory manager failed to allocate %d bytes\n", slotSize);
         return static_cast<TByteObject*>(globals.nilObject);
@@ -117,14 +117,14 @@ template<> hptr<TSymbolArray> SmalltalkVM::newObject<TSymbolArray>(std::size_t d
     return hptr<TSymbolArray>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t dataSize, bool registerPointer)
+template<> hptr<TContext> SmalltalkVM::newObject<TContext>(std::size_t /*dataSize*/, bool registerPointer)
 {
     TClass* klass = globals.contextClass;
     TContext* instance = static_cast<TContext*>( newOrdinaryObject(klass, sizeof(TContext)) );
     return hptr<TContext>(instance, m_memoryManager, registerPointer);
 }
 
-template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t dataSize, bool registerPointer)
+template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t /*dataSize*/, bool registerPointer)
 {
     TClass* klass = globals.blockClass;
     TBlock* instance = static_cast<TBlock*>( newOrdinaryObject(klass, sizeof(TBlock)) );
@@ -333,11 +333,11 @@ void SmalltalkVM::doPushBlock(TVMExecutionContext& ec)
     hptr<TBlock> newBlock = newObject<TBlock>();
 
     // Allocating block's stack
-    uint32_t stackSize = getIntegerValue(ec.currentContext->method->stackSize);
+    uint32_t stackSize = ec.currentContext->method->stackSize;
     newBlock->stack    = newObject<TObjectArray>(stackSize/*, false*/);
 
-    newBlock->argumentLocation = newInteger(ec.instruction.low);
-    newBlock->blockBytePointer = newInteger(ec.bytePointer);
+    newBlock->argumentLocation = ec.instruction.low;
+    newBlock->blockBytePointer = ec.bytePointer;
 
     //We set block->bytePointer, stackTop, previousContext when block is invoked
 
@@ -398,15 +398,15 @@ void SmalltalkVM::doSendMessage(TVMExecutionContext& ec, TSymbol* selector, TObj
 
     // Create a new context for the giving method and arguments
     hptr<TContext>   newContext = newObject<TContext>();
-    hptr<TObjectArray> newStack = newObject<TObjectArray>(getIntegerValue(receiverMethod->stackSize));
-    hptr<TObjectArray> newTemps = newObject<TObjectArray>(getIntegerValue(receiverMethod->temporarySize));
+    hptr<TObjectArray> newStack = newObject<TObjectArray>(receiverMethod->stackSize);
+    hptr<TObjectArray> newTemps = newObject<TObjectArray>(receiverMethod->temporarySize);
 
     newContext->stack           = newStack;
     newContext->temporaries     = newTemps;
     newContext->arguments       = messageArguments;
     newContext->method          = receiverMethod;
-    newContext->stackTop        = newInteger(0);
-    newContext->bytePointer     = newInteger(0);
+    newContext->stackTop        = 0;
+    newContext->bytePointer     = 0;
 
     // Suppose that current send message operation is last operation in the current context.
     // If it is true then next instruction will be either stackReturn or blockReturn.
@@ -500,8 +500,8 @@ void SmalltalkVM::doSendBinary(TVMExecutionContext& ec)
     // If operands are both small integers, we may handle it ourselves
     if (isSmallInteger(leftObject) && isSmallInteger(rightObject)) {
         // Loading actual operand values
-        int32_t rightOperand = getIntegerValue(reinterpret_cast<TInteger>(rightObject));
-        int32_t leftOperand  = getIntegerValue(reinterpret_cast<TInteger>(leftObject));
+        int32_t rightOperand = TInteger(rightObject);
+        int32_t leftOperand  = TInteger(leftObject);
         bool unusedCondition;
 
         // Performing an operation
@@ -653,7 +653,7 @@ void SmalltalkVM::doPushConstant(TVMExecutionContext& ec)
         case 7:
         case 8:
         case 9: {
-            TObject* constInt = reinterpret_cast<TObject*>(newInteger(constant));
+            TObject* constInt = TInteger(constant);
             ec.stackPush(constInt);
         } break;
 
@@ -723,13 +723,13 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
             }
 
             // Inject the result...
-            ec.stackTop = getIntegerValue(ec.currentContext->stackTop);
+            ec.stackTop = ec.currentContext->stackTop;
             ec.stackPush( ec.returnedValue );
 
             // Save the stack pointer
-            ec.currentContext->stackTop = newInteger(ec.stackTop);
+            ec.currentContext->stackTop = ec.stackTop;
 
-            ec.bytePointer = getIntegerValue(ec.currentContext->bytePointer);
+            ec.bytePointer = ec.currentContext->bytePointer;
     }
 
     return returnNoReturn;
@@ -779,17 +779,15 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TString* prompt = ec.stackPop<TString>();
             std::string strPrompt(reinterpret_cast<const char*>(prompt->getBytes()), prompt->getSize());
 
-            char* input = readline(strPrompt.c_str());
-            if (input) {
-                uint32_t inputSize = std::strlen(input);
+            std::string input;
+            bool userInsertedAnything = CompletionEngine::Instance()->readline(strPrompt, input);
 
-                if (inputSize > 0)
-                    add_history(input);
+            if ( userInsertedAnything ) {
+                if ( !input.empty() )
+                    CompletionEngine::Instance()->addHistory(input);
 
-                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, inputSize) );
-                std::memcpy(result->getBytes(), input, inputSize);
-
-                std::free(input);
+                TString* result = static_cast<TString*>( newBinaryObject(globals.stringClass, input.size()) );
+                std::memcpy(result->getBytes(), input.c_str(), input.size());
                 return result;
             } else
                 return globals.nilObject;
@@ -811,21 +809,20 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
 #endif
 
         case primitive::startNewProcess: { // 6
-            TInteger  value = reinterpret_cast<TInteger>( ec.stackPop() );
-            uint32_t  ticks = getIntegerValue(value);
+            TInteger  ticks = ec.stackPop();
             TProcess* newProcess = ec.stackPop<TProcess>();
 
             // FIXME possible stack overflow due to recursive call
             TExecuteResult result = this->execute(newProcess, ticks);
 
-            return reinterpret_cast<TObject*>(newInteger(result));
+            return TInteger(result);
         } break;
 
         case primitive::allocateObject: { // 7
             // Taking object's size and class from the stack
             TObject* size  = ec.stackPop();
             TClass*  klass = ec.stackPop<TClass>();
-            uint32_t fieldsCount = getIntegerValue(reinterpret_cast<TInteger>(size));
+            uint32_t fieldsCount = TInteger(size);
 
             // Instantinating the object. Each object has size and class fields
 
@@ -834,7 +831,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
 
         case primitive::blockInvoke: { // 8
             TBlock*  block = ec.stackPop<TBlock>();
-            uint32_t argumentLocation = getIntegerValue(block->argumentLocation);
+            uint32_t argumentLocation = block->argumentLocation;
 
             // Amount of arguments stored on the stack except the block itself
             uint32_t argCount = ec.instruction.low - 1;
@@ -859,7 +856,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
 
             // Block is bound to the method's bytecodes, so it's
             // first bytecode will not be zero but the value specified
-            ec.bytePointer = getIntegerValue(block->blockBytePointer);
+            ec.bytePointer = block->blockBytePointer;
 
             return block;
         } break;
@@ -870,8 +867,8 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             break;
 
         case primitive::allocateByteArray: { // 20
-            int32_t dataSize = getIntegerValue(reinterpret_cast<TInteger>( ec.stackPop() ));
-            TClass* klass    = ec.stackPop<TClass>();
+            TInteger dataSize = ec.stackPop();
+            TClass* klass     = ec.stackPop<TClass>();
 
             return newBinaryObject(klass, dataSize);
         } break;
@@ -893,7 +890,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
 
             // Smalltalk indexes arrays starting from 1, not from 0
             // So we need to recalculate the actual array index before
-            uint32_t actualIndex = getIntegerValue(reinterpret_cast<TInteger>(indexObject)) - 1;
+            uint32_t actualIndex = TInteger(indexObject) - 1;
 
             // Checking boundaries
             if (actualIndex >= array->getSize()) {
@@ -949,10 +946,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 break;
             }
 
-            TInteger integer = reinterpret_cast<TInteger>(object);
-            int32_t  value   = getIntegerValue(integer);
-
-            return reinterpret_cast<TObject*>(newInteger(value)); // FIXME long integer
+            return object; // FIXME long integer
         } break;
 
         case primitive::flushCache: // 34
@@ -1053,9 +1047,9 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 
     // Smalltalk indexes are counted starting from 1.
     // We need to decrement all values to get the zero based index:
-    int32_t iSourceStartOffset      = getIntegerValue(reinterpret_cast<TInteger>(sourceStartOffset)) - 1;
-    int32_t iDestinationStartOffset = getIntegerValue(reinterpret_cast<TInteger>(destinationStartOffset)) - 1;
-    int32_t iDestinationStopOffset  = getIntegerValue(reinterpret_cast<TInteger>(destinationStopOffset)) - 1;
+    int32_t iSourceStartOffset      = TInteger(sourceStartOffset) - 1;
+    int32_t iDestinationStartOffset = TInteger(destinationStartOffset) - 1;
+    int32_t iDestinationStopOffset  = TInteger(destinationStopOffset) - 1;
     int32_t iCount                  = iDestinationStopOffset - iDestinationStartOffset + 1;
 
     if ( iSourceStartOffset      < 0 ||

@@ -3,11 +3,11 @@
  *
  *    Program entry point
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -35,6 +35,7 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
+#include <cstdlib>
 
 #include <vm.h>
 #include <args.h>
@@ -54,6 +55,16 @@ int main(int argc, char **argv) {
 
     llstArgs.parse(argc, argv);
 
+    if (llstArgs.showHelp) {
+        std::cout << args::getHelp() << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    if (llstArgs.showVersion) {
+        std::cout << args::getVersion() << std::endl;
+        return EXIT_SUCCESS;
+    }
+
 #if defined(LLVM)
     std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
 #else
@@ -62,7 +73,7 @@ int main(int argc, char **argv) {
     memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
 
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
-    smalltalkImage->loadImage(llstArgs.imagePath.c_str());
+    smalltalkImage->loadImage(llstArgs.imagePath);
 
     {
         Image::ImageWriter writer;
@@ -88,12 +99,12 @@ int main(int argc, char **argv) {
     initContext->arguments = vm.newObject<TObjectArray>(1);
     initContext->arguments->putField(0, globals.nilObject);
 
-    initContext->bytePointer = newInteger(0);
+    initContext->bytePointer = 0;
     initContext->previousContext = static_cast<TContext*>(globals.nilObject);
 
-    const uint32_t stackSize = getIntegerValue(globals.initialMethod->stackSize);
+    const uint32_t stackSize = globals.initialMethod->stackSize;
     initContext->stack = vm.newObject<TObjectArray>(stackSize);
-    initContext->stackTop = newInteger(0);
+    initContext->stackTop = 0;
 
     initContext->method = globals.initialMethod;
 
@@ -150,5 +161,5 @@ int main(int argc, char **argv) {
     runtime.printStat();
 #endif
 
-    return 0;
+    return EXIT_SUCCESS;
 }

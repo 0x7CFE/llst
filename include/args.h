@@ -3,11 +3,11 @@
  *
  *    Helper functions for command line argument parsing
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -44,11 +44,14 @@ struct args
     std::size_t maxHeapSize;
     std::string imagePath;
     int         showHelp;
+    int         showVersion;
     args() :
-        heapSize(0), maxHeapSize(0), showHelp(false)
+        heapSize(0), maxHeapSize(0), showHelp(false), showVersion(false)
     {
     }
     void parse(int argc, char **argv);
+    static std::string getHelp();
+    static std::string getVersion();
 };
 
 #endif

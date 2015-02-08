@@ -3,11 +3,11 @@
  *
  *    Implementation of Image class which loads the file image into memory
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -35,12 +35,7 @@
 #include <vm.h>
 #include <memory.h>
 
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <sys/mman.h>
-#include <netinet/in.h>
+//#include <netinet/in.h> //TODO endianness
 
 #include <cerrno>
 #include <cstring>
@@ -48,6 +43,8 @@
 #include <string>
 #include <cassert>
 #include <algorithm>
+#include <iostream>
+#include <stdexcept>
 
 // Placeholder for root objects
 TGlobals globals;
@@ -62,71 +59,15 @@ TObject* Image::getGlobal(const N* name) const {
 template TObject* Image::getGlobal<char>(const char* key) const;
 template TObject* Image::getGlobal<TSymbol>(const TSymbol* key) const;
 
-bool Image::openImageFile(const char* fileName)
-{
-    // Opening file for reading
-    m_imageFileFD = open(fileName, O_RDONLY);
-    if (m_imageFileFD < 0)
-    {
-        std::fprintf(stderr, "Failed to open file %s : %s\n", fileName, std::strerror(errno));
-        return false;
-    }
-
-    // Reading file size in bytes
-    struct stat st;
-    if (fstat(m_imageFileFD, &st) < 0) {
-        close(m_imageFileFD);
-        m_imageFileFD = -1;
-        std::fprintf(stderr, "Failed to get file size : %s\n", std::strerror(errno));
-        return false;
-    }
-    m_imageFileSize = st.st_size;
-
-    // Mapping the image file to the memory
-    m_imageMap = mmap(
-        0,                // let the kernel provide the address
-        m_imageFileSize,  // map the entire image file
-        PROT_READ,        // read only access
-        MAP_PRIVATE,      // private mapping only for us
-        m_imageFileFD,    // map this file
-        0);               // from the very beginning (zero offset)
-
-    if (!m_imageMap) {
-        std::fprintf(stderr, "Failed to mmap image file: %s\n", std::strerror(errno));
-
-        // Something goes wrong
-        close(m_imageFileFD);
-        m_imageFileFD = -1;
-        return false;
-    }
-
-    // Initializing pointers
-    m_imagePointer = static_cast<uint8_t*>(m_imageMap);
-    return true;
-}
-
-void Image::closeImageFile()
-{
-    munmap(m_imageMap, m_imageFileSize);
-    close(m_imageFileFD);
-
-    m_imagePointer = 0;
-    m_imageMap = 0;
-    m_imageFileSize = 0;
-}
-
 uint32_t Image::readWord()
 {
-    if (m_imagePointer == (static_cast<uint8_t*>(m_imageMap) + m_imageFileSize) )
-        return 0; // Unexpected EOF TODO break
-
     uint32_t value = 0;
     uint8_t  byte  = 0;
 
     // Very stupid yet simple multibyte encoding
     // value = FF + FF ... + x where x < FF
     do {
-        byte = *m_imagePointer++;
+        byte = m_inputStream.get();
         value += byte;
     } while ( byte == 0xFF );
     return value;
@@ -139,7 +80,7 @@ TObject* Image::readObject()
     TImageRecordType type = static_cast<TImageRecordType>(readWord());
     switch (type) {
         case invalidObject:
-            std::fprintf(stderr, "Invalid object at offset %d\n", m_imagePointer - static_cast<uint8_t*>(m_imageMap));
+            std::cerr << "Invalid object at offset " << m_inputStream.tellg() << std::endl;
             std::exit(1);
             break;
 
@@ -161,12 +102,9 @@ TObject* Image::readObject()
         }
 
         case inlineInteger: {
-            //uint32_t value = * reinterpret_cast<uint32_t*>(m_imagePointer);
-            uint32_t value = m_imagePointer[0] | (m_imagePointer[1] << 8) |
-                            (m_imagePointer[2] << 16) | (m_imagePointer[3] << 24);
-            m_imagePointer += sizeof(uint32_t);
-            TInteger newObject = newInteger(value); // FIXME endianness
-            return reinterpret_cast<TObject*>(newObject);
+            uint32_t value = m_inputStream.get() | (m_inputStream.get() << 8) |
+                            (m_inputStream.get() << 16) | (m_inputStream.get() << 24);
+            return TInteger(value); // FIXME endianness
         }
 
         case byteObject: {
@@ -206,18 +144,25 @@ TObject* Image::readObject()
     }
 }
 
-bool Image::loadImage(const char* fileName)
+bool Image::loadImage(const std::string& fileName)
 {
-    if ( !openImageFile(fileName) ) {
-        std::fprintf(stderr, "could not open image file %s\n", fileName);
-        return false;
+    m_inputStream.exceptions( std::ifstream::eofbit | std::ifstream::badbit );
+    m_inputStream.open(fileName.c_str(), std::ifstream::binary);
+
+    if ( !m_inputStream.is_open() ) {
+        throw std::runtime_error("Could not open image file " + fileName);
     }
 
-    // TODO Check whether heap is already initialized
+    //Get the size of the file
+    m_inputStream.seekg(0, std::ifstream::end);
+    std::ifstream::pos_type fileSize = m_inputStream.tellg();
 
+    //Reset the position to the beginning of the file
+    m_inputStream.seekg(0);
+
+    // TODO Check whether heap is already initialized
     // Multiplier of 1.5 of imageFileSize should be a good estimation for static heap size
-    if ( !m_memoryManager->initializeStaticHeap(m_imageFileSize + m_imageFileSize / 2) ) {
-        closeImageFile();
+    if ( !m_memoryManager->initializeStaticHeap(fileSize * 1.5) ) {
         return false;
     }
 
@@ -243,8 +188,6 @@ bool Image::loadImage(const char* fileName)
 
     std::fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
     m_indirects.clear();
-
-    closeImageFile();
 
     return true;
 }
@@ -298,7 +241,7 @@ void Image::ImageWriter::writeObject(std::ofstream& os, TObject* object)
 
     switch (type) {
         case inlineInteger: {
-            uint32_t integer = getIntegerValue(reinterpret_cast<TInteger>(object));
+            uint32_t integer = TInteger(object);
             os.write(reinterpret_cast<char*>(&integer), sizeof(integer));
         } break;
         case byteObject: {

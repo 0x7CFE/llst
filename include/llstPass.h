@@ -4,11 +4,11 @@
  *    Optimizing LLVM pass for JIT code generator.
  *    Tries to remove redundant memory loads and roots.
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -33,14 +33,6 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <llvm/Function.h>
-#include <llvm/Module.h>
 #include <llvm/Pass.h>
-#include <llvm/Instructions.h>
-#include <llvm/IntrinsicInst.h>
-#include <llvm/Support/Debug.h>
-#include <llvm/Support/raw_ostream.h>
-#include <llvm/ADT/Statistic.h>
-#include <set>
 
 llvm::FunctionPass* createLLSTPass();
