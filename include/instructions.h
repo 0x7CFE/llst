@@ -303,7 +303,7 @@ public:
     BasicBlockVisitor(ParsedBytecode* parsedBytecode) : m_parsedBytecode(parsedBytecode) { }
     virtual ~BasicBlockVisitor() { }
 
-    virtual bool visitBlock(BasicBlock& basicBlock) { return true; }
+    virtual bool visitBlock(BasicBlock& /*basicBlock*/) { return true; }
 
     void run() {
         ParsedBytecode::iterator iBlock = m_parsedBytecode->begin();
@@ -324,7 +324,7 @@ protected:
 class InstructionVisitor : public BasicBlockVisitor {
 public:
     InstructionVisitor(ParsedBytecode* parsedBytecode) : BasicBlockVisitor(parsedBytecode) { }
-    virtual bool visitInstruction(const TSmalltalkInstruction& instruction) { return true; }
+    virtual bool visitInstruction(const TSmalltalkInstruction& /*instruction*/) { return true; }
 
 protected:
     virtual bool visitBlock(BasicBlock& basicBlock) {
@@ -360,7 +360,7 @@ public:
     }
 
 protected:
-    virtual bool visitBlock(ParsedBlock& parsedBlock) { return true; }
+    virtual bool visitBlock(ParsedBlock& /*parsedBlock*/) { return true; }
 
 private:
     ParsedMethod* const m_parsedMethod;

@@ -150,7 +150,7 @@ public:
     const TSmalltalkInstruction& getInstruction() const { return m_instruction; }
 
     ControlNode* getArgument(const std::size_t index = 0) const {
-        assert(index >= 0 && index < m_arguments.size());
+        assert(index < m_arguments.size());
         return m_arguments[index];
     }
 
@@ -408,7 +408,7 @@ public:
     DomainVisitor(ControlGraph* graph) : m_graph(graph) { }
     virtual ~DomainVisitor() { }
 
-    virtual bool visitDomain(ControlDomain& domain) { return true; }
+    virtual bool visitDomain(ControlDomain& /*domain*/) { return true; }
     virtual void domainsVisited() { }
 
     void run() {
@@ -434,7 +434,7 @@ protected:
 class NodeVisitor : public DomainVisitor {
 public:
     NodeVisitor(ControlGraph* graph) : DomainVisitor(graph) { }
-    virtual bool visitNode(ControlNode& node) { return true; }
+    virtual bool visitNode(ControlNode& /*node*/) { return true; }
     virtual void nodesVisited() { }
 
 protected:
@@ -460,7 +460,7 @@ protected:
 class PlainNodeVisitor {
 public:
     PlainNodeVisitor(ControlGraph* graph) : m_graph(graph) { }
-    virtual bool visitNode(ControlNode& node) { return true; }
+    virtual bool visitNode(ControlNode& /*node*/) { return true; }
     virtual void nodesVisited() { }
 
     void run() {
