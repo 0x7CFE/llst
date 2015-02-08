@@ -5,7 +5,7 @@
 #include <instructions.h>
 #include <analysis.h>
 
-void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char *__function)
+void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char */*__function*/)
 {
     std::stringstream ss;
     ss << "Assertion '" << __assertion << "' failed in '" << __file << "' at: " << __line;
