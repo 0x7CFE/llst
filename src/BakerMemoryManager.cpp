@@ -3,11 +3,11 @@
  *
  *    Implementation of BakerMemoryManager class
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -36,6 +36,14 @@
 #include <cstring>
 #include <cstdlib>
 #include <sys/time.h>
+
+#include <cassert>
+bool is_aligned_properly(void *p) {
+    return uint32_t(p) % sizeof(void*) == 0;
+}
+bool is_aligned_properly(uint32_t x) {
+    return x % sizeof(void*) == 0;
+}
 
 BakerMemoryManager::BakerMemoryManager() :
     m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),
@@ -102,11 +110,13 @@ bool BakerMemoryManager::initializeHeap(std::size_t heapSize, std::size_t maxHea
 void BakerMemoryManager::growHeap(uint32_t requestedSize)
 {
     // Stage1. Growing inactive heap
-    uint32_t newHeapSize = correctPadding(requestedSize + m_heapSize + m_heapSize / 2);
+    uint32_t newHeapSize = correctPadding(2 * requestedSize + m_heapSize + m_heapSize / 2);
+    while( !is_aligned_properly(newHeapSize/2) )
+        newHeapSize = correctPadding(newHeapSize+1);
 
     std::printf("MM: Growing heap to %d\n", newHeapSize);
 
-    uint32_t newMediane = newHeapSize / 2;
+    const uint32_t newMediane = newHeapSize / 2;
     uint8_t** activeHeapBase   = m_activeHeapOne ? &m_heapOne : &m_heapTwo;
     uint8_t** inactiveHeapBase = m_activeHeapOne ? &m_heapTwo : &m_heapOne;
 
@@ -139,6 +149,7 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
             std::memset(*activeHeapBase, 0, newMediane);
         }
     }
+
     collectGarbage();
 
     m_heapSize = newHeapSize;
@@ -146,8 +157,25 @@ void BakerMemoryManager::growHeap(uint32_t requestedSize)
 
 void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*= 0*/ )
 {
+    assert(requestedSize == correctPadding(requestedSize));
     if (gcOccured)
         *gcOccured = false;
+
+    // Quick check for the case when new object is
+    // considerably larger that the active heap space
+    if (requestedSize > m_heapSize / 2) {
+        const uint32_t newHeapSize = correctPadding(2 * requestedSize + m_heapSize + m_heapSize / 2);
+
+        if (newHeapSize < m_maxHeapSize) {
+            growHeap(requestedSize);
+        } else {
+            std::fprintf(stderr, "Could not allocate %u bytes because doing so would exceed heap limit %u\n", requestedSize, m_maxHeapSize);
+            return 0;
+        }
+
+        if (gcOccured)
+            *gcOccured = true;
+    }
 
     std::size_t attempts = 2;
     while (attempts-- > 0) {
@@ -155,9 +183,9 @@ void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*
             collectGarbage();
 
             // If even after collection there is too less space
-            // we may try to expand the heap
+            // we may try to expand the heap if limit is not yet reached
             const uintptr_t distance = m_activeHeapPointer - m_activeHeapBase;
-            if ((m_heapSize < m_maxHeapSize) && (distance < m_heapSize / 6))
+            if ((distance < m_heapSize / 16) && (m_heapSize < m_maxHeapSize))
                growHeap(requestedSize);
 
             if (gcOccured)
@@ -167,6 +195,7 @@ void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*
 
         m_activeHeapPointer -= requestedSize;
         void* result = m_activeHeapPointer;
+        assert( is_aligned_properly(result) );
 
         if (gcOccured && !*gcOccured)
             m_allocationsCount++;

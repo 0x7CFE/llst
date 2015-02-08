@@ -1,5 +1,165 @@
 
 [Current]
+
+[v_0.3]
+2015-01-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Fixes Baker MM reallocation
+    
+    Issue: #14
+
+2015-01-30  Roman Proskuryakov  <prv@adfox.ru>
+
+    Moves to llvm 3.3
+    
+    Issue: #49
+
+2015-01-30  Roman Proskuryakov  <prv@adfox.ru>
+
+    Fixes the deps of debian package.
+
+2014-03-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    The code generated page fault during execution of movdqa instruction
+    This SSE instruction requered the data to be alined by 16 bytes.
+    
+    The code corresponding to the bug is:
+    
+    @SmalltalkVM::newOrdinaryObject
+        for (uint32_t index = 0; index < fieldsCount; index++)
+            instance->putField(index, globals.nilObject);
+    
+    movdqa moves a double quadword from src to dst. The compiler optimized this loop into a set of movdqa instructions.
+    That means that 'instance' was aligned neither by 16 bytes nor by 4 bytes.
+    
+    When BakerMemoryManager::growHeap does its job it divides newHeapSize by 2.
+     newHeapSize/2 must be equal to correctPadding(newHeapSize/2). But it is not.
+    
+    Issue: #28
+
+2014-05-14  Roman  <humbug@deeptown.org>
+
+    Updates README.md
+    
+    Issue: #50
+2014-05-14  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves targets 'doc' and 'image' into their own CMakeLists.txt
+    
+    Issue: #50
+
+2014-04-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds FindPOD2MAN.cmake and FindGZIP.cmake
+    
+    Adds option 'BUILD_DOCS'.
+    Now cmake is able to convert pod files into man pages.
+    
+    Issue: #50
+
+2014-05-09  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds toolchain for mingw32
+    
+    Issue: #50
+
+2014-05-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds check for Threads in CMake script
+    
+    Issue: #50
+
+2014-05-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds cmake module to find LLVM
+    
+    Issue: #50
+
+2014-05-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds cmake module to find libreadline and libtinfo
+    
+    Issue: #50
+
+2014-05-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Moves common vars into cmake/variables.cmake
+    
+    Issue: #50
+
+2014-05-12  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds target `make uninstall`
+    
+    Issue: #50
+
+2014-02-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds CLI arg `-v, --version`
+    
+    Issue: #50
+
+2014-03-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes -Wall -Wextra warnings
+    
+    Issue: #50
+
+2014-01-08  Dmitry Kashitsyn  <korvin@deeptown.org>
+
+    Adds include guard to completion engine header
+
+2013-12-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds handling of READLINE option in cmake
+    
+    Now usage of readline library may be controlled
+    by passing a -DREADLINE=(ON|OFF) parameter to cmake.
+    
+    If parameter is passed library usage depends on value.
+    If parameter is omitted it defaults to ON.
+    
+    Issue: #52
+
+2013-12-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds a dumb version of CompletionEngine without libreadline
+    
+    Issue: #52
+
+2013-12-25  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Makes the code compile with MinGW
+    
+    Issue: #46
+
+2013-12-24  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Makes Image::loadImage() cross-platform
+    
+    It worked fine for GNU/Linux, FreeBSD, but the is no mmap in MS \|/iNdOwS.
+    The function is rewritten with std::ifstream.
+    
+    Issue: #46
+
+2014-01-06  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds a new cmake target to compress and install ChangeLog
+    
+    Issue: #43
+
+2013-12-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Removes redundant static_cast<int32> for TInteger
+    
+    Issue: #51
+
+2013-12-31  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Implements primitive 'readline' inside CompletionEngine
+    
+    Issue: #52
+
 2013-12-29  Roman Proskuryakov  <humbug@deeptown.org>
 
     Adds script to generate ChangeLog
@@ -19,6 +179,70 @@
     Target `package_source` should not pack neither .kdev_include_paths nor *.image files.
     
     Issue: #43
+
+2013-12-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    TInteger keeps m_value of type int32_t, not TObject*
+    
+    Issue: #51
+
+2013-12-28  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes JIT compilation
+    
+    Issue: #51
+
+2013-12-26  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds TInteger::operator +-(int32_t)
+    
+    With these operators we can write a code like:
+      TInteger x = 42;
+      int y = x + 2;
+    
+    Issue: #51
+
+2013-12-22  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Replaces `typedef int32_t TInteger` with a real class
+    
+    Issue: #51
+
+2013-12-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes compilation warnings for Arch Linux
+    
+    Issue: #46
+
+2013-12-07  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes llvm asserts for Arch Linux
+    
+    Issue: #46
+
+2013-12-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Requires CMake 2.8.4 due to cygwin warnings
+    
+    Issue: #46
+
+2013-12-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds `#include <cstdio>` to resolve type FILE
+    
+    Issue: #46
+
+2013-12-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Adds EOL to args.h
+    
+    Issue: #46
+
+2013-12-03  Roman Proskuryakov  <humbug@deeptown.org>
+
+    Fixes error with undeclared 'EXIT_SUCCESS' for RPi
+    
+    Issue: #46
 
 2013-12-02  Roman Proskuryakov  <humbug@deeptown.org>
 

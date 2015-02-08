@@ -3,11 +3,11 @@
  *
  *    LLST memory management routines and interfaces
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -331,13 +331,13 @@ public:
     virtual bool  isInStaticHeap(void* location);
 
     virtual void  collectGarbage() {}
-    virtual void  addStaticRoot(TObject** pointer) {}
-    virtual void  removeStaticRoot(TObject** pointer) {}
-    virtual void  registerExternalPointer(TObject** pointer) {}
-    virtual void  releaseExternalPointer(TObject** pointer) {}
-    virtual void  registerExternalHeapPointer(object_ptr& pointer) {}
-    virtual void  releaseExternalHeapPointer(object_ptr& pointer) {}
-    virtual bool  checkRoot(TObject* value, TObject** objectSlot) { return false; }
+    virtual void  addStaticRoot(TObject** /*pointer*/) {}
+    virtual void  removeStaticRoot(TObject** /*pointer*/) {}
+    virtual void  registerExternalPointer(TObject** /*pointer*/) {}
+    virtual void  releaseExternalPointer(TObject** /*pointer*/) {}
+    virtual void  registerExternalHeapPointer(object_ptr& /*pointer*/) {}
+    virtual void  releaseExternalHeapPointer(object_ptr& /*pointer*/) {}
+    virtual bool  checkRoot(TObject* /*value*/, TObject** /*objectSlot*/) { return false; }
     virtual uint32_t allocsBeyondCollection() { return 0; }
     virtual TMemoryManagerInfo getStat() { return TMemoryManagerInfo(); }
 };

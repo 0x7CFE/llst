@@ -4,11 +4,11 @@
  *    Implementation of MethodCompiler class which is used to
  *    translate smalltalk bytecodes to LLVM IR code
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -34,8 +34,10 @@
  */
 
 #include <jit.h>
+
+#include <llvm/IR/Intrinsics.h>
+
 #include <stdarg.h>
-#include <llvm/Support/CFG.h>
 #include <iostream>
 #include <sstream>
 #include <opcodes.h>
@@ -83,8 +85,8 @@ Function* MethodCompiler::createFunction(TMethod* method)
     Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
-    function->addFnAttr(Attributes(Attribute::InlineHint));
-//     function->addFnAttr(Attributes(Attribute::AlwaysInline));
+    function->addFnAttr(Attribute::InlineHint);
+//     function->addFnAttr(Attribute::AlwaysInline);
     return function;
 }
 

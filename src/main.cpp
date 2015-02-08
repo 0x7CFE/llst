@@ -3,11 +3,11 @@
  *
  *    Program entry point
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.2
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
  *
  *    LLST is
- *        Copyright (C) 2012-2013 by Dmitry Kashitsyn   <korvin@deeptown.org>
- *        Copyright (C) 2012-2013 by Roman Proskuryakov <humbug@deeptown.org>
+ *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ *        Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
  *
  *    LLST is based on the LittleSmalltalk which is
  *        Copyright (C) 1987-2005 by Timothy A. Budd
@@ -71,6 +71,11 @@ int main(int argc, char **argv) {
 
     if (llstArgs.showHelp) {
         std::cout << args::getHelp() << std::endl;
+        return EXIT_SUCCESS;
+    }
+
+    if (llstArgs.showVersion) {
+        std::cout << args::getVersion() << std::endl;
         return EXIT_SUCCESS;
     }
 

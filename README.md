@@ -37,7 +37,7 @@ $ sudo apt-get install ia32-libs g++-multilib libreadline-dev:i386
 
 ~/llst $ mkdir build && cd build
 ~/llst/build $ cmake ..
-~/llst/build $ make
+~/llst/build $ make llst
 ~/llst/build $ ./llst
 ```
 
@@ -46,14 +46,14 @@ $ sudo apt-get install ia32-libs g++-multilib libreadline-dev:i386
 LLVM
 ====
 
-By default LLST is built without LLVM support. If you wish to enable it, you should pass -DLLVM=ON parameter to the cmake:
+By default LLST is built without LLVM support. If you wish to enable it, you should pass -DUSE_LLVM=ON parameter to the cmake:
 ```
 ~/llst/build $ rm CMakeCache.txt
-~/llst/build $ cmake -DLLVM=ON ..
+~/llst/build $ cmake -DUSE_LLVM=ON ..
 ~/llst/build $ make
 ```
 
-You should have LLVM installed and llvm-config be accessible from your environment. You may override the LLVM version by passing -DLLVM_VERSION=x.y parameter to cmake (where x.y should be replaced with actual version to use).
+You should have LLVM 3.1 installed and llvm-config or llvm-config-3.1 be accessible from your environment.
 
 License
 =======
