@@ -42,6 +42,7 @@
 #include <sstream>
 #include <opcodes.h>
 #include <analysis.h>
+#include <visualization.h>
 
 using namespace llvm;
 
@@ -236,6 +237,11 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Creating the function named as "Class>>method" or using provided one
     jit.function = methodFunction ? methodFunction : createFunction(method);
+
+    {
+        ControlGraphVisualizer vis(jit.controlGraph, std::string(jit.function->getName()) + ".dot");
+        vis.run();
+    }
 
     // Creating the preamble basic block and inserting it into the function
     // It will contain basic initialization code (args, temps and so on)
@@ -605,6 +611,8 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
     Value* argsHolder = protectPointer(jit, argumentsArray);
     argsHolder->setName("pArgs.");
+
+    jit.currentNode->setValue(argsHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
 }
 
@@ -628,7 +636,8 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 
 llvm::Value* MethodCompiler::processLeafNode(st::InstructionNode* instruction)
 {
-
+    assert(false);
+    return 0;
 }
 
 llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* = 0*/) {
@@ -915,7 +924,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
         case special::popTop:
             // This should be completely eliminated by graph constructor
-            assert(false);
+//            assert(false);
 //             if (jit.hasValue())
 //                 jit.popValue(0, true);
             break;
@@ -991,7 +1000,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
 void MethodCompiler::doPrimitive(TJITContext& jit)
 {
-    uint32_t opcode = jit.currentNode->getInstruction().getArgument();
+    uint32_t opcode = jit.currentNode->getInstruction().getExtra();
 
     Value* primitiveResult = 0;
     Value* primitiveFailed = jit.builder->getFalse();
