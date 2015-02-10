@@ -309,7 +309,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 std::exit(1);
             }
 
-            outs() << *blockFunction;
+            outs() << *blockFunction << "\n";
 
             verifyModule(*m_JITModule, AbortProcessAction);
 

@@ -621,8 +621,8 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     Value* argsHolder = protectPointer(jit, argumentsArray);
     argsHolder->setName("pArgs.");
 
-    jit.currentNode->setValue(argsHolder);
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
+    setNodeValue(jit.currentNode, argsHolder);
+    //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
@@ -912,30 +912,12 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
 
         case special::duplicate:
-            // FIXME Duplicate the TStackValue, not the result
-            {
-                // We're popping the value from the stack to a temporary holder
-                // and then pushing two lazy stack values pointing to it.
-
-                Value* dupValue  = getArgument(jit); // jit.popValue();
-                Value* dupHolder = protectPointer(jit, dupValue);
-                dupHolder->setName("pDup.");
-
-                // Two equal values are pushed on the stack
-                jit.currentNode->setValue(dupHolder);
-
-                // jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
-                // jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, dupHolder));
-            }
-
-            //jit.pushValue(jit.lastValue());
+            // This should be completely eliminated by graph constructor
+            assert(false);
             break;
 
         case special::popTop:
-            // This should be completely eliminated by graph constructor
-//            assert(false);
-//             if (jit.hasValue())
-//                 jit.popValue(0, true);
+            // Simply doing nothing
             break;
 
         case special::branch: {
@@ -957,8 +939,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             const uint32_t skipOffset   = getSkipOffset(jit.currentNode);
 
             if (!iPreviousInst->isTerminator()) {
-                jit.currentNode->getOutEdges();
-
                 // Finding appropriate branch target
                 // from the previously stored basic blocks
                 BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
@@ -1053,7 +1033,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     BasicBlock* primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
 
     compilePrimitive(jit, opcode, primitiveResult, primitiveFailed, primitiveSucceededBB, primitiveFailedBB);
-    jit.currentNode->setValue(primitiveResult);
 
     jit.builder->CreateCondBr(primitiveFailed, primitiveFailedBB, primitiveSucceededBB);
     jit.builder->SetInsertPoint(primitiveSucceededBB);
@@ -1061,6 +1040,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.builder->CreateRet(primitiveResult);
     jit.builder->SetInsertPoint(primitiveFailedBB);
 
+    setNodeValue(jit.currentNode, primitiveResult);
 //     jit.pushValue(m_globals.nilObject);
 }
 
