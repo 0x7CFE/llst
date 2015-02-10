@@ -309,6 +309,8 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 std::exit(1);
             }
 
+            outs() << *blockFunction;
+
             verifyModule(*m_JITModule, AbortProcessAction);
 
             optimizeFunction(blockFunction);

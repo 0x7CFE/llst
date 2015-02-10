@@ -192,10 +192,13 @@ void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* sourc
 
     private:
         virtual bool visitBlock(st::BasicBlock& basicBlock) {
+            std::ostringstream offset;
+            offset << "offset" << basicBlock.getOffset();
+
             MethodCompiler* compiler = m_jit.compiler; // self reference
             llvm::BasicBlock* newBlock = llvm::BasicBlock::Create(
                 compiler->m_JITModule->getContext(),   // creating context
-                "branch.",                             // new block's name
+                offset.str(),                          // new block's name
                 m_jit.function                         // method's function
             );
 
@@ -274,7 +277,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Switching builder context to the first basic block from the preamble
     BasicBlock* body = m_targetToBlockMap[0];
-    body->setName("body.");
+    body->setName("offset0");
 
     jit.builder->SetInsertPoint(jit.preamble);
     jit.builder->CreateBr(body);
@@ -284,6 +287,8 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Processing the method's bytecodes
     writeFunctionBody(jit);
+
+    outs() << *jit.function;
 
     // Cleaning up
     m_blockFunctions.clear();
@@ -540,7 +545,11 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
         writePreamble(blockContext, /*isBlock*/ true);
         scanForBranches(blockContext, blockContext.parsedBlock);
 
-        BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
+        ss.str("");
+        ss << "offset" << blockOffset;
+        BasicBlock* blockBody = m_targetToBlockMap[blockOffset];
+        blockBody->setName(ss.str());
+
         blockContext.builder->CreateBr(blockBody);
         blockContext.builder->SetInsertPoint(blockBody);
 
@@ -568,7 +577,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value*  value = jit.currentNode->getArgument()->getValue(); //jit.lastValue();
+    Value*  value = getArgument(jit); //jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
     Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
@@ -580,7 +589,7 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
     uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value*  value = jit.currentNode->getArgument()->getValue(); // jit.lastValue();
+    Value*  value = getArgument(jit); // jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
     Value* self  = jit.getSelf();
@@ -944,16 +953,19 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         case special::branchIfTrue:
         case special::branchIfFalse: {
             // Loading branch target bytecode offset
-            uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
+            const uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
+            const uint32_t skipOffset   = getSkipOffset(jit.currentNode);
 
             if (!iPreviousInst->isTerminator()) {
+                jit.currentNode->getOutEdges();
+
                 // Finding appropriate branch target
                 // from the previously stored basic blocks
                 BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
 
                 // This is a block that goes right after the branch instruction.
                 // If branch condition is not met execution continues right after
-                BasicBlock* skipBlock = BasicBlock::Create(m_JITModule->getContext(), "branchSkip.", jit.function);
+                BasicBlock* skipBlock = m_targetToBlockMap[skipOffset];
 
                 // Creating condition check
                 Value* boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
@@ -962,7 +974,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
                 // Switching to a newly created block
-                jit.builder->SetInsertPoint(skipBlock);
+                //jit.builder->SetInsertPoint(skipBlock);
             }
         } break;
 
@@ -996,6 +1008,27 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         default:
             std::printf("JIT: unknown special opcode %d\n", opcode);
     }
+}
+
+uint16_t MethodCompiler::getSkipOffset(st::InstructionNode* branch)
+{
+    assert(branch->getInstruction().isBranch());
+    assert(branch->getInstruction().opcode != special::branch);
+    assert(branch->getOutEdges().size() == 2);
+
+    // One of the offsets we know. It is the target offset when condition is met.
+    const uint16_t targetOffset = branch->getInstruction().getExtra();
+
+    // Other one will be offset of the block to which points the other edge
+    st::TNodeSet::iterator iNode = branch->getOutEdges().begin();
+    const st::ControlNode* const edge1 = *iNode++;
+    const st::ControlNode* const edge2 = *iNode;
+
+    const uint16_t offset = edge1->getDomain()->getBasicBlock()->getOffset();
+    if (offset == targetOffset)
+        return edge2->getDomain()->getBasicBlock()->getOffset();
+    else
+        return offset;
 }
 
 void MethodCompiler::doPrimitive(TJITContext& jit)

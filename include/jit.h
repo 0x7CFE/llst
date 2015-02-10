@@ -288,6 +288,8 @@ private:
     llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
 
+    uint16_t getSkipOffset(st::InstructionNode* branch);
+
     uint32_t m_callSiteIndex;
     std::map<uint32_t, uint32_t> m_callSiteIndexToOffset;
 public:
