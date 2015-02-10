@@ -181,14 +181,14 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
     return detector.isBlockReturnFound();
 }
 
-void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*/)
+void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t byteCount /*= 0*/)
 {
     // Iterating over method's basic blocks and creating their representation in LLVM
     // Created blocks are collected in the m_targetToBlockMap map with bytecode offset as a key
 
     class Visitor : public st::BasicBlockVisitor {
     public:
-        Visitor(TJITContext& jit) : BasicBlockVisitor(jit.parsedMethod), m_jit(jit) { }
+        Visitor(TJITContext& jit, st::ParsedBytecode* source) : BasicBlockVisitor(source), m_jit(jit) { }
 
     private:
         virtual bool visitBlock(st::BasicBlock& basicBlock) {
@@ -206,7 +206,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, uint32_t byteCount /*= 0*
         TJITContext& m_jit;
     };
 
-    Visitor visitor(jit);
+    Visitor visitor(jit, source);
     visitor.run();
 }
 
@@ -270,7 +270,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // collects branch targets. Creates target basic blocks beforehand.
     // Target blocks are collected in the m_targetToBlockMap map with
     // target bytecode offset as a key.
-    scanForBranches(jit);
+    scanForBranches(jit, jit.parsedMethod);
 
     // Switching builder context to the first basic block from the preamble
     BasicBlock* body = m_targetToBlockMap[0];
@@ -538,7 +538,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
         blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
         blockContext.builder = new IRBuilder<>(blockContext.preamble);
         writePreamble(blockContext, /*isBlock*/ true);
-        scanForBranches(blockContext);
+        scanForBranches(blockContext, blockContext.parsedBlock);
 
         BasicBlock* blockBody = BasicBlock::Create(m_JITModule->getContext(), "blockBody", blockContext.function);
         blockContext.builder->CreateBr(blockBody);
@@ -547,7 +547,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
         writeFunctionBody(blockContext);
 
         // Running optimization passes on a block function
-        JITRuntime::Instance()->optimizeFunction(blockContext.function);
+        //JITRuntime::Instance()->optimizeFunction(blockContext.function);
     }
 
     // Create block object and fill it with context information
