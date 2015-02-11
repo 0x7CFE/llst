@@ -576,26 +576,26 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
-    uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value*  value = getArgument(jit); //jit.lastValue();
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+    Value* const  value = getArgument(jit); //jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
     Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-    Value* context = jit.getCurrentContext();
-    Value* temps   = builder.CreateCall(getTempsFromContext, context);
+    Value* const context = jit.getCurrentContext();
+    Value* const temps   = builder.CreateCall(getTempsFromContext, context);
     builder.CreateCall3(m_baseFunctions.setObjectField, temps, builder.getInt32(index), value);
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
-    uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value*  value = getArgument(jit); // jit.lastValue();
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+    Value* const  value = getArgument(jit); // jit.lastValue();
     IRBuilder<>& builder = * jit.builder;
 
-    Value* self  = jit.getSelf();
+    Function* const getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
+    Value*    const self = jit.getSelf();
+    Value*    const fieldPointer = builder.CreateCall2(getObjectFieldPtr, self, builder.getInt32(index));
 
-    Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-    Value* fieldPointer = builder.CreateCall2(getObjectFieldPtr, self, builder.getInt32(index));
     builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
     builder.CreateStore(value, fieldPointer);
 }
@@ -603,22 +603,22 @@ void MethodCompiler::doAssignInstance(TJITContext& jit)
 void MethodCompiler::doMarkArguments(TJITContext& jit)
 {
     // Here we need to create the arguments array from the values on the stack
-    uint8_t argumentsCount = jit.currentNode->getInstruction().getArgument();
+    const uint8_t argumentsCount = jit.currentNode->getInstruction().getArgument();
 
     // FIXME Probably we may unroll the arguments array and pass the values directly.
     //       However, in some cases this may lead to additional architectural problems.
-    Value* argumentsObject    = createArray(jit, argumentsCount);
+    Value* const argumentsObject = createArray(jit, argumentsCount);
 
     // Filling object with contents
     uint8_t index = argumentsCount;
     assert(argumentsCount == jit.currentNode->getArgumentsCount());
     while (index > 0) {
-        Value* value = getArgument(jit, index - 1); // jit.popValue();
-        jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), value);
+        Value* const argument = getArgument(jit, index - 1); // jit.popValue();
+        jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), argument);
     }
 
-    Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-    Value* argsHolder = protectPointer(jit, argumentsArray);
+    Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
+    Value* const argsHolder = protectPointer(jit, argumentsArray);
     argsHolder->setName("pArgs.");
 
     setNodeValue(jit.currentNode, argsHolder);
@@ -627,9 +627,9 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
 {
-    Value* value     = getArgument(jit); // jit.popValue();
-    Value* condition = 0;
+    Value* const value = getArgument(jit); // jit.popValue();
 
+    Value* condition = 0;
     switch ( static_cast<unaryBuiltIns::Opcode>(jit.currentNode->getInstruction().getArgument()) ) {
         case unaryBuiltIns::isNil:  condition = jit.builder->CreateICmpEQ(value, m_globals.nilObject, "isNil.");  break;
         case unaryBuiltIns::notNil: condition = jit.builder->CreateICmpNE(value, m_globals.nilObject, "notNil."); break;
@@ -638,7 +638,8 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
             std::fprintf(stderr, "JIT: Invalid opcode %d passed to sendUnary\n", jit.currentNode->getInstruction().getArgument());
     }
 
-    Value* result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
+    // FIXME Do not protect the result object because it will always be the literal value
+    Value* const result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
     setNodeValue(jit.currentNode, result);
     //jit.pushValue(result);
 }
@@ -666,7 +667,7 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node)
     }
 
     const std::size_t inEdgesCount = node->getInEdges().size();
-    if (st::InstructionNode* instruction = node->cast<st::InstructionNode>()) {
+    if (st::InstructionNode* const instruction = node->cast<st::InstructionNode>()) {
         // If node is a leaf from the same domain we may encode it locally.
         // If not, creating a dummy value wich will be replaced by real value later.
 
@@ -706,7 +707,7 @@ void MethodCompiler::setNodeValue(st::ControlNode* node, llvm::Value* value)
 {
     assert(value);
 
-    Value* oldValue = node->getValue();
+    Value* const oldValue = node->getValue();
     if (oldValue) {
         if (isa<UndefValue>(oldValue))
             oldValue->replaceAllUsesWith(value);
@@ -722,17 +723,17 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // 0, 1 or 2 for '<', '<=' or '+' respectively
     binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.currentNode->getInstruction().getArgument());
 
-    Value* rightValue = getArgument(jit, 1); // jit.popValue();
-    Value* leftValue  = getArgument(jit, 0); // jit.popValue();
+    Value* const rightValue = getArgument(jit, 1); // jit.popValue();
+    Value* const leftValue  = getArgument(jit, 0); // jit.popValue();
 
     // Checking if values are both small integers
-    Value*    rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
-    Value*    leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftValue);
-    Value*    isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
+    Value* const rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
+    Value* const leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftValue);
+    Value* const isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
 
-    BasicBlock* integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
-    BasicBlock* sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
-    BasicBlock* resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
+    BasicBlock* const integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
+    BasicBlock* const sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
+    BasicBlock* const resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
 
     // Depending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
@@ -740,15 +741,15 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     // Now the integers part
     jit.builder->SetInsertPoint(integersBlock);
-    Value*    rightInt     = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
-    Value*    leftInt      = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftValue);
+    Value* const rightInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
+    Value* const leftInt  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftValue);
 
     Value* intResult       = 0; // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
     switch (opcode) {
-        case binaryBuiltIns::operatorLess    : intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
+        case binaryBuiltIns::operatorLess:     intResult = jit.builder->CreateICmpSLT(leftInt, rightInt); break;
         case binaryBuiltIns::operatorLessOrEq: intResult = jit.builder->CreateICmpSLE(leftInt, rightInt); break;
-        case binaryBuiltIns::operatorPlus    : intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
+        case binaryBuiltIns::operatorPlus:     intResult = jit.builder->CreateAdd(leftInt, rightInt);     break;
         default:
             std::fprintf(stderr, "JIT: Invalid opcode %d passed to sendBinary\n", opcode);
     }
@@ -760,7 +761,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         // We need to create TInteger value and cast it to the pointer
 
         // Interpreting raw integer value as a pointer
-        Value*  smalltalkInt = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult, "intAsPtr.");
+        Value* const smalltalkInt = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult, "intAsPtr.");
         intResultObject = jit.builder->CreateIntToPtr(smalltalkInt, m_baseTypes.object->getPointerTo());
         intResultObject->setName("sum.");
     } else {
@@ -821,29 +822,29 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // We do not know now which way the program will be executed,
     // so we need to aggregate two possible results one of which
     // will be then selected as a return value
-    PHINode* phi = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
+    PHINode* const phi = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
     phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
-    Value* resultHolder = protectPointer(jit, phi);
+    Value* const resultHolder = protectPointer(jit, phi);
     setNodeValue(jit.currentNode, resultHolder);
     //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
-    Value* arguments = getArgument(jit); // jit.popValue();
+    Value* const arguments = getArgument(jit); // jit.popValue();
 
     // First of all we need to get the actual message selector
-    Value* selectorObject  = jit.getLiteral(jit.currentNode->getInstruction().getArgument());
-    Value* messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
+    Value* const selectorObject  = jit.getLiteral(jit.currentNode->getInstruction().getArgument());
+    Value* const messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
 
     std::ostringstream ss;
     ss << "#" << jit.originMethod->literals->getField(jit.currentNode->getInstruction().getArgument())->toString() << ".";
     messageSelector->setName(ss.str());
 
     // Forming a message parameters
-    Value* sendMessageArgs[] = {
+    Value* const sendMessageArgs[] = {
         jit.getCurrentContext(), // calling context
         messageSelector,         // selector
         arguments,               // message arguments
@@ -857,19 +858,19 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* result = 0;
     if (jit.methodHasBlockReturn) {
         // Creating basic block that will be branched to on normal invoke
-        BasicBlock* nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+        BasicBlock* const nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
 
         // Performing a function invoke
         result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.exceptionLandingPad, sendMessageArgs);
 
-        // Switching builder to new block
+        // Switching builder to a new block
         jit.builder->SetInsertPoint(nextBlock);
     } else {
         // Just calling the function. No block switching is required
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
 
-    Value* resultHolder = protectPointer(jit, result);
+    Value* const resultHolder = protectPointer(jit, result);
     setNodeValue(jit.currentNode, resultHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
@@ -878,30 +879,30 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 {
     const uint8_t opcode = jit.currentNode->getInstruction().getArgument();
 
-    BasicBlock::iterator iPreviousInst = jit.builder->GetInsertPoint();
-    if (iPreviousInst != jit.builder->GetInsertBlock()->begin())
-        --iPreviousInst;
+//     BasicBlock::iterator iPreviousInst = jit.builder->GetInsertPoint();
+//     if (iPreviousInst != jit.builder->GetInsertBlock()->begin())
+//         --iPreviousInst;
 
     switch (opcode) {
         case special::selfReturn:
-            if (! iPreviousInst->isTerminator())
-                jit.builder->CreateRet(jit.getSelf());
+//             if (! iPreviousInst->isTerminator())
+            jit.builder->CreateRet(jit.getSelf());
             break;
 
         case special::stackReturn:
 //             if ( !iPreviousInst->isTerminator() && jit.hasValue() )
-                jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
+            jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
             break;
 
         case special::blockReturn:
             /*if ( !iPreviousInst->isTerminator() && jit.hasValue())*/ {
                 // Peeking the return value from the stack
-                Value* value = getArgument(jit); // jit.popValue();
+                Value* const value = getArgument(jit); // jit.popValue();
 
                 // Loading the target context information
-                Value* blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), m_baseTypes.block->getPointerTo());
-                Value* creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
-                Value* targetContext      = jit.builder->CreateLoad(creatingContextPtr);
+                Value* const blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), m_baseTypes.block->getPointerTo());
+                Value* const creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
+                Value* const targetContext      = jit.builder->CreateLoad(creatingContextPtr);
 
                 // Emitting the TBlockReturn exception
                 jit.builder->CreateCall2(m_runtimeAPI.emitBlockReturn, value, targetContext);
@@ -922,12 +923,13 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
         case special::branch: {
             // Loading branch target bytecode offset
-            uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
+            const uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
 
-            if (!iPreviousInst->isTerminator()) {
+//             if (!iPreviousInst->isTerminator())
+            {
                 // Finding appropriate branch target
                 // from the previously stored basic blocks
-                BasicBlock* target = m_targetToBlockMap[targetOffset];
+                BasicBlock* const target = m_targetToBlockMap[targetOffset];
                 jit.builder->CreateBr(target);
             }
         } break;
@@ -938,19 +940,20 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             const uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
             const uint32_t skipOffset   = getSkipOffset(jit.currentNode);
 
-            if (!iPreviousInst->isTerminator()) {
+//             if (!iPreviousInst->isTerminator())
+            {
                 // Finding appropriate branch target
                 // from the previously stored basic blocks
-                BasicBlock* targetBlock = m_targetToBlockMap[targetOffset];
+                BasicBlock* const targetBlock = m_targetToBlockMap[targetOffset];
 
                 // This is a block that goes right after the branch instruction.
                 // If branch condition is not met execution continues right after
-                BasicBlock* skipBlock = m_targetToBlockMap[skipOffset];
+                BasicBlock* const skipBlock = m_targetToBlockMap[skipOffset];
 
                 // Creating condition check
-                Value* boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
-                Value* condition  = getArgument(jit); // jit.popValue();
-                Value* boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
+                Value* const boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
+                Value* const condition  = getArgument(jit); // jit.popValue();
+                Value* const boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
                 jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
                 // Switching to a newly created block
@@ -959,18 +962,18 @@ void MethodCompiler::doSpecial(TJITContext& jit)
         } break;
 
         case special::sendToSuper: {
-            Value* argsObject        = getArgument(jit); // jit.popValue();
-            Value* arguments         = jit.builder->CreateBitCast(argsObject, m_baseTypes.objectArray->getPointerTo());
+            Value* const argsObject        = getArgument(jit); // jit.popValue();
+            Value* const arguments         = jit.builder->CreateBitCast(argsObject, m_baseTypes.objectArray->getPointerTo());
 
-            uint32_t literalIndex    = jit.currentNode->getInstruction().getExtra();
-            Value*   selectorObject  = jit.getLiteral(literalIndex);
-            Value*   messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
+            const uint32_t literalIndex    = jit.currentNode->getInstruction().getExtra();
+            Value* const   selectorObject  = jit.getLiteral(literalIndex);
+            Value* const   messageSelector = jit.builder->CreateBitCast(selectorObject, m_baseTypes.symbol->getPointerTo());
 
-            Value* currentClass      = jit.getMethodClass();
-            Value* parentClassPtr    = jit.builder->CreateStructGEP(currentClass, 2);
-            Value* parentClass       = jit.builder->CreateLoad(parentClassPtr);
+            Value* const currentClass      = jit.getMethodClass();
+            Value* const parentClassPtr    = jit.builder->CreateStructGEP(currentClass, 2);
+            Value* const parentClass       = jit.builder->CreateLoad(parentClassPtr);
 
-            Value* sendMessageArgs[] = {
+            Value* const sendMessageArgs[] = {
                 jit.getCurrentContext(),     // calling context
                 messageSelector, // selector
                 arguments,       // message arguments
@@ -979,8 +982,8 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             };
             m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
-            Value* result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
-            Value* resultHolder = protectPointer(jit, result);
+            Value* const result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
+            Value* const resultHolder = protectPointer(jit, result);
             setNodeValue(jit.currentNode, resultHolder);
 //             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
@@ -1029,8 +1032,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     // If your primitive may fail, you may use 2 ways:
     // 1) set br primitiveFailedBB
     // 2) bind primitiveFailed with any i1 result
-    BasicBlock* primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceededBB", jit.function);
-    BasicBlock* primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
+    BasicBlock* const primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceededBB", jit.function);
+    BasicBlock* const primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
 
     compilePrimitive(jit, opcode, primitiveResult, primitiveFailed, primitiveSucceededBB, primitiveFailedBB);
 
@@ -1054,102 +1057,103 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 {
     switch (opcode) {
         case primitive::objectsAreEqual: {
-            Value* object2 = getArgument(jit, 1); // jit.popValue();
-            Value* object1 = getArgument(jit, 0); // jit.popValue();
+            Value* const object2 = getArgument(jit, 1); // jit.popValue();
+            Value* const object1 = getArgument(jit, 0); // jit.popValue();
 
-            Value* result    = jit.builder->CreateICmpEQ(object1, object2);
-            Value* boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
+            Value* const result    = jit.builder->CreateICmpEQ(object1, object2);
+            Value* const boolValue = jit.builder->CreateSelect(result, m_globals.trueObject, m_globals.falseObject);
 
             primitiveResult = boolValue;
         } break;
 
         // TODO ioGetchar
         case primitive::ioPutChar: {
-            Value* intObject = getArgument(jit); // jit.popValue();
-            Value* intValue  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, intObject);
-            Value* charValue = jit.builder->CreateTrunc(intValue, jit.builder->getInt8Ty());
+            Value* const intObject = getArgument(jit); // jit.popValue();
+            Value* const intValue  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, intObject);
+            Value* const charValue = jit.builder->CreateTrunc(intValue, jit.builder->getInt8Ty());
 
-            Function* putcharFunc = cast<Function>(m_JITModule->getOrInsertFunction("putchar", jit.builder->getInt32Ty(), jit.builder->getInt8Ty(), NULL));
+            Function* const putcharFunc = cast<Function>(m_JITModule->getOrInsertFunction("putchar", jit.builder->getInt32Ty(), jit.builder->getInt8Ty(), NULL));
             jit.builder->CreateCall(putcharFunc, charValue);
 
             primitiveResult = m_globals.nilObject;
         } break;
 
         case primitive::getClass: {
-            Value* object = getArgument(jit); // jit.popValue();
-            Value* klass  = jit.builder->CreateCall(m_baseFunctions.getObjectClass, object, "class");
+            Value* const object = getArgument(jit); // jit.popValue();
+            Value* const klass  = jit.builder->CreateCall(m_baseFunctions.getObjectClass, object, "class");
             primitiveResult = jit.builder->CreateBitCast(klass, m_baseTypes.object->getPointerTo());
         } break;
-        case primitive::getSize: {
-            Value* object           = getArgument(jit); // jit.popValue();
-            Value* objectIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, object, "isSmallInt");
 
-            BasicBlock* asSmallInt = BasicBlock::Create(m_JITModule->getContext(), "asSmallInt", jit.function);
-            BasicBlock* asObject   = BasicBlock::Create(m_JITModule->getContext(), "asObject", jit.function);
+        case primitive::getSize: {
+            Value* const object           = getArgument(jit); // jit.popValue();
+            Value* const objectIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, object, "isSmallInt");
+
+            BasicBlock* const asSmallInt = BasicBlock::Create(m_JITModule->getContext(), "asSmallInt", jit.function);
+            BasicBlock* const asObject   = BasicBlock::Create(m_JITModule->getContext(), "asObject", jit.function);
             jit.builder->CreateCondBr(objectIsSmallInt, asSmallInt, asObject);
 
             jit.builder->SetInsertPoint(asSmallInt);
-            Value* result = jit.builder->CreateCall(m_baseFunctions.newInteger, jit.builder->getInt32(0));
+            Value* const result = jit.builder->CreateCall(m_baseFunctions.newInteger, jit.builder->getInt32(0));
             jit.builder->CreateRet(result);
 
             jit.builder->SetInsertPoint(asObject);
-            Value* size     = jit.builder->CreateCall(m_baseFunctions.getObjectSize, object, "size");
-            primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, size);
+            Value* const size = jit.builder->CreateCall(m_baseFunctions.getObjectSize, object, "size");
+            primitiveResult   = jit.builder->CreateCall(m_baseFunctions.newInteger, size);
         } break;
 
         case primitive::startNewProcess: { // 6
             // /* ticks. unused */    jit.popValue();
-            Value* processObject = getArgument(jit, 1); // jit.popValue();
-            Value* process       = jit.builder->CreateBitCast(processObject, m_baseTypes.process->getPointerTo());
+            Value*    const processObject  = getArgument(jit, 1); // jit.popValue();
+            Value*    const process        = jit.builder->CreateBitCast(processObject, m_baseTypes.process->getPointerTo());
 
-            Function* executeProcess = m_JITModule->getFunction("executeProcess");
-            Value*    processResult  = jit.builder->CreateCall(executeProcess, process);
+            Function* const executeProcess = m_JITModule->getFunction("executeProcess");
+            Value*    const processResult  = jit.builder->CreateCall(executeProcess, process);
 
             primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, processResult);
         } break;
 
         case primitive::allocateObject: { // 7
-            Value* sizeObject  = getArgument(jit, 1); // jit.popValue();
-            Value* klassObject = getArgument(jit, 0); // jit.popValue();
-            Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
+            Value* const sizeObject  = getArgument(jit, 1); // jit.popValue();
+            Value* const klassObject = getArgument(jit, 0); // jit.popValue();
+            Value* const klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
 
-            Value* size        = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "size.");
-            Value* slotSize    = jit.builder->CreateCall(m_baseFunctions.getSlotSize, size, "slotSize.");
-            Value* newInstance = jit.builder->CreateCall2(m_runtimeAPI.newOrdinaryObject, klass, slotSize, "instance.");
+            Value* const size        = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "size.");
+            Value* const slotSize    = jit.builder->CreateCall(m_baseFunctions.getSlotSize, size, "slotSize.");
+            Value* const newInstance = jit.builder->CreateCall2(m_runtimeAPI.newOrdinaryObject, klass, slotSize, "instance.");
 
             primitiveResult = newInstance;
         } break;
 
         case primitive::allocateByteArray: { // 20
-            Value* sizeObject  = getArgument(jit, 1); // jit.popValue();
-            Value* klassObject = getArgument(jit, 0); // jit.popValue();
+            Value* const sizeObject  = getArgument(jit, 1); // jit.popValue();
+            Value* const klassObject = getArgument(jit, 0); // jit.popValue();
 
-            Value* klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
-            Value* dataSize    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "dataSize.");
-            Value* newInstance = jit.builder->CreateCall2(m_runtimeAPI.newBinaryObject, klass, dataSize, "instance.");
+            Value* const klass       = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
+            Value* const dataSize    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, sizeObject, "dataSize.");
+            Value* const newInstance = jit.builder->CreateCall2(m_runtimeAPI.newBinaryObject, klass, dataSize, "instance.");
 
             primitiveResult = jit.builder->CreateBitCast(newInstance, m_baseTypes.object->getPointerTo() );
         } break;
 
         case primitive::cloneByteObject: { // 23
-            Value* klassObject    = getArgument(jit, 1); // jit.popValue();
-            Value* original       = getArgument(jit, 0); // jit.popValue();
-            Value* originalHolder = protectPointer(jit, original);
+            Value* const klassObject    = getArgument(jit, 1); // jit.popValue();
+            Value* const original       = getArgument(jit, 0); // jit.popValue();
+            Value* const originalHolder = protectPointer(jit, original);
 
-            Value* klass    = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
-            Value* dataSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, original, "dataSize.");
-            Value* clone    = jit.builder->CreateCall2(m_runtimeAPI.newBinaryObject, klass, dataSize, "clone.");
+            Value* const klass    = jit.builder->CreateBitCast(klassObject, m_baseTypes.klass->getPointerTo());
+            Value* const dataSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, original, "dataSize.");
+            Value* const clone    = jit.builder->CreateCall2(m_runtimeAPI.newBinaryObject, klass, dataSize, "clone.");
 
-            Value* originalObject = jit.builder->CreateBitCast(jit.builder->CreateLoad(originalHolder), m_baseTypes.object->getPointerTo());
-            Value* cloneObject    = jit.builder->CreateBitCast(clone, m_baseTypes.object->getPointerTo());
-            Value* sourceFields   = jit.builder->CreateCall(m_baseFunctions.getObjectFields, originalObject);
-            Value* destFields     = jit.builder->CreateCall(m_baseFunctions.getObjectFields, cloneObject);
+            Value* const originalObject = jit.builder->CreateBitCast(jit.builder->CreateLoad(originalHolder), m_baseTypes.object->getPointerTo());
+            Value* const cloneObject    = jit.builder->CreateBitCast(clone, m_baseTypes.object->getPointerTo());
+            Value* const sourceFields   = jit.builder->CreateCall(m_baseFunctions.getObjectFields, originalObject);
+            Value* const destFields     = jit.builder->CreateCall(m_baseFunctions.getObjectFields, cloneObject);
 
-            Value* source       = jit.builder->CreateBitCast(sourceFields, jit.builder->getInt8PtrTy());
-            Value* destination  = jit.builder->CreateBitCast(destFields, jit.builder->getInt8PtrTy());
+            Value* const source       = jit.builder->CreateBitCast(sourceFields, jit.builder->getInt8PtrTy());
+            Value* const destination  = jit.builder->CreateBitCast(destFields, jit.builder->getInt8PtrTy());
 
             // Copying the data
-            Value* copyArgs[] = {
+            Value* const copyArgs[] = {
                 destination,
                 source,
                 dataSize,
@@ -1157,8 +1161,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 jit.builder->getFalse()   // not volatile
             };
 
-            Type* memcpyType[] = {jit.builder->getInt8PtrTy(), jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty() };
-            Function* memcpyIntrinsic = getDeclaration(m_JITModule, Intrinsic::memcpy, memcpyType);
+            Type* const memcpyType[] = {jit.builder->getInt8PtrTy(), jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty() };
+            Function* const memcpyIntrinsic = getDeclaration(m_JITModule, Intrinsic::memcpy, memcpyType);
 
             jit.builder->CreateCall(memcpyIntrinsic, copyArgs);
 
@@ -1170,27 +1174,27 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             break;
 
         case primitive::blockInvoke: { // 8
-            Value* object = getArgument(jit); // jit.popValue();
-            Value* block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
+            Value* const object = getArgument(jit); // jit.popValue();
+            Value* const block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
 
-            int32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
+            const int32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
 
-            Value* blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
-            Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-            Value* blockTemps = jit.builder->CreateCall(getTempsFromContext, blockAsContext);
+            Value* const blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
+            Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
+            Value* const blockTemps = jit.builder->CreateCall(getTempsFromContext, blockAsContext);
 
-            Value* tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
+            Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
 
-            Value* argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
-            Value* argumentLocationField  = jit.builder->CreateLoad(argumentLocationPtr);
-            Value* argumentLocationObject = jit.builder->CreateIntToPtr(argumentLocationField, m_baseTypes.object->getPointerTo());
-            Value* argumentLocation       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, argumentLocationObject, "argLocation.");
+            Value* const argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
+            Value* const argumentLocationField  = jit.builder->CreateLoad(argumentLocationPtr);
+            Value* const argumentLocationObject = jit.builder->CreateIntToPtr(argumentLocationField, m_baseTypes.object->getPointerTo());
+            Value* const argumentLocation       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, argumentLocationObject, "argLocation.");
 
-            BasicBlock* tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
+            BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
 
             //Checking the passed temps size TODO unroll stack
-            Value* blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
-            Value* tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount);
+            Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
+            Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount);
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
             jit.builder->SetInsertPoint(tempsChecked);
 
@@ -1198,13 +1202,13 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
             {
                 // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
-                Value* fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
-                Value* argument   = getArgument(jit, index); // jit.popValue();
+                Value* const fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
+                Value* const argument   = getArgument(jit, index); // jit.popValue();
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, blockTemps, fieldIndex, argument);
             }
 
-            Value* args[] = { block, jit.getCurrentContext() };
-            Value* result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
+            Value* const args[] = { block, jit.getCurrentContext() };
+            Value* const result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
 
             primitiveResult = result;
         } break;
@@ -1214,12 +1218,12 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             //after calling cxa_throw. But! Someone may add Smalltalk code after <19>
             //Thats why we have to create unconditional br to 'primitiveFailed'
             //to catch any generated code into that BB
-            Value* contextPtr2Size = jit.builder->CreateTrunc(ConstantExpr::getSizeOf(m_baseTypes.context->getPointerTo()->getPointerTo()), jit.builder->getInt32Ty());
-            Value* expnBuffer      = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, contextPtr2Size);
-            Value* expnTypedBuffer = jit.builder->CreateBitCast(expnBuffer, m_baseTypes.context->getPointerTo()->getPointerTo());
+            Value* const contextPtr2Size = jit.builder->CreateTrunc(ConstantExpr::getSizeOf(m_baseTypes.context->getPointerTo()->getPointerTo()), jit.builder->getInt32Ty());
+            Value* const expnBuffer      = jit.builder->CreateCall(m_exceptionAPI.cxa_allocate_exception, contextPtr2Size);
+            Value* const expnTypedBuffer = jit.builder->CreateBitCast(expnBuffer, m_baseTypes.context->getPointerTo()->getPointerTo());
             jit.builder->CreateStore(jit.getCurrentContext(), expnTypedBuffer);
 
-            Value* throwArgs[] = {
+            Value* const throwArgs[] = {
                 expnBuffer,
                 jit.builder->CreateBitCast(m_exceptionAPI.contextTypeInfo, jit.builder->getInt8PtrTy()),
                 ConstantPointerNull::get(jit.builder->getInt8PtrTy())
@@ -1232,31 +1236,31 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         case primitive::arrayAt:       // 24
         case primitive::arrayAtPut: {  // 5
             std::size_t argIndex = (opcode == primitive::arrayAtPut) ? 2 : 1;
-            Value* indexObject = getArgument(jit, argIndex--); // jit.popValue();
-            Value* arrayObject = getArgument(jit, argIndex--); // jit.popValue();
-            Value* valueObejct = (opcode == primitive::arrayAtPut) ? getArgument(jit, argIndex--) : 0;
+            Value* const indexObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* const arrayObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* const valueObejct = (opcode == primitive::arrayAtPut) ? getArgument(jit, argIndex--) : 0;
 
-            BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
+            BasicBlock* const indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
             //Checking whether index is Smallint //TODO jump to primitiveFailed if not
-            Value* indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
+            Value* const indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
 
-            Value* index       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
-            Value* actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1));
+            Value* const index       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
+            Value* const actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1));
 
             //Checking boundaries
-            Value* arraySize   = jit.builder->CreateCall(m_baseFunctions.getObjectSize, arrayObject);
-            Value* indexGEZero = jit.builder->CreateICmpSGE(actualIndex, jit.builder->getInt32(0));
-            Value* indexLTSize = jit.builder->CreateICmpSLT(actualIndex, arraySize);
-            Value* boundaryOk  = jit.builder->CreateAnd(indexGEZero, indexLTSize);
+            Value* const arraySize   = jit.builder->CreateCall(m_baseFunctions.getObjectSize, arrayObject);
+            Value* const indexGEZero = jit.builder->CreateICmpSGE(actualIndex, jit.builder->getInt32(0));
+            Value* const indexLTSize = jit.builder->CreateICmpSLT(actualIndex, arraySize);
+            Value* const boundaryOk  = jit.builder->CreateAnd(indexGEZero, indexLTSize);
 
-            Value* indexOk = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk);
+            Value* const indexOk = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk);
             jit.builder->CreateCondBr(indexOk, indexChecked, primitiveFailedBB);
             jit.builder->SetInsertPoint(indexChecked);
 
             if (opcode == primitive::arrayAtPut) {
-                Function* getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-                Value* fieldPointer = jit.builder->CreateCall2(getObjectFieldPtr, arrayObject, actualIndex);
+                Function* const getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
+                Value*    const fieldPointer = jit.builder->CreateCall2(getObjectFieldPtr, arrayObject, actualIndex);
                 jit.builder->CreateCall2(m_runtimeAPI.checkRoot, valueObejct, fieldPointer);
                 jit.builder->CreateStore(valueObejct, fieldPointer);
 
@@ -1269,39 +1273,39 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         case primitive::stringAt:       // 21
         case primitive::stringAtPut: {  // 22
             std::size_t argIndex = (opcode == primitive::stringAtPut) ? 2 : 1;
-            Value* indexObject = getArgument(jit, argIndex--); // jit.popValue();
-            Value* stringObject = getArgument(jit, argIndex--); // jit.popValue();
-            Value* valueObejct = (opcode == primitive::stringAtPut) ? getArgument(jit, argIndex--) : 0;
+            Value* const indexObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* const stringObject = getArgument(jit, argIndex--); // jit.popValue();
+            Value* const valueObejct = (opcode == primitive::stringAtPut) ? getArgument(jit, argIndex--) : 0;
 
-            BasicBlock* indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
+            BasicBlock* const indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
 
             //Checking whether index is Smallint //TODO jump to primitiveFailed if not
-            Value* indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
+            Value* const indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
 
             // Acquiring integer value of the index (from the smalltalk's TInteger)
-            Value*    index    = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
-            Value* actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1));
+            Value* const index       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, indexObject);
+            Value* const actualIndex = jit.builder->CreateSub(index, jit.builder->getInt32(1));
 
             //Checking boundaries
-            Value* stringSize  = jit.builder->CreateCall(m_baseFunctions.getObjectSize, stringObject);
-            Value* indexGEZero = jit.builder->CreateICmpSGE(actualIndex, jit.builder->getInt32(0));
-            Value* indexLTSize = jit.builder->CreateICmpSLT(actualIndex, stringSize);
-            Value* boundaryOk  = jit.builder->CreateAnd(indexGEZero, indexLTSize);
+            Value* const stringSize  = jit.builder->CreateCall(m_baseFunctions.getObjectSize, stringObject);
+            Value* const indexGEZero = jit.builder->CreateICmpSGE(actualIndex, jit.builder->getInt32(0));
+            Value* const indexLTSize = jit.builder->CreateICmpSLT(actualIndex, stringSize);
+            Value* const boundaryOk  = jit.builder->CreateAnd(indexGEZero, indexLTSize);
 
-            Value* indexOk = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk, "indexOk.");
+            Value* const indexOk     = jit.builder->CreateAnd(indexIsSmallInt, boundaryOk, "indexOk.");
             jit.builder->CreateCondBr(indexOk, indexChecked, primitiveFailedBB);
             jit.builder->SetInsertPoint(indexChecked);
 
             // Getting access to the actual indexed byte location
-            Value* fields    = jit.builder->CreateCall(m_baseFunctions.getObjectFields, stringObject);
-            Value* bytes     = jit.builder->CreateBitCast(fields, jit.builder->getInt8PtrTy());
-            Value* bytePtr   = jit.builder->CreateGEP(bytes, actualIndex);
+            Value* const fields     = jit.builder->CreateCall(m_baseFunctions.getObjectFields, stringObject);
+            Value* const bytes      = jit.builder->CreateBitCast(fields, jit.builder->getInt8PtrTy());
+            Value* const bytePtr    = jit.builder->CreateGEP(bytes, actualIndex);
 
             if (opcode == primitive::stringAtPut) {
                 // Popping new value from the stack, getting actual integral value from the TInteger
                 // then shrinking it to the 1 byte representation and inserting into the pointed location
-                Value* valueInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, valueObejct);
-                Value* byte = jit.builder->CreateTrunc(valueInt, jit.builder->getInt8Ty());
+                Value* const valueInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, valueObejct);
+                Value* const byte = jit.builder->CreateTrunc(valueInt, jit.builder->getInt8Ty());
                 jit.builder->CreateStore(byte, bytePtr);
 
                 primitiveResult = stringObject;
@@ -1310,8 +1314,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 // expanding it to the 4 byte integer and returning
                 // as TInteger value
 
-                Value* byte = jit.builder->CreateLoad(bytePtr);
-                Value* expandedByte = jit.builder->CreateZExt(byte, jit.builder->getInt32Ty());
+                Value* const byte = jit.builder->CreateLoad(bytePtr);
+                Value* const expandedByte = jit.builder->CreateZExt(byte, jit.builder->getInt32Ty());
                 primitiveResult = jit.builder->CreateCall(m_baseFunctions.newInteger, expandedByte);
             }
         } break;
@@ -1327,19 +1331,19 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         case primitive::smallIntBitOr:      // 36
         case primitive::smallIntBitAnd:     // 37
         case primitive::smallIntBitShift: { // 39
-            Value* rightObject = getArgument(jit, 1); // jit.popValue();
-            Value* leftObject  = getArgument(jit, 0); // jit.popValue();
+            Value* const rightObject = getArgument(jit, 1); // jit.popValue();
+            Value* const leftObject  = getArgument(jit, 0); // jit.popValue();
             compileSmallIntPrimitive(jit, opcode, leftObject, rightObject, primitiveResult, primitiveFailedBB);
         } break;
 
         case primitive::bulkReplace: {
-            Value* destination            = getArgument(jit, 4); // jit.popValue();
-            Value* sourceStartOffset      = getArgument(jit, 3); // jit.popValue();
-            Value* source                 = getArgument(jit, 2); // jit.popValue();
-            Value* destinationStopOffset  = getArgument(jit, 1); // jit.popValue();
-            Value* destinationStartOffset = getArgument(jit, 0); // jit.popValue();
+            Value* const destination            = getArgument(jit, 4); // jit.popValue();
+            Value* const sourceStartOffset      = getArgument(jit, 3); // jit.popValue();
+            Value* const source                 = getArgument(jit, 2); // jit.popValue();
+            Value* const destinationStopOffset  = getArgument(jit, 1); // jit.popValue();
+            Value* const destinationStartOffset = getArgument(jit, 0); // jit.popValue();
 
-            Value* arguments[]  = {
+            Value* const arguments[]  = {
                 destination,
                 destinationStartOffset,
                 destinationStopOffset,
@@ -1347,17 +1351,17 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 sourceStartOffset
             };
 
-            Value* isBulkReplaceSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
+            Value* const isBulkReplaceSucceeded  = jit.builder->CreateCall(m_runtimeAPI.bulkReplace, arguments, "ok.");
             primitiveResult = destination;
             primitiveFailed = jit.builder->CreateNot(isBulkReplaceSucceeded);
         } break;
 
         case primitive::LLVMsendMessage: {
-            Value* args     = jit.builder->CreateBitCast( getArgument(jit, 1) /*jit.popValue()*/, m_baseTypes.objectArray->getPointerTo() );
-            Value* selector = jit.builder->CreateBitCast( getArgument(jit, 0) /*jit.popValue()*/, m_baseTypes.symbol->getPointerTo() );
-            Value* context  = jit.getCurrentContext();
+            Value* const args     = jit.builder->CreateBitCast( getArgument(jit, 1) /*jit.popValue()*/, m_baseTypes.objectArray->getPointerTo() );
+            Value* const selector = jit.builder->CreateBitCast( getArgument(jit, 0) /*jit.popValue()*/, m_baseTypes.symbol->getPointerTo() );
+            Value* const context  = jit.getCurrentContext();
 
-            Value* sendMessageArgs[] = {
+            Value* const sendMessageArgs[] = {
                 context, // calling context
                 selector,
                 args,
@@ -1389,18 +1393,18 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
         default: {
             // Here we need to create the arguments array from the values on the stack
-            uint8_t argumentsCount = jit.currentNode->getInstruction().getArgument();
-            Value* argumentsObject    = createArray(jit, argumentsCount);
+            const uint8_t argumentsCount = jit.currentNode->getInstruction().getArgument();
+            Value* const argumentsObject    = createArray(jit, argumentsCount);
 
             // Filling object with contents
             uint8_t index = argumentsCount;
             while (index > 0) {
-                Value* value = getArgument(jit); // jit.popValue();
-                jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), value);
+                Value* const argument = getArgument(jit); // jit.popValue();
+                jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), argument);
             }
 
-            Value* argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-            Value* primitiveFailedPtr = jit.builder->CreateAlloca(jit.builder->getInt1Ty(), 0, "primitiveFailedPtr");
+            Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
+            Value* const primitiveFailedPtr = jit.builder->CreateAlloca(jit.builder->getInt1Ty(), 0, "primitiveFailedPtr");
             jit.builder->CreateStore(jit.builder->getFalse(), primitiveFailedPtr);
 
             primitiveResult = jit.builder->CreateCall3(m_runtimeAPI.callPrimitive, jit.builder->getInt8(opcode), argumentsArray, primitiveFailedPtr);
@@ -1416,64 +1420,64 @@ void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
                                             Value*& primitiveResult,
                                             BasicBlock* primitiveFailedBB)
 {
-    Value* rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightObject);
-    Value* leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftObject);
-    Value* areIntsCond = jit.builder->CreateAnd(rightIsInt, leftIsInt);
+    Value* const rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightObject);
+    Value* const leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftObject);
+    Value* const areIntsCond = jit.builder->CreateAnd(rightIsInt, leftIsInt);
 
     BasicBlock* areIntsBB = BasicBlock::Create(m_JITModule->getContext(), "areInts", jit.function);
     jit.builder->CreateCondBr(areIntsCond, areIntsBB, primitiveFailedBB);
 
     jit.builder->SetInsertPoint(areIntsBB);
-    Value* rightOperand = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightObject);
-    Value* leftOperand  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftObject);
+    Value* const rightOperand = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightObject);
+    Value* const leftOperand  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftObject);
 
     switch(opcode) {
         case primitive::smallIntAdd: {
-            Value* intResult = jit.builder->CreateAdd(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateAdd(leftOperand, rightOperand);
             //FIXME overflow
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntDiv: {
-            Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
-            BasicBlock* divBB  = BasicBlock::Create(m_JITModule->getContext(), "div", jit.function);
+            Value* const isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
+            BasicBlock*  divBB  = BasicBlock::Create(m_JITModule->getContext(), "div", jit.function);
             jit.builder->CreateCondBr(isZero, primitiveFailedBB, divBB);
 
             jit.builder->SetInsertPoint(divBB);
-            Value* intResult = jit.builder->CreateSDiv(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateSDiv(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntMod: {
-            Value*      isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
-            BasicBlock* modBB  = BasicBlock::Create(m_JITModule->getContext(), "mod", jit.function);
+            Value* const isZero = jit.builder->CreateICmpEQ(rightOperand, jit.builder->getInt32(0));
+            BasicBlock*  modBB  = BasicBlock::Create(m_JITModule->getContext(), "mod", jit.function);
             jit.builder->CreateCondBr(isZero, primitiveFailedBB, modBB);
 
             jit.builder->SetInsertPoint(modBB);
-            Value* intResult = jit.builder->CreateSRem(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateSRem(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntLess: {
-            Value* condition = jit.builder->CreateICmpSLT(leftOperand, rightOperand);
+            Value* const condition = jit.builder->CreateICmpSLT(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
         } break;
         case primitive::smallIntEqual: {
-            Value* condition = jit.builder->CreateICmpEQ(leftOperand, rightOperand);
+            Value* const condition = jit.builder->CreateICmpEQ(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
         } break;
         case primitive::smallIntMul: {
-            Value* intResult = jit.builder->CreateMul(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateMul(leftOperand, rightOperand);
             //FIXME overflow
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntSub: {
-            Value* intResult = jit.builder->CreateSub(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateSub(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntBitOr: {
-            Value* intResult = jit.builder->CreateOr(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateOr(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntBitAnd: {
-            Value* intResult = jit.builder->CreateAnd(leftOperand, rightOperand);
+            Value* const intResult = jit.builder->CreateAnd(leftOperand, rightOperand);
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntBitShift: {
@@ -1481,21 +1485,21 @@ void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
             BasicBlock* shiftLeftBB   = BasicBlock::Create(m_JITModule->getContext(), "<<", jit.function);
             BasicBlock* shiftResultBB = BasicBlock::Create(m_JITModule->getContext(), "shiftResult", jit.function);
 
-            Value* rightIsNeg = jit.builder->CreateICmpSLT(rightOperand, jit.builder->getInt32(0));
+            Value* const rightIsNeg = jit.builder->CreateICmpSLT(rightOperand, jit.builder->getInt32(0));
             jit.builder->CreateCondBr(rightIsNeg, shiftRightBB, shiftLeftBB);
 
             jit.builder->SetInsertPoint(shiftRightBB);
-            Value* rightOperandNeg  = jit.builder->CreateNeg(rightOperand);
-            Value* shiftRightResult = jit.builder->CreateAShr(leftOperand, rightOperandNeg);
+            Value* const rightOperandNeg  = jit.builder->CreateNeg(rightOperand);
+            Value* const shiftRightResult = jit.builder->CreateAShr(leftOperand, rightOperandNeg);
             jit.builder->CreateBr(shiftResultBB);
 
             jit.builder->SetInsertPoint(shiftLeftBB);
-            Value* shiftLeftResult = jit.builder->CreateShl(leftOperand, rightOperand);
-            Value* shiftLeftFailed = jit.builder->CreateICmpSGT(leftOperand, shiftLeftResult);
+            Value* const shiftLeftResult = jit.builder->CreateShl(leftOperand, rightOperand);
+            Value* const shiftLeftFailed = jit.builder->CreateICmpSGT(leftOperand, shiftLeftResult);
             jit.builder->CreateCondBr(shiftLeftFailed, primitiveFailedBB, shiftResultBB);
 
             jit.builder->SetInsertPoint(shiftResultBB);
-            PHINode* phi = jit.builder->CreatePHI(jit.builder->getInt32Ty(), 2);
+            PHINode* const phi = jit.builder->CreatePHI(jit.builder->getInt32Ty(), 2);
             phi->addIncoming(shiftRightResult, shiftRightBB);
             phi->addIncoming(shiftLeftResult, shiftLeftBB);
 
@@ -1507,16 +1511,16 @@ void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
 MethodCompiler::TStackObject MethodCompiler::allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount)
 {
     // Storing current edit location
-    BasicBlock* insertBlock = builder.GetInsertBlock();
+    BasicBlock* const insertBlock = builder.GetInsertBlock();
     BasicBlock::iterator insertPoint = builder.GetInsertPoint();
 
     // Switching to the preamble
-    BasicBlock* preamble = insertBlock->getParent()->begin();
+    BasicBlock* const preamble = insertBlock->getParent()->begin();
     builder.SetInsertPoint(preamble, preamble->begin());
 
     // Allocating the object slot
     const uint32_t  holderSize = baseSize + sizeof(TObject*) * fieldsCount;
-    AllocaInst* objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize));
+    AllocaInst* const objectSlot = builder.CreateAlloca(builder.getInt8Ty(), builder.getInt32(holderSize));
     objectSlot->setAlignment(4);
 
     // Allocating object holder in the preamble
@@ -1527,21 +1531,21 @@ MethodCompiler::TStackObject MethodCompiler::allocateStackObject(llvm::IRBuilder
 
     Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
 
-    //Value* structData = { ConstantInt::get(builder.getInt1Ty(), 1) };
+    //Value* const structData = { ConstantInt::get(builder.getInt1Ty(), 1) };
 
     // Registering holder in GC and supplying metadata that tells GC to treat this particular root
     // as a pointer to a stack object. Stack objects are not moved by GC. Instead, only their fields
     // and class pointer are updated.
-    //Value* metaData = ConstantStruct::get(m_JITModule->getTypeByName("TGCMetaData"), ConstantInt::get(builder.getInt1Ty(), 1));
-    Value* metaData = m_JITModule->getGlobalVariable("stackObjectMeta");
-    Value* stackRoot = builder.CreateBitCast(objectHolder, builder.getInt8PtrTy()->getPointerTo());
+    //Value* const metaData = ConstantStruct::get(m_JITModule->getTypeByName("TGCMetaData"), ConstantInt::get(builder.getInt1Ty(), 1));
+    Value* const metaData = m_JITModule->getGlobalVariable("stackObjectMeta");
+    Value* const stackRoot = builder.CreateBitCast(objectHolder, builder.getInt8PtrTy()->getPointerTo());
     builder.CreateCall2(gcrootIntrinsic, stackRoot, builder.CreateBitCast(metaData, builder.getInt8PtrTy()));
 
     // Returning to the original edit location
     builder.SetInsertPoint(insertBlock, insertPoint);
 
     // Storing the address of stack object to the holder
-    Value* newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
+    Value* const newObject = builder.CreateBitCast(objectSlot, m_baseTypes.object->getPointerTo());
     builder.CreateStore(newObject, objectHolder/*, true*/);
 
     TStackObject result;
