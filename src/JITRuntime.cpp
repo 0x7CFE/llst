@@ -362,6 +362,8 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 // Compiling function and storing it to the table for further use
                 methodFunction = m_methodCompiler->compileMethod(method);
 
+                outs() << *methodFunction << "\n";
+
                 verifyModule(*m_JITModule, AbortProcessAction);
 
                 optimizeFunction(methodFunction);

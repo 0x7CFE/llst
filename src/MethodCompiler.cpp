@@ -288,8 +288,6 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // Processing the method's bytecodes
     writeFunctionBody(jit);
 
-    outs() << *jit.function;
-
     // Cleaning up
     m_blockFunctions.clear();
     m_targetToBlockMap.clear();
@@ -913,8 +911,10 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             break;
 
         case special::duplicate:
-            // This should be completely eliminated by graph constructor
-            assert(false);
+            // Duplicating the origin value in the dup node.
+            // When dup consumers will be remapped to the real
+            // value in the ControlGraph this will be redundant.
+            setNodeValue(jit.currentNode, getNodeValue(jit, jit.currentNode->getArgument()));
             break;
 
         case special::popTop:
