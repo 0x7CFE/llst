@@ -243,17 +243,18 @@ public:
         m_localStack.push_back(value);
     }
 
-    ControlNode* popValue() {
+    ControlNode* topValue(bool keep = false) {
         assert(! m_localStack.empty());
 
         ControlNode* value = m_localStack.back();
-        m_localStack.pop_back();
+        if (!keep)
+            m_localStack.pop_back();
         return value;
     }
 
-    void requestArgument(std::size_t index, InstructionNode* forNode) {
+    void requestArgument(std::size_t index, InstructionNode* forNode, bool keep = false) {
         if (! m_localStack.empty()) {
-            ControlNode* argument = popValue();
+            ControlNode* argument = topValue(keep);
             forNode->setArgument(index, argument);
             argument->addConsumer(forNode);
 

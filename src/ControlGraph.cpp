@@ -114,9 +114,7 @@ void GraphConstructor::processNode(InstructionNode* node)
 
         case opcode::assignTemporary: // TODO Link with tau node
         case opcode::assignInstance:
-            // FIXME should not pop/push the stack
-            m_currentDomain->requestArgument(0, node);
-            m_currentDomain->pushValue(node);
+            m_currentDomain->requestArgument(0, node, true);
             break;
 
         case opcode::sendUnary:
@@ -166,13 +164,16 @@ void GraphConstructor::processSpecials(InstructionNode* node)
             break;
 
         case special::sendToSuper:
-        case special::duplicate:
             m_currentDomain->requestArgument(0, node);
             m_currentDomain->pushValue(node);
             break;
 
+        case special::duplicate:
+            m_currentDomain->requestArgument(0, node, true);
+            m_currentDomain->pushValue(node);
+            break;
+
         case special::popTop:
-            // m_currentDomain->popValue();
             m_currentDomain->requestArgument(0, node);
             break;
 
@@ -264,9 +265,10 @@ void GraphLinker::processNode(ControlNode& node)
         m_nodeToLink = 0;
     }
 
-    InstructionNode* const instruction = node.cast<InstructionNode>();
-    if (instruction && instruction->getInstruction().isTerminator())
-        return; // terminator nodes will take care of themselves
+    if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
+        if (instruction->getInstruction().isTerminator())
+            return; // terminator nodes will take care of themselves
+    }
 
     const TNodeSet& outEdges = node.getOutEdges();
     TNodeSet::iterator iNode = outEdges.begin();
@@ -311,21 +313,22 @@ void GraphLinker::processArgumentRequests()
 
 void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request)
 {
-    ControlNode* const argument = getRequestedNode(domain, argumentIndex);
+    InstructionNode* const requestingNode = request.requestingNode;
+    ControlNode*     const argument       = getRequestedNode(domain, argumentIndex);
     const ControlNode::TNodeType argumentType = argument->getNodeType();
 
     std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", argument->getIndex(), request.requestingNode->getIndex());
 
-    request.requestingNode->setArgument(request.index, argument);
-    argument->addConsumer(request.requestingNode);
+    requestingNode->setArgument(request.index, argument);
+    argument->addConsumer(requestingNode);
 
     // We need to link the nodes only from the same domain
     // Cross domain references are handled separately
-    if (argument->getDomain() == request.requestingNode->getDomain())
-        argument->addEdge(request.requestingNode);
+    if (argument->getDomain() == requestingNode->getDomain())
+        argument->addEdge(requestingNode);
 
     if (argumentType == ControlNode::ntPhi) {
-        argument->addEdge(request.requestingNode);
+        argument->addEdge(requestingNode);
 
         // Registering phi as a consumer for all input nodes
         TNodeSet::iterator iNode = argument->getInEdges().begin();
