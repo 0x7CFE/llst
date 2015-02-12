@@ -149,8 +149,13 @@ bool st::TSmalltalkInstruction::isValueConsumer() const {
             return true;
 
         case opcode::doSpecial:
-            // All other specials consume a value
-            return m_argument != special::branch;
+            switch (m_argument) {
+                case special::branch:
+                case special::selfReturn:
+                    return false;
+                default:
+                    return true;
+            }
 
         case opcode::doPrimitive:
             // All system primitives consume a value
