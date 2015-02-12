@@ -306,6 +306,37 @@ public:
     }
 };
 
+class H_BranchJumpsOnCorrectNode: public st::NodeVisitor
+{
+public:
+    H_BranchJumpsOnCorrectNode(st::ControlGraph* graph) : st::NodeVisitor(graph) {}
+    virtual bool visitNode(st::ControlNode& node) {
+        if (st::InstructionNode* instNode = node.cast<st::InstructionNode>()) {
+            st::TSmalltalkInstruction inst = instNode->getInstruction();
+            if (inst.isBranch()) {
+                const st::TNodeSet& outEdges = instNode->getOutEdges();
+                for(st::TNodeSet::const_iterator it = outEdges.begin(); it != outEdges.end(); ++it) {
+                    st::ControlNode* outNode = *it;
+                    if (outNode->cast<st::InstructionNode>()) {
+                        st::TSmalltalkInstruction outInst = outNode->cast<st::InstructionNode>()->getInstruction();
+
+                        if (inst.getArgument() == special::branch) {
+                            SCOPED_TRACE("Unconditional branches shouldn't jump on terminators");
+                            EXPECT_FALSE(outInst.isTerminator())
+                                << "'" << inst.toString() << "' shouldn't jump on '" << outInst.toString() << "'";
+                        } else {
+                            SCOPED_TRACE("Conditional branches shouldn't jump on branches");
+                            EXPECT_FALSE(outInst.isBranch())
+                                << "'" << inst.toString() << "' shouldn't jump on '" << outInst.toString() << "'";
+                        }
+                    }
+                }
+            }
+        }
+        return true;
+    }
+};
+
 void H_CheckCFGCorrect(st::ControlGraph* graph)
 {
     {
@@ -330,6 +361,10 @@ void H_CheckCFGCorrect(st::ControlGraph* graph)
     }
     {
         H_ConsumeProvider visitor(graph);
+        visitor.run();
+    }
+    {
+        H_BranchJumpsOnCorrectNode visitor(graph);
         visitor.run();
     }
 }
