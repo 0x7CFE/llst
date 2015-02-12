@@ -272,6 +272,39 @@ private:
     }
 };
 
+class H_ConsumeProvider: public st::PlainNodeVisitor
+{
+public:
+    H_ConsumeProvider(st::ControlGraph* graph) : st::PlainNodeVisitor(graph) {}
+    virtual bool visitNode(st::ControlNode& node) {
+        if (st::InstructionNode* instNode = node.cast<st::InstructionNode>()) {
+            st::TSmalltalkInstruction inst = instNode->getInstruction();
+            if (inst.isValueConsumer()) {
+                // Each consumer must consume value
+                std::size_t argSize = instNode->getArgumentsCount();
+                EXPECT_GT(argSize, 0);
+                for(std::size_t i = 0; i < argSize; ++i) {
+                    st::ControlNode* argNode = instNode->getArgument(i);
+                    if (st::InstructionNode* arg = argNode->cast<st::InstructionNode>()) {
+                        EXPECT_TRUE(arg->getInstruction().isValueProvider())
+                            << "'" << arg->getInstruction().toString() << "' should provide value for '" << inst.toString() << "'";
+                    }
+                }
+            }
+        }
+        if (st::PhiNode* phiNode = node.cast<st::PhiNode>()) {
+            const st::TNodeSet& inEdges = phiNode->getInEdges();
+            for(st::TNodeSet::const_iterator it = inEdges.begin(); it != inEdges.end(); ++it) {
+                st::ControlNode* edge = *it;
+                if (st::InstructionNode* inst = edge->cast<st::InstructionNode>()) {
+                    EXPECT_TRUE(inst->getInstruction().isValueProvider())
+                        << "'" << inst->getInstruction().toString() << "' should provide value for 'Phi index: " << phiNode->getPhiIndex() << "'";
+                }
+            }
+        }
+        return true;
+    }
+};
 
 void H_CheckCFGCorrect(st::ControlGraph* graph)
 {
@@ -294,6 +327,10 @@ void H_CheckCFGCorrect(st::ControlGraph* graph)
     {
         H_NoOrphans checker(graph);
         checker.check();
+    }
+    {
+        H_ConsumeProvider visitor(graph);
+        visitor.run();
     }
 }
 
