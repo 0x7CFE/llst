@@ -53,6 +53,7 @@ TEST(TSmalltalkInstruction, isValueConsumer)
         SCOPED_TRACE("conditional branches are consumers");
         EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfTrue).isValueConsumer());
         EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfFalse).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branch).isValueConsumer());
     }
     {
         SCOPED_TRACE("insts dealing with messages are consumers");
@@ -71,6 +72,7 @@ TEST(TSmalltalkInstruction, isValueConsumer)
         EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::popTop).isValueConsumer());
         EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::stackReturn).isValueConsumer());
         EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::blockReturn).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::selfReturn).isValueConsumer());
     }
 }
 
