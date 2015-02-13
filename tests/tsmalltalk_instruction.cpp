@@ -42,8 +42,24 @@ TEST(TSmalltalkInstruction, isValueProvider)
         SCOPED_TRACE("some other insts are not providers either");
         EXPECT_FALSE(st::TSmalltalkInstruction(opcode::assignTemporary).isValueProvider());
         EXPECT_FALSE(st::TSmalltalkInstruction(opcode::assignInstance).isValueProvider());
-        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doPrimitive).isValueProvider());
         EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::popTop).isValueProvider());
+    }
+    {
+        SCOPED_TRACE("the other are providers");
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doPrimitive).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::duplicate).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::markArguments).isValueProvider());
+
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushInstance).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushArgument).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushTemporary).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushLiteral).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushBlock).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushConstant).isValueProvider());
+
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::sendMessage).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::sendUnary).isValueProvider());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::sendBinary).isValueProvider());
     }
 }
 
