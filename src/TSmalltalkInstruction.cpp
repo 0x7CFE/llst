@@ -48,11 +48,11 @@ bool st::TSmalltalkInstruction::isValueProvider() const {
         case opcode::sendMessage:
         case opcode::sendUnary:
         case opcode::sendBinary:
+        case opcode::doPrimitive:
             return true;
 
         case opcode::assignTemporary:
         case opcode::assignInstance:
-        case opcode::doPrimitive: // ?
             return false;
 
         case opcode::doSpecial:
