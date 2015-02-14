@@ -58,11 +58,11 @@ public:
         m_currentDomain->addNode(newNode);
 
         // Processing instruction by adding references
-        std::printf("GraphConstructor::visitInstruction : processing node %.2u %s%s \n",
-                    newNode->getIndex(),
-                    newNode->getInstruction().isBranch() ? "^" : "",
-                    newNode->getInstruction().isTerminator() ? "!" : ""
-                   );
+//         std::printf("GraphConstructor::visitInstruction : processing node %.2u %s%s \n",
+//                     newNode->getIndex(),
+//                     newNode->getInstruction().isBranch() ? "^" : "",
+//                     newNode->getInstruction().isTerminator() ? "!" : ""
+//                    );
         processNode(newNode);
 
         return true;
@@ -260,7 +260,7 @@ void GraphLinker::processNode(ControlNode& node)
 
     // Linking pending node
     if (m_nodeToLink) {
-        std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
+//         std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
         m_nodeToLink->addEdge(&node);
         m_nodeToLink = 0;
     }
