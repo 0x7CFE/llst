@@ -245,7 +245,7 @@ private:
     TBaseFunctions m_baseFunctions;
 
     llvm::Value* processLeafNode(st::InstructionNode* instruction);
-    llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node);
+    llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock = 0);
     void setNodeValue(st::ControlNode* node, llvm::Value* value);
     llvm::Value* getArgument(TJITContext& jit, std::size_t index = 0);
 

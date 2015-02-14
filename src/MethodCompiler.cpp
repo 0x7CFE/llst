@@ -306,7 +306,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
             llvm::BasicBlock* newBlock = m_jit.compiler->m_targetToBlockMap[domain.getBasicBlock()->getOffset()];
 
             newBlock->moveAfter(m_jit.builder->GetInsertBlock()); // for a pretty sequenced BB output
-            m_jit.builder->SetInsertPoint(newBlock);
+            m_jit.builder->SetInsertPoint(newBlock, newBlock->getFirstInsertionPt());
 
             return NodeVisitor::visitDomain(domain);
         }
@@ -521,6 +521,11 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
+    {
+        ControlGraphVisualizer vis(blockContext.controlGraph, blockFunctionName + ".dot");
+        vis.run();
+    }
+
     std::vector<Type*> blockParams;
     blockParams.push_back(m_baseTypes.block->getPointerTo()); // block object with context information
 
@@ -552,6 +557,8 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
         blockContext.builder->SetInsertPoint(blockBody);
 
         writeFunctionBody(blockContext);
+
+        outs() << *blockContext.function << "\n";
 
         // Running optimization passes on a block function
         //JITRuntime::Instance()->optimizeFunction(blockContext.function);
@@ -652,35 +659,48 @@ llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* =
     return getNodeValue(jit, jit.currentNode->getArgument(index));
 }
 
-Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node)
+Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock /*= 0*/)
 {
     Value* value = node->getValue();
     if (value) {
-        // If value is a holder, reading stored value.
-        // Otherwise, returning as is.
-        if (isa<AllocaInst>(value))
+        // If value is a holder, loading and returning the stored value.
+        if (isa<AllocaInst>(value)) {
+            // In phi mode we should insert the load in the incoming block
+            if (insertBlock) {
+                TerminatorInst* const terminator = insertBlock->getTerminator();
+                if (terminator)
+                    jit.builder->SetInsertPoint(insertBlock, terminator); // inserting before terminator
+                else
+                    jit.builder->SetInsertPoint(insertBlock); // appending to the end of the block
+            }
+
+            // inserting in the current block
             return jit.builder->CreateLoad(value);
-        else
-            return value;
+        }
+
+        // Otherwise, returning as is.
+        return value;
     }
 
     const std::size_t inEdgesCount = node->getInEdges().size();
     if (st::InstructionNode* const instruction = node->cast<st::InstructionNode>()) {
         // If node is a leaf from the same domain we may encode it locally.
-        // If not, creating a dummy value wich will be replaced by real value later.
+        // If not, create a dummy value wich will be replaced by real value later.
 
         if (!inEdgesCount && instruction->getDomain() == jit.currentNode->getDomain())
-            value = processLeafNode(instruction);
+            value = processLeafNode(instruction); // FIXME WTF?
         else
             value = UndefValue::get(jit.builder->getVoidTy());
 
-    } else if (st::PhiNode* phiNode = node->cast<st::PhiNode>()) {
+    } else if (st::PhiNode* const phiNode = node->cast<st::PhiNode>()) {
+        // Storing insertion point to return to it later
         BasicBlock* const insertBlock = jit.builder->GetInsertBlock();
         const BasicBlock::iterator storedInsertionPoint = jit.builder->GetInsertPoint();
-        const BasicBlock::iterator firstInsertionPoint  = insertBlock->getFirstInsertionPt();
-        jit.builder->SetInsertPoint(insertBlock, firstInsertionPoint);
 
-        PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object, inEdgesCount);
+        // Switching to the phi insertion point
+        jit.builder->SetInsertPoint(insertBlock, insertBlock->getFirstInsertionPt());
+
+        PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), inEdgesCount, "phi.");
 
         st::TNodeSet::iterator iNode = phiNode->getInEdges().begin();
         for (; iNode != phiNode->getInEdges().end(); ++iNode) {
@@ -688,16 +708,25 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node)
             BasicBlock* const inBlock = m_targetToBlockMap[inNode->getDomain()->getBasicBlock()->getOffset()];
             assert(inBlock);
 
-            phiValue->addIncoming(getNodeValue(jit, inNode), inBlock);
+            // This call may change the insertion point of one of the incoming values is a value holder,
+            // not just a simple value. Load should be inserted in the incoming basic block.
+            phiValue->addIncoming(getNodeValue(jit, inNode, inBlock), inBlock);
         }
 
-        phiNode->setValue(phiValue);
-        jit.builder->SetInsertPoint(insertBlock, storedInsertionPoint);
+        // Phi is created at the top of the basic block but consumed later.
+        // Value will be broken if GC will be invoked between phi and consumer.
+        // Resetting the insertion point which may be changed in getNodeValue() before.
+        jit.builder->SetInsertPoint(insertBlock, insertBlock->getFirstInsertionPt());
+        Value* const phiHolder = protectPointer(jit, phiValue);
 
-        value = phiValue;
+        // Finally, restoring original insertion point and loading the value from phi
+        jit.builder->SetInsertPoint(insertBlock, storedInsertionPoint);
+        value = jit.builder->CreateLoad(phiHolder);
     }
 
     assert(value);
+    node->setValue(value);
+
     return value;
 }
 
@@ -1193,8 +1222,8 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
 
             //Checking the passed temps size TODO unroll stack
-            Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation);
-            Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount);
+            Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation, "blockAcceptsArgCount.");
+            Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount, "tempSizeOk.");
             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
             jit.builder->SetInsertPoint(tempsChecked);
 
@@ -1202,8 +1231,9 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
             {
                 // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
-                Value* const fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index));
+                Value* const fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index), "fieldIndex.");
                 Value* const argument   = getArgument(jit, index); // jit.popValue();
+                argument->setName("argument.");
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, blockTemps, fieldIndex, argument);
             }
 
