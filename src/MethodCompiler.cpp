@@ -1072,7 +1072,8 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.builder->CreateRet(primitiveResult);
     jit.builder->SetInsertPoint(primitiveFailedBB);
 
-    setNodeValue(jit.currentNode, primitiveResult);
+    // FIXME Are we really allowed to use the value without holder?
+     setNodeValue(jit.currentNode, primitiveResult);
 //     jit.pushValue(m_globals.nilObject);
 }
 
@@ -1206,7 +1207,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             Value* const object = getArgument(jit); // jit.popValue();
             Value* const block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
 
-            const int32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
+            const uint32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
 
             Value* const blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
             Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
@@ -1220,6 +1221,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             Value* const argumentLocation       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, argumentLocationObject, "argLocation.");
 
             BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
+            tempsChecked->moveAfter(jit.builder->GetInsertBlock());
 
             //Checking the passed temps size TODO unroll stack
             Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation, "blockAcceptsArgCount.");
@@ -1232,7 +1234,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             {
                 // (*blockTemps)[argumentLocation + index] = stack[--ec.stackTop];
                 Value* const fieldIndex = jit.builder->CreateAdd(argumentLocation, jit.builder->getInt32(index), "fieldIndex.");
-                Value* const argument   = getArgument(jit, index); // jit.popValue();
+                Value* const argument   = getArgument(jit, index + 1); // jit.popValue();
                 argument->setName("argument.");
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, blockTemps, fieldIndex, argument);
             }
@@ -1308,6 +1310,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             Value* const valueObejct = (opcode == primitive::stringAtPut) ? getArgument(jit, argIndex--) : 0;
 
             BasicBlock* const indexChecked = BasicBlock::Create(m_JITModule->getContext(), "indexChecked.", jit.function);
+            indexChecked->moveAfter(jit.builder->GetInsertBlock());
 
             //Checking whether index is Smallint //TODO jump to primitiveFailed if not
             Value* const indexIsSmallInt = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, indexObject);
