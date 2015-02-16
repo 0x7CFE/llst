@@ -34,6 +34,7 @@
 #include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/raw_ostream.h"
 #include <llvm/Analysis/Verifier.h>
+#include "llvm/Transforms/Instrumentation.h"
 
 #include <typeinfo>
 
@@ -152,6 +153,11 @@ int main() {
     builder.CreateCall(end_catch);
 
     builder.CreateRet( result ); // << z.y
+
+    ModulePass *DebugIRPass = createDebugIRPass(
+        /*HideDebugIntrinsics*/ false, /*HideDebugMetadata*/ false,
+        /*Directory*/ "./", /*Filename*/ "llst_cxx_eh");
+    DebugIRPass->runOnModule(*M);
 
     TargetOptions Opts;
     ExecutionEngine* EE = EngineBuilder(M)
