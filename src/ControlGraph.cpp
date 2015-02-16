@@ -3,6 +3,8 @@
 
 using namespace st;
 
+static const bool traces_enabled = false;
+
 bool NodeIndexCompare::operator() (const ControlNode* a, const ControlNode* b)
 {
     return a->getIndex() < b->getIndex();
@@ -46,7 +48,9 @@ public:
         m_currentDomain = m_graph->getDomainFor(&basicBlock);
         m_currentDomain->setBasicBlock(&basicBlock);
 
-        std::printf("GraphConstructor::visitBlock : block %p (%.2u), domain %p\n", &basicBlock, basicBlock.getOffset(), m_currentDomain);
+        if (traces_enabled)
+            std::printf("GraphConstructor::visitBlock : block %p (%.2u), domain %p\n", &basicBlock, basicBlock.getOffset(), m_currentDomain);
+
         return InstructionVisitor::visitBlock(basicBlock);
     }
 
@@ -58,11 +62,13 @@ public:
         m_currentDomain->addNode(newNode);
 
         // Processing instruction by adding references
-//         std::printf("GraphConstructor::visitInstruction : processing node %.2u %s%s \n",
-//                     newNode->getIndex(),
-//                     newNode->getInstruction().isBranch() ? "^" : "",
-//                     newNode->getInstruction().isTerminator() ? "!" : ""
-//                    );
+        if (traces_enabled)
+            std::printf("GraphConstructor::visitInstruction : processing node %.2u %s%s \n",
+                newNode->getIndex(),
+                newNode->getInstruction().isBranch() ? "^" : "",
+                newNode->getInstruction().isTerminator() ? "!" : ""
+            );
+
         processNode(newNode);
 
         return true;
@@ -213,17 +219,19 @@ public:
     virtual bool visitDomain(ControlDomain& domain) {
         m_currentDomain = &domain;
 
-        std::printf("GraphLinker::visitDomain : processing domain %p, block offset %.2u, referrers %u, local stack %u, requested args %.2u\n",
-                    &domain,
-                    domain.getBasicBlock()->getOffset(),
-                    domain.getBasicBlock()->getReferers().size(),
-                    domain.getLocalStack().size(),
-                    domain.getRequestedArguments().size()
-                   );
+        if (traces_enabled) {
+            std::printf("GraphLinker::visitDomain : processing domain %p, block offset %.2u, referrers %u, local stack %u, requested args %.2u\n",
+                &domain,
+                domain.getBasicBlock()->getOffset(),
+                domain.getBasicBlock()->getReferers().size(),
+                domain.getLocalStack().size(),
+                domain.getRequestedArguments().size()
+            );
 
-        for (std::size_t index = 0; index < domain.getRequestedArguments().size(); index++)
-            std::printf("GraphLinker::visitDomain : arg request %u, node index %.2u\n",
-                        index, domain.getRequestedArguments()[index].requestingNode->getIndex());
+            for (std::size_t index = 0; index < domain.getRequestedArguments().size(); index++)
+                std::printf("GraphLinker::visitDomain : arg request %u, node index %.2u\n",
+                            index, domain.getRequestedArguments()[index].requestingNode->getIndex());
+        }
 
         processBranching();
         processArgumentRequests();
@@ -260,7 +268,9 @@ void GraphLinker::processNode(ControlNode& node)
 
     // Linking pending node
     if (m_nodeToLink) {
-//         std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
+        if (traces_enabled)
+            std::printf("GraphLinker::processNode : linking nodes %.2u and %.2u\n", m_nodeToLink->getIndex(), node.getIndex());
+
         m_nodeToLink->addEdge(&node);
         m_nodeToLink = 0;
     }
@@ -299,7 +309,9 @@ void GraphLinker::processBranching()
         InstructionNode* const  terminator = refererDomain->getTerminator();
         assert(terminator && terminator->getInstruction().isBranch());
 
-        std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", terminator->getIndex(), entryPoint->getIndex());
+        if (traces_enabled)
+            std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", terminator->getIndex(), entryPoint->getIndex());
+
         terminator->addEdge(entryPoint);
     }
 }
@@ -317,7 +329,8 @@ void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentInde
     ControlNode*     const argument       = getRequestedNode(domain, argumentIndex);
     const ControlNode::TNodeType argumentType = argument->getNodeType();
 
-    std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", argument->getIndex(), request.requestingNode->getIndex());
+    if (traces_enabled)
+        std::printf("GraphLinker::processNode : linking nodes of argument request %.2u and %.2u\n", argument->getIndex(), request.requestingNode->getIndex());
 
     requestingNode->setArgument(request.index, argument);
     argument->addConsumer(requestingNode);
@@ -416,15 +429,19 @@ public:
 
             const TNodeSet& consumers = instruction->getConsumers();
             if (consumers.empty()) {
-                std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
+                if (traces_enabled)
+                    std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
+
                 m_nodesToRemove.push_back(instruction);
             } else if (consumers.size() == 1) {
                 if (InstructionNode* const consumer = (*consumers.begin())->cast<InstructionNode>()) {
                     const TSmalltalkInstruction& consumerInstruction = consumer->getInstruction();
                     if (consumerInstruction == TSmalltalkInstruction(opcode::doSpecial, special::popTop)) {
-                        std::printf("GraphOptimizer::visitNode : node %u is consumed only by popTop %u and may be removed\n",
-                                    instruction->getIndex(),
-                                    consumer->getIndex());
+                        if (traces_enabled)
+                            std::printf("GraphOptimizer::visitNode : node %u is consumed only by popTop %u and may be removed\n",
+                                instruction->getIndex(),
+                                consumer->getIndex()
+                            );
 
                         m_nodesToRemove.push_back(consumer);
                         m_nodesToRemove.push_back(instruction);
@@ -433,7 +450,9 @@ public:
             }
         } else if (PhiNode* const phi = node.cast<PhiNode>()) {
             if (phi->getInEdges().size() == 1) {
-                std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", phi->getIndex());
+                if (traces_enabled)
+                    std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", phi->getIndex());
+
                 m_nodesToRemove.push_back(phi);
             }
         }
@@ -462,10 +481,12 @@ private:
         InstructionNode* const valueTarget = (*phi->getOutEdges().begin())->cast<InstructionNode>();
         assert(valueTarget);
 
-        std::printf("Skipping phi node %.2u and remapping edges to link values directly: %.2u <-- %.2u\n",
-                    phi->getIndex(),
-                    valueSource->getIndex(),
-                    valueTarget->getIndex());
+        if (traces_enabled)
+            std::printf("Skipping phi node %.2u and remapping edges to link values directly: %.2u <-- %.2u\n",
+                phi->getIndex(),
+                valueSource->getIndex(),
+                valueTarget->getIndex()
+            );
 
         valueSource->removeEdge(phi);
         phi->removeEdge(valueTarget);
@@ -495,10 +516,12 @@ private:
         while (iNode != node->getInEdges().end()) {
             ControlNode* const sourceNode = *iNode++;
 
-            std::printf("Remapping node %.2u from %.2u to %.2u\n",
-                        sourceNode->getIndex(),
-                        node->getIndex(),
-                        nextNode->getIndex());
+            if (traces_enabled)
+                std::printf("Remapping node %.2u from %.2u to %.2u\n",
+                    sourceNode->getIndex(),
+                    node->getIndex(),
+                    nextNode->getIndex()
+                );
 
             sourceNode->removeEdge(node);
             sourceNode->addEdge(nextNode);
@@ -510,15 +533,16 @@ private:
         {
             ControlNode* const targetNode = *iNode++;
 
-            std::printf("Erasing edge %.2u -> %.2u\n",
-                        node->getIndex(),
-                        targetNode->getIndex());
+            if (traces_enabled)
+                std::printf("Erasing edge %.2u -> %.2u\n", node->getIndex(), targetNode->getIndex());
 
             node->removeEdge(targetNode);
         }
 
+        if (traces_enabled)
+            std::printf("Erasing node %.2u\n", node->getIndex());
+
         // Removing node from the graph
-        std::printf("Erasing node %.2u\n", node->getIndex());
         node->getDomain()->removeNode(node);
         m_graph->eraseNode(node);
     }
@@ -529,21 +553,27 @@ private:
 
 void ControlGraph::buildGraph()
 {
+    if (traces_enabled)
+        std::printf("Phase 1. Constructing control graph\n");
+
     // Iterating through basic blocks of parsed method and constructing node domains
-    std::printf("Phase 1. Constructing control graph\n");
     GraphConstructor constructor(this);
     constructor.run();
+
+    if (traces_enabled)
+        std::printf("Phase 2. Linking control graph\n");
 
     // Linking nodes that requested argument during previous stage.
     // They're linked using phi nodes or a direct link if possible.
     // Also branching edges are added so graph remains linked even if
     // no stack relations exist.
-    std::printf("Phase 2. Linking control graph\n");
     GraphLinker linker(this);
     linker.run();
 
+    if (traces_enabled)
+        std::printf("Phase 3. Optimizing control graph\n");
+
     // Optimizing graph by removing stalled nodes and merging linear branch sequences
-    std::printf("Phase 3. Optimizing control graph\n");
     GraphOptimizer optimizer(this);
     optimizer.run();
 }
