@@ -8,9 +8,9 @@
 #include <map>
 #include <analysis.h>
 
-class ControlGraphVisualizer : public st::NodeVisitor {
+class ControlGraphVisualizer : public st::PlainNodeVisitor {
 public:
-    ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName) : st::NodeVisitor(graph) {
+    ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName) : st::PlainNodeVisitor(graph) {
         m_stream.open(fileName.c_str(), std::ios::out | std::ios::trunc);
 
         m_stream << "digraph G2 {\n";
