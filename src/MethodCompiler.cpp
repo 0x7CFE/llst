@@ -242,7 +242,9 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     jit.function = methodFunction ? methodFunction : createFunction(method);
 
     {
-        ControlGraphVisualizer vis(jit.controlGraph, std::string(jit.function->getName()) + ".dot");
+        std::ostringstream ss;
+        ss << "dots/" << jit.function->getName().data() << ".dot";
+        ControlGraphVisualizer vis(jit.controlGraph, ss.str());
         vis.run();
     }
 
@@ -522,7 +524,9 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     std::string blockFunctionName = ss.str();
 
     {
-        ControlGraphVisualizer vis(blockContext.controlGraph, blockFunctionName + ".dot");
+        std::ostringstream ss;
+        ss << "dots/" << blockFunctionName << ".dot";
+        ControlGraphVisualizer vis(blockContext.controlGraph, ss.str());
         vis.run();
     }
 
@@ -702,15 +706,16 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
 
         PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), inEdgesCount, "phi.");
 
-        st::TNodeSet::iterator iNode = phiNode->getInEdges().begin();
-        for (; iNode != phiNode->getInEdges().end(); ++iNode) {
-            st::ControlNode* const inNode = *iNode;
-            BasicBlock* const inBlock = m_targetToBlockMap[inNode->getDomain()->getBasicBlock()->getOffset()];
+        const st::PhiNode::TIncomingList& incomingList = phiNode->getIncomingList();
+        for (std::size_t index = 0; index < incomingList.size(); index++) {
+            const st::PhiNode::TIncoming& incoming = incomingList[index];
+
+            BasicBlock* const inBlock = m_targetToBlockMap[incoming.domain->getBasicBlock()->getOffset()];
             assert(inBlock);
 
             // This call may change the insertion point of one of the incoming values is a value holder,
             // not just a simple value. Load should be inserted in the incoming basic block.
-            phiValue->addIncoming(getNodeValue(jit, inNode, inBlock), inBlock);
+            phiValue->addIncoming(getNodeValue(jit, incoming.node, inBlock), inBlock);
         }
 
         // Phi is created at the top of the basic block but consumed later.
