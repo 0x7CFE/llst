@@ -39,6 +39,21 @@ template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>() {
     return static_cast<PushBlockNode*>(node);
 }
 
+TNodeSet PhiNode::getRealValues() {
+    TNodeSet values;
+
+    for (std::size_t i = 0; i < m_incomingList.size(); i++) {
+        if (PhiNode* const phi = m_incomingList[i].node->cast<PhiNode>()) {
+            const TNodeSet& realValues = phi->getRealValues();
+            values.insert(realValues.begin(), realValues.end());
+        } else {
+            values.insert(m_incomingList[i].node);
+        }
+    }
+
+    return values;
+}
+
 class GraphConstructor : public InstructionVisitor {
 public:
     GraphConstructor(ControlGraph* graph)
@@ -337,17 +352,8 @@ void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentInde
 
     // We need to link the nodes only from the same domain
     // Cross domain references are handled separately
-    if (argument->getDomain() == requestingNode->getDomain())
+    if (requestingNode->getNodeType() == ControlNode::ntPhi || argumentType == ControlNode::ntPhi || argument->getDomain() == requestingNode->getDomain())
         argument->addEdge(requestingNode);
-
-    if (argumentType == ControlNode::ntPhi) {
-        argument->addEdge(requestingNode);
-
-        // Registering phi as a consumer for all input nodes
-        TNodeSet::iterator iNode = argument->getInEdges().begin();
-        for (; iNode != argument->getInEdges().end(); ++iNode)
-            (*iNode)->addConsumer(argument);
-    }
 }
 
 void GraphLinker::mergePhi(PhiNode* source, PhiNode* target)
@@ -376,8 +382,8 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
 
     BasicBlock::TBasicBlockSet::iterator iBlock = refererBlocks.begin();
     for (; iBlock != refererBlocks.end(); ++iBlock) {
-        ControlDomain* const refererDomain = m_graph->getDomainFor(* iBlock);
-        const TNodeList&     refererStack  = refererDomain->getLocalStack();
+        ControlDomain* const refererDomain    = m_graph->getDomainFor(* iBlock);
+        const TNodeList&     refererStack     = refererDomain->getLocalStack();
         const std::size_t    refererStackSize = refererStack.size();
 
         if (!refererStackSize || argumentIndex > refererStackSize - 1) {
@@ -390,10 +396,10 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
             if (singleReferer) {
                 result = refererValue;
             } else {
-                // Nested phi nodes should be merged together
-                if (PhiNode* const phi = refererValue->cast<PhiNode>())
-                    mergePhi(phi, static_cast<PhiNode*>(result));
-                else
+                result->cast<PhiNode>()->addIncoming(refererDomain, refererValue);
+                refererValue->addConsumer(result);
+
+                if (refererValue->getNodeType() == ControlNode::ntPhi)
                     refererValue->addEdge(result);
             }
 
@@ -402,10 +408,15 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
             assert(valueIndex < refererStackSize);
             ControlNode* const stackValue = refererStack[valueIndex];
 
-            if (singleReferer)
+            if (singleReferer) {
                 result = stackValue;
-            else
-                stackValue->addEdge(result);
+            } else {
+                result->cast<PhiNode>()->addIncoming(refererDomain, stackValue);
+                stackValue->addConsumer(result);
+
+                if (stackValue->getNodeType() == ControlNode::ntPhi)
+                    stackValue->addEdge(result);
+            }
         }
     }
 
@@ -453,7 +464,8 @@ public:
                 if (traces_enabled)
                     std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", phi->getIndex());
 
-                m_nodesToRemove.push_back(phi);
+                // FIXME Should be modified according to new phi linking rules
+                // m_nodesToRemove.push_back(phi);
             }
         }
 
