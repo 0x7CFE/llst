@@ -2,6 +2,8 @@
 #define LLST_ANALYSIS_INCLUDED
 
 #include <set>
+#include <vector>
+
 #include <instructions.h>
 
 namespace llvm {
@@ -202,13 +204,33 @@ private:
 // to a node having a phi node as it's agrument.
 class PhiNode : public ControlNode {
 public:
-    PhiNode(uint32_t index) : ControlNode(index) { }
+    PhiNode(uint32_t index) : ControlNode(index) { m_incomingList.reserve(2); }
     virtual TNodeType getNodeType() const { return ntPhi; }
     uint32_t getPhiIndex() const { return m_phiIndex; }
     void setPhiIndex(uint32_t value) { m_phiIndex = value; }
 
+    struct TIncoming {
+        ControlDomain* domain;
+        ControlNode*   node;
+    };
+
+    typedef std::vector<TIncoming> TIncomingList;
+
+    // Value node may or may not belong to the specified domain
+    void addIncoming(ControlDomain* domain, ControlNode* value) {
+        TIncoming incoming;
+        incoming.domain = domain;
+        incoming.node  = value;
+
+        m_incomingList.push_back(incoming);
+    }
+
+    const TIncomingList& getIncomingList() const { return m_incomingList; }
+    TNodeSet getRealValues();
+
 private:
-    uint32_t m_phiIndex;
+    uint32_t      m_phiIndex;
+    TIncomingList m_incomingList;
 };
 
 // Tau node is reserved for further use in type inference subsystem.
