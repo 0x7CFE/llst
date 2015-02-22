@@ -325,6 +325,38 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
             return NodeVisitor::visitNode(node);
         }
 
+        virtual void nodesVisited() {
+            BasicBlock* const lastBlock = m_jit.builder->GetInsertBlock();
+            m_jit.currentNode->getDomain()->getBasicBlock()->setEndValue(lastBlock);
+        }
+
+        virtual void domainsVisited() {
+            // Process pending phi nodes by replacing stub values with emitted code
+
+            TJITContext::TPhiList::iterator iPhi = m_jit.pendingPhiNodes.begin();
+            for (; iPhi != m_jit.pendingPhiNodes.end(); ++iPhi) {
+                st::PhiNode* const phi = *iPhi;
+
+                Value* const stubValue = phi->getValue();
+                assert(isa<UndefValue>(stubValue));
+
+                // Emitting code of the real phi instruction and corresponding loads
+                Value* const realValueHolder = m_jit.compiler->getPhiValue(m_jit, phi);
+
+                // Iterating through all value users and replacing stub uses with real value
+                for (Value::use_iterator iUse = stubValue->use_begin(); iUse != stubValue->use_end(); ++iUse) {
+                    // Inserting the load directly before the value consumer
+                    m_jit.builder->SetInsertPoint(iUse.getUse());
+                    Value* const realValue = m_jit.builder->CreateLoad(realValueHolder);
+
+                    iUse->replaceUsesOfWith(stubValue, realValue);
+                }
+
+                phi->setValue(realValueHolder);
+            }
+        }
+
+    private:
         TJITContext& m_jit;
     };
 
@@ -665,7 +697,23 @@ llvm::Value* MethodCompiler::processLeafNode(st::InstructionNode* instruction)
 }
 
 llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* = 0*/) {
-    return getNodeValue(jit, jit.currentNode->getArgument(index));
+    st::ControlNode* const argument = jit.currentNode->getArgument(index);
+
+    if (st::PhiNode* const phi = argument->cast<st::PhiNode>()) {
+        // Phi encoding generates additional load logic in potentially uncomplete basic blocks.
+        // We could not process encode phi node before all basic blocks are completed.
+
+        // Creating dummy value that will be replaced later with actual value.
+        Value* const phiValue = UndefValue::get(jit.builder->getVoidTy());
+        phi->setValue(phiValue);
+
+        // Phi node processing will be done after last graph node is encoded.
+        jit.pendingPhiNodes.push_back(phi);
+
+        return phiValue;
+    }
+
+    return getNodeValue(jit, argument);
 }
 
 Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock /*= 0*/)
@@ -702,46 +750,12 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
             value = UndefValue::get(jit.builder->getVoidTy());
 
     } else if (st::PhiNode* const phiNode = node->cast<st::PhiNode>()) {
-        // Storing insertion point to return to it later
-        BasicBlock* const storedInsertBlock = insertBlock ? insertBlock : jit.builder->GetInsertBlock();
-        BasicBlock::iterator storedInsertionPoint = jit.builder->GetInsertPoint();
+        // This should be done in a separate pass after encoding of all basic blocks
+        assert(insertBlock);
 
-        // If insert block is provided we need to store specified position, not just the last one
-        if (insertBlock) {
-            TerminatorInst* const terminator = insertBlock->getTerminator();
-            if (terminator)
-                storedInsertionPoint = terminator;          // inserting before terminator
-            else
-                storedInsertionPoint = insertBlock->end();  // appending to the end of the block
-        }
+        Value* const phiHolder = getPhiValue(jit, phiNode);
 
-        // Switching to the phi insertion point
-        BasicBlock* const phiInsertBlock = phiNode->getDomain()->getBasicBlock()->getValue();
-        assert(phiInsertBlock);
-        jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
-
-        PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), inEdgesCount, "phi.");
-
-        const st::PhiNode::TIncomingList& incomingList = phiNode->getIncomingList();
-        for (std::size_t index = 0; index < incomingList.size(); index++) {
-            const st::PhiNode::TIncoming& incoming = incomingList[index];
-
-            BasicBlock* const inBlock = incoming.domain->getBasicBlock()->getEndValue(); // m_targetToBlockMap[incoming.domain->getBasicBlock()->getOffset()];
-            assert(inBlock);
-
-            // This call may change the insertion point if one of the incoming values is a value holder,
-            // not just a simple value. Load should be inserted in the incoming basic block.
-            phiValue->addIncoming(getNodeValue(jit, incoming.node, inBlock), inBlock);
-        }
-
-        // Phi is created at the top of the basic block but consumed later.
-        // Value will be broken if GC will be invoked between phi and consumer.
-        // Resetting the insertion point which may be changed in getNodeValue() before.
-        jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
-        Value* const phiHolder = protectPointer(jit, phiValue);
-
-        // Finally, restoring original insertion point and loading the value from phi
-        jit.builder->SetInsertPoint(storedInsertBlock, storedInsertionPoint);
+        jit.builder->SetInsertPoint(insertBlock, insertBlock->getTerminator());
         value = jit.builder->CreateLoad(phiHolder);
     }
 
@@ -751,6 +765,35 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
     return value;
 }
 
+llvm::Value* MethodCompiler::getPhiValue(TJITContext& jit, st::PhiNode* phiNode)
+{
+    // Switching to the phi insertion point
+    BasicBlock* const phiInsertBlock = phiNode->getDomain()->getBasicBlock()->getValue();
+    assert(phiInsertBlock);
+    jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
+
+    PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), phiNode->getIncomingList().size(), "phi.");
+
+    const st::PhiNode::TIncomingList& incomingList = phiNode->getIncomingList();
+    for (std::size_t index = 0; index < incomingList.size(); index++) {
+        const st::PhiNode::TIncoming& incoming = incomingList[index];
+
+        BasicBlock* const incomingBlock = incoming.domain->getBasicBlock()->getEndValue(); // m_targetToBlockMap[incoming.domain->getBasicBlock()->getOffset()];
+        assert(incomingBlock);
+
+        // This call may change the insertion point if one of the incoming values is a value holder,
+        // not just a simple value. Load should be inserted in the incoming basic block.
+        phiValue->addIncoming(getNodeValue(jit, incoming.node, incomingBlock), incomingBlock);
+    }
+
+    // Phi is created at the top of the basic block but consumed later.
+    // Value will be broken if GC will be invoked between phi and consumer.
+    // Resetting the insertion point which may be changed in getNodeValue() before.
+    jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
+
+    return protectPointer(jit, phiValue);
+}
+
 void MethodCompiler::setNodeValue(st::ControlNode* node, llvm::Value* value)
 {
     assert(value);
@@ -758,7 +801,7 @@ void MethodCompiler::setNodeValue(st::ControlNode* node, llvm::Value* value)
     Value* const oldValue = node->getValue();
     if (oldValue) {
         if (isa<UndefValue>(oldValue))
-            oldValue->replaceAllUsesWith(value);
+            oldValue->replaceAllUsesWith(value); // FIXME Rewrite using direct access to use list
         else
             assert(false);
     }

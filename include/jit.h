@@ -171,6 +171,10 @@ public:
         st::ControlGraph*    controlGraph;
         st::InstructionNode* currentNode;
 
+        // List of phi nodes waiting to be processed
+        typedef std::list<st::PhiNode*> TPhiList;
+        TPhiList            pendingPhiNodes;
+
         TMethod*            originMethod; // Smalltalk method we're currently processing
 
         llvm::Function*     function;     // LLVM function that is created based on method
@@ -246,6 +250,7 @@ private:
 
     llvm::Value* processLeafNode(st::InstructionNode* instruction);
     llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock = 0);
+    llvm::Value* getPhiValue(TJITContext& jit, st::PhiNode* phi);
     void setNodeValue(st::ControlNode* node, llvm::Value* value);
     llvm::Value* getArgument(TJITContext& jit, std::size_t index = 0);
 
