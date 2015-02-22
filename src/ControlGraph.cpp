@@ -378,7 +378,13 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
     // In case of exactly one referer we may link values directly
     // Otherwise we should iterate through all referers and aggregate values using phi node
     const bool singleReferer = (refererBlocks.size() == 1);
-    ControlNode* result = singleReferer ? 0 : m_graph->newNode<PhiNode>();
+    ControlNode* result = 0;
+
+    if (!singleReferer) {
+        PhiNode* const phi = m_graph->newNode<PhiNode>();
+        phi->setDomain(domain);
+        result = phi;
+    }
 
     BasicBlock::TBasicBlockSet::iterator iBlock = refererBlocks.begin();
     for (; iBlock != refererBlocks.end(); ++iBlock) {

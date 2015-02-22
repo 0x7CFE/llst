@@ -11,6 +11,10 @@
 #include <types.h>
 #include <opcodes.h>
 
+namespace llvm {
+    class BasicBlock;
+}
+
 namespace st {
 
 struct TSmalltalkInstruction {
@@ -165,12 +169,22 @@ public:
         return false;
     }
 
-    BasicBlock(uint16_t blockOffset = 0) : m_offset(blockOffset) { }
+    void setValue(llvm::BasicBlock* value) { m_value = value; }
+    llvm::BasicBlock* getValue() const { return m_value; }
+
+    void setEndValue(llvm::BasicBlock* value) { m_value = value; }
+    llvm::BasicBlock* getEndValue() const { return m_value; }
+
+    BasicBlock(uint16_t blockOffset = 0)
+        : m_offset(blockOffset), m_value(0), m_endValue(0) { }
 
 private:
     uint16_t m_offset;
     TInstructionVector m_instructions;
     TBasicBlockSet     m_referers;
+
+    llvm::BasicBlock*  m_value;
+    llvm::BasicBlock*  m_endValue;
 };
 
 // This is a base class for ParsedMethod and ParsedBlock

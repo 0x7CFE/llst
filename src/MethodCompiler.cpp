@@ -202,7 +202,9 @@ void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* sourc
                 m_jit.function                         // method's function
             );
 
-            compiler->m_targetToBlockMap[basicBlock.getOffset()] = newBlock;
+//             compiler->m_targetToBlockMap[basicBlock.getOffset()] = newBlock;
+            basicBlock.setValue(newBlock);
+
             return true;
         }
 
@@ -278,7 +280,8 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     scanForBranches(jit, jit.parsedMethod);
 
     // Switching builder context to the first basic block from the preamble
-    BasicBlock* body = m_targetToBlockMap[0];
+    BasicBlock* const body = jit.parsedMethod->getBasicBlockByOffset(0)->getValue(); // m_targetToBlockMap[0];
+    assert(body);
     body->setName("offset0");
 
     jit.builder->SetInsertPoint(jit.preamble);
@@ -292,7 +295,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Cleaning up
     m_blockFunctions.clear();
-    m_targetToBlockMap.clear();
+//     m_targetToBlockMap.clear();
 
     return jit.function;
 }
@@ -305,7 +308,8 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
 
     private:
         virtual bool visitDomain(st::ControlDomain& domain) {
-            llvm::BasicBlock* newBlock = m_jit.compiler->m_targetToBlockMap[domain.getBasicBlock()->getOffset()];
+            llvm::BasicBlock* newBlock = domain.getBasicBlock()->getValue();
+            // llvm::BasicBlock* newBlock = m_jit.compiler->m_targetToBlockMap[domain.getBasicBlock()->getOffset()];
 
             newBlock->moveAfter(m_jit.builder->GetInsertBlock()); // for a pretty sequenced BB output
             m_jit.builder->SetInsertPoint(newBlock, newBlock->getFirstInsertionPt());
@@ -554,7 +558,8 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 
         ss.str("");
         ss << "offset" << blockOffset;
-        BasicBlock* blockBody = m_targetToBlockMap[blockOffset];
+        BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
+        assert(blockBody);
         blockBody->setName(ss.str());
 
         blockContext.builder->CreateBr(blockBody);
@@ -698,11 +703,22 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
 
     } else if (st::PhiNode* const phiNode = node->cast<st::PhiNode>()) {
         // Storing insertion point to return to it later
-        BasicBlock* const insertBlock = jit.builder->GetInsertBlock();
-        const BasicBlock::iterator storedInsertionPoint = jit.builder->GetInsertPoint();
+        BasicBlock* const storedInsertBlock = insertBlock ? insertBlock : jit.builder->GetInsertBlock();
+        BasicBlock::iterator storedInsertionPoint = jit.builder->GetInsertPoint();
+
+        // If insert block is provided we need to store specified position, not just the last one
+        if (insertBlock) {
+            TerminatorInst* const terminator = insertBlock->getTerminator();
+            if (terminator)
+                storedInsertionPoint = terminator;          // inserting before terminator
+            else
+                storedInsertionPoint = insertBlock->end();  // appending to the end of the block
+        }
 
         // Switching to the phi insertion point
-        jit.builder->SetInsertPoint(insertBlock, insertBlock->getFirstInsertionPt());
+        BasicBlock* const phiInsertBlock = phiNode->getDomain()->getBasicBlock()->getValue();
+        assert(phiInsertBlock);
+        jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
 
         PHINode* const phiValue = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), inEdgesCount, "phi.");
 
@@ -710,10 +726,10 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
         for (std::size_t index = 0; index < incomingList.size(); index++) {
             const st::PhiNode::TIncoming& incoming = incomingList[index];
 
-            BasicBlock* const inBlock = m_targetToBlockMap[incoming.domain->getBasicBlock()->getOffset()];
+            BasicBlock* const inBlock = incoming.domain->getBasicBlock()->getEndValue(); // m_targetToBlockMap[incoming.domain->getBasicBlock()->getOffset()];
             assert(inBlock);
 
-            // This call may change the insertion point of one of the incoming values is a value holder,
+            // This call may change the insertion point if one of the incoming values is a value holder,
             // not just a simple value. Load should be inserted in the incoming basic block.
             phiValue->addIncoming(getNodeValue(jit, incoming.node, inBlock), inBlock);
         }
@@ -721,11 +737,11 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
         // Phi is created at the top of the basic block but consumed later.
         // Value will be broken if GC will be invoked between phi and consumer.
         // Resetting the insertion point which may be changed in getNodeValue() before.
-        jit.builder->SetInsertPoint(insertBlock, insertBlock->getFirstInsertionPt());
+        jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
         Value* const phiHolder = protectPointer(jit, phiValue);
 
         // Finally, restoring original insertion point and loading the value from phi
-        jit.builder->SetInsertPoint(insertBlock, storedInsertionPoint);
+        jit.builder->SetInsertPoint(storedInsertBlock, storedInsertionPoint);
         value = jit.builder->CreateLoad(phiHolder);
     }
 
@@ -766,6 +782,8 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     BasicBlock* const integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
     BasicBlock* const sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
     BasicBlock* const resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
+
+    jit.currentNode->getDomain()->getBasicBlock()->setEndValue(resultBlock);
 
     // Depending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
@@ -891,6 +909,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     if (jit.methodHasBlockReturn) {
         // Creating basic block that will be branched to on normal invoke
         BasicBlock* const nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+        jit.currentNode->getDomain()->getBasicBlock()->setEndValue(nextBlock);
 
         // Performing a function invoke
         result = jit.builder->CreateInvoke(m_runtimeAPI.sendMessage, nextBlock, jit.exceptionLandingPad, sendMessageArgs);
@@ -959,13 +978,12 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             // Loading branch target bytecode offset
             const uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
 
-//             if (!iPreviousInst->isTerminator())
-            {
-                // Finding appropriate branch target
-                // from the previously stored basic blocks
-                BasicBlock* const target = m_targetToBlockMap[targetOffset];
-                jit.builder->CreateBr(target);
-            }
+            // Finding appropriate branch target
+            // from the previously stored basic blocks
+            BasicBlock* const target = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(targetOffset)->getValue(); // m_targetToBlockMap[targetOffset];
+            assert(target);
+
+            jit.builder->CreateBr(target);
         } break;
 
         case special::branchIfTrue:
@@ -974,25 +992,20 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             const uint32_t targetOffset = jit.currentNode->getInstruction().getExtra();
             const uint32_t skipOffset   = getSkipOffset(jit.currentNode);
 
-//             if (!iPreviousInst->isTerminator())
-            {
-                // Finding appropriate branch target
-                // from the previously stored basic blocks
-                BasicBlock* const targetBlock = m_targetToBlockMap[targetOffset];
+            // Finding appropriate branch target
+            // from the previously stored basic blocks
+            BasicBlock* const targetBlock = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(targetOffset)->getValue(); // m_targetToBlockMap[targetOffset];
 
-                // This is a block that goes right after the branch instruction.
-                // If branch condition is not met execution continues right after
-                BasicBlock* const skipBlock = m_targetToBlockMap[skipOffset];
+            // This is a block that goes right after the branch instruction.
+            // If branch condition is not met execution continues right after
+            BasicBlock* const skipBlock = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(skipOffset)->getValue(); // m_targetToBlockMap[skipOffset];
 
-                // Creating condition check
-                Value* const boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
-                Value* const condition  = getArgument(jit); // jit.popValue();
-                Value* const boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
-                jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
+            // Creating condition check
+            Value* const boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
+            Value* const condition  = getArgument(jit); // jit.popValue();
+            Value* const boolValue  = jit.builder->CreateICmpEQ(condition, boolObject);
+            jit.builder->CreateCondBr(boolValue, targetBlock, skipBlock);
 
-                // Switching to a newly created block
-                //jit.builder->SetInsertPoint(skipBlock);
-            }
         } break;
 
         case special::sendToSuper: {
@@ -1068,6 +1081,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     // 2) bind primitiveFailed with any i1 result
     BasicBlock* const primitiveSucceededBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveSucceededBB", jit.function);
     BasicBlock* const primitiveFailedBB = BasicBlock::Create(m_JITModule->getContext(), "primitiveFailedBB", jit.function);
+    // FIXME setEndValue() ?
 
     compilePrimitive(jit, opcode, primitiveResult, primitiveFailed, primitiveSucceededBB, primitiveFailedBB);
 

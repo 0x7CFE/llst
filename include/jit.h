@@ -232,7 +232,7 @@ public:
 
 private:
     llvm::Module* m_JITModule;
-    std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
+//     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t byteCount = 0);
     bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
 
