@@ -172,8 +172,8 @@ public:
     void setValue(llvm::BasicBlock* value) { m_value = value; }
     llvm::BasicBlock* getValue() const { return m_value; }
 
-    void setEndValue(llvm::BasicBlock* value) { m_value = value; }
-    llvm::BasicBlock* getEndValue() const { return m_value; }
+    void setEndValue(llvm::BasicBlock* value) { m_endValue = value; }
+    llvm::BasicBlock* getEndValue() const { return m_endValue; }
 
     BasicBlock(uint16_t blockOffset = 0)
         : m_offset(blockOffset), m_value(0), m_endValue(0) { }
