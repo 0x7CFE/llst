@@ -16,8 +16,8 @@ std::string edgeStyle(st::ControlNode* from, st::ControlNode* to) {
     const st::InstructionNode* const fromInstruction = from->cast<st::InstructionNode>();
 	const st::InstructionNode* const toInstruction   = to->cast<st::InstructionNode>();
 
-//     if (from->getNodeType() == st::ControlNode::ntPhi)
-//         return "[color=\"black\"]";
+    if (from->getNodeType() == st::ControlNode::ntPhi && to->getNodeType() == st::ControlNode::ntPhi)
+        return "[style=invis color=red constraint=false]";
 
     if (fromInstruction && fromInstruction->getInstruction().isBranch())
         return "[color=\"grey\" style=\"dashed\"]";
@@ -62,6 +62,10 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
             m_stream << " labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"dashed\" constraint=false];\n";
         }
     } else if (const st::PhiNode* const phi = node.cast<st::PhiNode>()) {
+
+        m_stream << "\t\t" << phi->getIndex() << " -> " << phi->getDomain()->getEntryPoint()->getIndex()  << " ["
+            << "labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"invis\" constraint=true ];\n";
+
         const st::PhiNode::TIncomingList& incomingList = phi->getIncomingList();
         for (std::size_t index = 0; index < incomingList.size(); index++) {
             const st::PhiNode::TIncoming& incoming = incomingList[index];
