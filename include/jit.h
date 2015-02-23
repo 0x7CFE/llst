@@ -248,10 +248,9 @@ private:
     TExceptionAPI  m_exceptionAPI;
     TBaseFunctions m_baseFunctions;
 
-    void replaceStub(TJITContext& jit, llvm::Value* stubValue, llvm::Value* realValue);
-
     llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock = 0);
     llvm::Value* getPhiValue(TJITContext& jit, st::PhiNode* phi);
+    void encodePhiIncomings(TJITContext& jit, st::PhiNode* phiNode);
     void setNodeValue(TJITContext& jit, st::ControlNode* node, llvm::Value* value);
     llvm::Value* getArgument(TJITContext& jit, std::size_t index = 0);
 
