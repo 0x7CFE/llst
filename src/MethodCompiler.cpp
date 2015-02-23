@@ -341,18 +341,10 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
                 assert(isa<UndefValue>(stubValue));
 
                 // Emitting code of the real phi instruction and corresponding loads
-                Value* const realValueHolder = m_jit.compiler->getPhiValue(m_jit, phi);
+                Value* const realValue = m_jit.compiler->getPhiValue(m_jit, phi);
 
-                // Iterating through all value users and replacing stub uses with real value
-                for (Value::use_iterator iUse = stubValue->use_begin(); iUse != stubValue->use_end(); ++iUse) {
-                    // Inserting the load directly before the value consumer
-                    m_jit.builder->SetInsertPoint(iUse.getUse());
-                    Value* const realValue = m_jit.builder->CreateLoad(realValueHolder);
-
-                    iUse->replaceUsesOfWith(stubValue, realValue);
-                }
-
-                phi->setValue(realValueHolder);
+                m_jit.compiler->replaceStub(m_jit, stubValue, realValue);
+                phi->setValue(realValue);
             }
         }
 
@@ -362,6 +354,27 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
 
     Visitor visitor(jit);
     visitor.run();
+}
+
+void MethodCompiler::replaceStub(TJITContext& jit, llvm::Value* stubValue, llvm::Value* realValue)
+{
+    assert(isa<UndefValue>(stubValue));
+
+    // Iterating through all value users and replacing stub uses with real value
+    for (Value::use_iterator iUse = stubValue->use_begin(); iUse != stubValue->use_end(); ++iUse) {
+        // Replacement object may be either value or it's holder.
+        // In case of a holder we need to emit the load instruction.
+        const bool isHolder = isa<AllocaInst>(realValue);
+        Value*  replacement = realValue;
+
+        if (isHolder) {
+            // Inserting the load directly before the value consumer
+            jit.builder->SetInsertPoint(iUse.getUse());
+            replacement = jit.builder->CreateLoad(realValue);
+        }
+
+        iUse->replaceUsesOfWith(stubValue, replacement);
+    }
 }
 
 void MethodCompiler::writeInstruction(TJITContext& jit) {
@@ -446,7 +459,7 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     field->setName(ss.str());
 
     Value* const holder = protectPointer(jit, field);
-    setNodeValue(jit.currentNode, holder);
+    setNodeValue(jit, jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
@@ -473,7 +486,7 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
     argument->setName(ss.str());
 
     Value* const holder = protectPointer(jit, argument);
-    setNodeValue(jit.currentNode, holder);
+    setNodeValue(jit, jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushTemporary(TJITContext& jit)
@@ -492,7 +505,7 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
     temporary->setName(ss.str());
 
     Value* const holder = protectPointer(jit, temporary);
-    setNodeValue(jit.currentNode, holder);
+    setNodeValue(jit, jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushLiteral(TJITContext& jit)
@@ -508,7 +521,7 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
     literal->setName(ss.str());
 
     Value* const holder = protectPointer(jit, literal);
-    setNodeValue(jit.currentNode, holder);
+    setNodeValue(jit, jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -543,7 +556,7 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
             std::fprintf(stderr, "JIT: unknown push constant %d\n", constant);
     }
 
-    setNodeValue(jit.currentNode, constantValue);
+    setNodeValue(jit, jit.currentNode, constantValue);
 }
 
 void MethodCompiler::doPushBlock(TJITContext& jit)
@@ -602,7 +615,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
         outs() << *blockContext.function << "\n";
 
         // Running optimization passes on a block function
-        //JITRuntime::Instance()->optimizeFunction(blockContext.function);
+        JITRuntime::Instance()->optimizeFunction(blockContext.function);
     }
 
     // Create block object and fill it with context information
@@ -616,7 +629,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     blockObject->setName("block.");
 
     Value* blockHolder = protectPointer(jit, blockObject);
-    setNodeValue(jit.currentNode, blockHolder);
+    setNodeValue(jit, jit.currentNode, blockHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
 }
 
@@ -667,7 +680,7 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     Value* const argsHolder = protectPointer(jit, argumentsArray);
     argsHolder->setName("pArgs.");
 
-    setNodeValue(jit.currentNode, argsHolder);
+    setNodeValue(jit, jit.currentNode, argsHolder);
     //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
 }
 
@@ -686,14 +699,8 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
 
     // FIXME Do not protect the result object because it will always be the literal value
     Value* const result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
-    setNodeValue(jit.currentNode, result);
+    setNodeValue(jit, jit.currentNode, result);
     //jit.pushValue(result);
-}
-
-llvm::Value* MethodCompiler::processLeafNode(st::InstructionNode* instruction)
-{
-    assert(false);
-    return 0;
 }
 
 llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* = 0*/) {
@@ -739,15 +746,9 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
         return value;
     }
 
-    const std::size_t inEdgesCount = node->getInEdges().size();
     if (st::InstructionNode* const instruction = node->cast<st::InstructionNode>()) {
-        // If node is a leaf from the same domain we may encode it locally.
-        // If not, create a dummy value wich will be replaced by real value later.
-
-        if (!inEdgesCount && instruction->getDomain() == jit.currentNode->getDomain())
-            value = processLeafNode(instruction); // FIXME WTF?
-        else
-            value = UndefValue::get(jit.builder->getVoidTy());
+        // Сreating a dummy value which will be replaced by a real value later.
+        value = UndefValue::get(jit.builder->getVoidTy());
 
     } else if (st::PhiNode* const phiNode = node->cast<st::PhiNode>()) {
         // This should be done in a separate pass after encoding of all basic blocks
@@ -794,17 +795,13 @@ llvm::Value* MethodCompiler::getPhiValue(TJITContext& jit, st::PhiNode* phiNode)
     return protectPointer(jit, phiValue);
 }
 
-void MethodCompiler::setNodeValue(st::ControlNode* node, llvm::Value* value)
+void MethodCompiler::setNodeValue(TJITContext& jit, st::ControlNode* node, llvm::Value* value)
 {
     assert(value);
 
     Value* const oldValue = node->getValue();
-    if (oldValue) {
-        if (isa<UndefValue>(oldValue))
-            oldValue->replaceAllUsesWith(value); // FIXME Rewrite using direct access to use list
-        else
-            assert(false);
-    }
+    if (oldValue)
+        replaceStub(jit, oldValue, value);
 
     node->setValue(value);
 }
@@ -826,7 +823,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     BasicBlock* const sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
     BasicBlock* const resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
 
-    jit.currentNode->getDomain()->getBasicBlock()->setEndValue(resultBlock);
+//     jit.currentNode->getDomain()->getBasicBlock()->setEndValue(resultBlock);
 
     // Depending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
@@ -920,7 +917,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
     Value* const resultHolder = protectPointer(jit, phi);
-    setNodeValue(jit.currentNode, resultHolder);
+    setNodeValue(jit, jit.currentNode, resultHolder);
     //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
@@ -965,7 +962,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     }
 
     Value* const resultHolder = protectPointer(jit, result);
-    setNodeValue(jit.currentNode, resultHolder);
+    setNodeValue(jit, jit.currentNode, resultHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
@@ -1010,7 +1007,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             // Duplicating the origin value in the dup node.
             // When dup consumers will be remapped to the real
             // value in the ControlGraph this will be redundant.
-            setNodeValue(jit.currentNode, getNodeValue(jit, jit.currentNode->getArgument()));
+            setNodeValue(jit, jit.currentNode, getNodeValue(jit, jit.currentNode->getArgument()));
             break;
 
         case special::popTop:
@@ -1074,7 +1071,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
             Value* const result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
             Value* const resultHolder = protectPointer(jit, result);
-            setNodeValue(jit.currentNode, resultHolder);
+            setNodeValue(jit, jit.currentNode, resultHolder);
 //             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
 
@@ -1135,7 +1132,9 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.builder->SetInsertPoint(primitiveFailedBB);
 
     // FIXME Are we really allowed to use the value without holder?
-     setNodeValue(jit.currentNode, primitiveResult);
+    setNodeValue(jit, jit.currentNode, primitiveResult);
+//     jit.currentNode->getDomain()->getBasicBlock()->setEndValue(primitiveFailedBB);
+
 //     jit.pushValue(m_globals.nilObject);
 }
 
