@@ -8,6 +8,7 @@
 
 namespace llvm {
     class Value;
+    class PHINode;
 }
 
 namespace st {
@@ -204,7 +205,7 @@ private:
 // to a node having a phi node as it's agrument.
 class PhiNode : public ControlNode {
 public:
-    PhiNode(uint32_t index) : ControlNode(index) { m_incomingList.reserve(2); }
+    PhiNode(uint32_t index) : ControlNode(index), m_phiValue(0) { m_incomingList.reserve(2); }
     virtual TNodeType getNodeType() const { return ntPhi; }
     uint32_t getPhiIndex() const { return m_phiIndex; }
     void setPhiIndex(uint32_t value) { m_phiIndex = value; }
@@ -228,9 +229,13 @@ public:
     const TIncomingList& getIncomingList() const { return m_incomingList; }
     TNodeSet getRealValues();
 
+    llvm::PHINode* getPhiValue() const { return m_phiValue; }
+    void setPhiValue(llvm::PHINode* value) { m_phiValue = value; }
+
 private:
-    uint32_t      m_phiIndex;
-    TIncomingList m_incomingList;
+    uint32_t       m_phiIndex;
+    TIncomingList  m_incomingList;
+    llvm::PHINode* m_phiValue;
 };
 
 // Tau node is reserved for further use in type inference subsystem.
