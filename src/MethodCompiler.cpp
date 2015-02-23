@@ -1109,7 +1109,7 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.builder->SetInsertPoint(primitiveFailedBB);
 
     // FIXME Are we really allowed to use the value without holder?
-    setNodeValue(jit, jit.currentNode, primitiveResult);
+    setNodeValue(jit, jit.currentNode, m_globals.nilObject);
 //     jit.currentNode->getDomain()->getBasicBlock()->setEndValue(primitiveFailedBB);
 
 //     jit.pushValue(m_globals.nilObject);
