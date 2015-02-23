@@ -1171,7 +1171,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
         case primitive::startNewProcess: { // 6
             // /* ticks. unused */    jit.popValue();
-            Value*    const processObject  = getArgument(jit, 1); // jit.popValue();
+            Value*    const processObject  = getArgument(jit, 0); // jit.popValue();
             Value*    const process        = jit.builder->CreateBitCast(processObject, m_baseTypes.process->getPointerTo());
 
             Function* const executeProcess = m_JITModule->getFunction("executeProcess");
