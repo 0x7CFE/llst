@@ -115,6 +115,10 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
                 TSymbolArray* const literals = m_graph->getParsedMethod()->getOrigin()->literals;
                 TSymbol* const name = literals->getField(instruction->getInstruction().getArgument());
                 label += " " + name->toString();
+            } else if (instruction->getInstruction().isBranch()) {
+                std::stringstream ss;
+                ss << " " << instruction->getInstruction().getExtra();
+                label += ss.str();
             }
 
             const bool isTerminator = instruction->getInstruction().isTerminator();
