@@ -322,7 +322,7 @@ hierarchy | class list |
 METHOD Class
 listMethods
 	methods keysDo:
-		[ :name | name printNl ]
+		[ :key | key printNl ]
 !
 METHOD Class
 allMethods | allMethods |
@@ -836,7 +836,7 @@ METHOD LoopTest
 symbolStressTest |x|
     x <- MyArray new: 100.
     100 times: [:idx| x at: idx put: (idx asString asSymbol) ]. "FIXME speedup"
-    [ x location: #0; ] assertEq: 0.
+    [ x location: #0 ] assertEq: 0.
 !
 
 COMMENT                                                                                                ----------ClassTest--------
@@ -1014,13 +1014,13 @@ CLASS ContextTest Test
 
 METHOD ContextTest
 backtrace
-    [ [] method name ] assertEq: 'backtrace' withComment: '1'.
-    [ [] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
+    [ [nil] method name ] assertEq: 'backtrace' withComment: '1'.
+    [ [nil] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
 !
 
 METHOD ContextTest
 instanceClass
-    [ [] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
+    [ [nil] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
 !
 
 COMMENT                                                                                                 -------PrimitiveTest----------
@@ -1688,22 +1688,88 @@ sortBenchmark: data
     ^data sort
 !
 
-METHOD Undefined
+METHOD System
 runSortBenchmarkFor: data
     ^Timer millisecondsToRun: [ nil sortBenchmark: data ]
 !
 
-METHOD Undefined
-main    | command  data |
-    " initialize classes "
+METHOD MetaSystem
+rebuildImage | classes |
+    classes <- List new.
+    globals do: [ :global |
+        (global isKindOf: Class)
+            ifTrue: [ classes add: global ] ].
 
-    Char initialize.
+    classes do: [ :class | class methods do:
+        [ :method | self rebuildMethod: method for: class ] ]
+!
+
+METHOD MetaSystem
+rebuildMethod: aMethod for: aClass | newMethod |
+    (aClass = Undefined)
+        ifTrue: [
+            'Compiling ' print. aClass print. ':' print.
+            aMethod name print. '... ' print.
+        ].
+
+    newMethod <- aClass parseMethod: aMethod text.
+    newMethod notNil
+        ifTrue:  [ 'ok' printNl ]
+        ifFalse: [ ^nil ].
+
+    self assignClass: aClass to: newMethod.
+    aClass methods at: (aMethod name) put: newMethod.
+    Method flushCache.
+!
+
+METHOD MetaSystem
+assignClass: aClass to: aMethod
+    super in: aMethod at: 6 put: aClass.
+!
+
+METHOD MetaSystem
+getMethodClass: aMethod
+    ^super in: aMethod at: 6
+!
+
+METHOD Undefined
+stackOverflowTest |x|
+    1 to: 100 do: [ 42 ]
+!
+
+METHOD Undefined
+runAllTests
     SmallIntTest new runAll.
     ArrayTest new runAll.
     PrimitiveTest new runAll.
     MagnitudeTest new runAll.
     ListTest new runAll.
     MethodLookupTest new runAll.
+!
+
+
+METHOD MetaSystem
+fixMethodClasses | classes |
+    classes <- List new.
+    globals do: [ :global |
+        (global isKindOf: Class)
+            ifTrue: [ classes add: global ] ].
+
+    classes do: [ :class | class methods do:
+        [ :method | self assignClass: class to: method ] ]
+!
+
+METHOD Undefined
+main    | command  data x |
+    Char initialize.
+    "System fixMethodClasses."
+
+    "SmallIntTest new runAll.
+    ArrayTest new runAll.
+    PrimitiveTest new runAll.
+    MagnitudeTest new runAll.
+    ListTest new runAll.
+    MethodLookupTest new runAll."
 
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
@@ -1725,6 +1791,14 @@ main    | command  data |
     'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
 
     "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
+
+    "Jit do: [ List with: 42 with: 43; sort ]."
+
+    "Jit do: [ nil runSort: 10000 ]."
+    "Jit do: [ 'hello' printNl ]."
+    "Jit do: [ System rebuildImage ]."
+    "Jit do: [ [ :p | x <- p ] value: 42 ]."
+    "Jit do: [ SmallIntTest new runAll ]."
 
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
@@ -2142,6 +2216,7 @@ temporarySize
 METHOD Method
 args: argNames inst: instNames temp: tempNames
 	" Hook for recording symbolic debug "
+	^self
 !
 COMMENT -----------Chars--------------
 METHOD MetaChar
@@ -2258,7 +2333,9 @@ asString
 !
 METHOD Char
 printString
-	^ String new: 2; at: 1 put: $$ ; at: 2 put: self
+    ^ String new: 2;
+        at: 1 put: $$;
+        at: 2 put: self
 !
 METHOD Char
 = aChar
@@ -2809,14 +2886,14 @@ asSymbol
 	^ Symbol new: self
 !
 METHOD String
-doIt	| meth command |
+doIt | meth command |
     command <- 'doItCommand '.
     ((self words at: 1) at: 1) = $| ifFalse: [ command <- command + ' ^ ' ].
 
-	meth <- Undefined parseMethod: command + self.
-	^ meth notNil
-		ifTrue: [ ^ Context new
-			  perform: meth withArguments: (Array new: 1) ]
+    meth <- Undefined parseMethod: command + self.
+    ^ meth notNil
+        ifTrue: [ ^ Context new
+                perform: meth withArguments: (Array new: 1) ]
 !
 METHOD String
 basicAt: index
@@ -3123,7 +3200,7 @@ keysDo: aBlock
 	1 to: keys size do: [:i| aBlock value: (keys at: i)]
 !
 METHOD Dictionary
-keysAsArray | i ret |
+keysAsArray | ret |
 	ret <- Array new: keys size.
 	1 to: keys size do: [:i| ret at: i put: (keys at: i)].
 	^ ret
@@ -4425,9 +4502,11 @@ lexInteger	| start |
 METHOD Parser
 lexAlnum | cc start |
 	start <- index.
-	[ ((cc <- self nextChar) isAlphanumeric) or: [ cc = $: ] ]
-			whileTrue: [ nil ].
-		" add any trailing colons "
+
+	[ cc <- self nextChar. cc isAlphanumeric or: [ cc = $: ] ]
+        whileTrue: [ nil ].
+
+    " add any trailing colons "
 	token <- text from: start to: index - 1
 !
 METHOD Parser
@@ -4539,16 +4618,19 @@ readStatement | lnum |
 !
 METHOD Parser
 readExpression   | node lnum |
-	self tokenIsName ifFalse: [ ^ self readCascade: self readTerm ].
-	node <- self nameNode: token asSymbol. self nextLex.
-	self tokenIsArrow
-		ifTrue: [ node assignable
-				ifFalse: [ self error: 'illegal assignment'].
-			lnum <- lineNum.
-			self nextLex.
-			^ (AssignNode at: lnum) target:
-				node expression: self readExpression ].
-	^ self readCascade: node
+    self tokenIsName ifFalse: [ ^ self readCascade: self readTerm ].
+    node <- self nameNode: token asSymbol. self nextLex.
+
+    self tokenIsArrow ifTrue: [
+        node assignable ifFalse: [ self error: 'illegal assignment'].
+
+        lnum <- lineNum.
+        self nextLex.
+
+        ^ (AssignNode at: lnum) target: node expression: self readExpression
+    ].
+
+    ^ self readCascade: node
 !
 METHOD Parser
 tokenIsArrow
@@ -4574,23 +4656,24 @@ readTerm   | node lnum |
 !
 METHOD Parser
 nameNode: name
-	" make a new name node "
-	name == #super
-		ifTrue: [ ^ (ArgumentNode at: lineNum) position: 0 ].
-	(1 to: tempNames size) do: [:i |
-		(name == (tempNames at: i))
-			ifTrue: [ ^ (TemporaryNode at: lineNum)
-				position: i ] ].
-	(1 to: argNames size) do: [:i |
-		(name == (argNames at: i))
-			ifTrue: [ ^ (ArgumentNode at: lineNum) position: i ] ].
-	(1 to: instNames size) do: [:i |
-		(name == (instNames at: i))
-			ifTrue: [ ^ (InstNode at: lineNum) position: i ] ].
-	^ (LiteralNode at: lineNum);
-		value: (globals at: name
-			ifAbsent: [ ^ self error:
-				'unrecognized name: ' + name printString ])
+    " make a new name node "
+    name == #super
+        ifTrue: [ ^ (ArgumentNode at: lineNum) position: 0 ].
+    (1 to: tempNames size) do: [:i |
+        (name == (tempNames at: i))
+            ifTrue: [ ^ (TemporaryNode at: lineNum)
+                position: i ] ].
+    (1 to: argNames size) do: [:i |
+        (name == (argNames at: i))
+            ifTrue: [ ^ (ArgumentNode at: lineNum) position: i ] ].
+    (1 to: instNames size) do: [:i |
+        (name == (instNames at: i))
+            ifTrue: [ ^ (InstNode at: lineNum) position: i ] ].
+
+    ^ (LiteralNode at: lineNum);
+        value: (globals at: name
+            ifAbsent: [ ^ self error:
+                'unrecognized name: ' + name printString ])
 !
 METHOD Parser
 readLiteral   | node |
@@ -4905,6 +4988,7 @@ compile: encoder block: inBlock | patchLocation |
 	super compile: encoder.
 	encoder genHigh: 12 low: temporaryLocation.
 	patchLocation <- encoder genVal: 0.
+
 	self compileInLine: encoder block: true.
 	encoder genHigh: 15 low: 2. " return top of stack "
 	encoder patch: patchLocation
@@ -5048,6 +5132,7 @@ name: n
 METHOD Encoder
 lineNum: l
 	" Don't care, except in DebugEncoder subclass "
+	^self
 !
 METHOD Encoder
 pushArgs: n
@@ -5329,7 +5414,7 @@ name
 !
 METHOD MetaSystem
 collectGarbage
-    <254>
+    <254>.
     self primitiveFailed
 !
 METHOD MetaSystem
