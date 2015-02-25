@@ -59,7 +59,6 @@ int main(int argc, char **argv) {
         std::cout << args::getHelp() << std::endl;
         return EXIT_SUCCESS;
     }
-
     if (llstArgs.showVersion) {
         std::cout << args::getVersion() << std::endl;
         return EXIT_SUCCESS;

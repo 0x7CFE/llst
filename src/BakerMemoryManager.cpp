@@ -39,6 +39,7 @@
 
 
 
+
 #include <cassert>
 bool is_aligned_properly(void *p) {
     return uint32_t(p) % sizeof(void*) == 0;
@@ -46,6 +47,8 @@ bool is_aligned_properly(void *p) {
 bool is_aligned_properly(uint32_t x) {
     return x % sizeof(void*) == 0;
 }
+
+
 
 BakerMemoryManager::BakerMemoryManager() :
     m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),

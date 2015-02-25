@@ -204,4 +204,6 @@ TMemoryManagerInfo NonCollectMemoryManager::getStat() {
     m_memoryInfo.freeHeapSize += (m_heapPointer - m_heapBase)*
             (m_memoryInfo.allocationTimer.get<TMicrosec>().toInt()/1000000.0) / 1024.0;
     return m_memoryInfo;
+
 }
+
