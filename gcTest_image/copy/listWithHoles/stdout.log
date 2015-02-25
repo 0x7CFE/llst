@@ -10,7 +10,7 @@ listWithHoles(items not changed after collect) OK
 nil
 ->Exited normally
 
-GC count: 308 (0/0), average allocations per gc: 22789, microseconds spent in GC: 4805695
-Heap size (Kb*s): 100466, Free heap size (Kb*s): 52976
+GC count: 308 (0/0), average allocations per gc: 22789, microseconds spent in GC: 4928963
+Heap size (Kb*s): 102281, Free heap size (Kb*s): 53945
 2231514 messages sent, cache hits: 1649892, misses: 7253, hit ratio 99.56 %
 

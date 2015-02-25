@@ -46,23 +46,6 @@ bool is_aligned_properly(void *p) {
 bool is_aligned_properly(uint32_t x) {
     return x % sizeof(void*) == 0;
 }
-Timer::Timer(){
-    gettimeofday(&timeCreate, NULL);
-}
-
-long Timer::getTimeLostms(){
-    timeval current;
-    gettimeofday(&current, NULL);
-    return (current.tv_sec - timeCreate.tv_sec) * 1000000 + (current.tv_usec - timeCreate.tv_usec);
-}
-
-timeval Timer::getTimeLost(){
-    timeval diff;
-    long msdiff = getTimeLostms();
-    diff.tv_sec = msdiff/1000000;
-    diff.tv_usec = msdiff - diff.tv_sec*1000000;
-    return diff;
-}
 
 BakerMemoryManager::BakerMemoryManager() :
     m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),
