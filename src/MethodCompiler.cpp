@@ -243,12 +243,12 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // Creating the function named as "Class>>method" or using provided one
     jit.function = methodFunction ? methodFunction : createFunction(method);
 
-    {
-        std::ostringstream ss;
-        ss << "dots/" << jit.function->getName().data() << ".dot";
-        ControlGraphVisualizer vis(jit.controlGraph, ss.str());
-        vis.run();
-    }
+//     {
+//         std::ostringstream ss;
+//         ss << "dots/" << jit.function->getName().data() << ".dot";
+//         ControlGraphVisualizer vis(jit.controlGraph, ss.str());
+//         vis.run();
+//     }
 
     // Creating the preamble basic block and inserting it into the function
     // It will contain basic initialization code (args, temps and so on)
@@ -548,12 +548,12 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
-    {
-        std::ostringstream ss;
-        ss << "dots/" << blockFunctionName << ".dot";
-        ControlGraphVisualizer vis(blockContext.controlGraph, ss.str());
-        vis.run();
-    }
+//     {
+//         std::ostringstream ss;
+//         ss << "dots/" << blockFunctionName << ".dot";
+//         ControlGraphVisualizer vis(blockContext.controlGraph, ss.str());
+//         vis.run();
+//     }
 
     std::vector<Type*> blockParams;
     blockParams.push_back(m_baseTypes.block->getPointerTo()); // block object with context information
@@ -588,10 +588,12 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 
         writeFunctionBody(blockContext);
 
-        outs() << *blockContext.function << "\n";
+//         outs() << *blockContext.function << "\n";
 
         // Running optimization passes on a block function
         JITRuntime::Instance()->optimizeFunction(blockContext.function);
+
+//         outs() << *blockContext.function << "\n";
     }
 
     // Create block object and fill it with context information
@@ -980,12 +982,17 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             }
             break;
 
-        case special::duplicate:
+        case special::duplicate: {
             // Duplicating the origin value in the dup node.
             // When dup consumers will be remapped to the real
             // value in the ControlGraph this will be redundant.
-            setNodeValue(jit, jit.currentNode, getNodeValue(jit, jit.currentNode->getArgument()));
+
+            Value* const original = getNodeValue(jit, jit.currentNode->getArgument());
+            Value* const copy     = protectPointer(jit, original);
+
+            setNodeValue(jit, jit.currentNode, copy);
             break;
+        }
 
         case special::popTop:
             // Simply doing nothing
