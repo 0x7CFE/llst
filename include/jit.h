@@ -149,6 +149,7 @@ struct TBaseFunctions {
     llvm::Function* getLiteral;
     llvm::Function* getArgument;
     llvm::Function* getInstance;
+    llvm::Function* setInstance;
     llvm::Function* getTemps;
     llvm::Function* getTemporary;
     llvm::Function* setTemporary;
@@ -169,6 +170,7 @@ struct TBaseFunctions {
         getLiteral       = module->getFunction("getLiteralFromContext");
         getArgument      = module->getFunction("getArgFromContext");
         getInstance      = module->getFunction("getInstanceFromContext");
+        setInstance      = module->getFunction("setInstanceInContext");
         getTemps         = module->getFunction("getTempsFromContext");
         getTemporary     = module->getFunction("getTemporaryFromContext");
         setTemporary     = module->getFunction("setTemporaryInContext");

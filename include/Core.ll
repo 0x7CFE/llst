@@ -309,6 +309,14 @@ define %TObject* @getInstanceFromContext(%TContext* %context, i32 %index) {
     ret %TObject* %instance
 }
 
+define void @setInstanceInContext(%TContext* %context, i32 %index, %TObject* %value) {
+    %self = call %TObject* @getArgFromContext(%TContext* %context, i32 0)
+    %instancePtr = call %TObject** @getObjectFieldPtr(%TObject* %self, i32 %index)
+    call void @checkRoot(%TObject* %value, %TObject** %instancePtr)
+    store %TObject* %value, %TObject** %instancePtr
+    ret void
+}
+
 define void @dummy() gc "shadow-stack" {
     ; enabling shadow stack init on this module
     ret void
