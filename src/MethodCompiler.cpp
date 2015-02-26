@@ -47,6 +47,14 @@
 
 using namespace llvm;
 
+template<typename T>
+std::string to_string(const T& x) {
+    // FIXME there is the same function in C++11
+    std::ostringstream ss;
+    ss << x;
+    return ss.str();
+}
+
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
     Module* jitModule = JITRuntime::Instance()->getModule();
