@@ -653,13 +653,12 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
         return;
     }
 
-    Function* const getArgFromContext = m_JITModule->getFunction("getArgFromContext");
-    Value* const context  = jit.getCurrentContext();
-    Value* const argument = jit.builder->CreateCall2(getArgFromContext, context, jit.builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "arg" << index << ".";
-    argument->setName(ss.str());
+    Value* const argument = jit.builder->CreateCall2(
+            m_baseFunctions.getArgument,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index)
+    );
+    argument->setName(std::string("arg") + to_string(index) + ".");
 
     Value* const holder = protectProducerNode(jit, jit.currentNode, argument);
     setNodeValue(jit, jit.currentNode, holder);

@@ -146,6 +146,7 @@ struct TBaseFunctions {
     llvm::Function* setObjectField;
     llvm::Function* getSlotSize;
     llvm::Function* getLiteral;
+    llvm::Function* getArgument;
     llvm::Function* getTemporary;
     llvm::Function* setTemporary;
 
@@ -162,6 +163,7 @@ struct TBaseFunctions {
         setObjectField   = module->getFunction("setObjectField");
         getSlotSize      = module->getFunction("getSlotSize");
         getLiteral       = module->getFunction("getLiteralFromContext");
+        getArgument      = module->getFunction("getArgFromContext");
         getTemporary     = module->getFunction("getTemporaryFromContext");
         setTemporary     = module->getFunction("setTemporaryInContext");
     }
