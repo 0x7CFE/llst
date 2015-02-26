@@ -237,23 +237,21 @@ is_object:
     ret %TClass* %class
 }
 
-
 define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {
     %addr = call %TClass** @getObjectClassPtr(%TObject* %this)
     store %TClass* %class, %TClass** %addr
     ret %TObject* %this
 }
 
-define %TObject** @getObjectFields(%TObject* %this) {
-    %fields = getelementptr inbounds %TObject* %this, i32 0, i32 2
-    %result = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 0
-    ret %TObject** %result
-}
-
 define %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index) {
     %fields    = getelementptr inbounds %TObject* %object, i32 0, i32 2
     %fieldPtr  = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
     ret %TObject** %fieldPtr
+}
+
+define %TObject** @getObjectFields(%TObject* %this) {
+    %fieldsPtr = call %TObject** @getObjectFieldPtr(%TObject* %this, i32 0)
+    ret %TObject** %fieldsPtr
 }
 
 define %TObject* @getObjectField(%TObject* %object, i32 %index) {
