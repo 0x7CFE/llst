@@ -828,12 +828,11 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value* const  value = getArgument(jit); // jit.lastValue();
+    Value* const  value = getArgument(jit);
     IRBuilder<>& builder = * jit.builder;
 
-    Function* const getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-    Value*    const self = jit.getSelf();
-    Value*    const fieldPointer = builder.CreateCall2(getObjectFieldPtr, self, builder.getInt32(index));
+    Value* const self = jit.getSelf();
+    Value* const fieldPointer = builder.CreateCall2(m_baseFunctions.getObjectFieldPtr, self, builder.getInt32(index));
 
     builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
     builder.CreateStore(value, fieldPointer);
