@@ -261,7 +261,7 @@ define %TObject* @getObjectField(%TObject* %object, i32 %index) {
 }
 
 define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) {
-    %fieldPtr  = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
+    %fieldPtr = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
     store %TObject* %value, %TObject** %fieldPtr
     ret %TObject** %fieldPtr
 }
