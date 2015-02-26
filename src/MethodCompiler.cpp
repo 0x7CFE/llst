@@ -1740,8 +1740,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             jit.builder->SetInsertPoint(indexChecked);
 
             if (opcode == primitive::arrayAtPut) {
-                Function* const getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-                Value*    const fieldPointer = jit.builder->CreateCall2(getObjectFieldPtr, arrayObject, actualIndex);
+                Value* const fieldPointer = jit.builder->CreateCall2(m_baseFunctions.getObjectFieldPtr, arrayObject, actualIndex);
                 jit.builder->CreateCall2(m_runtimeAPI.checkRoot, valueObejct, fieldPointer);
                 jit.builder->CreateStore(valueObejct, fieldPointer);
 

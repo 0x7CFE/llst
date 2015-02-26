@@ -142,6 +142,7 @@ struct TBaseFunctions {
     llvm::Function* getObjectClass;
     llvm::Function* setObjectClass;
     llvm::Function* getObjectFields;
+    llvm::Function* getObjectFieldPtr;
     llvm::Function* getObjectField;
     llvm::Function* setObjectField;
     llvm::Function* getSlotSize;
@@ -160,6 +161,7 @@ struct TBaseFunctions {
         getObjectClass   = module->getFunction("getObjectClass");
         setObjectClass   = module->getFunction("setObjectClass");
         getObjectFields  = module->getFunction("getObjectFields");
+        getObjectFieldPtr= module->getFunction("getObjectFieldPtr");
         getObjectField   = module->getFunction("getObjectField");
         setObjectField   = module->getFunction("setObjectField");
         getSlotSize      = module->getFunction("getSlotSize");
