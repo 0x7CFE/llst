@@ -1659,9 +1659,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             const uint32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
 
             Value* const blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
-            Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-            Value* const blockTemps = jit.builder->CreateCall(getTempsFromContext, blockAsContext);
-
+            Value* const blockTemps = jit.builder->CreateCall(m_baseFunctions.getTemps, blockAsContext);
             Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
 
             Value* const argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
