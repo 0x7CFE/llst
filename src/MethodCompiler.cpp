@@ -672,17 +672,12 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-
-    Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-    Function* const getObjectField = m_JITModule->getFunction("getObjectField");
-
-    Value* const context   = jit.getCurrentContext();
-    Value* const temps     = jit.builder->CreateCall(getTempsFromContext, context);
-    Value* const temporary = jit.builder->CreateCall2(getObjectField, temps, jit.builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "temp" << index << ".";
-    temporary->setName(ss.str());
+    Value* const temporary = jit.builder->CreateCall2(
+            m_baseFunctions.getTemporary,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index)
+    );
+    temporary->setName(std::string("temp") + to_string(index) + ".");
 
     Value* const holder = protectProducerNode(jit, jit.currentNode, temporary);
     setNodeValue(jit, jit.currentNode, holder);
