@@ -303,6 +303,12 @@ define void @setTemporaryInContext(%TContext* %context, i32 %index, %TObject* %v
     ret void
 }
 
+define %TObject* @getInstanceFromContext(%TContext* %context, i32 %index) {
+    %self = call %TObject* @getArgFromContext(%TContext* %context, i32 0)
+    %instance = call %TObject* @getObjectField(%TObject* %self, i32 %index)
+    ret %TObject* %instance
+}
+
 define void @dummy() gc "shadow-stack" {
     ; enabling shadow stack init on this module
     ret void

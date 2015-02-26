@@ -628,18 +628,14 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
 void MethodCompiler::doPushInstance(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Function* const getObjectField = m_JITModule->getFunction("getObjectField");
+    Value* const instance = jit.builder->CreateCall2(
+            m_baseFunctions.getInstance,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index)
+    );
+    instance->setName(std::string("instance") + to_string(index) + ".");
 
-    // Self is interpreted as object array.
-    // Array elements are instance variables.
-    Value* const self  = jit.getSelf();
-    Value* const field = jit.builder->CreateCall2(getObjectField, self, jit.builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "field" << index << ".";
-    field->setName(ss.str());
-
-    Value* const holder = protectProducerNode(jit, jit.currentNode, field);
+    Value* const holder = protectProducerNode(jit, jit.currentNode, instance);
     setNodeValue(jit, jit.currentNode, holder);
 }
 
