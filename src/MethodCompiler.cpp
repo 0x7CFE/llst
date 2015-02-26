@@ -696,14 +696,7 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
         ss << "const" << result << ".";
         result->setName(ss.str());
     } else {
-        Function* const getLiteralFromContext = m_JITModule->getFunction("getLiteralFromContext");
-        Value* const context = jit.getCurrentContext();
-        Value* const literalValue = jit.builder->CreateCall2(getLiteralFromContext, context, jit.builder->getInt32(index));
-
-        std::ostringstream ss;
-        ss << "lit" << (uint32_t) index << ".";
-        literalValue->setName(ss.str());
-
+        Value* const literalValue = jit.getLiteral(index);
         result = protectProducerNode(jit, jit.currentNode, literalValue);
     }
 
