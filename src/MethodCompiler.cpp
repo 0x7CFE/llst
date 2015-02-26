@@ -57,16 +57,12 @@ std::string to_string(const T& x) {
 
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
-    Module* jitModule = JITRuntime::Instance()->getModule();
-    Function* getLiteralFromContext = jitModule->getFunction("getLiteralFromContext");
-
-    Value* context = getCurrentContext();
-    CallInst* literal = builder->CreateCall2(getLiteralFromContext, context, builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "lit" << index << ".";
-    literal->setName(ss.str());
-
+    Value* const literal = builder->CreateCall2(
+            compiler->m_baseFunctions.getLiteral,
+            getCurrentContext(),
+            builder->getInt32(index)
+    );
+    literal->setName(std::string("lit") + to_string(index) + ".");
     return literal;
 }
 
