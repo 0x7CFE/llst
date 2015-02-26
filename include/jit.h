@@ -147,6 +147,7 @@ struct TBaseFunctions {
     llvm::Function* getSlotSize;
     llvm::Function* getLiteral;
     llvm::Function* getTemporary;
+    llvm::Function* setTemporary;
 
     void initializeFromModule(llvm::Module* module) {
         isSmallInteger   = module->getFunction("isSmallInteger");
@@ -162,6 +163,7 @@ struct TBaseFunctions {
         getSlotSize      = module->getFunction("getSlotSize");
         getLiteral       = module->getFunction("getLiteralFromContext");
         getTemporary     = module->getFunction("getTemporaryFromContext");
+        setTemporary     = module->getFunction("setTemporaryInContext");
     }
 };
 

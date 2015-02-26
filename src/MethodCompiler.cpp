@@ -831,13 +831,14 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value* const  value = getArgument(jit); //jit.lastValue();
-    IRBuilder<>& builder = * jit.builder;
+    Value* const  value = getArgument(jit);
 
-    Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-    Value* const context = jit.getCurrentContext();
-    Value* const temps   = builder.CreateCall(getTempsFromContext, context);
-    builder.CreateCall3(m_baseFunctions.setObjectField, temps, builder.getInt32(index), value);
+    jit.builder->CreateCall3(
+            m_baseFunctions.setTemporary,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index),
+            value
+    );
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
