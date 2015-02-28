@@ -142,7 +142,12 @@ public:
     st::GraphWalker::TVisitResult checkNode(st::ControlNode* node) {
         if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
             if (candidate->getInstruction().mayCauseGC()) {
-                // Walking through the nodes seeking for consumer
+                outs() << "Detector noticed node " << candidate->getIndex() << " that may cause GC\n";
+
+                m_detected = true;
+                return st::GraphWalker::vrStopWalk;
+
+                /* / Walking through the nodes seeking for consumer
                 // If it is found then candidate node may affect
                 // the consumer. Procucer should be protected.
                 m_verifier.run(candidate);
@@ -160,7 +165,7 @@ public:
                     // This means that we may safely ignore this node and all it's subpaths.
 
                     return st::GraphWalker::vrSkipPath;
-                }
+                } */
             }
         } else if (st::PhiNode* const phi = node->cast<st::PhiNode>()) {
             // Phi node may not cause gc, protects it's value separately
@@ -210,14 +215,24 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
         if (producer->getDomain() == consumer->getDomain()) {
             // Walking through the domain searching for dangerous nodes
 
-            st::ControlNode* node = producer;
+            assert(producer->getOutEdges().size() == 1);
+            st::ControlNode* node = *producer->getOutEdges().begin();
+
             while (true) {
-                if (node == consumer)
+                if (node == consumer) {
+//                     outs() << "Producer " << producer->getIndex() << " is safe and do not need a protection (1)\n";
+
                     return false;
+                }
 
                 if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
-                    if (candidate->getInstruction().mayCauseGC())
+                    if (candidate->getInstruction().mayCauseGC()) {
+                        outs() << "Producer " << producer->getIndex()
+                               << " should be protected because node "
+                               << candidate->getIndex() << " may cause GC\n";
+
                         return true;
+                    }
                 } else {
                     // There should be instruction nodes only
                     assert(false);
@@ -240,6 +255,7 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 
     Walker walker(detector);
     walker.addStopNode(producer);
+    walker.addStopNodes(consumers);
 
     // Running detector for all incoming paths to consumers originating from producer.
     // Walker will accumulate all safe paths and will not traverse any safe node twice.
@@ -248,19 +264,26 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
         st::ControlNode* const consumer = *iConsumer;
         walker.run(consumer, st::GraphWalker::wdBackward);
 
-        if (detector.isDetected())
+        if (detector.isDetected()) {
+            outs() << "Producer " << producer->getIndex()
+                   << " should be protected because detector says that it is required\n";
+
             return true;
+        }
     }
+
+//     outs() << "Producer " << producer->getIndex() << " is safe and do not need a protection (2)\n";
+    return false;
 
     // Changing direction to forward and performing last check starting from procucer.
     // We need to reset the stop list because now we'll use differennt edges.
-    walker.resetStopNodes();
+//     walker.resetStopNodes();
+//
+//     // When performing a forward run we need to end at consumers
+//     walker.addStopNodes(consumers);
+//     walker.run(producer, st::GraphWalker::wdForward);
 
-    // When performing a forward run we need to end at consumers
-    walker.addStopNodes(consumers);
-    walker.run(producer, st::GraphWalker::wdForward);
-
-    return detector.isDetected();
+//     return detector.isDetected();
 }
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
@@ -381,6 +404,8 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // Creating the function named as "Class>>method" or using provided one
     jit.function = methodFunction ? methodFunction : createFunction(method);
 
+    outs() << "Compiling " << jit.function->getName() << "\n";
+
 //     {
 //         std::ostringstream ss;
 //         ss << "dots/" << jit.function->getName().data() << ".dot";
@@ -435,6 +460,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     m_blockFunctions.clear();
 //     m_targetToBlockMap.clear();
 
+    outs() << "Done compiling method " << jit.function->getName() << "\n";
     return jit.function;
 }
 
@@ -634,8 +660,8 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
     ss << "lit" << (uint32_t) index << ".";
     literal->setName(ss.str());
 
-    //Value* const holder = protectPointer(jit, literal);
-    setNodeValue(jit, jit.currentNode, literal);
+    Value* const holder = protectPointer(jit, literal);
+    setNodeValue(jit, jit.currentNode, holder);
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -686,6 +712,8 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
+    outs() << "Compiling block " << blockFunctionName << "\n";
+
 //     {
 //         std::ostringstream ss;
 //         ss << "dots/" << blockFunctionName << ".dot";
@@ -733,6 +761,8 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 
 //         outs() << *blockContext.function << "\n";
     }
+
+    outs() << "Done compiling block " << blockFunctionName << "\n";
 
     // Create block object and fill it with context information
     Value* args[] = {

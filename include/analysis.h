@@ -538,6 +538,7 @@ public:
         assert(startNode);
         m_direction = direction;
 
+        m_stopNodes.erase(startNode);
         walkIn(startNode);
         nodesVisited();
     }
@@ -593,6 +594,7 @@ public:
     void run(ControlNode* startNode) {
         assert(startNode);
         m_verified = false;
+
         ForwardWalker::run(startNode);
     }
 

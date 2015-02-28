@@ -85,7 +85,7 @@ bool st::TSmalltalkInstruction::isTrivial() const {
         case opcode::pushTemporary:
         case opcode::pushLiteral:
         case opcode::pushConstant:
-        case opcode::pushBlock:
+      //  case opcode::pushBlock:
         case opcode::markArguments:
             return true;
 
@@ -112,6 +112,7 @@ bool st::TSmalltalkInstruction::mayCauseGC() const {
         case opcode::assignInstance:
             return false;
 
+        case opcode::pushBlock:
         case opcode::sendUnary:
         case opcode::sendBinary:
         case opcode::sendMessage:
