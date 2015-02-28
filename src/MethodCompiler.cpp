@@ -125,6 +125,144 @@ Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
     return holder;
 }
 
+Value* MethodCompiler::protectProducerNode(TJITContext& jit, st::ControlNode* node, Value* value)
+{
+    if (shouldProtectProducer(jit.currentNode))
+        return protectPointer(jit, value);
+    else
+        return value; // return value as is
+}
+
+class Detector {
+public:
+    Detector(st::PathVerifier& verifier) : m_verifier(verifier), m_detected(false) {}
+
+    bool isDetected() const { return m_detected; }
+
+    st::GraphWalker::TVisitResult checkNode(st::ControlNode* node) {
+        if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
+            if (candidate->getInstruction().mayCauseGC()) {
+                // Walking through the nodes seeking for consumer
+                // If it is found then candidate node may affect
+                // the consumer. Procucer should be protected.
+                m_verifier.run(candidate);
+
+                if (m_verifier.isVerified()) {
+                    // We found a node that may cause GC and it is really
+                    // on the path between procducer and one of the consumers.
+                    // We've just proved that the value should be protected.
+
+                    m_detected = true;
+                    return st::GraphWalker::vrStopWalk;
+
+                } else {
+                    // Node may cause GC but control flow will never reach any of tracked consumers.
+                    // This means that we may safely ignore this node and all it's subpaths.
+
+                    return st::GraphWalker::vrSkipPath;
+                }
+            }
+        } else if (st::PhiNode* const phi = node->cast<st::PhiNode>()) {
+            // Phi node may not cause gc, protects it's value separately
+            // and do not have outgoing edges that we may traverse.
+
+            return st::GraphWalker::vrSkipPath;
+        } else {
+            assert(false);
+        }
+
+        return st::GraphWalker::vrKeepWalking;
+    }
+
+private:
+    st::PathVerifier& m_verifier;
+    bool m_detected;
+};
+
+class Walker : public st::GraphWalker {
+public:
+    Walker(Detector& detector) : m_detector(detector) {}
+
+private:
+    Detector& m_detector;
+    virtual TVisitResult visitNode(st::ControlNode* node) { return m_detector.checkNode(node); }
+};
+
+bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
+{
+    // We should protect the value by holder if consumer of this value is far away.
+    // By far away we mean that it crosses the barrier of potential garbage collection.
+    // For example if value is consumed right next to the point it was produced, then
+    // protection is not neccessary. Otherwise if there are memory allocation points in
+    // between then value protection is a must.
+    //
+    // In order to find out whether value protection is required, we trace the possible
+    // control- and data-flow paths and check what instructions are on the way between
+    // value producer and all potential consumers. If there is at least one dangerous
+    // operation on any of possible execution paths then the whole value should be protected.
+
+    const st::TNodeSet& consumers = producer->getConsumers();
+
+    // In case of local domain reference we may apply fast check
+    if (consumers.size() == 1) {
+        st::ControlNode* const consumer = *consumers.begin();
+
+        if (producer->getDomain() == consumer->getDomain()) {
+            // Walking through the domain searching for dangerous nodes
+
+            st::ControlNode* node = producer;
+            while (true) {
+                if (node == consumer)
+                    return false;
+
+                if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
+                    if (candidate->getInstruction().mayCauseGC())
+                        return true;
+                } else {
+                    // There should be instruction nodes only
+                    assert(false);
+                }
+
+                assert(node->getOutEdges().size() == 1);
+                node = *node->getOutEdges().begin();
+            }
+        }
+    }
+
+    // Ok, it seem that fast lookup had failed. It means that we're dealing with
+    // a complex case that affects several domains and probably phi nodes.
+    // We need to perform a generic lookup walking through the whole graph.
+
+    st::PathVerifier verifier(consumers);
+    verifier.addStopNode(producer);
+
+    Detector detector(verifier);
+
+    Walker walker(detector);
+    walker.addStopNode(producer);
+
+    // Running detector for all incoming paths to consumers originating from producer.
+    // Walker will accumulate all safe paths and will not traverse any safe node twice.
+
+    for (st::TNodeSet::iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
+        st::ControlNode* const consumer = *iConsumer;
+        walker.run(consumer, st::GraphWalker::wdBackward);
+
+        if (detector.isDetected())
+            return true;
+    }
+
+    // Changing direction to forward and performing last check starting from procucer.
+    // We need to reset the stop list because now we'll use differennt edges.
+    walker.resetStopNodes();
+
+    // When performing a forward run we need to end at consumers
+    walker.addStopNodes(consumers);
+    walker.run(producer, st::GraphWalker::wdForward);
+
+    return detector.isDetected();
+}
+
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 {
     Value* context = 0;

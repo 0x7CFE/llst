@@ -166,6 +166,12 @@ struct TBaseFunctions {
 class MethodCompiler {
 public:
 
+    enum TProtectionMode {
+        pmUnknown = 0,
+        pmShouldProtect,
+        pmSafe
+    };
+
     struct TJITContext {
         st::ParsedMethod*    parsedMethod;
         st::ControlGraph*    controlGraph;
@@ -256,6 +262,8 @@ private:
 
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
+    llvm::Value* protectProducerNode(TJITContext& jit, st::ControlNode* node, llvm::Value* value);
+    bool shouldProtectProducer(st::ControlNode* node);
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit);
