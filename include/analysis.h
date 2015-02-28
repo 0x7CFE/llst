@@ -74,12 +74,12 @@ typedef std::vector<ControlNode*> TNodeList;
 
 class NodeIndexCompare {
 public:
-    bool operator() (const ControlNode* a, const ControlNode* b);
+    bool operator() (const ControlNode* a, const ControlNode* b) const;
 };
 
 class DomainOffsetCompare {
 public:
-    bool operator() (const ControlDomain* a, const ControlDomain* b);
+    bool operator() (const ControlDomain* a, const ControlDomain* b) const;
 };
 
 typedef std::set<ControlNode*, NodeIndexCompare> TNodeSet;
@@ -510,6 +510,111 @@ public:
 protected:
     ControlGraph* const m_graph;
 };
+
+class GraphWalker {
+public:
+    GraphWalker() { }
+    virtual ~GraphWalker() { }
+
+    void addStopNode(ControlNode* node) { m_stopNodes.insert(node); }
+    void addStopNodes(const TNodeSet& nodes) { m_stopNodes.insert(nodes.begin(), nodes.end()); }
+    void resetStopNodes() { m_stopNodes.clear(); }
+
+    enum TVisitResult {
+        vrKeepWalking = 0,
+        vrSkipPath,
+        vrStopWalk
+    };
+
+    virtual TVisitResult visitNode(ControlNode* node) = 0;
+    virtual void nodesVisited() { }
+
+    enum TWalkDirection {
+        wdForward,
+        wdBackward
+    };
+
+    void run(ControlNode* startNode, TWalkDirection direction) {
+        assert(startNode);
+        m_direction = direction;
+
+        walkIn(startNode);
+        nodesVisited();
+    }
+
+private:
+    bool walkIn(ControlNode* currentNode) {
+        const TNodeSet& nodes = (m_direction == wdForward) ?
+            currentNode->getOutEdges() : currentNode->getInEdges();
+
+        for (TNodeSet::iterator iNode = nodes.begin(); iNode != nodes.end(); ++iNode) {
+            ControlNode* const node = *iNode;
+
+            if (m_stopNodes.find(node) != m_stopNodes.end())
+                continue;
+            else
+                m_stopNodes.insert(node);
+
+            switch (const TVisitResult result = visitNode(node)) {
+                case vrKeepWalking:
+                    if (!walkIn(node))
+                        return false;
+                    break;
+
+                case vrStopWalk:
+                    return false;
+
+                case vrSkipPath:
+                    continue;
+            }
+        }
+
+        return true;
+    }
+
+private:
+    TWalkDirection m_direction;
+    TNodeSet       m_stopNodes;
+};
+
+class ForwardWalker : public GraphWalker {
+public:
+    void run(ControlNode* startNode) { GraphWalker::run(startNode, wdForward); }
+};
+
+class PathVerifier : public ForwardWalker {
+public:
+    PathVerifier(const TNodeSet& destinationNodes)
+        : m_destinationNodes(destinationNodes), m_verified(false) {}
+
+    bool isVerified() const { return m_verified; }
+    void reset() { resetStopNodes(); m_verified = false; }
+
+    void run(ControlNode* startNode) {
+        assert(startNode);
+        m_verified = false;
+        ForwardWalker::run(startNode);
+    }
+
+private:
+    virtual TVisitResult visitNode(ControlNode* node) {
+        // Checking if there is a path between
+        // start node and any of the destination nodes.
+
+        if (m_destinationNodes.find(node) != m_destinationNodes.end()) {
+            m_verified = true;
+            return vrStopWalk;
+        }
+
+        return vrKeepWalking;
+    }
+
+private:
+    const TNodeSet& m_destinationNodes;
+    bool m_verified;
+};
+
+
 
 } // namespace st
 

@@ -5,12 +5,12 @@ using namespace st;
 
 static const bool traces_enabled = false;
 
-bool NodeIndexCompare::operator() (const ControlNode* a, const ControlNode* b)
+bool NodeIndexCompare::operator() (const ControlNode* a, const ControlNode* b) const
 {
     return a->getIndex() < b->getIndex();
 }
 
-bool DomainOffsetCompare::operator() (const ControlDomain* a, const ControlDomain* b) {
+bool DomainOffsetCompare::operator() (const ControlDomain* a, const ControlDomain* b) const {
     return a->getBasicBlock()->getOffset() < b->getBasicBlock()->getOffset();
 }
 
