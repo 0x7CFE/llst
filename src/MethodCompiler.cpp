@@ -572,7 +572,7 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
     ss << "field" << index << ".";
     field->setName(ss.str());
 
-    Value* const holder = protectPointer(jit, field);
+    Value* const holder = protectProducerNode(jit, jit.currentNode, field);
     setNodeValue(jit, jit.currentNode, holder);
 }
 
@@ -599,7 +599,7 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
     ss << "arg" << index << ".";
     argument->setName(ss.str());
 
-    Value* const holder = protectPointer(jit, argument);
+    Value* const holder = protectProducerNode(jit, jit.currentNode, argument);
     setNodeValue(jit, jit.currentNode, holder);
 }
 
@@ -618,7 +618,7 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
     ss << "temp" << index << ".";
     temporary->setName(ss.str());
 
-    Value* const holder = protectPointer(jit, temporary);
+    Value* const holder = protectProducerNode(jit, jit.currentNode, temporary);
     setNodeValue(jit, jit.currentNode, holder);
 }
 
@@ -634,8 +634,8 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
     ss << "lit" << (uint32_t) index << ".";
     literal->setName(ss.str());
 
-    Value* const holder = protectPointer(jit, literal);
-    setNodeValue(jit, jit.currentNode, holder);
+    //Value* const holder = protectPointer(jit, literal);
+    setNodeValue(jit, jit.currentNode, literal);
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
@@ -744,7 +744,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     blockObject = jit.builder->CreateBitCast(blockObject, m_baseTypes.object->getPointerTo());
     blockObject->setName("block.");
 
-    Value* blockHolder = protectPointer(jit, blockObject);
+    Value* blockHolder = protectProducerNode(jit, jit.currentNode, blockObject);
     setNodeValue(jit, jit.currentNode, blockHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
 }
@@ -793,7 +793,7 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     }
 
     Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-    Value* const argsHolder = protectPointer(jit, argumentsArray);
+    Value* const argsHolder = protectProducerNode(jit, jit.currentNode, argumentsArray);
     argsHolder->setName("pArgs.");
 
     setNodeValue(jit, jit.currentNode, argsHolder);
@@ -855,7 +855,7 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
             // Endoing phi and it's holder
             jit.builder->SetInsertPoint(currentBlock, currentBlock->getFirstInsertionPt());
             PHINode* const phiValue  = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), phiNode->getIncomingList().size(), "phi.");
-            Value*   const phiHolder = protectPointer(jit, phiValue);
+            Value*   const phiHolder = protectProducerNode(jit, phiNode, phiValue);
 
             phiNode->setPhiValue(phiValue);
 
@@ -866,12 +866,12 @@ Value* MethodCompiler::getNodeValue(TJITContext& jit, st::ControlNode* node, llv
             jit.builder->SetInsertPoint(currentBlock, storedInsertPoint);
 
             // Encoding the value load to be used in requesting instruction
-            value = jit.builder->CreateLoad(phiHolder);
+            value = (phiHolder == phiValue) ? static_cast<Value*>(phiValue) : jit.builder->CreateLoad(phiHolder);
         } else {
             Value* const phiHolder = getPhiValue(jit, phiNode);
 
             jit.builder->SetInsertPoint(insertBlock, insertBlock->getTerminator());
-            value = jit.builder->CreateLoad(phiHolder);
+            value = isa<AllocaInst>(phiHolder) ? jit.builder->CreateLoad(phiHolder) : phiHolder;
         }
     }
 
@@ -897,7 +897,7 @@ llvm::Value* MethodCompiler::getPhiValue(TJITContext& jit, st::PhiNode* phiNode)
     // Resetting the insertion point which may be changed in getNodeValue() before.
     jit.builder->SetInsertPoint(phiInsertBlock, phiInsertBlock->getFirstInsertionPt());
 
-    return protectPointer(jit, phiValue);
+    return protectProducerNode(jit, phiNode, phiValue);
 }
 
 void MethodCompiler::encodePhiIncomings(TJITContext& jit, st::PhiNode* phiNode)
@@ -1033,7 +1033,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     phi->addIncoming(intResultObject, integersBlock);
     phi->addIncoming(sendMessageResult, sendBinaryBlock);
 
-    Value* const resultHolder = protectPointer(jit, phi);
+    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, phi);
     setNodeValue(jit, jit.currentNode, resultHolder);
     //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
@@ -1078,7 +1078,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
 
-    Value* const resultHolder = protectPointer(jit, result);
+    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
     setNodeValue(jit, jit.currentNode, resultHolder);
 //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
@@ -1126,7 +1126,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             // value in the ControlGraph this will be redundant.
 
             Value* const original = getNodeValue(jit, jit.currentNode->getArgument());
-            Value* const copy     = protectPointer(jit, original);
+            Value* const copy     = protectProducerNode(jit, jit.currentNode, original);
 
             setNodeValue(jit, jit.currentNode, copy);
             break;
@@ -1192,7 +1192,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
             Value* const result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
-            Value* const resultHolder = protectPointer(jit, result);
+            Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
             setNodeValue(jit, jit.currentNode, resultHolder);
 //             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
