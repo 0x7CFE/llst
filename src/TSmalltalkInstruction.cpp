@@ -100,6 +100,35 @@ bool st::TSmalltalkInstruction::isTrivial() const {
     }
 }
 
+bool st::TSmalltalkInstruction::mayCauseGC() const {
+    // NOTE We expect that markArguments is encoded
+    //      directly, so no heap allocation occur
+
+    if (isTrivial() || isTerminator())
+        return false;
+
+    switch (m_opcode) {
+        case opcode::assignTemporary:
+        case opcode::assignInstance:
+            return false;
+
+        case opcode::sendUnary:
+        case opcode::sendBinary:
+        case opcode::sendMessage:
+            return true;
+
+        case opcode::doSpecial:
+            // The only special that may cause GC
+            return m_argument == special::sendToSuper;
+
+        case opcode::doPrimitive:
+            return true;
+
+        default:
+            return false;
+    }
+}
+
 bool st::TSmalltalkInstruction::isValueConsumer() const {
     switch (m_opcode) {
         case opcode::pushInstance:

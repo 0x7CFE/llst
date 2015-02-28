@@ -57,6 +57,7 @@ struct TSmalltalkInstruction {
     bool isBranch() const;
     bool isValueProvider() const;
     bool isValueConsumer() const;
+    bool mayCauseGC() const;
 
     std::string toString() const;
 
