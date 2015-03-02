@@ -660,7 +660,7 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
     ss << "lit" << (uint32_t) index << ".";
     literal->setName(ss.str());
 
-    Value* const holder = protectPointer(jit, literal);
+    Value* const holder = protectProducerNode(jit, jit.currentNode, literal);
     setNodeValue(jit, jit.currentNode, holder);
 }
 
@@ -1015,18 +1015,11 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // We need to create an arguments array and fill it with argument objects
     // Then send the message just like ordinary one
 
-    // Creation of argument array may cause the GC which will break the arguments
-    // We need to temporarily store them in a safe place
-    Value* leftValueHolder  = protectPointer(jit, leftValue);
-    Value* rightValueHolder = protectPointer(jit, rightValue);
-
     // Now creating the argument array
     Value* argumentsObject  = createArray(jit, 2);
 
-    Value* restoredLeftValue  = jit.builder->CreateLoad(leftValueHolder);
-    Value* restoredRightValue = jit.builder->CreateLoad(rightValueHolder);
-    jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(0), restoredLeftValue);
-    jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(1), restoredRightValue);
+    jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(0), leftValue);
+    jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(1), rightValue);
 
     Value* argumentsArray    = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
     Value* sendMessageArgs[] = {
