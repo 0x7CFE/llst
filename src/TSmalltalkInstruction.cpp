@@ -113,7 +113,7 @@ bool st::TSmalltalkInstruction::mayCauseGC() const {
             return false;
 
         case opcode::pushBlock:
-        case opcode::sendUnary:
+//         case opcode::sendUnary:
         case opcode::sendBinary:
         case opcode::sendMessage:
             return true;

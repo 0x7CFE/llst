@@ -180,7 +180,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     createExecuteProcessFunction();
 
     // Initializing the method compiler
-    m_methodCompiler = new MethodCompiler(m_JITModule, m_runtimeAPI, m_exceptionAPI);
+    m_methodCompiler = new MethodCompiler(*this, m_JITModule, m_runtimeAPI, m_exceptionAPI);
 
     // Initializing caches
     std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));

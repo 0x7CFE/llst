@@ -163,6 +163,8 @@ struct TBaseFunctions {
     }
 };
 
+class JITRuntime;
+
 class MethodCompiler {
 public:
 
@@ -241,6 +243,7 @@ public:
 
 
 private:
+    JITRuntime& m_runtime;
     llvm::Module* m_JITModule;
 //     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
     void scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t byteCount = 0);
@@ -282,6 +285,7 @@ private:
     void doSendUnary(TJITContext& jit);
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
+    bool doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode);
     void doSpecial(TJITContext& jit);
 
     void doPrimitive(TJITContext& jit);
@@ -330,11 +334,12 @@ public:
     TStackObject allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
     MethodCompiler(
+        JITRuntime& runtime,
         llvm::Module* JITModule,
         TRuntimeAPI   runtimeApi,
         TExceptionAPI exceptionApi
     )
-        : m_JITModule(JITModule),
+        : m_runtime(runtime), m_JITModule(JITModule),
         m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi), m_callSiteIndex(1)
     {
         m_baseTypes.initializeFromModule(JITModule);

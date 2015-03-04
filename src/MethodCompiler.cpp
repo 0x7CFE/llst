@@ -36,6 +36,7 @@
 #include <jit.h>
 
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/Analysis/Verifier.h>
 
 #include <stdarg.h>
 #include <iostream>
@@ -1061,8 +1062,179 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
+
+bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode)
+{
+    // Optimized version of doSendMessage which takes into account that
+    // pending message should be sent to the literal receiver
+    // (either constant or a member of method literals). Literal receivers
+    // are encoded at the time of method compilation, so thier value and
+    // their class will not change over time. Moreover, actual values
+    // are known at compile time and may be used to lookup the actual
+    // method that should be invoked.
+
+    // Locating message selector
+    TSymbolArray& literals   = *jit.originMethod->literals;
+    TSymbol* const messageSelector = literals[jit.currentNode->getInstruction().getArgument()];
+
+    TObject* literalReceiver = 0;
+
+    // Determining receiver class
+    const st::TSmalltalkInstruction::TOpcode opcode = receiverNode->getInstruction().getOpcode();
+    if (opcode == opcode::pushLiteral) {
+        literalReceiver = literals[receiverNode->getInstruction().getArgument()];
+    } else if (opcode == opcode::pushConstant) {
+        const uint8_t constant = receiverNode->getInstruction().getArgument();
+        switch(constant) {
+            case 0: case 1: case 2: case 3: case 4:
+            case 5: case 6: case 7: case 8: case 9:
+                literalReceiver = TInteger(constant);
+                break;
+
+            case pushConstants::nil:         literalReceiver = globals.nilObject;   break;
+            case pushConstants::trueObject:  literalReceiver = globals.trueObject;  break;
+            case pushConstants::falseObject: literalReceiver = globals.falseObject; break;
+        }
+    }
+
+    assert(literalReceiver);
+    TClass* const receiverClass = isSmallInteger(literalReceiver) ? globals.smallIntClass : literalReceiver->getClass();
+
+    // Locating a method suitable for a direct call
+    TMethod* const directMethod = m_runtime.getVM()->lookupMethod(messageSelector, receiverClass);
+
+    if (! directMethod) {
+        outs() << "Error! Could not lookup method for class "  << receiverClass->name->toString() << ", selector " << messageSelector->toString() << "\n";
+        return false;
+    }
+
+    std::string directFunctionName = directMethod->klass->name->toString() + ">>" + messageSelector->toString();
+    Function* directFunction = m_JITModule->getFunction(directFunctionName);
+
+    if (!directFunction) {
+        // Compiling function and storing it to the table for further use
+        directFunction = compileMethod(directMethod);
+
+        verifyFunction(*directFunction , llvm::AbortProcessAction);
+
+        m_runtime.optimizeFunction(directFunction);
+    }
+
+    // Allocating context object and temporaries on the methodFunction's stack.
+    // This operation does not affect garbage collector, so no pointer protection
+    // is required. Moreover, this is operation is much faster than heap allocation.
+    const bool hasTemporaries  = directMethod->temporarySize > 0;
+    const uint32_t contextSize = sizeof(TContext);
+    const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * directMethod->temporarySize : 0;
+
+    // Allocating stack space for objects and registering GC protection holder
+
+    MethodCompiler::TStackObject contextPair = allocateStackObject(*jit.builder, sizeof(TContext), 0);
+    Value* contextSlot   = contextPair.objectSlot;
+    Value* tempsSlot = 0;
+
+    if (hasTemporaries) {
+        MethodCompiler::TStackObject tempsPair = allocateStackObject(*jit.builder, sizeof(TObjectArray), directMethod->temporarySize);
+        tempsSlot = tempsPair.objectSlot;
+    }
+
+    // Filling stack space with zeroes
+    jit.builder->CreateMemSet(
+        contextSlot,             // destination address
+        jit.builder->getInt8(0), // fill with zeroes
+        contextSize,             // size of object slot
+        0,                       // no alignment
+        false                    // volatile operation
+    );
+
+    if (hasTemporaries)
+        jit.builder->CreateMemSet(
+            tempsSlot,                // destination address
+            jit.builder->getInt8(0),  // fill with zeroes
+            tempsSize,                // size of object slot
+            0,                        // no alignment
+            false                     // volatile operation
+        );
+
+    // Initializing object fields
+    // TODO Move the init sequence out of the block or check that it is correctly optimized in loops
+    Value* newContextObject  = jit.builder->CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
+    Value* newTempsObject    = hasTemporaries ? jit.builder->CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
+    Function* setObjectSize  = getBaseFunctions().setObjectSize;
+    Function* setObjectClass = getBaseFunctions().setObjectClass;
+
+    // Object size stored in the TSize field of any ordinary object contains
+    // number of pointers except for the first two fields
+    const uint32_t contextFieldsCount = contextSize / sizeof(TObject*) - 2;
+
+    jit.builder->CreateCall2(setObjectSize, newContextObject, jit.builder->getInt32(contextFieldsCount));
+    jit.builder->CreateCall2(setObjectClass, newContextObject, getJitGlobals().contextClass);
+
+    if (hasTemporaries) {
+        const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
+        jit.builder->CreateCall2(setObjectSize, newTempsObject, jit.builder->getInt32(tempsFieldsCount));
+        jit.builder->CreateCall2(setObjectClass, newTempsObject, getJitGlobals().arrayClass);
+    }
+
+    Function* setObjectField  = getBaseFunctions().setObjectField;
+    Value* methodRawPointer   = jit.builder->getInt32(reinterpret_cast<uint32_t>(directMethod));
+    Value* directMethodObject = jit.builder->CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
+
+    Value* previousContext = jit.getCurrentContext(); // jit.builder->CreateLoad(info.contextHolder);
+    Value* contextObject   = jit.builder->CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
+
+    Value* const arguments = getArgument(jit);
+    Value* messageArgumentsObject = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
+
+    jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(0), directMethodObject);
+    jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(1), messageArgumentsObject);
+    if (hasTemporaries)
+        jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), newTempsObject);
+    else
+        jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), getJitGlobals().nilObject);
+    jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(3), contextObject);
+
+    Value* newContext = jit.builder->CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
+    Value* result = 0;
+
+    if (jit.methodHasBlockReturn) {
+        // Creating basic block that will be branched to on normal invoke
+        BasicBlock* const nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+        jit.currentNode->getDomain()->getBasicBlock()->setEndValue(nextBlock);
+
+        // Performing a function invoke
+        result = jit.builder->CreateInvoke(directFunction, nextBlock, jit.exceptionLandingPad, newContext);
+
+        // Switching builder to a new block
+        jit.builder->SetInsertPoint(nextBlock);
+    } else {
+        // Just calling the function. No block switching is required
+        result = jit.builder->CreateCall(directFunction, newContext);
+    }
+
+    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
+    setNodeValue(jit, jit.currentNode, resultHolder);
+
+    return true;
+}
+
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
+
+    st::InstructionNode* const markArgumentsNode = jit.currentNode->getArgument()->cast<st::InstructionNode>();
+    assert(markArgumentsNode);
+
+    st::InstructionNode* const receiverNode = markArgumentsNode->getArgument()->cast<st::InstructionNode>();
+    assert(receiverNode);
+
+    // In case of a literal receiver we may encode direct method call
+    if (receiverNode->getInstruction().getOpcode() == opcode::pushLiteral ||
+        receiverNode->getInstruction().getOpcode() == opcode::pushConstant)
+    {
+        if (doSendMessageToLiteral(jit, receiverNode))
+            return;
+    }
+
     Value* const arguments = getArgument(jit); // jit.popValue();
 
     // First of all we need to get the actual message selector
