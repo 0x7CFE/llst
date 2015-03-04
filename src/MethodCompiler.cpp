@@ -194,6 +194,35 @@ private:
     virtual TVisitResult visitNode(st::ControlNode* node) { return m_detector.checkNode(node); }
 };
 
+bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
+{
+    class GCDetector : public st::ForwardWalker {
+    public:
+        GCDetector() : m_detected(false) {}
+
+        virtual TVisitResult visitNode(st::ControlNode* node) {
+            if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
+                if (candidate->getInstruction().mayCauseGC()) {
+                    m_detected = true;
+                    return st::GraphWalker::vrStopWalk;
+                }
+            }
+
+            return st::GraphWalker::vrKeepWalking;
+        }
+
+        bool isDetected() const { return m_detected; }
+
+    private:
+        bool m_detected;
+    };
+
+    GCDetector detector;
+    detector.run((*jit.controlGraph->begin())->getEntryPoint());
+
+    return detector.isDetected();
+}
+
 bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 {
     // We should protect the value by holder if consumer of this value is far away.
@@ -305,7 +334,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     context->setName("contextParameter");
 
     // Protecting the context holder
-    jit.contextHolder = protectPointer(jit, context);
+    jit.contextHolder = jit.methodIsTrivial ? context : protectPointer(jit, context);
     jit.contextHolder->setName("pContext");
 
     // Storing self pointer
@@ -313,18 +342,26 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* arguments = jit.builder->CreateLoad(pargs);
     Value* pobject   = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
     Value* self      = jit.builder->CreateCall2(m_baseFunctions.getObjectField, pobject, jit.builder->getInt32(0));
-    jit.selfHolder   = protectPointer(jit, self);
+    jit.selfHolder   = jit.methodIsTrivial ? self : protectPointer(jit, self);
     jit.selfHolder->setName("pSelf");
 }
 
 Value* MethodCompiler::TJITContext::getCurrentContext()
 {
-    return builder->CreateLoad(contextHolder, "context.");
+    // Trivial methods do not protect their context
+    if (isa<AllocaInst>(contextHolder))
+        return builder->CreateLoad(contextHolder, "context.");
+    else
+        return contextHolder;
 }
 
 Value* MethodCompiler::TJITContext::getSelf()
 {
-    return builder->CreateLoad(selfHolder, "self.");
+    // Trivial methods do not protect their self pointer
+    if (isa<AllocaInst>(selfHolder))
+        return builder->CreateLoad(selfHolder, "self.");
+    else
+        return selfHolder;
 }
 
 bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
@@ -426,6 +463,8 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // all send message operations as invokes, not just simple calls
     jit.methodHasBlockReturn = scanForBlockReturn(jit);
 
+    jit.methodIsTrivial = !methodAllocatesMemory(jit);
+
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
     writePreamble(jit);
@@ -462,6 +501,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 //     m_targetToBlockMap.clear();
 
     outs() << "Done compiling method " << jit.function->getName() << "\n";
+
     return jit.function;
 }
 
