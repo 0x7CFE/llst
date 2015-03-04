@@ -653,16 +653,32 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
 
-    Function* const getLiteralFromContext = m_JITModule->getFunction("getLiteralFromContext");
-    Value* const context = jit.getCurrentContext();
-    Value* const literal = jit.builder->CreateCall2(getLiteralFromContext, context, jit.builder->getInt32(index));
+    TSymbolArray&  literals = *jit.originMethod->literals;
+    TObject* const literal  = literals[index];
 
-    std::ostringstream ss;
-    ss << "lit" << (uint32_t) index << ".";
-    literal->setName(ss.str());
+    Value* result = 0;
 
-    Value* const holder = protectProducerNode(jit, jit.currentNode, literal);
-    setNodeValue(jit, jit.currentNode, holder);
+    if (isSmallInteger(literal)) {
+        Value* const integerValue = jit.builder->getInt32( TInteger(literal).rawValue() );
+        result = jit.builder->CreateIntToPtr(integerValue, m_baseTypes.object->getPointerTo());
+
+        std::ostringstream ss;
+        ss << "const" << result << ".";
+        result->setName(ss.str());
+    } else {
+        Function* const getLiteralFromContext = m_JITModule->getFunction("getLiteralFromContext");
+        Value* const context = jit.getCurrentContext();
+        Value* const literalValue = jit.builder->CreateCall2(getLiteralFromContext, context, jit.builder->getInt32(index));
+
+        std::ostringstream ss;
+        ss << "lit" << (uint32_t) index << ".";
+        literalValue->setName(ss.str());
+
+        result = protectProducerNode(jit, jit.currentNode, literalValue);
+    }
+
+    assert(result);
+    setNodeValue(jit, jit.currentNode, result);
 }
 
 void MethodCompiler::doPushConstant(TJITContext& jit)
