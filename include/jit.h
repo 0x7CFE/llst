@@ -191,6 +191,7 @@ public:
         llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
+        bool                methodAllocatesMemory;
 
         MethodCompiler* compiler; // link to outer class for variable access
 
@@ -204,8 +205,8 @@ public:
 
         TJITContext(MethodCompiler* compiler, TMethod* method, bool parse = true)
         : currentNode(0), originMethod(method), function(0), builder(0),
-          preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
-          contextHolder(0), selfHolder(0)
+            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false),
+            methodAllocatesMemory(true), compiler(compiler), contextHolder(0), selfHolder(0)
         {
             if (parse) {
                 parsedMethod = new st::ParsedMethod(method);
@@ -267,6 +268,7 @@ private:
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
     llvm::Value* protectProducerNode(TJITContext& jit, st::ControlNode* node, llvm::Value* value);
     bool shouldProtectProducer(st::ControlNode* node);
+    bool methodAllocatesMemory(TJITContext& jit);
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
     void writeFunctionBody(TJITContext& jit);

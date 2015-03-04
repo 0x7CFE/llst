@@ -334,7 +334,7 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     context->setName("contextParameter");
 
     // Protecting the context holder
-    jit.contextHolder = jit.methodIsTrivial ? context : protectPointer(jit, context);
+    jit.contextHolder = jit.methodAllocatesMemory ? protectPointer(jit, context) : context;
     jit.contextHolder->setName("pContext");
 
     // Storing self pointer
@@ -342,14 +342,13 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     Value* arguments = jit.builder->CreateLoad(pargs);
     Value* pobject   = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
     Value* self      = jit.builder->CreateCall2(m_baseFunctions.getObjectField, pobject, jit.builder->getInt32(0));
-    jit.selfHolder   = jit.methodIsTrivial ? self : protectPointer(jit, self);
+    jit.selfHolder   = jit.methodAllocatesMemory ? protectPointer(jit, self) : self;
     jit.selfHolder->setName("pSelf");
 }
 
 Value* MethodCompiler::TJITContext::getCurrentContext()
 {
-    // Trivial methods do not protect their context
-    if (isa<AllocaInst>(contextHolder))
+    if (methodAllocatesMemory)
         return builder->CreateLoad(contextHolder, "context.");
     else
         return contextHolder;
@@ -357,8 +356,7 @@ Value* MethodCompiler::TJITContext::getCurrentContext()
 
 Value* MethodCompiler::TJITContext::getSelf()
 {
-    // Trivial methods do not protect their self pointer
-    if (isa<AllocaInst>(selfHolder))
+    if (methodAllocatesMemory)
         return builder->CreateLoad(selfHolder, "self.");
     else
         return selfHolder;
@@ -463,7 +461,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // all send message operations as invokes, not just simple calls
     jit.methodHasBlockReturn = scanForBlockReturn(jit);
 
-    jit.methodIsTrivial = !methodAllocatesMemory(jit);
+    jit.methodAllocatesMemory = methodAllocatesMemory(jit);
 
     // Writing the function preamble and initializing
     // commonly used pointers such as method arguments or temporaries
