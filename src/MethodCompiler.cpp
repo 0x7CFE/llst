@@ -643,18 +643,13 @@ void MethodCompiler::doPushInstance(TJITContext& jit)
 
 void MethodCompiler::doPushArgument(TJITContext& jit)
 {
-    /* const st::TNodeList& consumers = jit.currentNode->getConsumers();
-    if (consumers.empty()) {
-        assert(false);
+    const uint8_t index = jit.currentNode->getInstruction().getArgument();
+
+    if (index == 0) {
+        // Optimizing self
+        setNodeValue(jit, jit.currentNode, jit.selfHolder);
         return;
     }
-
-    // If we have only one consumer it's better to encode instruction near it.
-    // It would be consumer's responsibility to encode us before it's site.
-    if (consumers.size() == 1)
-        return; */
-
-    const uint8_t index = jit.currentNode->getInstruction().getArgument();
 
     Function* const getArgFromContext = m_JITModule->getFunction("getArgFromContext");
     Value* const context  = jit.getCurrentContext();
