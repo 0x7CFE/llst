@@ -41,15 +41,15 @@ TEST_P(P_DecodeBytecode, StackSemanticsTemps)
 
                     {
                         SCOPED_TRACE("Second arg must be phi");
-                        EXPECT_EQ( secondArg->getNodeType(), st::ControlNode::ntPhi );
+                        EXPECT_EQ( st::ControlNode::ntPhi, secondArg->getNodeType() );
                     }
                     {
                         SCOPED_TRACE("First arg must be PushTemporary");
-                        EXPECT_EQ( firstArg->getNodeType(), st::ControlNode::ntInstruction );
+                        EXPECT_EQ( st::ControlNode::ntInstruction, firstArg->getNodeType() );
                         st::InstructionNode* pushTemp = firstArg->cast<st::InstructionNode>();
                         EXPECT_TRUE(pushTemp != NULL);
                         if (pushTemp)
-                            EXPECT_EQ(pushTemp->getInstruction().getOpcode(), opcode::pushTemporary);
+                            EXPECT_EQ( opcode::pushTemporary, pushTemp->getInstruction().getOpcode() );
                     }
 
                     return false;

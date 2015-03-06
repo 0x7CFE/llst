@@ -30,19 +30,19 @@ void checkSendBinaryArg(st::ControlNode* arg)
 {
     {
         SCOPED_TRACE("Each argument of sendBinary is a phi node");
-        EXPECT_EQ( arg->getNodeType(), st::ControlNode::ntPhi);
+        ASSERT_EQ( st::ControlNode::ntPhi, arg->getNodeType());
     }
     {
         SCOPED_TRACE("Each argument of sendBinary has 2 egdes");
-        EXPECT_EQ( arg->getInEdges().size(), 2);
+        ASSERT_EQ( 2, arg->getInEdges().size() );
     }
     {
         SCOPED_TRACE("Each edge of arg-phi is a PushConstant");
         for(st::TNodeSet::iterator i = arg->getInEdges().begin(); i != arg->getInEdges().end(); i++) {
             st::ControlNode* edge = *i;
-            EXPECT_EQ( edge->getNodeType(), st::ControlNode::ntInstruction );
+            ASSERT_EQ( st::ControlNode::ntInstruction, edge->getNodeType() );
             if (st::InstructionNode* edgeInst = edge->cast<st::InstructionNode>()) {
-                EXPECT_EQ( edgeInst->getInstruction().getOpcode(), opcode::pushConstant );
+                ASSERT_EQ( opcode::pushConstant, edgeInst->getInstruction().getOpcode() );
             }
         }
     }
@@ -62,8 +62,8 @@ TEST_P(P_DecodeBytecode, ABAB)
                 {
                     sendBinaryFound = true;
 
-                    EXPECT_EQ( inst->getInEdges().size(), 4); // 2 branches + 2 phis
-                    EXPECT_EQ( inst->getArgumentsCount(), 2);
+                    EXPECT_EQ( 4, inst->getInEdges().size()); // 2 branches + 2 phis
+                    EXPECT_EQ( 2, inst->getArgumentsCount() );
                     st::ControlNode* firstArg = inst->getArgument(0);
                     st::ControlNode* secondArg = inst->getArgument(1);
                     EXPECT_NE(firstArg, secondArg);
