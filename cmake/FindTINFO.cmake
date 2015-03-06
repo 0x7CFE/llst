@@ -5,9 +5,8 @@
 #  TINFO_INCLUDE_DIRS
 #  TINFO_LIBRARIES
 
-find_library(TINFO_LIBRARIES
-    NAMES tinfo
-)
+find_library(TINFO_LIBRARIES NAMES tinfo)
+mark_as_advanced(TINFO_LIBRARIES)
 
 include(FindPackageHandleStandardArgs)
 FIND_PACKAGE_HANDLE_STANDARD_ARGS( tinfo DEFAULT_MSG TINFO_LIBRARIES )
