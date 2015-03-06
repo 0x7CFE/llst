@@ -20,13 +20,11 @@ option(USE_POD2MAN "Should we use pod2man to build the documentation (we will cr
 if (USE_LLVM)
     if (LLVM_FOUND)
         message(STATUS "Using LLVM ${LLVM_VERSION}")
-        set (CMAKE_EXE_LINKER_FLAGS "${LLVM_LD_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
-
         # LLVM generates loads of warnings...
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
-
+        set (CMAKE_CXX_FLAGS "${LLVM_CPP_FLAGS} ${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
         set (LLVM_LIBS_TO_LINK ${LLVM_LIBS})
-        add_definitions(-DLLVM ${LLVM_CPP_FLAGS})
+        link_directories(${LLVM_LIB_DIR})
+        add_definitions(-DLLVM)
     else()
         message(FATAL_ERROR "\nInstall llvm-${LLVM_PACKAGE_VERSION}-dev:i386 and try again.")
     endif()
