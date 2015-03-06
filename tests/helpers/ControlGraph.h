@@ -364,8 +364,8 @@ void H_CheckCFGCorrect(st::ControlGraph* graph)
         visitor.run();
     }
     {
-        H_BranchJumpsOnCorrectNode visitor(graph);
-        visitor.run();
+    //    H_BranchJumpsOnCorrectNode visitor(graph);
+    //    visitor.run();
     }
 }
 
