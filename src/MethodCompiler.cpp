@@ -871,13 +871,9 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
         Value* const argument = getArgument(jit, index - 1); // jit.popValue();
         jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), argument);
     }
-
     Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-    Value* const argsHolder = protectProducerNode(jit, jit.currentNode, argumentsArray);
-    argsHolder->setName("pArgs.");
 
-    setNodeValue(jit, jit.currentNode, argsHolder);
-    //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
+    setNodeValue(jit, jit.currentNode, argumentsArray);
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
