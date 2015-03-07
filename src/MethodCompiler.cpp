@@ -257,9 +257,9 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 
                 if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
                     if (candidate->getInstruction().mayCauseGC()) {
-                        outs() << "Producer " << producer->getIndex()
-                               << " should be protected because node "
-                               << candidate->getIndex() << " may cause GC\n";
+//                         outs() << "Producer " << producer->getIndex()
+//                                << " should be protected because node "
+//                                << candidate->getIndex() << " may cause GC\n";
 
                         return true;
                     }
@@ -295,8 +295,8 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
         walker.run(consumer, st::GraphWalker::wdBackward);
 
         if (detector.isDetected()) {
-            outs() << "Producer " << producer->getIndex()
-                   << " should be protected because detector says that it is required\n";
+//             outs() << "Producer " << producer->getIndex()
+//                    << " should be protected because detector says that it is required\n";
 
             return true;
         }
@@ -412,7 +412,7 @@ void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* sourc
     visitor.run();
 }
 
-Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
+TObjectAndSize MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
 {
     TStackObject array = allocateStackObject(*jit.builder, sizeof(TObjectArray), elementsCount);
     // Instantinating new array object
@@ -430,7 +430,7 @@ Value* MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCount)
     jit.builder->CreateCall2(m_baseFunctions.setObjectSize, arrayObject, jit.builder->getInt32(elementsCount));
     jit.builder->CreateCall2(m_baseFunctions.setObjectClass, arrayObject, m_globals.arrayClass);
 
-    return arrayObject;
+    return std::make_pair(arrayObject, arraySize);
 }
 
 Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
@@ -807,7 +807,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 //         outs() << *blockContext.function << "\n";
 
         // Running optimization passes on a block function
-        JITRuntime::Instance()->optimizeFunction(blockContext.function);
+        JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
 
 //         outs() << *blockContext.function << "\n";
     }
@@ -862,7 +862,9 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
 
     // FIXME Probably we may unroll the arguments array and pass the values directly.
     //       However, in some cases this may lead to additional architectural problems.
-    Value* const argumentsObject = createArray(jit, argumentsCount);
+    TObjectAndSize array = createArray(jit, argumentsCount);
+    Value* const argumentsObject = array.first;
+    const uint32_t sizeInBytes = array.second;
 
     // Filling object with contents
     uint8_t index = argumentsCount;
@@ -872,8 +874,15 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
         jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), argument);
     }
     Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
+    //Value* const argsHolder = protectProducerNode(jit, jit.currentNode, argumentsArray);
+    //argsHolder->setName("pArgs.");
+
+    Value* const argumentsPointer = jit.builder->CreateBitCast(argumentsObject, jit.builder->getInt8PtrTy());
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_start);
+    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->getInt64(sizeInBytes), argumentsPointer);
 
     setNodeValue(jit, jit.currentNode, argumentsArray);
+    //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
@@ -1062,7 +1071,9 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // Then send the message just like ordinary one
 
     // Now creating the argument array
-    Value* argumentsObject  = createArray(jit, 2);
+    TObjectAndSize array = createArray(jit, 2);
+    Value* const argumentsObject = array.first;
+    const uint32_t sizeInBytes = array.second; // TODO lifetime
 
     jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(0), leftValue);
     jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(1), rightValue);
@@ -1108,7 +1119,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 }
 
 
-bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode)
+bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode, TClass* receiverClass /*= 0*/)
 {
     // Optimized version of doSendMessage which takes into account that
     // pending message should be sent to the literal receiver
@@ -1122,28 +1133,32 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
     TSymbolArray& literals   = *jit.originMethod->literals;
     TSymbol* const messageSelector = literals[jit.currentNode->getInstruction().getArgument()];
 
-    TObject* literalReceiver = 0;
-
     // Determining receiver class
-    const st::TSmalltalkInstruction::TOpcode opcode = receiverNode->getInstruction().getOpcode();
-    if (opcode == opcode::pushLiteral) {
-        literalReceiver = literals[receiverNode->getInstruction().getArgument()];
-    } else if (opcode == opcode::pushConstant) {
-        const uint8_t constant = receiverNode->getInstruction().getArgument();
-        switch(constant) {
-            case 0: case 1: case 2: case 3: case 4:
-            case 5: case 6: case 7: case 8: case 9:
-                literalReceiver = TInteger(constant);
-                break;
+    if (!receiverClass) {
+        TObject* literalReceiver = 0;
 
-            case pushConstants::nil:         literalReceiver = globals.nilObject;   break;
-            case pushConstants::trueObject:  literalReceiver = globals.trueObject;  break;
-            case pushConstants::falseObject: literalReceiver = globals.falseObject; break;
+        const st::TSmalltalkInstruction::TOpcode opcode = receiverNode->getInstruction().getOpcode();
+        if (opcode == opcode::pushLiteral) {
+            literalReceiver = literals[receiverNode->getInstruction().getArgument()];
+        } else if (opcode == opcode::pushConstant) {
+            const uint8_t constant = receiverNode->getInstruction().getArgument();
+            switch(constant) {
+                case 0: case 1: case 2: case 3: case 4:
+                case 5: case 6: case 7: case 8: case 9:
+                    literalReceiver = TInteger(constant);
+                    break;
+
+                case pushConstants::nil:         literalReceiver = globals.nilObject;   break;
+                case pushConstants::trueObject:  literalReceiver = globals.trueObject;  break;
+                case pushConstants::falseObject: literalReceiver = globals.falseObject; break;
+            }
         }
+
+        assert(literalReceiver);
+        receiverClass = isSmallInteger(literalReceiver) ? globals.smallIntClass : literalReceiver->getClass();
     }
 
-    assert(literalReceiver);
-    TClass* const receiverClass = isSmallInteger(literalReceiver) ? globals.smallIntClass : literalReceiver->getClass();
+    assert(receiverClass);
 
     // Locating a method suitable for a direct call
     TMethod* const directMethod = m_runtime.getVM()->lookupMethod(messageSelector, receiverClass);
@@ -1162,7 +1177,7 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
 
         verifyFunction(*directFunction , llvm::AbortProcessAction);
 
-        m_runtime.optimizeFunction(directFunction);
+        m_runtime.optimizeFunction(directFunction, false);
     }
 
     // Allocating context object and temporaries on the methodFunction's stack.
@@ -1257,6 +1272,11 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
         result = jit.builder->CreateCall(directFunction, newContext);
     }
 
+    AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
+    Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
+    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
+
     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
     setNodeValue(jit, jit.currentNode, resultHolder);
 
@@ -1272,12 +1292,29 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     st::InstructionNode* const receiverNode = markArgumentsNode->getArgument()->cast<st::InstructionNode>();
     assert(receiverNode);
 
+    const st::TSmalltalkInstruction instruction = receiverNode->getInstruction();
+
     // In case of a literal receiver we may encode direct method call
-    if (receiverNode->getInstruction().getOpcode() == opcode::pushLiteral ||
-        receiverNode->getInstruction().getOpcode() == opcode::pushConstant)
+    if (instruction.getOpcode() == opcode::pushLiteral ||
+        instruction.getOpcode() == opcode::pushConstant)
     {
         if (doSendMessageToLiteral(jit, receiverNode))
             return;
+    }
+
+    // We may optimize send to self if clas does not have children
+    // TODO More optimization possible: send to super, if chiildren do not override selector
+    if (instruction.getOpcode() == opcode::pushArgument && instruction.getArgument() == 0)
+    {
+        TClass* const receiverClass = jit.originMethod->klass;
+
+//         TODO if (sendToSuper)
+//             receiverClass = receiverClass->parentClass;
+
+        if (receiverClass->package == globals.nilObject) {
+            if (doSendMessageToLiteral(jit, receiverNode, receiverClass))
+                return;
+        }
     }
 
     Value* const arguments = getArgument(jit); // jit.popValue();
@@ -1317,6 +1354,11 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         // Just calling the function. No block switching is required
         result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
     }
+
+    AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
+    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
+    Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
+    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
     setNodeValue(jit, jit.currentNode, resultHolder);
@@ -1850,7 +1892,10 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
         default: {
             // Here we need to create the arguments array from the values on the stack
             const uint8_t argumentsCount = jit.currentNode->getInstruction().getArgument();
-            Value* const argumentsObject    = createArray(jit, argumentsCount);
+
+            TObjectAndSize array = createArray(jit, argumentsCount);
+            Value* const argumentsObject = array.first;
+            const uint32_t sizeInBytes = array.second; // TODO lifetime
 
             // Filling object with contents
             uint8_t index = argumentsCount;

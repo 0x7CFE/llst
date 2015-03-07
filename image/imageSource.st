@@ -49,7 +49,7 @@ COMMENT RAWCLASS doesn't automatically build Meta class; CLASS does
 COMMENT-----------------------------------------------------------
 COMMENT		The strange circular world at the beginning
 COMMENT RAWCLASS Object MetaObject nil
-RAWCLASS Class      MetaClass Object      name parentClass methods size variables package
+RAWCLASS Class      MetaClass Object      name parentClass methods size variables children
 RAWCLASS MetaObject Class     Class
 RAWCLASS MetaClass  Class     MetaObject
 COMMENT--------------------------------------------------------
@@ -276,7 +276,7 @@ name: n parent: c variables: v
 	methods <- Dictionary new.
 	size <- v size + c size.
 	variables <- v.
-	package <- nil.
+	children <- nil.
 !
 METHOD Class
 size
@@ -302,6 +302,29 @@ METHOD Class
 subclasses
 	self subclasses: 0
 !
+
+METHOD Class
+children
+    ^children
+!
+
+METHOD Class
+registerChild: aClass
+    children isNil ifTrue: [ children <- List new ].
+    children addLast: aClass.
+!
+
+METHOD MetaClass
+fillChildren |parent|
+    globals do: [ :obj |
+        (obj isKindOf: Class)
+            ifTrue: [
+                parent <- obj parent.
+                parent notNil ifTrue: [ parent registerChild: obj ]
+        ]
+    ]
+!
+
 METHOD Class
 subclasses: indent
 	globals do: [ :obj |
@@ -382,7 +405,6 @@ addMethod: text | meth |
 	meth notNil ifTrue: [
 		methods at: meth name put: meth.
 		Method flushCache.
-		'ok' printNl.
 		^ meth
 	].
 	^ nil
@@ -1532,6 +1554,11 @@ printMethod: aMethod
 !
 
 METHOD MetaJit
+printMethod: aSelector ofClass: aClass
+    self printMethod: (aClass methods at: aSelector)
+!
+
+METHOD MetaJit
 patchHotMethods
     <250>
 !
@@ -1631,7 +1658,7 @@ pushConstants |testBlock|
 METHOD Undefined
 sortTest | list |
     list <- List new.
-    1 to: 100 do: [ :x | list add: 1000 atRandom ].
+    1 to: 10000 do: [ :x | list add: 1000 atRandom ].
     list <- list sort.
     ^list
 
@@ -1694,32 +1721,24 @@ runSortBenchmarkFor: data
 !
 
 METHOD MetaSystem
-rebuildImage | classes |
+rebuildImage | classes methods |
     classes <- List new.
     globals do: [ :global |
         (global isKindOf: Class)
             ifTrue: [ classes add: global ] ].
 
+    methods <- List new.
     classes do: [ :class | class methods do:
-        [ :method | self rebuildMethod: method for: class ] ]
+        [ :method | methods add:
+            (self rebuildMethod: method for: class) ] ].
 !
 
 METHOD MetaSystem
-rebuildMethod: aMethod for: aClass | newMethod |
-    (aClass = Undefined)
-        ifTrue: [
-            'Compiling ' print. aClass print. ':' print.
-            aMethod name print. '... ' print.
-        ].
+rebuildMethod: aMethod for: aClass
+    "'Compiling ' print. aClass print. ':' print.
+    aMethod name print. '... ' printNl."
 
-    newMethod <- aClass parseMethod: aMethod text.
-    newMethod notNil
-        ifTrue:  [ 'ok' printNl ]
-        ifFalse: [ ^nil ].
-
-    self assignClass: aClass to: newMethod.
-    aClass methods at: (aMethod name) put: newMethod.
-    Method flushCache.
+    ^aClass parseMethod: aMethod text.
 !
 
 METHOD MetaSystem
@@ -1760,35 +1779,58 @@ fixMethodClasses | classes |
 !
 
 METHOD Undefined
+inlineTest1
+    ^42
+!
+
+METHOD Undefined
+inlineTest2
+    ^'Hello world'
+!
+
+METHOD Undefined
+inlineTest3
+    ^self inlineTest1
+!
+
+METHOD Undefined
+inlineTest4
+    ^'Hello world' printString
+!
+
+METHOD Undefined
+inlineTest |x y z t|
+    x <- self inlineTest1.
+    y <- self inlineTest2.
+    z <- self inlineTest3.
+    t <- self inlineTest4.
+!
+
+METHOD Undefined
+factTest: x
+    ^(x = 1) ifTrue: [1] ifFalse: [self factTest: x - 1]
+!
+
+METHOD Undefined
 main    | command  data x |
     Char initialize.
-    "System fixMethodClasses."
-
-    "SmallIntTest new runAll.
-    ArrayTest new runAll.
-    PrimitiveTest new runAll.
-    MagnitudeTest new runAll.
-    ListTest new runAll.
-    MethodLookupTest new runAll."
+    Class fillChildren.
+    System fixMethodClasses.
+    "Jit do: [ nil inlineTest ]."
 
     "Scheduler initialize.
     Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
     Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
     Scheduler run."
 
-    "'Preparing test data ...' print.
-    data <- List new.
-    1 to: 1000 do: [ :x | data add: 100000 atRandom ].
-    'done' printNl.
+    "'Soft run: ' print. (Timer millisecondsToRun: [ System rebuildImage ]) printNl."
+    "'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl."
+    "'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl."
 
-    'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
-    'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    "Jit patchHotMethods.
 
-    Jit patchHotMethods.
-
-    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
+    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl.
+    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl."
 
     "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
 
@@ -1796,7 +1838,9 @@ main    | command  data x |
 
     "Jit do: [ nil runSort: 10000 ]."
     "Jit do: [ 'hello' printNl ]."
-    "Jit do: [ System rebuildImage ]."
+    "Jit do: [ System rebuildImage ].
+    Jit printStatistics.
+    Jit patchHotMethods."
     "Jit do: [ [ :p | x <- p ] value: 42 ]."
     "Jit do: [ SmallIntTest new runAll ]."
 
@@ -2488,9 +2532,8 @@ insertSort: criteria | result |
 
 METHOD Collection
 sort: criteria | left right mediane |
-    "(self size < 2) ifTrue: [^self]."
-    (self size < 32)
-        ifTrue: [ ^ self insertSort: criteria ].
+    (self size < 2) ifTrue: [^self].
+    "(self size < 32) ifTrue: [ ^ self insertSort: criteria ]."
 
     mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
 
@@ -4433,10 +4476,6 @@ parse: c with: encoderClass	| encoder meth name |
 	self nextLex.
 	encoder <- encoderClass new.
 	name <- self readMethodName.
-	(c ~= Undefined) ifTrue: [
-		'Compiling ' print. c print. ':' print.
-		name print. '... ' print
-	].
 	encoder name: name.
 	self readMethodVariables.
 	self readBody compile: encoder block: false.
@@ -4461,13 +4500,16 @@ currentChar
 	^ text at: index ifAbsent: [ Char eof ]
 !
 METHOD Parser
-nextChar
-  | c |
-  c <- self currentChar.
-	(c = Char newline) ifTrue: [ lineNum <- lineNum + 1 ].
-	index <- index + 1.
-  (c = Char cr) ifTrue: [ ^self nextChar ]
-	^self currentChar
+nextChar | c |
+    c <- self currentChar.
+    (c = Char newline)
+        ifTrue: [ lineNum <- lineNum + 1 ].
+
+    index <- index + 1.
+    (c = Char cr)
+        ifTrue: [ ^self nextChar ].
+
+    ^self currentChar
 !
 METHOD Parser
 nextLex
@@ -4670,7 +4712,7 @@ nameNode: name
         (name == (instNames at: i))
             ifTrue: [ ^ (InstNode at: lineNum) position: i ] ].
 
-    ^ (LiteralNode at: lineNum);
+    ^ (LiteralNode at: lineNum)
         value: (globals at: name
             ifAbsent: [ ^ self error:
                 'unrecognized name: ' + name printString ])
@@ -4778,43 +4820,53 @@ readBlockTemporaries
 !
 METHOD Parser
 readCascade: base   | node list |
-	node <- self keywordContinuation: base.
-	tokenType = $;
-		ifTrue: [ node <- (CascadeNode at: lineNum) head: node.
-			list <- List new.
-			[ tokenType = $; ]
-				whileTrue: [ self nextLex.
-					list add:
-						(self keywordContinuation: nil ) ].
-			node list: list ].
-	^ node
+    node <- self keywordContinuation: base.
+
+    tokenType = $; ifTrue: [
+        node <- (CascadeNode at: lineNum) head: node.
+        list <- List new.
+
+        [ tokenType = $; ] whileTrue: [
+            self nextLex.
+            list add: (self keywordContinuation: nil)
+        ].
+
+        node list: list
+    ].
+
+    ^ node
 !
 METHOD Parser
 keywordContinuation: base  | receiver name args lnum |
-	receiver <- self binaryContinuation: base.
-	self tokenIsKeyword
-		ifFalse: [ ^ receiver ].
-	name <- ''.
-	args <- List new.
-	lnum <- lineNum.
-	[ self tokenIsKeyword ]
-		whileTrue: [ name <- name + token. self nextLex.
-			args add:
-				(self binaryContinuation: self readTerm) ].
-	^ (MessageNode at: lnum) receiver:
-		receiver name: name asSymbol arguments: args
+    receiver <- self binaryContinuation: base.
+    self tokenIsKeyword ifFalse: [ ^receiver ].
+
+    name <- ''.
+    args <- List new.
+    lnum <- lineNum.
+
+    [ self tokenIsKeyword ] whileTrue: [
+        name <- name + token. self nextLex.
+        args add: (self binaryContinuation: self readTerm) ].
+
+    ^ (MessageNode at: lnum)
+        receiver: receiver
+        name: name asSymbol
+        arguments: args
 !
 METHOD Parser
 binaryContinuation: base | receiver name lnum |
-	receiver <- self unaryContinuation: base.
-	[ self tokenIsBinary]
-		whileTrue: [ lnum <- lineNum.
-			name <- token asSymbol. self nextLex.
-			receiver <- (MessageNode at: lnum)
-				receiver: receiver name: name arguments:
-					(List with:
-						(self unaryContinuation: self readTerm)) ].
-	^ receiver
+    receiver <- self unaryContinuation: base.
+
+    [ self tokenIsBinary ] whileTrue: [
+        lnum <- lineNum.
+        name <- token asSymbol. self nextLex.
+        receiver <- (MessageNode at: lnum)
+            receiver: receiver
+            name: name
+            arguments: (List with: (self unaryContinuation: self readTerm)) ].
+
+    ^receiver
 !
 METHOD Parser
 unaryContinuation: base | receiver lnum |

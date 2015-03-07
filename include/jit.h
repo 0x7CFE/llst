@@ -165,6 +165,8 @@ struct TBaseFunctions {
 
 class JITRuntime;
 
+typedef std::pair<llvm::Value*, uint32_t> TObjectAndSize;
+
 class MethodCompiler {
 public:
 
@@ -287,7 +289,7 @@ private:
     void doSendUnary(TJITContext& jit);
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
-    bool doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode);
+    bool doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode, TClass* receiverClass = 0);
     void doSpecial(TJITContext& jit);
 
     void doPrimitive(TJITContext& jit);
@@ -304,7 +306,7 @@ private:
                                 llvm::Value*& primitiveResult,
                                 llvm::BasicBlock* primitiveFailedBB);
 
-    llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
+    TObjectAndSize createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
 
     uint16_t getSkipOffset(st::InstructionNode* branch);
@@ -466,6 +468,8 @@ public:
 
         llvm::Value* contextHolder;
         llvm::Value* tempsHolder;
+
+        TDirectBlock() : basicBlock(0), returnValue(0), contextHolder(0), tempsHolder(0) {}
     };
 
     struct TPatchInfo {
@@ -504,7 +508,7 @@ public:
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
     llvm::Module* getModule() { return m_JITModule; }
 
-    void optimizeFunction(llvm::Function* function);
+    void optimizeFunction(llvm::Function* function, bool runModulePass);
     void printStat();
 
     void initialize(SmalltalkVM* softVM);

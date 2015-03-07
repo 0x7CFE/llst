@@ -95,7 +95,7 @@ void JITRuntime::printStat()
 
     std::printf("\nHot methods:\n");
     std::printf("\tHit count\tMethod name\n");
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < 100; i++) {
         if (hotMethods.empty())
             break;
 
@@ -275,12 +275,13 @@ void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blo
 }
 
 
-void JITRuntime::optimizeFunction(Function* function)
+void JITRuntime::optimizeFunction(Function* function, bool runModulePass)
 {
-    m_modulePassManager->run(*m_JITModule);
-
     // Running the optimization passes on a function
     m_functionPassManager->run(*function);
+
+    if (runModulePass)
+        m_modulePassManager->run(*m_JITModule);
 }
 
 TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
@@ -309,11 +310,11 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
                 std::exit(1);
             }
 
-            outs() << *blockFunction << "\n";
+//             outs() << *blockFunction << "\n";
 
             verifyModule(*m_JITModule, AbortProcessAction);
 
-            optimizeFunction(blockFunction);
+            optimizeFunction(blockFunction, true);
         }
 
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
@@ -362,11 +363,11 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 // Compiling function and storing it to the table for further use
                 methodFunction = m_methodCompiler->compileMethod(method);
 
-                outs() << *methodFunction << "\n";
+//                 outs() << *methodFunction << "\n";
 
                 verifyModule(*m_JITModule, AbortProcessAction);
 
-                optimizeFunction(methodFunction);
+                optimizeFunction(methodFunction, true);
             }
 
             // Calling the method and returning the result
@@ -379,7 +380,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
         }
 
         // Updating call site statistics and scheduling method processing
-        updateHotSites(compiledMethodFunction, callingContext, message, receiverClass, callSiteIndex);
+        updateHotSites(compiledMethodFunction, previousContext, message, receiverClass, callSiteIndex);
 
         // Preparing the context objects. Because we do not call the software
         // implementation here, we do not need to allocate the stack object
@@ -421,6 +422,9 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
     // TODO reload cache if callerMethodFunction was popped out
 
+    if (!callerMethodFunction)
+        return;
+
     THotMethod& callerMethod = m_hotMethods[callerMethodFunction];
     TCallSite& callSite = callerMethod.callSites[callSiteIndex];
 
@@ -451,7 +455,7 @@ void JITRuntime::patchHotMethods()
     outs() << "Patching active methods that have hot call sites\n";
 
     // Processing 50 most active methods
-    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+    for (uint32_t i = 0, j = hotMethods.size()-1; /*(i < 50) &&*/ (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
 
         // We're interested only in methods with call sites
@@ -492,7 +496,7 @@ void JITRuntime::patchHotMethods()
     }
 
     // Running optimization passes on functions
-    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+    for (uint32_t i = 0, j = hotMethods.size()-1; /*(i < 50) &&*/ (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
 
         // We're interested only in methods with call sites
@@ -505,7 +509,7 @@ void JITRuntime::patchHotMethods()
             continue;
 
         outs() << "Optimizing " << hotMethod->methodFunction->getName().str() << " ...";
-        optimizeFunction(hotMethod->methodFunction);
+        optimizeFunction(hotMethod->methodFunction, false);
 
         outs() << "done. Verifying ...";
 
@@ -516,8 +520,12 @@ void JITRuntime::patchHotMethods()
         outs() << "done.\n";
     }
 
+    outs() << "Inlining methods...";
+    m_modulePassManager->run(*m_JITModule);
+    outs() << "done.\n";
+
     // Compiling functions
-    for (uint32_t i = 0, j = hotMethods.size()-1; (i < 50) && (i < hotMethods.size()); i++, j--) {
+    for (uint32_t i = 0, j = hotMethods.size()-1; /*(i < 50) &&*/ (i < hotMethods.size()); i++, j--) {
         THotMethod* hotMethod = hotMethods[j];
 
         // We're interested only in methods with call sites
@@ -573,13 +581,19 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
 
     // FIXME Probably we need to select only N most active class hits
     for (TCallSite::TClassHitsMap::iterator iClassHit = classHits.begin(); iClassHit != classHits.end(); ++iClassHit) {
+        // Locating a method suitable for a direct call
+        TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
+        if (!directMethod) {
+            outs() << "Lookup failed for handler of " << callSite.messageSelector->toString() << " starting at " << iClassHit->first->name->toString() << "\n";
+            directBlocks[iClassHit->first] = TDirectBlock();
+            continue;
+        }
+
         TDirectBlock newBlock;
         newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", info.callInstruction->getParent()->getParent(), info.nextBlock);
 
         builder.SetInsertPoint(newBlock.basicBlock);
 
-        // Locating a method suitable for a direct call
-        TMethod* directMethod = m_softVM->lookupMethod(callSite.messageSelector, iClassHit->first); // TODO check for 0
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
 
@@ -789,7 +803,7 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
     originBlock->getInstList().pop_back();
 
     // Checking whether we may perform constant class propagation
-    bool isLiteralReceiver = detectLiteralReceiver(info.messageArguments) && (directBlocks.size() == 1);
+    const bool isLiteralReceiver = false; // detectLiteralReceiver(info.messageArguments) && (directBlocks.size() == 1);
 
     if (! isLiteralReceiver) {
         // Fallback block contains original call to default JIT sendMessage handler.
@@ -846,6 +860,12 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
         }
 
         for (TDirectBlockMap::iterator iBlock = directBlocks.begin(); iBlock != directBlocks.end(); ++iBlock)  {
+            if (! iBlock->second.basicBlock) {
+                outs() << "Skipping malformed direct block, selector " << callSite.messageSelector->toString()
+                << " class " << iBlock->first->name->toString() << " call site index " << callSiteIndex << "\n";
+                continue;
+            }
+
             TClass* klass = iBlock->first;
             TDirectBlock& directBlock = iBlock->second;
 
