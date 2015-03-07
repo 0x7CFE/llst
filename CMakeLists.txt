@@ -4,7 +4,7 @@ set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_SOURCE_DIR}/cmake/variables.cmake")
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 set (LLVM_PACKAGE_VERSION 3.3)
 
-project(llst-project)
+project(llst)
 
 find_package(Threads REQUIRED QUIET)
 find_package(READLINE)
@@ -132,8 +132,10 @@ set (CPACK_STRIP_FILES "llst")
 
 
 set (CPACK_GENERATOR "DEB")
+set (CPACK_DEBIAN_PACKAGE_HOMEPAGE "http://llst.org")
 set (CPACK_DEBIAN_PACKAGE_MAINTAINER "Team <info@llst.org>")
-set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6")
+set (CPACK_DEBIAN_PACKAGE_ARCHITECTURE "i386")
+set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6:i386, libgcc1:i386, libstdc++6:i386, libreadline6:i386, libtinfo5:i386")
 
 include(CPack)
 
