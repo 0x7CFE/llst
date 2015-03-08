@@ -440,7 +440,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // Creating the function named as "Class>>method" or using provided one
     jit.function = methodFunction ? methodFunction : createFunction(method);
 
-    outs() << "Compiling " << jit.function->getName() << "\n";
+//     outs() << "Compiling " << jit.function->getName() << "\n";
 
 //     {
 //         std::ostringstream ss;
@@ -498,7 +498,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     m_blockFunctions.clear();
 //     m_targetToBlockMap.clear();
 
-    outs() << "Done compiling method " << jit.function->getName() << "\n";
+//     outs() << "Done compiling method " << jit.function->getName() << "\n";
 
     return jit.function;
 }
@@ -762,7 +762,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
-    outs() << "Compiling block " << blockFunctionName << "\n";
+//     outs() << "Compiling block " << blockFunctionName << "\n";
 
 //     {
 //         std::ostringstream ss;
@@ -812,7 +812,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 //         outs() << *blockContext.function << "\n";
     }
 
-    outs() << "Done compiling block " << blockFunctionName << "\n";
+//     outs() << "Done compiling block " << blockFunctionName << "\n";
 
     // Create block object and fill it with context information
     Value* args[] = {
