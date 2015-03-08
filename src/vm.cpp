@@ -158,37 +158,13 @@ bool SmalltalkVM::checkRoot(TObject* value, TObject** objectSlot)
     return m_memoryManager->checkRoot(value, objectSlot);
 }
 
-TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
-{
-    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
-    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
-
-    if (entry.methodName == selector && entry.receiverClass == klass) {
-        m_cacheHits++;
-        return entry.method;
-    } else {
-        m_cacheMisses++;
-        return 0;
-    }
-}
-
-void SmalltalkVM::updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method)
-{
-    uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
-    TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
-
-    entry.methodName    = selector;
-    entry.receiverClass = klass;
-    entry.method        = method;
-}
-
 TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
 {
     assert(selector != 0);
     assert(klass != 0);
     // First of all checking the method cache
     // Frequently called methods most likely will be there
-    TMethod* method = lookupMethodInCache(selector, klass);
+    TMethod* method = m_methodCache.get(selector, klass);
     if (method)
         return method; // We're lucky!
 
@@ -200,18 +176,12 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
         method = methods->find<TMethod>(selector);
         if (method) {
             // Storing result in cache
-            updateMethodCache(selector, klass, method);
+            m_methodCache.set(selector, klass, method);
             return method;
         }
     }
 
     return 0;
-}
-
-void SmalltalkVM::flushMethodCache()
-{
-    for (std::size_t i = 0; i < LOOKUP_CACHE_SIZE; i++)
-        m_lookupCache[i].methodName = 0;
 }
 
 SmalltalkVM::TExecuteResult SmalltalkVM::execute(TProcess* p, uint32_t ticks)
@@ -950,7 +920,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         } break;
 
         case primitive::flushCache: // 34
-            flushMethodCache();
+            m_methodCache.clear();
             break;
 
         case primitive::bulkReplace: { // 38
@@ -1033,7 +1003,7 @@ void SmalltalkVM::onCollectionOccured()
 {
     // Here we need to handle the GC collection event
     //printf("VM: GC had just occured. Flushing the method cache.\n");
-    flushMethodCache();
+    m_methodCache.clear();
 }
 
 bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStartOffset, TObject* destinationStopOffset, TObject* source, TObject* sourceStartOffset) {
@@ -1101,7 +1071,7 @@ bool SmalltalkVM::doBulkReplace( TObject* destination, TObject* destinationStart
 
 void SmalltalkVM::printVMStat()
 {
-    float hitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    MethodCache::Stat stat = m_methodCache.getStat();
     std::printf("%d messages sent, cache hits: %d, misses: %d, hit ratio %.2f %%\n",
-        m_messagesSent, m_cacheHits, m_cacheMisses, hitRatio);
+        m_messagesSent, stat.hits, stat.misses, stat.getRatio());
 }

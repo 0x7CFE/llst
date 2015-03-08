@@ -39,6 +39,7 @@
 
 #include <types.h>
 #include <memory.h>
+#include <MethodCache.h>
 
 template <int I>
 struct Int2Type
@@ -112,32 +113,14 @@ private:
         { }
     };
 
-    struct TMethodCacheEntry
-    {
-        TObject* methodName;
-        TClass*  receiverClass;
-        TMethod* method;
-    };
-
-    static const unsigned int LOOKUP_CACHE_SIZE = 512;
-    TMethodCacheEntry m_lookupCache[LOOKUP_CACHE_SIZE];
-    uint32_t m_cacheHits;
-    uint32_t m_cacheMisses;
+    MethodCache m_methodCache;
     uint32_t m_messagesSent;
 
-
-    // fast method lookup in the method cache
-    TMethod* lookupMethodInCache(TSymbol* selector, TClass* klass);
 public:
     TMethod* lookupMethod(TSymbol* selector, TClass* klass);
 
     bool checkRoot(TObject* value, TObject** objectSlot);
 private:
-
-    void updateMethodCache(TSymbol* selector, TClass* klass, TMethod* method);
-
-    // flush the method lookup cache
-    void flushMethodCache();
 
     void doPushConstant(TVMExecutionContext& ec);
     void doPushBlock(TVMExecutionContext& ec);
@@ -173,10 +156,9 @@ public:
     TObject*     newOrdinaryObject(TClass* klass, std::size_t slotSize);
 
     SmalltalkVM(Image* image, IMemoryManager* memoryManager)
-        : m_cacheHits(0), m_cacheMisses(0), m_messagesSent(0), m_image(image),
+        : m_methodCache(), m_messagesSent(0), m_image(image),
         m_memoryManager(memoryManager), m_lastGCOccured(false) //, ec(memoryManager)
     {
-        flushMethodCache();
     }
 
     TExecuteResult execute(TProcess* p, uint32_t ticks);

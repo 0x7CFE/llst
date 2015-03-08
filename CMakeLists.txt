@@ -99,6 +99,7 @@ set(CPP_FILES
     src/TInstruction.cpp
     src/TSymbol.cpp
     src/vm.cpp
+    src/MethodCache.cpp
 )
 
 if (USE_LLVM)
