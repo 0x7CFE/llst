@@ -1458,6 +1458,13 @@ millisecondsToRun: aBlock | timer |
 !
 
 METHOD Timer
+millisecondsToRun: aBlock | time |
+    time <- self value.
+    aBlock value.
+    ^self value - time.
+!
+
+METHOD Timer
 initValue
     ^initValue
 !
@@ -1735,8 +1742,8 @@ rebuildImage | classes methods |
 
 METHOD MetaSystem
 rebuildMethod: aMethod for: aClass
-    "'Compiling ' print. aClass print. ':' print.
-    aMethod name print. '... ' printNl."
+    'Compiling ' print. aClass print. ':' print.
+    aMethod name print. '... ' printNl.
 
     ^aClass parseMethod: aMethod text.
 !
@@ -1812,37 +1819,153 @@ factTest: x
 !
 
 METHOD Undefined
+factTest2: x
+    (x = 1) ifTrue: [^1] ifFalse: [^self factTest2: x - 1]
+!
+
+CLASS Benchmark    Object
+CLASS Mock         Object
+
+METHOD Mock
+selfReturn
+    ^self
+!
+
+METHOD Mock
+stackReturn
+    ^nil
+!
+
+METHOD Mock
+argReturn: arg
+    ^arg
+!
+
+METHOD Mock
+literalReturn
+    ^'Hello world!'
+!
+
+METHOD Mock
+blockReturn
+    [^self] value.
+!
+
+METHOD Mock
+invokeBlock: aBlock
+    aBlock value.
+!
+
+METHOD Mock
+selfSend
+    self selfReturn.
+!
+
+METHOD Mock
+invokePrimitive
+    <1 nil nil>.
+!
+
+METHOD Mock
+failPrimitive
+    <21 'Hello' 9>.
+!
+
+METHOD Mock
+doesNotUnderstand: aSelector
+    ^self
+!
+
+METHOD Mock
+invokeUnknownSelector
+    ^Mock new anUnknownSelector.
+!
+
+METHOD Benchmark
+softRun: aBlock rounds: rounds text: text
+    | time delta |
+
+    System collectGarbage.
+
+    " Executing a block measuring total time "
+    time <- Timer get.
+    1 to: rounds do: [ :x | aBlock value ].
+    delta <- Timer get - time.
+
+    text print. $ print. delta printNl.
+    ^delta
+!
+
+METHOD Benchmark
+jitRun: aBlock rounds: rounds text: text
+    | time delta x |
+
+    System collectGarbage.
+    time <- Timer get.
+
+    " Executing a block that will do the job "
+    Jit sendMessage: #value withArguments:
+        (Array with: [ x <- 0.
+            [x < rounds] whileTrue:
+                [ aBlock value. x <- x + 1 ] ]).
+
+    delta <- Timer get - time.
+
+    text print. $ print. delta print. ' (jit)' printNl.
+    ^delta
+!
+
+METHOD Benchmark
+run: aBlock rounds: rounds text: text
+    self softRun: aBlock rounds: rounds text: text.
+    self jitRun:  aBlock rounds: rounds text: text.
+!
+
+METHOD Benchmark
+run: rounds | mock |
+    mock <- Mock new.
+
+    self run: [ 2 + 3 ] rounds: rounds text: 'Literal addition'.
+    self run: [ 2 + (mock argReturn: 3) ] rounds: rounds text: 'SmallInt + object'.
+    self run: [ (mock argReturn: 3) + 2] rounds: rounds text: 'object + SmallInt'.
+
+    self run: [ 1 to: rounds do: [ :x | 2 + 3 ] ] rounds: 1 text: 'Literal addition in a loop'.
+    self run: [ 1 to: rounds do: [ :x | 2 + (mock argReturn: 3) ] ] rounds: 1 text: 'SmallInt + object in a loop'.
+    self run: [ 1 to: rounds do: [ :x | (mock argReturn: 3) + 2 ] ] rounds: 1 text: 'object + SmallInt in a loop'.
+
+    self run: [ mock selfReturn ] rounds: rounds text: 'Self return'.
+    self run: [ mock stackReturn ] rounds: rounds text: 'Stack return'.
+    self run: [ mock argReturn: nil ] rounds: rounds text: 'Arg return'.
+    self run: [ mock literalReturn ] rounds: rounds text: 'Literal return'.
+
+    self run: [ mock invokeBlock: [nil] ] rounds: rounds text: 'Block invoke'.
+    self run: [ mock blockReturn ] rounds: rounds text: 'Block return'.
+
+    self run: [ 'Hello world' size ] rounds: rounds text: 'Literal receiver'.
+    self run: [ mock selfSend ] rounds: rounds text: 'Self dispatch'.
+
+    " Stupid imageBuilder crashes if method is too long :( "
+    self run2: rounds
+!
+
+METHOD Benchmark
+run2: rounds | mock |
+    mock <- Mock new.
+
+    self run: [ mock selfReturn selfReturn selfReturn selfReturn selfReturn ] rounds: rounds text: 'Chain dispatch'.
+    self run: [ mock selfReturn; selfReturn; selfReturn; selfReturn; selfReturn ] rounds: rounds text: 'Cascade dispatch'.
+
+    self run: [ mock invokePrimitive ] rounds: rounds text: 'Primitive invocation'.
+    self run: [ mock failPrimitive ] rounds: rounds text: 'Failed primitive invocation'.
+
+    self run: [ mock invokeUnknownSelector ] rounds: rounds text: 'Dispatch of #doesNotUnderstand'.
+!
+
+METHOD Undefined
 main    | command  data x |
     Char initialize.
     Class fillChildren.
     System fixMethodClasses.
-    "Jit do: [ nil inlineTest ]."
-
-    "Scheduler initialize.
-    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
-    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
-    Scheduler run."
-
-    "'Soft run: ' print. (Timer millisecondsToRun: [ System rebuildImage ]) printNl."
-    "'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl."
-    "'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl."
-
-    "Jit patchHotMethods.
-
-    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ System rebuildImage ] ]) printNl."
-
-    "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
-
-    "Jit do: [ List with: 42 with: 43; sort ]."
-
-    "Jit do: [ nil runSort: 10000 ]."
-    "Jit do: [ 'hello' printNl ]."
-    "Jit do: [ System rebuildImage ].
-    Jit printStatistics.
-    Jit patchHotMethods."
-    "Jit do: [ [ :p | x <- p ] value: 42 ]."
-    "Jit do: [ SmallIntTest new runAll ]."
 
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
@@ -5129,9 +5252,15 @@ sendMessage: encoder block: inBlock
 	encoder genHigh: 9 low: (encoder genLiteral: name)
 !
 METHOD MessageNode
-argumentsAreBlock
-	arguments do: [ :arg | arg isBlock ifFalse: [ ^ false ]].
-	^ true
+argumentsAreBlock |result|
+    "Version using block return"
+    arguments do: [ :arg | arg isBlock ifFalse: [ ^false ] ].
+    ^true
+
+    "Linear version"
+    "result <- true.
+    arguments do: [ :arg | arg isBlock ifFalse: [ result <- false ] ].
+    ^result"
 !
 METHOD MessageNode
 optimizeWhile: encoder block: inBlock | start save |
