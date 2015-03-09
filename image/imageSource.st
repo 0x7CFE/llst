@@ -1824,7 +1824,7 @@ factTest2: x
 !
 
 CLASS Benchmark    Object
-CLASS Mock         Object
+CLASS Mock         Object   field
 
 METHOD Mock
 selfReturn
@@ -1844,6 +1844,11 @@ argReturn: arg
 METHOD Mock
 literalReturn
     ^'Hello world!'
+!
+
+METHOD Mock
+fieldReturn
+    ^field
 !
 
 METHOD Mock
@@ -1881,6 +1886,17 @@ invokeUnknownSelector
     ^Mock new anUnknownSelector.
 !
 
+METHOD Mock
+setField: value
+    field <- value
+!
+
+METHOD Mock
+setTemporary: value | temp |
+    temp <- value
+    ^temp
+!
+
 METHOD Benchmark
 softRun: aBlock rounds: rounds text: text
     | time delta |
@@ -1898,16 +1914,14 @@ softRun: aBlock rounds: rounds text: text
 
 METHOD Benchmark
 jitRun: aBlock rounds: rounds text: text
-    | time delta x |
+    | time delta |
 
     System collectGarbage.
     time <- Timer get.
 
     " Executing a block that will do the job "
     Jit sendMessage: #value withArguments:
-        (Array with: [ x <- 0.
-            [x < rounds] whileTrue:
-                [ aBlock value. x <- x + 1 ] ]).
+        (Array with: [ 1 to: rounds do: [ :x | aBlock value ] ]).
 
     delta <- Timer get - time.
 
@@ -1937,12 +1951,12 @@ run: rounds | mock |
     self run: [ mock stackReturn ] rounds: rounds text: 'Stack return'.
     self run: [ mock argReturn: nil ] rounds: rounds text: 'Arg return'.
     self run: [ mock literalReturn ] rounds: rounds text: 'Literal return'.
+    self run: [ mock fieldReturn ] rounds: rounds text: 'Field return'.
 
-    self run: [ mock invokeBlock: [nil] ] rounds: rounds text: 'Block invoke'.
-    self run: [ mock blockReturn ] rounds: rounds text: 'Block return'.
+    self run: [ mock setField: nil ] rounds: rounds text: 'Set field'.
+    self run: [ mock setTemporary: nil ] rounds: rounds text: 'Set temporary'.
 
     self run: [ 'Hello world' size ] rounds: rounds text: 'Literal receiver'.
-    self run: [ mock selfSend ] rounds: rounds text: 'Self dispatch'.
 
     " Stupid imageBuilder crashes if method is too long :( "
     self run2: rounds
@@ -1951,6 +1965,11 @@ run: rounds | mock |
 METHOD Benchmark
 run2: rounds | mock |
     mock <- Mock new.
+
+    self run: [ mock selfSend ] rounds: rounds text: 'Self dispatch'.
+
+    self run: [ mock invokeBlock: [nil] ] rounds: rounds text: 'Block invoke'.
+    self run: [ mock blockReturn ] rounds: rounds text: 'Block return'.
 
     self run: [ mock selfReturn selfReturn selfReturn selfReturn selfReturn ] rounds: rounds text: 'Chain dispatch'.
     self run: [ mock selfReturn; selfReturn; selfReturn; selfReturn; selfReturn ] rounds: rounds text: 'Cascade dispatch'.

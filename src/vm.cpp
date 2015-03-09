@@ -140,13 +140,15 @@ void SmalltalkVM::TVMExecutionContext::stackPush(TObject* object)
         uint32_t stackSize = currentContext->stack->getSize();
         if( stackTop >= stackSize ) {
             //resize the current stack
-            hptr<TObjectArray> newStack = m_vm->newObject<TObjectArray>(stackSize+5);
-            for(uint32_t i = 0; i < stackSize; i++) {
-                TObject* value = currentContext->stack->getField(i);
-                newStack->putField(i, value);
-            }
+            hptr<TObjectArray> newStack = m_vm->newObject<TObjectArray>(stackSize*2);
+            std::copy(newStack->getFields(), newStack->getFields()+stackSize, currentContext->stack->getFields());
+//             for(uint32_t i = 0; i < stackSize; i++) {
+//                 TObject* value = currentContext->stack->getField(i);
+//                 newStack->putField(i, value);
+//             }
             currentContext->stack = newStack;
-            std::cerr << std::endl << "VM: Stack overflow in '" << currentContext->method->name->toString() << "'" << std::endl;
+            std::cerr << currentContext->method->name->toString() << "!";
+            //std::cerr << std::endl << "VM: Stack overflow in '" << currentContext->method->name->toString() << "'" << std::endl;
         }
     }
     currentContext->stack->putField(stackTop++, object);
