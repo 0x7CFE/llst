@@ -41,6 +41,47 @@
 #include <vector>
 #include <list>
 #include <fstream>
+#include "timer.h"
+
+
+
+struct TMemoryManagerHeapEvent{
+    const char* eventName;
+    TDuration<TSec> timeDiff;
+    uint32_t usedHeapSizeBeforeCollect;
+    uint32_t usedHeapSizeAfterCollect;
+    uint32_t totalHeapSize;
+};
+
+struct TMemoryManagerHeapInfo{
+    uint32_t usedHeapSizeBeforeCollect;
+    uint32_t usedHeapSizeAfterCollect;
+    uint32_t totalHeapSize;
+    std::list<TMemoryManagerHeapEvent> heapEvents;
+    TMemoryManagerHeapInfo() :
+        usedHeapSizeBeforeCollect(0),
+        usedHeapSizeAfterCollect(0),
+        totalHeapSize(0)
+        {}
+    bool empty() const {
+        return usedHeapSizeBeforeCollect == 0 &&
+                usedHeapSizeAfterCollect == 0 &&
+                totalHeapSize == 0 &&
+                heapEvents.empty();
+    }
+};
+
+//represent three kinds of events in garbage collection log:
+//just event, event which takes some time, event which interacting with a heap
+struct TMemoryManagerEvent{
+    const char* eventName;
+    TDuration<TSec> begin; //time spent from program start to event begin
+    TDuration<TSec> timeDiff; //maybe null
+    TMemoryManagerHeapInfo heapInfo; //maybe empty
+    TMemoryManagerEvent():begin(), timeDiff(), heapInfo() {}
+};
+
+
 
 
 // Memory manager statics is held
@@ -53,6 +94,12 @@ struct TMemoryManagerInfo {
     uint32_t leftToRightCollections;
     uint32_t rightToLeftCollections;
     uint64_t rightCollectionDelay;
+    double heapSize;     //integral by time (Kb*s)
+    double freeHeapSize; //integral by time (Kb*s)
+    Timer timer;
+    Timer allocationTimer;
+    Timer heapIncreaseTimer;
+    std::list<TMemoryManagerEvent> events;
 };
 
 struct object_ptr {
@@ -64,6 +111,7 @@ struct object_ptr {
 private:
     object_ptr(const object_ptr& value);
 };
+
 
 // Generic interface to a memory manager.
 // Custom implementations such as BakerMemoryManager
@@ -214,6 +262,11 @@ protected:
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
 
+    //FIXME delete from memory manager. initilize somewhere else
+    std::fstream       m_logFile;
+    TMemoryManagerInfo m_memoryInfo;
+    void writeLogLine(TMemoryManagerEvent event);
+
     struct TRootPointers {
         uint32_t size;
         uint32_t top;
@@ -312,6 +365,7 @@ protected:
     size_t    m_heapSize;
     uint8_t*  m_heapBase;
     uint8_t*  m_heapPointer;
+    TMemoryManagerInfo m_memoryInfo;
 
     std::vector<void*> m_usedHeaps;
 
@@ -319,7 +373,9 @@ protected:
     uint8_t*  m_staticHeapBase;
     uint8_t*  m_staticHeapPointer;
 
+    std::fstream       m_logFile;
     void growHeap();
+    void writeLogLine(TMemoryManagerEvent event);
 public:
     NonCollectMemoryManager();
     virtual ~NonCollectMemoryManager();
@@ -339,7 +395,7 @@ public:
     virtual void  releaseExternalHeapPointer(object_ptr& /*pointer*/) {}
     virtual bool  checkRoot(TObject* /*value*/, TObject** /*objectSlot*/) { return false; }
     virtual uint32_t allocsBeyondCollection() { return 0; }
-    virtual TMemoryManagerInfo getStat() { return TMemoryManagerInfo(); }
+    virtual TMemoryManagerInfo getStat();
 };
 
 class LLVMMemoryManager : public BakerMemoryManager {
@@ -440,3 +496,4 @@ public:
 };
 
 #endif
+

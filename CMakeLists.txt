@@ -93,6 +93,7 @@ set(CPP_FILES
     src/TInstruction.cpp
     src/TSymbol.cpp
     src/vm.cpp
+    src/Timer.cpp
 )
 
 if (USE_LLVM)
