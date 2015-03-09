@@ -1917,12 +1917,10 @@ jitRun: aBlock rounds: rounds text: text
     | time delta |
 
     System collectGarbage.
-    time <- Timer get.
 
     " Executing a block that will do the job "
-    Jit sendMessage: #value withArguments:
-        (Array with: [ 1 to: rounds do: [ :x | aBlock value ] ]).
-
+    time <- Timer get.
+    Jit do: [ 1 to: rounds do: [ :x | aBlock value ] ].
     delta <- Timer get - time.
 
     text print. $ print. delta print. ' (jit)' printNl.
@@ -1978,6 +1976,49 @@ run2: rounds | mock |
     self run: [ mock failPrimitive ] rounds: rounds text: 'Failed primitive invocation'.
 
     self run: [ mock invokeUnknownSelector ] rounds: rounds text: 'Dispatch of #doesNotUnderstand'.
+
+    self run3: rounds
+!
+
+METHOD Benchmark
+run3: rounds | array ordered indices |
+    array <- Array new: 10000.
+    indices <- Array new: 10000.
+    1 to: array size do: [ :x | indices at: x put: (array size atRandom) ].
+
+    self run: [ 1 to: array size do: [ :x | array at: x ] ] rounds: rounds / (array size) text: 'Array, linear read'.
+    self run: [ 1 to: array size do: [ :x | array at: (indices at: x) ] ] rounds: rounds / (array size) text: 'Array, random read'.
+
+    array <- Array new: 2.
+    self softRun: [ array insert: nil at: array size / 2 ] rounds: rounds text: 'Array, middle insert'.
+
+    array <- Array new: 2.
+    self jitRun: [ array insert: nil at: array size / 2 ] rounds: rounds text: 'Array, middle insert'.
+
+    ordered <- OrderedArray new: 0.
+    self softRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, creation'.
+    self softRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, selection'.
+
+    ordered <- OrderedArray new: 0.
+    self jitRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, creation'.
+    self jitRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, selection'.
+
+    self run4: rounds
+!
+
+METHOD Benchmark
+run4: rounds | list |
+    list <- List new.
+    self softRun: [ 1 to: rounds do: [ :x | list add: x ] ] rounds: 1 text: 'List front insert'.
+
+    list <- List new.
+    self jitRun: [ 1 to: rounds do: [ :x | list add: x ] ] rounds: 1 text: 'List front insert'.
+
+    "list <- List new.
+    self jitRun: [ 1 to: rounds do: [ :x | list addLast: x ] ] rounds: 1 text: 'List back insert'.
+
+    list <- List new.
+    self jitRun: [ 1 to: rounds do: [ :x | list addLast: x ] ] rounds: 1 text: 'List back insert'."
 !
 
 METHOD Undefined
@@ -2558,7 +2599,7 @@ at: value
 !
 METHOD Collection
 includes: aValue
-    self do: [ :element | element = aValue ifTrue: [ ^ true ]].
+    self do: [ :element | element = aValue ifTrue: [ ^ true ] ].
     ^ false
 !
 METHOD Collection
@@ -2841,16 +2882,16 @@ METHOD Array
 < arg		| selfsize argsize |
 	selfsize <- self size. argsize <- arg size.
 	1 to: (selfsize min: argsize)
-		do: [:i | (self at: i) ~= (arg at: i)
-			ifTrue: [ ^ (self at: i) < (arg at: i) ]].
+		do: [ :i | (self at: i) ~= (arg at: i)
+			ifTrue: [ ^ (self at: i) < (arg at: i) ] ].
 	^ selfsize < argsize
 !
 METHOD Array
 = anArray
 	self size = anArray size ifFalse: [ ^ false ].
 	1 to: self size do:
-		[:i | (self at: i) = (anArray at: i)
-			ifFalse: [ ^ false ]].
+		[ :i | (self at: i) = (anArray at: i)
+			ifFalse: [ ^ false ] ].
 	^ true
 !
 METHOD Array
