@@ -1996,29 +1996,34 @@ run3: rounds | array ordered indices |
     self jitRun: [ array insert: nil at: array size / 2 ] rounds: rounds text: 'Array, middle insert'.
 
     ordered <- OrderedArray new: 0.
-    self softRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, creation'.
-    self softRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, selection'.
+    self softRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, creation'.
+    self softRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, selection'.
 
     ordered <- OrderedArray new: 0.
-    self jitRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, creation'.
-    self jitRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: 1 text: 'OrderedArray, selection'.
+    self jitRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, creation'.
+    self jitRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, selection'.
 
     self run4: rounds
 !
 
 METHOD Benchmark
-run4: rounds | list |
+run4: rounds | list indices tree |
     list <- List new.
     self softRun: [ 1 to: rounds do: [ :x | list add: x ] ] rounds: 1 text: 'List front insert'.
 
     list <- List new.
     self jitRun: [ 1 to: rounds do: [ :x | list add: x ] ] rounds: 1 text: 'List front insert'.
 
-    "list <- List new.
-    self jitRun: [ 1 to: rounds do: [ :x | list addLast: x ] ] rounds: 1 text: 'List back insert'.
+    indices <- Array new: 10000.
+    1 to: indices size do: [ :x | indices at: x put: (indices size atRandom) ].
 
-    list <- List new.
-    self jitRun: [ 1 to: rounds do: [ :x | list addLast: x ] ] rounds: 1 text: 'List back insert'."
+    tree <- Tree new.
+    self softRun: [ 1 to: indices size do: [ :x | tree add: (indices at: x) ] ] rounds: 1 text: 'Tree insert'.
+
+    tree <- Tree new.
+    self jitRun: [ 1 to: indices size do: [ :x | tree add: (indices at: x) ] ] rounds: 1 text: 'Tree insert'.
+
+    self run: [ tree collect: [ :x | x * 2 ] ] rounds: 1 text: 'Tree collect'.
 !
 
 METHOD Undefined
@@ -4156,7 +4161,7 @@ copy
 METHOD Tree
 collect: transformBlock | newTree |
 	newTree <- Tree new.
-	self do: [:element| newTree add: (transformBlock value: element)]
+	self do: [:element| newTree add: (transformBlock value: element)].
 	^newTree
 !
 METHOD Tree
