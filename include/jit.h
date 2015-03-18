@@ -400,6 +400,7 @@ private:
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+    friend void         emitBlockReturn(TObject* value, TContext* targetContext);
 
     struct TFunctionCacheEntry
     {
@@ -425,6 +426,7 @@ private:
     uint32_t m_blockCacheMisses;
     uint32_t m_messagesDispatched;
     uint32_t m_blocksInvoked;
+    uint32_t m_blockReturnsEmitted;
     uint32_t m_objectsAllocated;
 
     TMethodFunction lookupFunctionInCache(TMethod* method);

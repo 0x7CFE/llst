@@ -76,12 +76,13 @@ void JITRuntime::printStat()
         "\tMessages dispatched: %12d\n"
         "\tObjects  allocated:  %12d\n"
         "\tBlocks   invoked:    %12d\n"
+        "\tBlockReturn emitted: %12d\n"
         "\tBlock    cache hits: %12d  misses %10d ratio %6.2f %%\n"
         "\tMessage  cache hits: %12d  misses %10d ratio %6.2f %%\n",
 
         m_messagesDispatched,
         m_objectsAllocated,
-        m_blocksInvoked,
+        m_blocksInvoked, m_blockReturnsEmitted,
         m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
         m_cacheHits, m_cacheMisses, hitRatio
     );
@@ -191,6 +192,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     m_cacheMisses = 0;
     m_messagesDispatched = 0;
     m_blocksInvoked = 0;
+    m_blockReturnsEmitted = 0;
     m_objectsAllocated = 0;
 }
 
@@ -1101,6 +1103,7 @@ TObject* invokeBlock(TBlock* block, TContext* callingContext)
 
 void emitBlockReturn(TObject* value, TContext* targetContext)
 {
+    JITRuntime::Instance()->m_blockReturnsEmitted++;
     throw TBlockReturn(value, targetContext);
 }
 
