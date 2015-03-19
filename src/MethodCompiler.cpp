@@ -406,7 +406,10 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // Checking whether method contains inline blocks that has blockReturn instruction.
     // If this is true we need to put an exception handler into the method and treat
     // all send message operations as invokes, not just simple calls
-    jit.methodHasBlockReturn = scanForBlockReturn(jit);
+    jit.methodHasBlockReturn = false; // scanForBlockReturn(jit);
+
+    if (jit.methodHasBlockReturn)
+        outs() << jit.function->getName() << " has blockReturn\n";
 
     jit.methodAllocatesMemory = methodAllocatesMemory(jit);
 
@@ -418,8 +421,10 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Writing exception handlers for the
     // correct operation of block return
-    if (jit.methodHasBlockReturn)
-        writeLandingPad(jit);
+//     if (jit.methodHasBlockReturn)
+//         writeLandingPad(jit);
+
+    writeUnwindBlockReturn(jit);
 
     // Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
@@ -530,6 +535,53 @@ void MethodCompiler::writeInstruction(TJITContext& jit) {
                          jit.currentNode->getInstruction().getOpcode(),
                          jit.currentNode->getIndex(), jit.originMethod->name->toString().c_str());
     }
+}
+
+
+void MethodCompiler::writeUnwindBlockReturn(TJITContext& jit)
+{
+    // We need to compare local context to the provided target context.
+    // if (currentContext == targetContext)
+    //      return { value, null }
+    // else
+    //      return { value, targetContext }
+
+    jit.unwindBlockReturn = BasicBlock::Create(m_JITModule->getContext(), "unwindBlockReturn", jit.function);
+    jit.builder->SetInsertPoint(jit.unwindBlockReturn);
+
+    //StructType* const returnType = StructType::get(m_baseTypes.object->getPointerTo(), m_baseTypes.context->getPointerTo(), NULL);
+    //(m_JITModule->getTypeByName("TReturnValue")
+
+    jit.unwindPhi = jit.builder->CreatePHI(m_baseTypes.returnValueType, 2);
+
+    Value* const targetContext  = jit.builder->CreateExtractValue(jit.unwindPhi, 1);
+    Value* const localContext   = jit.getCurrentContext();
+
+    Value* const compareTargets = jit.builder->CreateICmpEQ(localContext, targetContext);
+    BasicBlock*  returnBlock    = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
+    BasicBlock*  unwindBlock    = BasicBlock::Create(m_JITModule->getContext(), "continueUnwind", jit.function);
+
+    jit.builder->CreateCondBr(compareTargets, returnBlock, unwindBlock);
+
+    // return { value, null }
+    jit.builder->SetInsertPoint(returnBlock);
+    Value* const returnObject = jit.builder->CreateExtractValue(jit.unwindPhi, 0);
+    emitReturn(jit, returnObject);
+
+    // return { value, target }
+    jit.builder->SetInsertPoint(unwindBlock);
+    jit.builder->CreateRet(jit.unwindPhi);
+}
+
+void MethodCompiler::emitReturn(TJITContext& jit, Value* object, Value* targetContext /*= 0*/)
+{
+    if (!targetContext)
+        targetContext = ConstantPointerNull::get(m_baseTypes.context->getPointerTo());
+
+    Value* returnValue = UndefValue::get(m_baseTypes.returnValueType);
+    returnValue = jit.builder->CreateInsertValue(returnValue, object, 0);
+    returnValue = jit.builder->CreateInsertValue(returnValue, targetContext, 1);
+    jit.builder->CreateRet(returnValue);
 }
 
 void MethodCompiler::writeLandingPad(TJITContext& jit)
@@ -1023,9 +1075,17 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         sendMessageResult = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
 
         // Jumping out the sendBinaryBlock to the value aggregator
-        jit.builder->CreateBr(resultBlock);
+        //jit.builder->CreateBr(resultBlock);
     }
     sendMessageResult->setName("reply.");
+
+    // Sent message may result in a block return invokation.
+    // We should test target context and jump to unwind block if neccessary
+    Value* const resultObject   = jit.builder->CreateExtractValue(sendMessageResult, 0, "resultObject");
+    Value* const targetContext  = jit.builder->CreateExtractValue(sendMessageResult, 1, "targetContext");
+    Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);
+    jit.builder->CreateCondBr(isBlockReturn, jit.unwindBlockReturn, resultBlock);
+    jit.unwindPhi->addIncoming(sendMessageResult, jit.builder->GetInsertBlock());
 
     // Now the value aggregator block
     jit.builder->SetInsertPoint(resultBlock);
@@ -1035,7 +1095,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // will be then selected as a return value
     PHINode* const phi = jit.builder->CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
     phi->addIncoming(intResultObject, integersBlock);
-    phi->addIncoming(sendMessageResult, sendBinaryBlock);
+    phi->addIncoming(resultObject, sendBinaryBlock);
 
     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, phi);
     setNodeValue(jit, jit.currentNode, resultHolder);
@@ -1209,7 +1269,7 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
 
-    st::InstructionNode* const markArgumentsNode = jit.currentNode->getArgument()->cast<st::InstructionNode>();
+    /*st::InstructionNode* const markArgumentsNode = jit.currentNode->getArgument()->cast<st::InstructionNode>();
     assert(markArgumentsNode);
 
     st::InstructionNode* const receiverNode = markArgumentsNode->getArgument()->cast<st::InstructionNode>();
@@ -1234,7 +1294,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
             if (doSendMessageToLiteral(jit, receiverNode, receiverClass))
                 return;
         }
-    }
+    }*/
 
     Value* const arguments = getArgument(jit); // jit.popValue();
 
@@ -1258,7 +1318,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     };
     m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
-    Value* result = 0;
+    Value* result = 0; // { value, targetContext }
     if (jit.methodHasBlockReturn) {
         // Creating basic block that will be branched to on normal invoke
         BasicBlock* const nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
@@ -1279,7 +1339,17 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
     jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
-    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
+
+    Value* const targetContext  = jit.builder->CreateExtractValue(result, 1, "targetContext");
+    Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);
+
+    BasicBlock* const next = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+    jit.builder->CreateCondBr(isBlockReturn, jit.unwindBlockReturn, next);
+    jit.unwindPhi->addIncoming(result, jit.builder->GetInsertBlock());
+
+    jit.builder->SetInsertPoint(next);
+    Value* const resultObject = jit.builder->CreateExtractValue(result, 0, "resultObject");
+    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, resultObject);
     setNodeValue(jit, jit.currentNode, resultHolder);
 }
 
@@ -1289,26 +1359,37 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
     switch (opcode) {
         case special::selfReturn:
-            jit.builder->CreateRet(jit.getSelf());
+//            jit.builder->CreateRet(jit.getSelf());
+            emitReturn(jit, jit.getSelf());
             break;
 
         case special::stackReturn:
-            jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
+            //jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
+            emitReturn(jit, getArgument(jit));
             break;
 
         case special::blockReturn: {
+                // Peeking the return value from the stack
                 Value* const value = getArgument(jit); // jit.popValue();
 
+                // Target context is determined as a creating context of the current block context
+                Value* const blockContext = jit.getCurrentContext();
+                Value* const creatingContextField = jit.builder->CreateStructGEP(blockContext, 1);
+                Value* const creatingContext = jit.builder->CreateLoad(creatingContextField);
+
+                // Block return is implemented as a return of { object, targetContext }
+                emitReturn(jit, value, creatingContext);
+
                 // Loading the target context information
-                Value* const blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), m_baseTypes.block->getPointerTo());
-                Value* const creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
-                Value* const targetContext      = jit.builder->CreateLoad(creatingContextPtr);
-
-                // Emitting the TBlockReturn exception
-                jit.builder->CreateCall2(m_runtimeAPI.emitBlockReturn, value, targetContext);
-
-                // This will never be called
-                jit.builder->CreateUnreachable();
+//                 Value* const blockContext = jit.builder->CreateBitCast(jit.getCurrentContext(), m_baseTypes.block->getPointerTo());
+//                 Value* const creatingContextPtr = jit.builder->CreateStructGEP(blockContext, 2);
+//                 Value* const targetContext      = jit.builder->CreateLoad(creatingContextPtr);
+//
+//                 // Emitting the TBlockReturn exception
+//                 jit.builder->CreateCall2(m_runtimeAPI.emitBlockReturn, value, targetContext);
+//
+//                 // This will never be called
+//                 jit.builder->CreateUnreachable();
             }
             break;
 

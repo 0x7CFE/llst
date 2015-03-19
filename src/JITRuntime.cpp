@@ -291,7 +291,7 @@ void JITRuntime::optimizeFunction(Function* function, bool runModulePass)
         m_modulePassManager->run(*m_JITModule);
 }
 
-TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool once)
+TReturnValue JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool once)
 {
     // Guessing the block function name
     const uint16_t blockOffset = block->blockBytePointer;
@@ -328,7 +328,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool o
     }
 
     block->previousContext = callingContext->previousContext;
-    TObject* result = compiledBlockFunction(block);
+    const TReturnValue& result = compiledBlockFunction(block);
 
     if (once) {
         m_executionEngine->freeMachineCodeForFunction(blockFunction);
@@ -339,7 +339,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool o
     return result;
 }
 
-TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
+TReturnValue JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
 {
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
@@ -409,7 +409,7 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
     }
 
     try {
-        TObject* result = compiledMethodFunction(newContext);
+        const TReturnValue& result = compiledMethodFunction(newContext);
         return result;
     } catch( ... ) {
         //FIXME
@@ -997,7 +997,7 @@ void JITRuntime::initializeExceptionAPI() {
     Type* Int8PtrTy      = Type::getInt8PtrTy(Context);
 
     m_exceptionAPI.blockReturnType = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("blockReturnType", Int8PtrTy));
-    m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, TBlockReturn::getBlockReturnType());
+    m_executionEngine->addGlobalMapping(m_exceptionAPI.blockReturnType, TReturnValue::getBlockReturnType());
 
     m_exceptionAPI.contextTypeInfo = cast<GlobalValue>(m_JITModule->getOrInsertGlobal("contextTypeInfo", Int8PtrTy));
     m_executionEngine->addGlobalMapping(m_exceptionAPI.contextTypeInfo, const_cast<void*>(reinterpret_cast<const void*>( &typeid(TContext*) )));
@@ -1082,7 +1082,7 @@ TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
+TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
 {
     JITRuntime::Instance()->m_messagesDispatched++;
     return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass, callSiteIndex);
@@ -1093,7 +1093,7 @@ TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t byte
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
 }
 
-TObject* invokeBlock(TBlock* block, TContext* callingContext)
+TReturnValue invokeBlock(TBlock* block, TContext* callingContext)
 {
     JITRuntime::Instance()->m_blocksInvoked++;
     return JITRuntime::Instance()->invokeBlock(block, callingContext);
@@ -1102,7 +1102,7 @@ TObject* invokeBlock(TBlock* block, TContext* callingContext)
 void emitBlockReturn(TObject* value, TContext* targetContext)
 {
     JITRuntime::Instance()->m_blockReturnsEmitted++;
-    throw TBlockReturn(value, targetContext);
+    throw TReturnValue(value, targetContext);
 }
 
 void checkRoot(TObject* value, TObject** objectSlot)

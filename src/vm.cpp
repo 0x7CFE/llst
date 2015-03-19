@@ -723,7 +723,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
 }
 
 // TODO Refactor code to make this clean
-extern "C" { TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset = 0); }
+extern "C" { TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset = 0); }
 
 TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed) {
     switch (opcode) {
@@ -742,8 +742,11 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TObjectArray* args = ec.stackPop<TObjectArray>();
             TSymbol*  selector = ec.stackPop<TSymbol>();
             try {
-                return sendMessage(ec.currentContext, selector, args, 0);
-            } catch(TBlockReturn& blockReturn) {
+                const TReturnValue& returnValue = sendMessage(ec.currentContext, selector, args, 0);
+                if (returnValue.targetContext)
+                    ec.currentContext = returnValue.targetContext;
+                return returnValue.value;
+            } catch(TReturnValue& blockReturn) {
                 //When we catch blockReturn we change the current context to block.creatingContext.
                 //The post processing code will change 'block.creatingContext' to the previous one
                 // and the result of blockReturn will be injected on the stack

@@ -138,7 +138,7 @@
     %TSymbol*       ; badMethodSymbol
 }
 
-%TBlockReturn = type {
+%TReturnValue = type {
     %TObject*,      ; value
     %TContext*      ; targetContext
 }
@@ -333,9 +333,13 @@ declare %TByteObject* @newBinaryObject(%TClass*, i32)
 ;;;;;;;;;;;;;;;;; runtime API ;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
+;declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
+declare { %TObject*, %TContext* } @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
+
 declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer)
-declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
+declare { %TObject*, %TContext* }  @invokeBlock(%TBlock* %block, %TContext* %callingContext)
+;declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
+
 declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
 declare void @checkRoot(%TObject* %value, %TObject** %slot)
 declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
@@ -346,6 +350,7 @@ declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiv
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 declare i32 @__gcc_personality_v0(...)
+declare i32 @__gxx_personality_v0(...)
 declare i8* @__cxa_begin_catch(i8*)
 declare void @__cxa_end_catch()
 declare i8* @__cxa_allocate_exception(i32)
