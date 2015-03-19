@@ -10,10 +10,15 @@ os:
 cache:
   apt: true
 
+env:
+  matrix:
+    - USE_LLVM=Off
+    - USE_LLVM=On
+
 before_install:
   - ./.travis/linux/install-dependencies.sh
 
-before_script: cmake .
+before_script: cmake . -DUSE_LLVM=$USE_LLVM -DCMAKE_BUILD_TYPE=Release
 
 script: make
 
