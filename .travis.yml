@@ -7,6 +7,12 @@ compiler:
 os:
   - linux
 
+cache:
+  apt: true
+
+before_install:
+  - ./.travis/linux/install-dependencies.sh
+
 before_script: cmake .
 
 script: make
