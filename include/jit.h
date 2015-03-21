@@ -104,7 +104,7 @@ struct TObjectTypes {
         symbolArray = module->getTypeByName("TSymbolArray");
         globals     = module->getTypeByName("TGlobals");
         byteObject  = module->getTypeByName("TByteObject");
-        blockReturn = module->getTypeByName("TReturnValue");
+        blockReturn = module->getTypeByName("TBlockReturn");
         process     = module->getTypeByName("TProcess");
 
         returnValueType = llvm::StructType::get(
@@ -385,8 +385,9 @@ public:
 struct TReturnValue {
     TObject*  value;
     TContext* targetContext;
-    TReturnValue(TObject* value, TContext* targetContext)
-    : value(value), targetContext(targetContext) { }
+
+    TReturnValue(TObject* value = 0, TContext* targetContext = 0)
+        : value(value), targetContext(targetContext) { }
 
     static void* getBlockReturnType() {
         return const_cast<void*>(reinterpret_cast<const void*>( &typeid(TReturnValue) ));
@@ -416,6 +417,8 @@ public:
     typedef TReturnValue (*TBlockFunction)(TBlock*);
 
 private:
+    friend class SmalltalkVM;
+
     llvm::FunctionPassManager* m_functionPassManager;
     llvm::PassManager*         m_modulePassManager;
 
@@ -431,10 +434,10 @@ private:
 
     static JITRuntime* s_instance;
 
-    TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex = 0);
+    void sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex, TReturnValue& result);
+    void invokeBlock(TBlock* block, TContext* callingContext, TReturnValue& result);
 
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    TReturnValue invokeBlock(TBlock* block, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
@@ -535,7 +538,7 @@ private:
     bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
 
-    TObject* invokeBlock(TBlock* block, TContext* callingContext, bool once = false);
+    void invokeBlock(TBlock* block, TContext* callingContext, TReturnValue& result, bool once = false);
 
     void patchHotMethods();
     void printMethod(TMethod* method) {
@@ -561,3 +564,9 @@ public:
     ~JITRuntime();
 };
 
+extern "C" {
+
+void methodTrampoline(JITRuntime::TMethodFunction function, TContext* context, TReturnValue& result);
+void blockTrampoline(JITRuntime::TBlockFunction function, TBlock* block, TReturnValue& result);
+
+}

@@ -138,7 +138,7 @@
     %TSymbol*       ; badMethodSymbol
 }
 
-%TReturnValue = type {
+%TBlockReturn = type {
     %TObject*,      ; value
     %TContext*      ; targetContext
 }
@@ -337,13 +337,18 @@ declare %TByteObject* @newBinaryObject(%TClass*, i32)
 declare { %TObject*, %TContext* } @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
 
 declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer)
-declare { %TObject*, %TContext* }  @invokeBlock(%TBlock* %block, %TContext* %callingContext)
+declare { %TObject*, %TContext* } @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 ;declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 
 declare void @emitBlockReturn(%TObject* %value, %TContext* %targetContext)
 declare void @checkRoot(%TObject* %value, %TObject** %slot)
 declare i1 @bulkReplace(%TObject* %destination, %TObject* %sourceStartOffset, %TObject* %source, %TObject* %destinationStopOffset, %TObject* %destinationStartOffset)
 declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiveFailed)
+
+%TReturnValue = type {
+    %TObject*,      ; value
+    %TContext*      ; targetContext
+}
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
@@ -355,3 +360,24 @@ declare i8* @__cxa_begin_catch(i8*)
 declare void @__cxa_end_catch()
 declare i8* @__cxa_allocate_exception(i32)
 declare void @__cxa_throw(i8*, i8*, i8*)
+
+
+define { i32, i32 } @"test2"(%TContext* %contextParameter) #1 {
+  %1 = insertvalue { i32, i32 } undef, i32 1, 0
+  %2 = insertvalue { i32, i32 } %1, i32 2, 1
+  ret { i32, i32 } %2
+}
+
+; Function Attrs: inlinehint
+define { %TObject*, %TContext* } @"Mock>>selfReturn_"(%TContext* %pContext) #1 {
+preamble:
+  %0 = getelementptr inbounds %TContext* %pContext, i32 0, i32 2
+  %1 = load %TObjectArray** %0
+  %2 = getelementptr inbounds %TObjectArray* %1, i32 0, i32 0
+  %fields.i.i = getelementptr inbounds %TObject* %2, i32 0, i32 2
+  %fieldPtr.i.i = getelementptr inbounds [0 x %TObject*]* %fields.i.i, i32 0, i32 0
+  %result.i = load %TObject** %fieldPtr.i.i
+  %3 = insertvalue { %TObject*, %TContext* } undef, %TObject* %result.i, 0
+  %4 = insertvalue { %TObject*, %TContext* } %3, %TContext* null, 1
+  ret { %TObject*, %TContext* } %4
+}

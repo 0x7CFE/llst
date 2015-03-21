@@ -127,13 +127,16 @@ if (USE_LLVM)
         src/llstPass.cpp
         src/llstDebuggingPass.cpp
     )
+
+    add_library(trampoline "src/trampoline.cpp")
+    set_source_files_properties(src/trampoline.cpp PROPERTIES COMPILE_FLAGS "-freg-struct-return")
 endif()
 
 add_executable(llst src/main.cpp)
 add_dependencies(llst image)
 
 if (USE_LLVM)
-    target_link_libraries(llst jit ${LLVM_LIBS} ${LLVM_LD_FLAGS})
+    target_link_libraries(llst jit trampoline ${LLVM_LIBS} ${LLVM_LD_FLAGS})
 endif()
 target_link_libraries(llst standard_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 

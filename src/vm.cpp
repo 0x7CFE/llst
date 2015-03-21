@@ -723,7 +723,7 @@ SmalltalkVM::TExecuteResult SmalltalkVM::doPrimitive(hptr<TProcess>& process, TV
 }
 
 // TODO Refactor code to make this clean
-extern "C" { TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset = 0); }
+//extern "C" { TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteOffset = 0); }
 
 TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, TVMExecutionContext& ec, bool& failed) {
     switch (opcode) {
@@ -742,7 +742,9 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
             TObjectArray* args = ec.stackPop<TObjectArray>();
             TSymbol*  selector = ec.stackPop<TSymbol>();
             try {
-                const TReturnValue& returnValue = sendMessage(ec.currentContext, selector, args, 0);
+                TReturnValue returnValue;
+                JITRuntime::Instance()->sendMessage(ec.currentContext, selector, args, 0, 0, returnValue);
+
                 if (returnValue.targetContext)
                     ec.currentContext = returnValue.targetContext;
                 return returnValue.value;
@@ -765,8 +767,15 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case 247: { // Jit once: aBlock
             try {
                 TBlock* const block = ec.stackPop<TBlock>();
-                return JITRuntime::Instance()->invokeBlock(block, ec.currentContext, true);
-            } catch(TBlockReturn& blockReturn) {
+
+                TReturnValue returnValue;
+                JITRuntime::Instance()->invokeBlock(block, ec.currentContext, returnValue, true);
+
+                if (returnValue.targetContext)
+                    ec.currentContext = returnValue.targetContext;
+                return returnValue.value;
+
+            } catch(TReturnValue& blockReturn) {
                 ec.currentContext = blockReturn.targetContext;
                 return blockReturn.value;
             } catch(TContext* errorContext) {

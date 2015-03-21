@@ -153,7 +153,7 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // These are then used as an allocator function return types
 
     TargetOptions Opts;
-//    Opts.JITExceptionHandling = true;
+//     Opts.JITExceptionHandling = true;
     Opts.GuaranteedTailCallOpt = true;
 //    Opts.JITEmitDebugInfo = true;
 //    Opts.PrintMachineCode = true;
@@ -291,8 +291,10 @@ void JITRuntime::optimizeFunction(Function* function, bool runModulePass)
         m_modulePassManager->run(*m_JITModule);
 }
 
-TReturnValue JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool once)
+void JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, TReturnValue& result, bool once /*= false*/)
 {
+    m_blocksInvoked++;
+
     // Guessing the block function name
     const uint16_t blockOffset = block->blockBytePointer;
 
@@ -318,6 +320,8 @@ TReturnValue JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bo
                 std::exit(1);
             }
 
+//              outs() << *blockFunction << "\n";
+
             verifyModule(*m_JITModule, AbortProcessAction);
 
             optimizeFunction(blockFunction, true);
@@ -328,7 +332,8 @@ TReturnValue JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bo
     }
 
     block->previousContext = callingContext->previousContext;
-    const TReturnValue& result = compiledBlockFunction(block);
+    //const TReturnValue& result = compiledBlockFunction(block);
+    blockTrampoline(compiledBlockFunction, block, result);
 
     if (once) {
         m_executionEngine->freeMachineCodeForFunction(blockFunction);
@@ -336,11 +341,13 @@ TReturnValue JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bo
         flushBlockFunctionCache();
     }
 
-    return result;
+    // return result;
 }
 
-TReturnValue JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
+void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex, TReturnValue& result)
 {
+    m_messagesDispatched++;
+
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
     TContext*       newContext = 0;
@@ -375,7 +382,9 @@ TReturnValue JITRuntime::sendMessage(TContext* callingContext, TSymbol* message,
                 // Compiling function and storing it to the table for further use
                 methodFunction = m_methodCompiler->compileMethod(method);
 
-                verifyModule(*m_JITModule, AbortProcessAction);
+//                  outs() << *methodFunction << "\n";
+
+//                 verifyModule(*m_JITModule, AbortProcessAction);
 
                 optimizeFunction(methodFunction, true);
             }
@@ -383,6 +392,8 @@ TReturnValue JITRuntime::sendMessage(TContext* callingContext, TSymbol* message,
             // Calling the method and returning the result
             compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
             updateFunctionCache(method, compiledMethodFunction);
+
+//             outs() << *methodFunction << "\n";
 
             THotMethod& newMethod = m_hotMethods[compiledMethodFunction];
             newMethod.method = method;
@@ -409,8 +420,10 @@ TReturnValue JITRuntime::sendMessage(TContext* callingContext, TSymbol* message,
     }
 
     try {
-        const TReturnValue& result = compiledMethodFunction(newContext);
-        return result;
+        //const TReturnValue& result = compiledMethodFunction(newContext);
+        //return result;
+        methodTrampoline(compiledMethodFunction, newContext, result);
+
     } catch( ... ) {
         //FIXME
         //Do not remove this try catch (you will get "terminate called after throwing an instance of 'TContext*' or 'TBlockReturn'")
@@ -589,18 +602,22 @@ void JITRuntime::createDirectBlocks(TPatchInfo& info, TCallSite& callSite, TDire
             continue;
         }
 
-        TDirectBlock newBlock;
-        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", info.callInstruction->getParent()->getParent(), info.nextBlock);
-
-        builder.SetInsertPoint(newBlock.basicBlock);
-
         std::string directFunctionName = directMethod->klass->name->toString() + ">>" + callSite.messageSelector->toString();
         Function* directFunction = m_JITModule->getFunction(directFunctionName);
 
         if (!directFunction) {
             outs() << "Error! Could not acquire direct function for name " << directFunctionName << "\n";
-            abort();
+            //abort();
+            directBlocks[iClassHit->first] = TDirectBlock();
+            continue;
         }
+
+        TDirectBlock newBlock;
+        newBlock.basicBlock = BasicBlock::Create(m_JITModule->getContext(), "direct.", info.callInstruction->getParent()->getParent(), info.nextBlock);
+
+        builder.SetInsertPoint(newBlock.basicBlock);
+
+
 
 //         FunctionType* _printfType = FunctionType::get(builder.getInt32Ty(), builder.getInt8PtrTy(), true);
 //         Constant*     _printf     = m_JITModule->getOrInsertFunction("printf", _printfType);
@@ -848,7 +865,7 @@ void JITRuntime::patchCallSite(llvm::Function* methodFunction, llvm::Value* cont
 
         // This phi function will aggregate direct block and fallback block return values
         builder.SetInsertPoint(nextBlock, nextBlock->getInstList().begin());
-        PHINode* replyPhi = builder.CreatePHI(m_baseTypes.object->getPointerTo(), 2, "phi.");
+        PHINode* replyPhi = builder.CreatePHI(m_baseTypes.returnValueType, 2, "phi.");
         replyPhi->addIncoming(fallbackReply, fallbackBlock);
 
         // Splitting original block tore execution flow. Reconnecting blocks
@@ -1082,21 +1099,9 @@ TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex)
-{
-    JITRuntime::Instance()->m_messagesDispatched++;
-    return JITRuntime::Instance()->sendMessage(callingContext, message, arguments, receiverClass, callSiteIndex);
-}
-
 TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
     return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
-}
-
-TReturnValue invokeBlock(TBlock* block, TContext* callingContext)
-{
-    JITRuntime::Instance()->m_blocksInvoked++;
-    return JITRuntime::Instance()->invokeBlock(block, callingContext);
 }
 
 void emitBlockReturn(TObject* value, TContext* targetContext)

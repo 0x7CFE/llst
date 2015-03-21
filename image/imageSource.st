@@ -1996,7 +1996,7 @@ run2: rounds | mock |
     self run: [ mock selfSend ] rounds: rounds text: 'Self dispatch'.
 
     self run: [ mock invokeBlock: [nil] ] rounds: rounds text: 'Block invoke'.
-    self run: [ mock blockReturn ] rounds: rounds text: 'Block return'.
+    self run: [ 1 to: rounds do: [ :x | mock blockReturn ] ] rounds: 1 text: 'Block return'.
 
     self run: [ mock selfReturn selfReturn selfReturn selfReturn selfReturn ] rounds: rounds text: 'Chain dispatch'.
     self run: [ mock selfReturn; selfReturn; selfReturn; selfReturn; selfReturn ] rounds: rounds text: 'Cascade dispatch'.
@@ -2060,6 +2060,9 @@ main    | command  data x |
     Char initialize.
     Class fillChildren.
     System fixMethodClasses.
+
+    "Jit do: [ nil runAllTests ].
+    Jit do: [ System rebuildImage ]."
 
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]

@@ -82,9 +82,9 @@ Function* MethodCompiler::createFunction(TMethod* method)
 {
     Type* methodParams[] = { m_baseTypes.context->getPointerTo() };
     FunctionType* functionType = FunctionType::get(
-        m_baseTypes.object->getPointerTo(), // the type of function result
-        methodParams,                       // parameters
-        false                               // we're not dealing with vararg
+        m_baseTypes.returnValueType, //m_baseTypes.object->getPointerTo(), // the type of function result
+        methodParams,            // parameters
+        false                    // we're not dealing with vararg
     );
 
     std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
@@ -92,6 +92,8 @@ Function* MethodCompiler::createFunction(TMethod* method)
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
     function->addFnAttr(Attribute::InlineHint);
+//     function->addFnAttr(Attribute::ByVal);
+//     function->addFnAttr(Attribute::AlwaysInline);
     return function;
 }
 
@@ -444,6 +446,18 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
     // Processing the method's bytecodes
     writeFunctionBody(jit);
 
+    if (! jit.unwindBlockReturn->hasNUsesOrMore(1)) {
+        if (jit.unwindPhi->getNumIncomingValues()) {
+            outs() << *jit.function << "\n";
+            outs() << "Fatal error: phi is used but the block isn't!\n";
+            abort();
+        }
+
+        jit.unwindPhi->replaceAllUsesWith(UndefValue::get(m_baseTypes.returnValueType));
+        jit.unwindPhi->eraseFromParent();
+        jit.unwindPhi = 0;
+    }
+
     // Cleaning up
     m_blockFunctions.clear();
 
@@ -577,6 +591,9 @@ void MethodCompiler::emitReturn(TJITContext& jit, Value* object, Value* targetCo
 {
     if (!targetContext)
         targetContext = ConstantPointerNull::get(m_baseTypes.context->getPointerTo());
+
+//     Value* returnSlot  = jit.builder->CreateAlloca(m_baseTypes.returnValueType);
+//     Value* returnValue = jit.builder->CreateLoad(returnSlot); //UndefValue::get(m_baseTypes.returnValueType);
 
     Value* returnValue = UndefValue::get(m_baseTypes.returnValueType);
     returnValue = jit.builder->CreateInsertValue(returnValue, object, 0);
@@ -778,37 +795,64 @@ llvm::Function* MethodCompiler::compileBlock(TJITContext& jit, const std::string
     blockParams.push_back(m_baseTypes.block->getPointerTo()); // block object with context information
 
     FunctionType* const blockFunctionType = FunctionType::get(
-        m_baseTypes.object->getPointerTo(), // block return value
-        blockParams,                        // parameters
-        false                               // we're not dealing with vararg
+        m_baseTypes.returnValueType, //m_baseTypes.object->getPointerTo(), // block return value
+        blockParams,                 // parameters
+        false                        // we're not dealing with vararg
     );
 
-    // Creating block function named Class>>method@offset
-    blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
+    blockContext.function = m_JITModule->getFunction(blockFunctionName);
+    if (! blockContext.function) { // Checking if not already created
+        blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
 
-    blockContext.function->setGC("shadow-stack");
-    m_blockFunctions[blockFunctionName] = blockContext.function;
+        blockContext.function->setGC("shadow-stack");
+        m_blockFunctions[blockFunctionName] = blockContext.function;
 
-    // Creating the basic block and inserting it into the function
-    blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
-    blockContext.builder = new IRBuilder<>(blockContext.preamble);
-    writePreamble(blockContext, /*isBlock*/ true);
-    scanForBranches(blockContext, blockContext.parsedBlock);
+        // Creating the basic block and inserting it into the function
+        blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
+        blockContext.builder = new IRBuilder<>(blockContext.preamble);
+        writePreamble(blockContext, /*isBlock*/ true);
 
-    std::stringstream ss;
-    ss.str("");
-    ss << "offset" << blockOffset;
-    BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue();
-    assert(blockBody);
-    blockBody->setName(ss.str());
+        writeUnwindBlockReturn(blockContext);
 
-    blockContext.builder->CreateBr(blockBody);
-    blockContext.builder->SetInsertPoint(blockBody);
+        scanForBranches(blockContext, blockContext.parsedBlock);
 
-    writeFunctionBody(blockContext);
+        std::stringstream ss;
+        ss.str("");
+        ss << "offset" << blockOffset;
 
-    // Running optimization passes on a block function
-    JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
+        BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
+        assert(blockBody);
+        blockBody->setName(ss.str());
+
+        blockContext.builder->SetInsertPoint(blockContext.preamble);
+        blockContext.builder->CreateBr(blockBody);
+
+        blockContext.builder->SetInsertPoint(blockBody);
+
+        writeFunctionBody(blockContext);
+
+        // Erasing unwind phi if it is not needed
+        // Block will be removed by DCE
+        // TODO Better to detect it before unwind block is written
+        if (! blockContext.unwindBlockReturn->hasNUsesOrMore(1)) {
+            if (blockContext.unwindPhi->getNumIncomingValues()) {
+                outs() << *blockContext.function << "\n";
+                outs() << "Fatal error: phi is used but the block isn't!\n";
+                abort();
+            }
+
+            blockContext.unwindPhi->replaceAllUsesWith(UndefValue::get(m_baseTypes.returnValueType));
+            blockContext.unwindPhi->eraseFromParent();
+            blockContext.unwindPhi = 0;
+        }
+
+        //         outs() << *blockContext.function << "\n";
+
+        verifyFunction(*blockContext.function);
+
+        // Running optimization passes on a block function
+        JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
+    }
 
     return blockContext.function;
 }
@@ -1158,6 +1202,8 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
         // Compiling function and storing it to the table for further use
         directFunction = compileMethod(directMethod);
 
+//         outs() << *directFunction << "\n";
+
         verifyFunction(*directFunction , llvm::AbortProcessAction);
 
         m_runtime.optimizeFunction(directFunction, false);
@@ -1260,8 +1306,20 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
     Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
     jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
-    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
+    Value* const targetContext  = jit.builder->CreateExtractValue(result, 1, "targetContext");
+    Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);
+
+    BasicBlock* const next = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+    jit.builder->CreateCondBr(isBlockReturn, jit.unwindBlockReturn, next);
+    jit.unwindPhi->addIncoming(result, jit.builder->GetInsertBlock());
+
+    jit.builder->SetInsertPoint(next);
+    Value* const resultObject = jit.builder->CreateExtractValue(result, 0, "resultObject");
+    Value* const resultHolder = protectProducerNode(jit, jit.currentNode, resultObject);
     setNodeValue(jit, jit.currentNode, resultHolder);
+
+//     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
+//     setNodeValue(jit, jit.currentNode, resultHolder);
 
     return true;
 }
@@ -1269,7 +1327,7 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
 
-    /*st::InstructionNode* const markArgumentsNode = jit.currentNode->getArgument()->cast<st::InstructionNode>();
+    st::InstructionNode* const markArgumentsNode = jit.currentNode->getArgument()->cast<st::InstructionNode>();
     assert(markArgumentsNode);
 
     st::InstructionNode* const receiverNode = markArgumentsNode->getArgument()->cast<st::InstructionNode>();
@@ -1294,7 +1352,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
             if (doSendMessageToLiteral(jit, receiverNode, receiverClass))
                 return;
         }
-    }*/
+    }
 
     Value* const arguments = getArgument(jit); // jit.popValue();
 
@@ -1373,8 +1431,9 @@ void MethodCompiler::doSpecial(TJITContext& jit)
                 Value* const value = getArgument(jit); // jit.popValue();
 
                 // Target context is determined as a creating context of the current block context
-                Value* const blockContext = jit.getCurrentContext();
-                Value* const creatingContextField = jit.builder->CreateStructGEP(blockContext, 1);
+                Value* const context = jit.getCurrentContext();
+                Value* const blockContext = jit.builder->CreateBitCast(context, m_baseTypes.block->getPointerTo());
+                Value* const creatingContextField = jit.builder->CreateStructGEP(blockContext, 2);
                 Value* const creatingContext = jit.builder->CreateLoad(creatingContextField);
 
                 // Block return is implemented as a return of { object, targetContext }
@@ -1465,8 +1524,22 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             m_callSiteIndexToOffset[m_callSiteIndex++] = jit.currentNode->getIndex();
 
             Value* const result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
-            Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
+
+            Value* const targetContext  = jit.builder->CreateExtractValue(result, 1, "targetContext");
+            Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);
+
+            BasicBlock* const next = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
+            jit.builder->CreateCondBr(isBlockReturn, jit.unwindBlockReturn, next);
+            jit.unwindPhi->addIncoming(result, jit.builder->GetInsertBlock());
+
+            jit.builder->SetInsertPoint(next);
+            Value* const resultObject = jit.builder->CreateExtractValue(result, 0, "resultObject");
+            Value* const resultHolder = protectProducerNode(jit, jit.currentNode, resultObject);
             setNodeValue(jit, jit.currentNode, resultHolder);
+
+//             Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
+//             setNodeValue(jit, jit.currentNode, resultHolder);
+//             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
 
         default:
@@ -1522,7 +1595,11 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
     jit.builder->CreateCondBr(primitiveFailed, primitiveFailedBB, primitiveSucceededBB);
     jit.builder->SetInsertPoint(primitiveSucceededBB);
 
-    jit.builder->CreateRet(primitiveResult);
+    if (opcode == primitive::blockInvoke)
+        jit.builder->CreateRet(primitiveResult);
+    else
+        emitReturn(jit, primitiveResult);
+
     jit.builder->SetInsertPoint(primitiveFailedBB);
 
     // FIXME Are we really allowed to use the value without holder?
@@ -1576,7 +1653,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
             jit.builder->SetInsertPoint(asSmallInt);
             Value* const result = jit.builder->CreateCall(m_baseFunctions.newInteger, jit.builder->getInt32(0));
-            jit.builder->CreateRet(result);
+            emitReturn(jit, result); //jit.builder->CreateRet(result);
 
             jit.builder->SetInsertPoint(asObject);
             Value* const size = jit.builder->CreateCall(m_baseFunctions.getObjectSize, object, "size");
