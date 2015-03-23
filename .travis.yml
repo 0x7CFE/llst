@@ -10,6 +10,9 @@ os:
 cache:
   apt: true
 
+notifications:
+  email: false
+
 env:
   matrix:
     - USE_LLVM=Off
