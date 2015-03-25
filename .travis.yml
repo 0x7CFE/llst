@@ -13,6 +13,12 @@ cache:
 notifications:
   email: false
 
+branches:
+  only:
+    - master
+    - develop
+    - /^.*travis.*$/
+
 env:
   matrix:
     - USE_LLVM=Off
