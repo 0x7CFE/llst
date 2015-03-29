@@ -70,6 +70,15 @@ else()
 endif()
 
 
+option(BUILD_TESTS "Should we build tests?" OFF)
+
+if (BUILD_TESTS)
+    enable_testing()
+    configure_file( "${CMAKE_SOURCE_DIR}/cmake/CTestCustom.cmake.in" "${CMAKE_BINARY_DIR}/CTestCustom.cmake" @ONLY)
+    include(CTest)
+    add_subdirectory(tests)
+endif()
+
 add_subdirectory(doc)
 add_subdirectory(image)
 add_subdirectory(src)
