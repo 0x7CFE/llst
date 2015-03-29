@@ -25,9 +25,19 @@ env:
     - USE_LLVM=On
 
 before_install:
-  - ./.travis/linux/install-dependencies.sh
+  - ./.travis/${TRAVIS_OS_NAME}/install-dependencies.sh
 
-before_script: cmake . -DUSE_LLVM=$USE_LLVM -DCMAKE_BUILD_TYPE=Release
+before_script:
+  - mkdir -p build
+  - cd build
+  - cmake . -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=Release -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CMAKE_CXX_COMPILER}"
 
-script: make
+script:
+  - cd build
+  - make ExperimentalBuild
+  - make ExperimentalTest
+
+after_script:
+  - cd build
+  - make ExperimentalSubmit
 
