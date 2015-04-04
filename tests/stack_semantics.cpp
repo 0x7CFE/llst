@@ -1,4 +1,5 @@
 #include "patterns/DecodeBytecode.h"
+#include "helpers/ControlGraph.h"
 
 static const uint8_t bytecode[] = {
     81,         // 0000 PushConstant 1
@@ -23,6 +24,12 @@ static const uint8_t bytecode[] = {
 INSTANTIATE_TEST_CASE_P(_, P_DecodeBytecode,
     ::testing::Values( std::tr1::make_tuple(std::string("Bytecode"), std::string(reinterpret_cast<const char*>(bytecode), sizeof(bytecode))) )
 );
+
+TEST_P(P_DecodeBytecode, CorrectPhi)
+{
+    H_NonUniqueIncomingsOfPhi visitor(m_cfg);
+    visitor.run();
+}
 
 TEST_P(P_DecodeBytecode, StackSemanticsTemps)
 {

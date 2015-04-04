@@ -336,6 +336,28 @@ public:
     }
 };
 
+class H_NonUniqueIncomingsOfPhi: public st::PlainNodeVisitor
+{
+public:
+    H_NonUniqueIncomingsOfPhi(st::ControlGraph* graph) : st::PlainNodeVisitor(graph) {}
+    virtual bool visitNode(st::ControlNode& node) {
+        struct CompareIncoming {
+            static bool cmp(const st::PhiNode::TIncoming& left, const st::PhiNode::TIncoming& right) {
+                return left.node == right.node;
+            }
+        };
+
+        if (st::PhiNode* phi = node.cast<st::PhiNode>()) {
+            st::PhiNode::TIncomingList incomingList = phi->getIncomingList();
+            st::PhiNode::TIncomingList::iterator uniqueEnd = std::unique(incomingList.begin(), incomingList.end(), CompareIncoming::cmp);
+            std::size_t uniqueSize = std::distance(incomingList.begin(), uniqueEnd);
+            EXPECT_EQ(uniqueSize, phi->getIncomingList().size())
+                << "The incomings of phi must differ between each other";
+        }
+        return true;
+    }
+};
+
 void H_CheckCFGCorrect(st::ControlGraph* graph)
 {
     {
@@ -365,6 +387,10 @@ void H_CheckCFGCorrect(st::ControlGraph* graph)
     {
     //    H_BranchJumpsOnCorrectNode visitor(graph);
     //    visitor.run();
+    }
+    {
+        H_NonUniqueIncomingsOfPhi visitor(graph);
+        visitor.run();
     }
 }
 
