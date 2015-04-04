@@ -1829,8 +1829,8 @@ factTest: x
 METHOD Undefined
 main    | command  data x |
     Char initialize.
-    "Class fillChildren."
-    "System fixMethodClasses."
+    Class fillChildren.
+    System fixMethodClasses.
     "Jit do: [ nil inlineTest ]."
 
     " Jit do: [ StatementsTest new runAll; runAll. ]. "
