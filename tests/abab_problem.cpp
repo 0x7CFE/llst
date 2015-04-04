@@ -26,23 +26,44 @@ INSTANTIATE_TEST_CASE_P(_, P_DecodeBytecode,
     ::testing::Values( std::tr1::make_tuple(std::string("Bytecode for ABAB"), std::string(reinterpret_cast<const char*>(ABABbytecode), sizeof(ABABbytecode))) )
 );
 
-void checkSendBinaryArg(st::ControlNode* arg)
+void checkSendBinaryArg(st::InstructionNode* inst, int idx)
 {
+    st::ControlNode* arg = inst->getArgument(idx);
     {
         SCOPED_TRACE("Each argument of sendBinary is a phi node");
         ASSERT_EQ( st::ControlNode::ntPhi, arg->getNodeType());
     }
+    st::PhiNode* phiArg = arg->cast<st::PhiNode>();
+
+    std::vector<st::PhiNode*> phisToCheck;
+    switch (idx)
     {
-        SCOPED_TRACE("Each argument of sendBinary has 2 egdes");
-        ASSERT_EQ( 2, arg->getInEdges().size() );
+        case 0: {
+            // The first arg is a phi containing phis ><
+            ASSERT_EQ(2, phiArg->getInEdges().size());
+            st::ControlNode* phi1 = * phiArg->getInEdges().begin();
+            st::ControlNode* phi2 = * ++ phiArg->getInEdges().begin();
+            phisToCheck.push_back(phi1->cast<st::PhiNode>());
+            phisToCheck.push_back(phi2->cast<st::PhiNode>());
+        } break;
+        case 1: {
+            phisToCheck.push_back(phiArg);
+        } break;
+        default:
+            FAIL() << "idx should be 0 or 1";
     }
+    ASSERT_GT(phisToCheck.size(), 0);
+
     {
-        SCOPED_TRACE("Each edge of arg-phi is a PushConstant");
-        for(st::TNodeSet::iterator i = arg->getInEdges().begin(); i != arg->getInEdges().end(); i++) {
-            st::ControlNode* edge = *i;
-            ASSERT_EQ( st::ControlNode::ntInstruction, edge->getNodeType() );
-            if (st::InstructionNode* edgeInst = edge->cast<st::InstructionNode>()) {
-                ASSERT_EQ( opcode::pushConstant, edgeInst->getInstruction().getOpcode() );
+        for(std::size_t phiIdx = 0; phiIdx < phisToCheck.size(); phiIdx++) {
+            SCOPED_TRACE("Each edge of arg-phi is a PushConstant");
+            st::PhiNode* phi = phisToCheck[phiIdx];
+            for(st::TNodeSet::iterator i = phi->getInEdges().begin(); i != phi->getInEdges().end(); i++) {
+                st::ControlNode* edge = *i;
+                ASSERT_EQ( st::ControlNode::ntInstruction, edge->getNodeType() );
+                if (st::InstructionNode* edgeInst = edge->cast<st::InstructionNode>()) {
+                    ASSERT_EQ( opcode::pushConstant, edgeInst->getInstruction().getOpcode() );
+                }
             }
         }
     }
@@ -64,17 +85,15 @@ TEST_P(P_DecodeBytecode, ABAB)
 
                     EXPECT_EQ( 4, inst->getInEdges().size()); // 2 branches + 2 phis
                     EXPECT_EQ( 2, inst->getArgumentsCount() );
-                    st::ControlNode* firstArg = inst->getArgument(0);
-                    st::ControlNode* secondArg = inst->getArgument(1);
-                    EXPECT_NE(firstArg, secondArg);
+                    EXPECT_NE(inst->getArgument(0), inst->getArgument(1));
 
                     {
                         SCOPED_TRACE("Check first arg");
-                        checkSendBinaryArg(firstArg);
+                        checkSendBinaryArg(inst, 0);
                     }
                     {
                         SCOPED_TRACE("Check second arg");
-                        checkSendBinaryArg(secondArg);
+                        checkSendBinaryArg(inst, 1);
                     }
 
                     return false;
