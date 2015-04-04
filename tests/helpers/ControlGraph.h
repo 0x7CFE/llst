@@ -195,15 +195,15 @@ public:
                     EXPECT_GE( inst->getArgumentsCount(), 1);
                     break;
             }
-            if (inst->getInstruction().isValueProvider()) {
+            if (inst->getInstruction().isValueProvider() && inst->getInstruction().getOpcode() != opcode::pushBlock) {
                 const st::TNodeSet& consumers = inst->getConsumers();
                 EXPECT_GT(consumers.size(), 0);
             }
         }
         if (st::PhiNode* phi = node.cast<st::PhiNode>()) {
-            const st::TNodeSet& inEdges = phi->getInEdges();
+            const st::PhiNode::TIncomingList& incomingList = phi->getIncomingList();
             const st::TNodeSet& outEdges = phi->getOutEdges();
-            EXPECT_GT(inEdges.size(), 0) << "The phi must consist of at least 1 incoming edge";
+            EXPECT_GT(incomingList.size(), 0) << "The phi must have at least 1 incoming edge";
             EXPECT_GE(outEdges.size(), 1) << "There must be a node using the given phi";
         }
         if (st::TauNode* tau = node.cast<st::TauNode>()) {
@@ -280,9 +280,8 @@ public:
         if (st::InstructionNode* instNode = node.cast<st::InstructionNode>()) {
             st::TSmalltalkInstruction inst = instNode->getInstruction();
             if (inst.isValueConsumer()) {
-                // Each consumer must consume value
+                SCOPED_TRACE(inst.toString());
                 std::size_t argSize = instNode->getArgumentsCount();
-                EXPECT_GT(argSize, 0);
                 for(std::size_t i = 0; i < argSize; ++i) {
                     st::ControlNode* argNode = instNode->getArgument(i);
                     if (st::InstructionNode* arg = argNode->cast<st::InstructionNode>()) {
