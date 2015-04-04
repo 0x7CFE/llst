@@ -10,12 +10,7 @@
 
 class ControlGraphVisualizer : public st::PlainNodeVisitor {
 public:
-    ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName) : st::PlainNodeVisitor(graph) {
-        m_stream.open(fileName.c_str(), std::ios::out | std::ios::trunc);
-
-        m_stream << "digraph G2 {\n";
-        firstDomain = true;
-    }
+    ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName, const std::string& directory = ".");
 
     virtual ~ControlGraphVisualizer() { finish(); }
 

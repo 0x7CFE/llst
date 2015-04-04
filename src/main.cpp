@@ -56,7 +56,7 @@ void testControlGraph(Image* image) {
     st::ControlGraph controlGraph(&parsedMethod);
     controlGraph.buildGraph();
 
-    ControlGraphVisualizer visualizer(&controlGraph, "graph.dot");
+    ControlGraphVisualizer visualizer(&controlGraph, "graph");
     visualizer.run();
 }
 

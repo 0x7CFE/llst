@@ -1,5 +1,43 @@
 
 #include <visualization.h>
+#include <unistd.h>
+#include <iomanip>
+
+std::string escape_path(const std::string& path) {
+    if (path.empty())
+        return "<empty name>";
+    std::ostringstream escaped;
+    escaped.fill('0');
+    escaped << std::hex;
+
+    for (std::size_t i = 0; i < path.size(); ++i) {
+        std::string::value_type c = path[i];
+
+        if (iscntrl(c) || c == '/') {
+            escaped << '%' << std::setw(2) << (int) c;
+        } else {
+            escaped << c;
+        }
+    }
+
+    return escaped.str();
+}
+
+ControlGraphVisualizer::ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName, const std::string& directory /*= "."*/)
+    : st::PlainNodeVisitor(graph)
+{
+    std::string fullpath = directory + "/" + escape_path(fileName) + ".dot";
+    m_stream.open(fullpath.c_str(), std::ios::out | std::ios::trunc);
+    if (m_stream.fail()) {
+        std::stringstream ss;
+        ss << "Cannot open/truncate '" << fullpath << "' in '" << get_current_dir_name() << "'";
+        throw std::ios_base::failure( ss.str() );
+    }
+    m_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+    m_stream << "digraph G2 {\n";
+    firstDomain = true;
+}
 
 bool ControlGraphVisualizer::visitDomain(st::ControlDomain& /*domain*/) {
 //     if (!firstDomain)
@@ -113,8 +151,16 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
 
             if (instruction->getInstruction().getOpcode() == opcode::sendMessage) {
                 TSymbolArray* const literals = m_graph->getParsedMethod()->getOrigin()->literals;
-                TSymbol* const name = literals->getField(instruction->getInstruction().getArgument());
-                label += " " + name->toString();
+                uint32_t litIdx = instruction->getInstruction().getArgument();
+                std::string name;
+                if (literals)
+                    name = literals->getField(litIdx)->toString();
+                else {
+                    std::stringstream ss;
+                    ss << "lit" << litIdx;
+                    name = ss.str();
+                }
+                label += " " + name;
             } else if (instruction->getInstruction().isBranch()) {
                 std::stringstream ss;
                 ss << " " << instruction->getInstruction().getExtra();
