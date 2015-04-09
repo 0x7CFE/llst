@@ -15,6 +15,12 @@ B<llst> [B<-h> heap_size] [B<-H> max_heap_size] [[B<-i>] image]
 
 B<llst> - a SmallTalk virtual machine with JIT based on LLVM.
 
+First of all you need to build image from *.st with imageBuilder, then you run llst on the image.
+*.st - is a SmallTalk file containing the full declaration of an image(e.g. standard classes).
+The execution starts from Undefined>>main.
+
+FIXME: Provide imageBuilder with the package (you may find the binary in sources)
+
 =head2 OPTIONS
 
 =over 6
