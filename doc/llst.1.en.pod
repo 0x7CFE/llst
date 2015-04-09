@@ -25,11 +25,11 @@ B<llst> - a SmallTalk virtual machine with JIT based on LLVM.
 
 =item B<-h> heap_size, B<--heap=>heap_size
 
- Init size of the VM heap
+ Init size of the VM heap. If there is no enough space for VM to live in the size will be increased.
 
 =item B<-H> max_heap_size, B<--heap_max=>max_heap_size
 
- Max size of the VM heap
+ Max size of the VM heap. VM will not increase the size of the heap if maximum size is reached.
 
 =item B<--help>
 
