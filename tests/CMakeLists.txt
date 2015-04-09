@@ -1,5 +1,4 @@
-
-find_package(GTest REQUIRED)
+include(GTest)
 
 add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure)
 
@@ -11,5 +10,5 @@ macro(cxx_test pretty_name bin_name sources libs)
     add_dependencies(check ${bin_name})
 endmacro()
 
-include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/include ${GTEST_INCLUDE_DIR})
 
