@@ -101,9 +101,6 @@ endif()
 
 find_program(LLVM_CONFIG_EXE NAMES ${LLVM_CONFIG_NAMES} DOC "Full path to llvm-config")
 mark_as_advanced(LLVM_CONFIG_EXE)
-if (NOT LLVM_CONFIG_EXE)
-    message(STATUS "Could NOT find llvm-config (tried ${LLVM_CONFIG_NAMES})")
-endif()
 
 get_llvm_config_var(--cppflags   LLVM_CPP_FLAGS)
 get_llvm_config_var(--cxxflags   LLVM_CXX_FLAGS)
@@ -120,18 +117,31 @@ check_llvm_libs(LLVM_LIBS_INSTALLED)
 check_llvm_header("llvm/Support/TargetSelect.h" LLVM_HEADERS_INSTALLED)
 check_llvm_source_compiles("#include <llvm/Support/TargetSelect.h> \n int main(){ return 0; }" LLVM_COMPILED_AND_LINKED)
 
-if (LLVM_HEADERS_INSTALLED AND NOT LLVM_LIBS_INSTALLED)
-    message(STATUS "Only header files installed in the package")
+unset(custom_fail_msg)
+set(required_vars LLVM_CONFIG_EXE LLVM_LIBS_INSTALLED LLVM_HEADERS_INSTALLED LLVM_COMPILED_AND_LINKED)
+if (NOT LLVM_CONFIG_EXE)
+    string(REPLACE ";" ", " config_names "${LLVM_CONFIG_NAMES}")
+    set(custom_fail_msg "Could NOT find llvm-config (tried ${config_names})")
+    set(required_vars LLVM_CONFIG_EXE) # for a pretty fail message
+elseif (LLVM_HEADERS_INSTALLED AND NOT LLVM_LIBS_INSTALLED)
+    set(custom_fail_msg "Only header files installed in the package")
 elseif (LLVM_LIBS_INSTALLED AND NOT LLVM_HEADERS_INSTALLED)
-    message(STATUS "Libs installed while header files are missing")
+    set(custom_fail_msg "Libs installed while header files are missing")
 elseif (LLVM_HEADERS_INSTALLED AND LLVM_LIBS_INSTALLED AND NOT LLVM_COMPILED_AND_LINKED)
-    message(STATUS "Libs and headers are installed, but during test compilation something went wrong. See ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log for details")
+    set(custom_fail_msg "
+        LLVM libs and headers are installed,
+        but during test compilation something went wrong.
+        It could happen if the package is not i386.
+        See ${CMAKE_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/CMakeError.log for details.
+       ")
+else()
+    set(custom_fail_msg "Only llvm-config is installed")
 endif()
 
 FIND_PACKAGE_HANDLE_STANDARD_ARGS( LLVM
-    FOUND_VAR LLVM_FOUND
-    REQUIRED_VARS LLVM_CONFIG_EXE LLVM_LIBS_INSTALLED LLVM_HEADERS_INSTALLED LLVM_COMPILED_AND_LINKED
+    REQUIRED_VARS ${required_vars}
     VERSION_VAR LLVM_VERSION
+    FAIL_MESSAGE "${custom_fail_msg}"
 )
 
 set(LLVM_FOUND ${LLVM_FOUND} CACHE INTERNAL "LLVM_FOUND")
