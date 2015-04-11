@@ -1,0 +1,42 @@
+language: cpp
+
+compiler:
+  - gcc
+  - clang
+
+os:
+  - linux
+
+cache:
+  apt: true
+
+notifications:
+  email: false
+
+branches:
+  only:
+    - master
+    - develop
+    - /^.*travis.*$/
+
+env:
+  matrix:
+    - USE_LLVM=Off # if you rename On/Off,
+    - USE_LLVM=On  # fix all scripts (e.g. install-dependencies.sh)
+
+before_install:
+  - ./.travis/${TRAVIS_OS_NAME}/install-dependencies.sh
+
+before_script:
+  - mkdir -p build
+  - cd build
+  - cmake .. -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=Release -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CXX}_LLVM_${USE_LLVM}"
+
+script:
+  - make ExperimentalBuild
+
+after_script:
+  - cd build
+  - make ExperimentalTest
+  - make ExperimentalSubmit
+

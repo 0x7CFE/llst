@@ -2,13 +2,14 @@ cmake_minimum_required(VERSION 2.8.4)
 
 set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_SOURCE_DIR}/cmake/variables.cmake")
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+set (LLVM_PACKAGE_VERSION 3.3)
 
-project(llst-project)
+project(llst)
 
 find_package(Threads REQUIRED QUIET)
 find_package(READLINE)
 find_package(TINFO)
-find_package(LLVM 3.3 EXACT)
+find_package(LLVM ${LLVM_PACKAGE_VERSION} EXACT)
 find_package(POD2MAN)
 find_package(GZIP REQUIRED)
 
@@ -19,17 +20,13 @@ option(USE_POD2MAN "Should we use pod2man to build the documentation (we will cr
 if (USE_LLVM)
     if (LLVM_FOUND)
         message(STATUS "Using LLVM ${LLVM_VERSION}")
-        set (CMAKE_C_FLAGS "${LLVM_C_FLAGS} ${CMAKE_C_FLAGS}")
-        set (CMAKE_CXX_FLAGS "${LLVM_CXX_FLAGS} ${CMAKE_CXX_FLAGS}")
-        set (CMAKE_EXE_LINKER_FLAGS "${LLVM_LD_FLAGS} ${CMAKE_EXE_LINKER_FLAGS}")
-
         # LLVM generates loads of warnings...
-        set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
-
+        set (CMAKE_CXX_FLAGS "${LLVM_CPP_FLAGS} ${CMAKE_CXX_FLAGS} -Wno-unused-parameter")
         set (LLVM_LIBS_TO_LINK ${LLVM_LIBS})
+        link_directories(${LLVM_LIB_DIR})
         add_definitions(-DLLVM)
     else()
-        message(FATAL_ERROR "\nInstall llvm-3.3-dev:i386 and try again.")
+        message(FATAL_ERROR "\nInstall llvm-${LLVM_PACKAGE_VERSION}-dev:i386 and try again.")
     endif()
 else()
     message(STATUS "LLVM is disabled")
@@ -72,6 +69,15 @@ else()
     endfunction()
 endif()
 
+
+option(BUILD_TESTS "Should we build tests?" OFF)
+
+if (BUILD_TESTS)
+    enable_testing()
+    configure_file( "${CMAKE_SOURCE_DIR}/cmake/CTestCustom.cmake.in" "${CMAKE_BINARY_DIR}/CTestCustom.cmake" @ONLY)
+    include(CTest)
+    add_subdirectory(tests)
+endif()
 
 add_subdirectory(doc)
 add_subdirectory(image)
@@ -135,8 +141,10 @@ set (CPACK_STRIP_FILES "llst")
 
 
 set (CPACK_GENERATOR "DEB")
+set (CPACK_DEBIAN_PACKAGE_HOMEPAGE "http://llst.org")
 set (CPACK_DEBIAN_PACKAGE_MAINTAINER "Team <info@llst.org>")
-set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6")
+set (CPACK_DEBIAN_PACKAGE_ARCHITECTURE "i386")
+set (CPACK_DEBIAN_PACKAGE_DEPENDS "libc6:i386, libgcc1:i386, libstdc++6:i386, libreadline6:i386, libtinfo5:i386")
 
 include(CPack)
 

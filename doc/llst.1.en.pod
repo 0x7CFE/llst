@@ -1,15 +1,78 @@
 #pod2man --section=1 --center="LLST Documentation" --release=0.2 --name=llst ./doc/llst.1.en.pod | gzip -9 > ./doc/llst.1.en.gz
+#POD examples: L<http://juerd.nl/site.plp/perlpodtut>
+
+=encoding utf8
+
 =head1 NAME
 
-llst - a SmallTalk virtual machine
+llst - Low Level SmallTalk
+
+=head1 SYNOPSIS
+
+B<llst> [B<-h> heap_size] [B<-H> max_heap_size] [[B<-i>] image]
 
 =head1 DESCRIPTION
 
-TODO:
+B<llst> - a SmallTalk virtual machine with JIT based on LLVM.
 
+First of all you need to build image from *.st with imageBuilder, then you run llst on the image.
+*.st - is a SmallTalk file containing the full declaration of an image(e.g. standard classes).
+The execution starts from Undefined>>main.
+
+FIXME: Provide imageBuilder with the package (you may find the binary in sources)
+
+=head2 OPTIONS
+
+=over 6
+
+=item B<-i> image, B<--image=>image
+
+ Path to image
+
+=item B<-h> heap_size, B<--heap=>heap_size
+
+ Init size of the VM heap. If there is no enough space for VM to live in the size will be increased.
+
+=item B<-H> max_heap_size, B<--heap_max=>max_heap_size
+
+ Max size of the VM heap. VM will not increase the size of the heap if maximum size is reached.
+
+=item B<--help>
+
+ Display short help and quit
+
+=item B<-V>, B<--version>
+
+ Display version and quit
+
+=back
+
+=head1 BUGS
+
+Email bug reports to bugs@llst.org.
+
+=head1 COPYRIGHT
+
+ Copyright 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
+ Copyright 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>
+
+ Copyright 1987-2005 by Timothy A. Budd
+ Copyright 2007 by Charles R. Childers
+ Copyright 2005-2007 by Danny Reinhold
+
+Original license of LittleSmalltalk may be found in the copyright file.
+
+You should have received a copy of the GNU General Public License
+along with LLST.  If not, see L<http://www.gnu.org/licenses/>.
 
 =head1 SEE ALSO
 
-POD examples: L<http://juerd.nl/site.plp/perlpodtut>
+=over 4
+
+=item * "Getting Started with LLVM Core Libraries", Bruno Cardoso Lopes, Rafael Auler, Packt Publishing, 2014, ISBN 978-1-78216-692-4.
+
+=item * "A Little Smalltalk", Timothy Budd, Addison-Wesley, 1987, ISBN 0-201-10698-1.
+
+=back
 
 =cut

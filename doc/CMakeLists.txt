@@ -5,7 +5,7 @@ set (MAN_LLST_EN_GZ ${CMAKE_CURRENT_BINARY_DIR}/llst.1.en.gz)
 
 get_pod2man_cmd(MAN_LLST_EN_CMD FROM ${POD_LLST_EN} TO ${MAN_LLST_EN}
     SECTION 1 CENTER "LLST Documentation"
-    RELEASE 0.2.1
+    RELEASE 0.3.0
     NAME llst
 )
 add_custom_command(
