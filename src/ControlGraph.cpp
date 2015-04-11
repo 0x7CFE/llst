@@ -270,6 +270,7 @@ private:
 
     void mergePhi(PhiNode* source, PhiNode* target);
     ControlNode* getRequestedNode(ControlDomain* domain, std::size_t index);
+    ControlNode* optimizePhi(PhiNode* phi);
 
     ControlDomain* m_currentDomain;
     ControlNode*   m_nodeToLink;
@@ -371,6 +372,43 @@ void GraphLinker::mergePhi(PhiNode* source, PhiNode* target)
     m_graph->eraseNode(source);
 }
 
+ControlNode* GraphLinker::optimizePhi(PhiNode* phi)
+{
+    TNodeSet incomingValues;
+
+    const PhiNode::TIncomingList& incomings = phi->getIncomingList();
+    assert(incomings.size() > 1); // Phi should have at least two incoming edges
+
+    for (size_t index = 0; index < incomings.size(); index++)
+        incomingValues.insert(incomings[index].node);
+
+    assert(incomingValues.size());
+
+    if (traces_enabled)
+        std::printf("GraphLinker::optimizePhi : phi node %u has %u unique incoming values\n", phi->getIndex(), incomingValues.size());
+
+    if (incomingValues.size() > 1)
+        return phi; // Phi is ok, no need to optimize. Leave everything as is.
+
+    // It seem that phi node is redundant becasue all of it's incomings link to the same value.
+    // This may happen in a diamond-shaped reference diagram if incoming value stored in the top
+    // domain and consumed in the bottom one. Left and right domains are not affected.
+    // We may safely remove the phi because incoming value dominates it's consumer.
+
+    if (traces_enabled)
+        std::printf("GraphLinker::optimizePhi : phi node %u is redundant and may be removed\n", phi->getIndex());
+
+    // This is the real value that should be returned
+    ControlNode* const value = *incomingValues.begin();
+
+    // Unlink and erase phi
+    value->removeConsumer(phi);
+    value->removeEdge(phi);
+    m_graph->eraseNode(phi);
+
+    return value;
+}
+
 ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t argumentIndex)
 {
     const BasicBlock::TBasicBlockSet& refererBlocks = domain->getBasicBlock()->getReferers();
@@ -426,6 +464,9 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
         }
     }
 
+    if (!singleReferer)
+        result = optimizePhi(result->cast<PhiNode>());
+
     assert(result);
     return result;
 }
@@ -466,6 +507,20 @@ public:
                 }
             }
         } else if (PhiNode* const phi = node.cast<PhiNode>()) {
+            assert(incomings.size());
+
+            // We may remove the phi node if all of it's incoming entries map to the same node
+            /*const PhiNode::TIncomingList& incomings = phi->getIncomingList();
+            const ControlNode* const testNode = incomings[0].node;
+            bool  unique = true;
+
+            for (std::size_t index = 1; index < incomings.size(); index++) {
+                if (incomings[index].node != testNode) {
+                    unique = false;
+                    break;
+                }
+            }*/
+
             if (phi->getInEdges().size() == 1) {
                 if (traces_enabled)
                     std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", phi->getIndex());
