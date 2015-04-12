@@ -10,7 +10,7 @@ macro(cxx_test pretty_name bin_name sources libs)
     add_dependencies(check ${bin_name})
 endmacro()
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${GTEST_INCLUDE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/include ${GTEST_INCLUDE_DIR})
 
 cxx_test(TSmalltalkInstruction test_tsmalltalk_instruction "${CMAKE_CURRENT_SOURCE_DIR}/tsmalltalk_instruction.cpp" "stapi;-pthread")
 cxx_test(InstructionDecoder test_instruction_decoder "${CMAKE_CURRENT_SOURCE_DIR}/instruction_decoder.cpp" "stapi;-pthread")
