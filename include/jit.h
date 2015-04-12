@@ -142,10 +142,17 @@ struct TBaseFunctions {
     llvm::Function* getObjectClass;
     llvm::Function* setObjectClass;
     llvm::Function* getObjectFields;
+    llvm::Function* getObjectFieldPtr;
     llvm::Function* getObjectField;
     llvm::Function* setObjectField;
     llvm::Function* getSlotSize;
     llvm::Function* getLiteral;
+    llvm::Function* getArgument;
+    llvm::Function* getInstance;
+    llvm::Function* setInstance;
+    llvm::Function* getTemps;
+    llvm::Function* getTemporary;
+    llvm::Function* setTemporary;
 
     void initializeFromModule(llvm::Module* module) {
         isSmallInteger   = module->getFunction("isSmallInteger");
@@ -156,10 +163,17 @@ struct TBaseFunctions {
         getObjectClass   = module->getFunction("getObjectClass");
         setObjectClass   = module->getFunction("setObjectClass");
         getObjectFields  = module->getFunction("getObjectFields");
+        getObjectFieldPtr= module->getFunction("getObjectFieldPtr");
         getObjectField   = module->getFunction("getObjectField");
         setObjectField   = module->getFunction("setObjectField");
         getSlotSize      = module->getFunction("getSlotSize");
         getLiteral       = module->getFunction("getLiteralFromContext");
+        getArgument      = module->getFunction("getArgFromContext");
+        getInstance      = module->getFunction("getInstanceFromContext");
+        setInstance      = module->getFunction("setInstanceInContext");
+        getTemps         = module->getFunction("getTempsFromContext");
+        getTemporary     = module->getFunction("getTemporaryFromContext");
+        setTemporary     = module->getFunction("setTemporaryInContext");
     }
 };
 

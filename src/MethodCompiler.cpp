@@ -47,18 +47,22 @@
 
 using namespace llvm;
 
+template<typename T>
+std::string to_string(const T& x) {
+    // FIXME there is the same function in C++11
+    std::ostringstream ss;
+    ss << x;
+    return ss.str();
+}
+
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 {
-    Module* jitModule = JITRuntime::Instance()->getModule();
-    Function* getLiteralFromContext = jitModule->getFunction("getLiteralFromContext");
-
-    Value* context = getCurrentContext();
-    CallInst* literal = builder->CreateCall2(getLiteralFromContext, context, builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "lit" << index << ".";
-    literal->setName(ss.str());
-
+    Value* const literal = builder->CreateCall2(
+            compiler->m_baseFunctions.getLiteral,
+            getCurrentContext(),
+            builder->getInt32(index)
+    );
+    literal->setName(std::string("lit") + to_string(index) + ".");
     return literal;
 }
 
@@ -624,18 +628,14 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
 void MethodCompiler::doPushInstance(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Function* const getObjectField = m_JITModule->getFunction("getObjectField");
+    Value* const instance = jit.builder->CreateCall2(
+            m_baseFunctions.getInstance,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index)
+    );
+    instance->setName(std::string("instance") + to_string(index) + ".");
 
-    // Self is interpreted as object array.
-    // Array elements are instance variables.
-    Value* const self  = jit.getSelf();
-    Value* const field = jit.builder->CreateCall2(getObjectField, self, jit.builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "field" << index << ".";
-    field->setName(ss.str());
-
-    Value* const holder = protectProducerNode(jit, jit.currentNode, field);
+    Value* const holder = protectProducerNode(jit, jit.currentNode, instance);
     setNodeValue(jit, jit.currentNode, holder);
 }
 
@@ -649,13 +649,12 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
         return;
     }
 
-    Function* const getArgFromContext = m_JITModule->getFunction("getArgFromContext");
-    Value* const context  = jit.getCurrentContext();
-    Value* const argument = jit.builder->CreateCall2(getArgFromContext, context, jit.builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "arg" << index << ".";
-    argument->setName(ss.str());
+    Value* const argument = jit.builder->CreateCall2(
+            m_baseFunctions.getArgument,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index)
+    );
+    argument->setName(std::string("arg") + to_string(index) + ".");
 
     Value* const holder = protectProducerNode(jit, jit.currentNode, argument);
     setNodeValue(jit, jit.currentNode, holder);
@@ -664,17 +663,12 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-
-    Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-    Function* const getObjectField = m_JITModule->getFunction("getObjectField");
-
-    Value* const context   = jit.getCurrentContext();
-    Value* const temps     = jit.builder->CreateCall(getTempsFromContext, context);
-    Value* const temporary = jit.builder->CreateCall2(getObjectField, temps, jit.builder->getInt32(index));
-
-    std::ostringstream ss;
-    ss << "temp" << index << ".";
-    temporary->setName(ss.str());
+    Value* const temporary = jit.builder->CreateCall2(
+            m_baseFunctions.getTemporary,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index)
+    );
+    temporary->setName(std::string("temp") + to_string(index) + ".");
 
     Value* const holder = protectProducerNode(jit, jit.currentNode, temporary);
     setNodeValue(jit, jit.currentNode, holder);
@@ -697,14 +691,7 @@ void MethodCompiler::doPushLiteral(TJITContext& jit)
         ss << "const" << result << ".";
         result->setName(ss.str());
     } else {
-        Function* const getLiteralFromContext = m_JITModule->getFunction("getLiteralFromContext");
-        Value* const context = jit.getCurrentContext();
-        Value* const literalValue = jit.builder->CreateCall2(getLiteralFromContext, context, jit.builder->getInt32(index));
-
-        std::ostringstream ss;
-        ss << "lit" << (uint32_t) index << ".";
-        literalValue->setName(ss.str());
-
+        Value* const literalValue = jit.getLiteral(index);
         result = protectProducerNode(jit, jit.currentNode, literalValue);
     }
 
@@ -828,27 +815,25 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 void MethodCompiler::doAssignTemporary(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value* const  value = getArgument(jit); //jit.lastValue();
-    IRBuilder<>& builder = * jit.builder;
+    Value* const  value = getArgument(jit);
 
-    Function* getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-    Value* const context = jit.getCurrentContext();
-    Value* const temps   = builder.CreateCall(getTempsFromContext, context);
-    builder.CreateCall3(m_baseFunctions.setObjectField, temps, builder.getInt32(index), value);
+    jit.builder->CreateCall3(
+            m_baseFunctions.setTemporary,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index),
+            value
+    );
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value* const  value = getArgument(jit); // jit.lastValue();
-    IRBuilder<>& builder = * jit.builder;
-
-    Function* const getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-    Value*    const self = jit.getSelf();
-    Value*    const fieldPointer = builder.CreateCall2(getObjectFieldPtr, self, builder.getInt32(index));
-
-    builder.CreateCall2(m_runtimeAPI.checkRoot, value, fieldPointer);
-    builder.CreateStore(value, fieldPointer);
+    jit.builder->CreateCall3(
+            m_baseFunctions.setInstance,
+            jit.getCurrentContext(),
+            jit.builder->getInt32(index),
+            getArgument(jit)
+    );
 }
 
 void MethodCompiler::doMarkArguments(TJITContext& jit)
@@ -1671,9 +1656,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             const uint32_t argCount = jit.currentNode->getInstruction().getArgument() - 1;
 
             Value* const blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
-            Function* const getTempsFromContext = m_JITModule->getFunction("getTempsFromContext");
-            Value* const blockTemps = jit.builder->CreateCall(getTempsFromContext, blockAsContext);
-
+            Value* const blockTemps = jit.builder->CreateCall(m_baseFunctions.getTemps, blockAsContext);
             Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
 
             Value* const argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
@@ -1752,8 +1735,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             jit.builder->SetInsertPoint(indexChecked);
 
             if (opcode == primitive::arrayAtPut) {
-                Function* const getObjectFieldPtr = m_JITModule->getFunction("getObjectFieldPtr");
-                Value*    const fieldPointer = jit.builder->CreateCall2(getObjectFieldPtr, arrayObject, actualIndex);
+                Value* const fieldPointer = jit.builder->CreateCall2(m_baseFunctions.getObjectFieldPtr, arrayObject, actualIndex);
                 jit.builder->CreateCall2(m_runtimeAPI.checkRoot, valueObejct, fieldPointer);
                 jit.builder->CreateStore(valueObejct, fieldPointer);
 
