@@ -34,6 +34,7 @@
 
 #include <types.h>
 #include "vm.h"
+#include "analysis.h"
 
 #include <typeinfo>
 
@@ -162,78 +163,39 @@ struct TBaseFunctions {
     }
 };
 
-// Value stack is used as a FIFO value holder during the compilation process.
-// Software VM uses object arrays to hold the values in dynamic.
-// Instead we're interpriting the push, pop and assign instructions
-// as a commands which values should be linked together. For example,
-// two subsequent instructions 'pushTemporary 1' and 'assignInstance 2'
-// will be linked together with effect of instanceVariables[2] = temporaries[1]
-//
-// TStackValue is a base class for stack values. Descendant value may contain either
-// raw value or a deferred command to be done when evaluation takes place.
-// Use get() method to get the stored value.
-//
-// NOTE: Depending on the actual implementation, invoking method get() may result in
-//       a code generation. This should be done in a known context.
-//
-// See also: TPlainValue and TDeferredValue
-struct TStackValue {
-    virtual ~TStackValue() { }
-    virtual llvm::Value* get() = 0;
-};
+class JITRuntime;
 
-// TPlainValue represents simple llvm::Value* holder which does not
-// perform any additional actions when get() is called. Only stored value is returned.
-struct TPlainValue : public TStackValue {
-private:
-    llvm::Value* m_value;
-public:
-    TPlainValue(llvm::Value* value) : m_value(value) {}
-    virtual ~TPlainValue() { }
-
-    virtual llvm::Value* get() { return m_value; }
-};
+typedef std::pair<llvm::Value*, uint32_t> TObjectAndSize;
 
 class MethodCompiler {
 public:
-    // Some useful type aliases
-    typedef std::list<TStackValue*> TValueStack;
-    typedef std::set<llvm::BasicBlock*> TRefererSet;
 
-    // Block context is a logic encapsulation
-    // of Smalltalk's CFG and value transitions
-    struct TBasicBlockContext {
-        // Compile time stack of values that are
-        // produced as a result of opcode processing
-        TValueStack valueStack;
-
-        // Blocks that are referencing
-        // current block by branching to it
-        TRefererSet referers;
+    enum TProtectionMode {
+        pmUnknown = 0,
+        pmShouldProtect,
+        pmSafe
     };
 
-    // This structure contains working data which is
-    // used during the compilation process.
     struct TJITContext {
-        TMethod*            method;       // Smalltalk method we're currently processing
-        uint32_t            bytePointer;
+        st::ParsedMethod*    parsedMethod;
+        st::ControlGraph*    controlGraph;
+        st::InstructionNode* currentNode;
+
+        // List of phi nodes waiting to be processed
+        typedef std::list<st::PhiNode*> TPhiList;
+        TPhiList            pendingPhiNodes;
+
+        TMethod*            originMethod; // Smalltalk method we're currently processing
 
         llvm::Function*     function;     // LLVM function that is created based on method
-        TInstruction        instruction;  // currently processed instruction
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
 
         llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
         bool                methodHasBlockReturn;
-
-        typedef std::map<llvm::BasicBlock*, TBasicBlockContext> TBlockContextMap;
-        TBlockContextMap basicBlockContexts;
+        bool                methodAllocatesMemory;
 
         MethodCompiler* compiler; // link to outer class for variable access
-        bool hasValue();
-        void pushValue(llvm::Value* value);
-        llvm::Value* lastValue();
-        llvm::Value* popValue(llvm::BasicBlock* overrideBlock = 0, bool dropValue = false);
 
         llvm::Value* contextHolder;
         llvm::Value* selfHolder;
@@ -243,42 +205,51 @@ public:
         llvm::Value* getMethodClass();
         llvm::Value* getLiteral(uint32_t index);
 
-        void pushValue(TStackValue* value);
-
-        TJITContext(MethodCompiler* compiler, TMethod* method)
-            : method(method), bytePointer(0), function(0), builder(0),
-            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false), compiler(compiler),
-            contextHolder(0), selfHolder(0)
+        TJITContext(MethodCompiler* compiler, TMethod* method, bool parse = true)
+        : currentNode(0), originMethod(method), function(0), builder(0),
+            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false),
+            methodAllocatesMemory(true), compiler(compiler), contextHolder(0), selfHolder(0)
         {
-
+            if (parse) {
+                parsedMethod = new st::ParsedMethod(method);
+                controlGraph = new st::ControlGraph(parsedMethod);
+                controlGraph->buildGraph();
+            }
         };
 
         ~TJITContext() {
-            if (! basicBlockContexts.empty()) {
-                TBlockContextMap::iterator iContext = basicBlockContexts.begin();
-                while (iContext != basicBlockContexts.end()) {
-                    TValueStack& valueStack = iContext->second.valueStack;
-                    if (! valueStack.empty()) {
-                        TValueStack::iterator iStackValue = valueStack.begin();
-                        while (iStackValue != valueStack.end()) {
-                            delete *iStackValue;
-                            ++iStackValue;
-                        }
-                        valueStack.clear();
-                    }
-                    ++iContext;
-                }
-                basicBlockContexts.clear();
-            }
-
+            delete controlGraph;
             delete builder;
         }
     };
 
+    struct TJITBlockContext : public TJITContext {
+        st::ParsedBlock* parsedBlock;
+
+        TJITBlockContext(
+            MethodCompiler*   compiler,
+            st::ParsedMethod* method,
+            st::ParsedBlock*  block
+        )
+            : TJITContext(compiler, 0, false), parsedBlock(block)
+        {
+            parsedMethod = method;
+            originMethod = parsedMethod->getOrigin();
+            controlGraph = new st::ControlGraph(method, block);
+            controlGraph->buildGraph();
+        }
+
+        ~TJITBlockContext() {
+            parsedMethod = 0; // We do not want TJITContext to delete this
+        }
+    };
+
+
 private:
+    JITRuntime& m_runtime;
     llvm::Module* m_JITModule;
-    std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
-    void scanForBranches(TJITContext& jit, uint32_t byteCount = 0);
+//     std::map<uint32_t, llvm::BasicBlock*> m_targetToBlockMap;
+    void scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t byteCount = 0);
     bool scanForBlockReturn(TJITContext& jit, uint32_t byteCount = 0);
 
     std::map<std::string, llvm::Function*> m_blockFunctions;
@@ -289,11 +260,21 @@ private:
     TExceptionAPI  m_exceptionAPI;
     TBaseFunctions m_baseFunctions;
 
+    llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock = 0);
+    llvm::Value* getPhiValue(TJITContext& jit, st::PhiNode* phi);
+    void encodePhiIncomings(TJITContext& jit, st::PhiNode* phiNode);
+    void setNodeValue(TJITContext& jit, st::ControlNode* node, llvm::Value* value);
+    llvm::Value* getArgument(TJITContext& jit, std::size_t index = 0);
+
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
+    llvm::Value* protectProducerNode(TJITContext& jit, st::ControlNode* node, llvm::Value* value);
+    bool shouldProtectProducer(st::ControlNode* node);
+    bool methodAllocatesMemory(TJITContext& jit);
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
-    void writeFunctionBody(TJITContext& jit, uint32_t byteCount = 0);
+    void writeFunctionBody(TJITContext& jit);
+    void writeInstruction(TJITContext& jit);
     void writeLandingPad(TJITContext& jit);
 
     void doPushInstance(TJITContext& jit);
@@ -308,6 +289,7 @@ private:
     void doSendUnary(TJITContext& jit);
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
+    bool doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode, TClass* receiverClass = 0);
     void doSpecial(TJITContext& jit);
 
     void doPrimitive(TJITContext& jit);
@@ -324,8 +306,10 @@ private:
                                 llvm::Value*& primitiveResult,
                                 llvm::BasicBlock* primitiveFailedBB);
 
-    llvm::Value*    createArray(TJITContext& jit, uint32_t elementsCount);
+    TObjectAndSize createArray(TJITContext& jit, uint32_t elementsCount);
     llvm::Function* createFunction(TMethod* method);
+
+    uint16_t getSkipOffset(st::InstructionNode* branch);
 
     uint32_t m_callSiteIndex;
     std::map<uint32_t, uint32_t> m_callSiteIndexToOffset;
@@ -354,11 +338,12 @@ public:
     TStackObject allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
     MethodCompiler(
+        JITRuntime& runtime,
         llvm::Module* JITModule,
         TRuntimeAPI   runtimeApi,
         TExceptionAPI exceptionApi
     )
-        : m_JITModule(JITModule),
+        : m_runtime(runtime), m_JITModule(JITModule),
         m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi), m_callSiteIndex(1)
     {
         m_baseTypes.initializeFromModule(JITModule);
@@ -366,47 +351,6 @@ public:
         m_baseFunctions.initializeFromModule(JITModule);
     }
 };
-
-// TDeferredValue is used in cases when some particular actions should be done
-// when get() method is invoked. Typically this is used to pass an llvm Value*
-// to the later code ensuring that it will not be broken by a garbage collection.
-struct TDeferredValue : public TStackValue {
-    enum TOperation {
-        loadInstance,
-        loadArgument,
-        loadTemporary,
-        loadLiteral,
-
-        // result of message sent
-        // or pushed block
-        loadHolder
-    };
-
-private:
-    TOperation   m_operation;
-    uint32_t     m_index;
-    llvm::Value* m_argument;
-
-    MethodCompiler::TJITContext* m_jit;
-public:
-    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, uint32_t index) {
-        m_argument = 0;
-        m_operation = operation;
-        m_index = index;
-        m_jit = jit;
-    }
-
-    TDeferredValue(MethodCompiler::TJITContext* jit, TOperation operation, llvm::Value* argument) {
-        m_operation = operation;
-        m_argument = argument;
-        m_index = 0;
-        m_jit = jit;
-    }
-
-    virtual ~TDeferredValue() { }
-    virtual llvm::Value* get();
-};
-
 
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
@@ -456,6 +400,7 @@ private:
     friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
     friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+    friend void         emitBlockReturn(TObject* value, TContext* targetContext);
 
     struct TFunctionCacheEntry
     {
@@ -481,6 +426,7 @@ private:
     uint32_t m_blockCacheMisses;
     uint32_t m_messagesDispatched;
     uint32_t m_blocksInvoked;
+    uint32_t m_blockReturnsEmitted;
     uint32_t m_objectsAllocated;
 
     TMethodFunction lookupFunctionInCache(TMethod* method);
@@ -524,6 +470,8 @@ public:
 
         llvm::Value* contextHolder;
         llvm::Value* tempsHolder;
+
+        TDirectBlock() : basicBlock(0), returnValue(0), contextHolder(0), tempsHolder(0) {}
     };
 
     struct TPatchInfo {
@@ -562,7 +510,7 @@ public:
     llvm::ExecutionEngine* getExecutionEngine() { return m_executionEngine; }
     llvm::Module* getModule() { return m_JITModule; }
 
-    void optimizeFunction(llvm::Function* function);
+    void optimizeFunction(llvm::Function* function, bool runModulePass);
     void printStat();
 
     void initialize(SmalltalkVM* softVM);

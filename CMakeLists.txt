@@ -96,9 +96,17 @@ set(CPP_FILES
     src/NonCollectMemoryManager.cpp
     src/primitives.cpp
     src/TDictionary.cpp
-    src/TInstruction.cpp
     src/TSymbol.cpp
     src/vm.cpp
+
+    src/TSmalltalkInstruction.cpp
+    src/InstructionDecoder.cpp
+    src/ParsedMethod.cpp
+    src/ParsedBytecode.cpp
+    src/ParsedBlock.cpp
+
+    src/ControlGraph.cpp
+    src/ControlGraphVisualizer.cpp
 )
 
 if (USE_LLVM)

@@ -46,6 +46,20 @@
     #include <jit.h>
 #endif
 
+#include <visualization.h>
+
+void testControlGraph(Image* image) {
+    TClass*  objectClass = image->getGlobal<TClass>("Object");
+    TMethod* isKindOfMethod = objectClass->methods->find<TMethod>("isKindOf:");
+
+    st::ParsedMethod parsedMethod(isKindOfMethod);
+    st::ControlGraph controlGraph(&parsedMethod);
+    controlGraph.buildGraph();
+
+    ControlGraphVisualizer visualizer(&controlGraph, "graph.dot");
+    visualizer.run();
+}
+
 int main(int argc, char **argv) {
     args llstArgs;
 
@@ -75,10 +89,12 @@ int main(int argc, char **argv) {
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     smalltalkImage->loadImage(llstArgs.imagePath);
 
-    {
-        Image::ImageWriter writer;
-        writer.setGlobals(globals).writeTo("../image/MySmalltalkImage.image");
-    }
+    testControlGraph(smalltalkImage.get());
+
+//     {
+//         Image::ImageWriter writer;
+//         writer.setGlobals(globals).writeTo("../image/MySmalltalkImage.image");
+//     }
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
     // Creating completion database and filling it with info
