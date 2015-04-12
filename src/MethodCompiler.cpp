@@ -1073,7 +1073,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     // Now creating the argument array
     TObjectAndSize array = createArray(jit, 2);
     Value* const argumentsObject = array.first;
-    const uint32_t sizeInBytes = array.second; // TODO lifetime
+    // const uint32_t sizeInBytes = array.second; // TODO lifetime
 
     jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(0), leftValue);
     jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(1), rightValue);
@@ -1895,7 +1895,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
             TObjectAndSize array = createArray(jit, argumentsCount);
             Value* const argumentsObject = array.first;
-            const uint32_t sizeInBytes = array.second; // TODO lifetime
+            // const uint32_t sizeInBytes = array.second; // TODO lifetime
 
             // Filling object with contents
             uint8_t index = argumentsCount;
