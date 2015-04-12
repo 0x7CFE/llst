@@ -443,9 +443,7 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 //     outs() << "Compiling " << jit.function->getName() << "\n";
 
 //     {
-//         std::ostringstream ss;
-//         ss << "dots/" << jit.function->getName().data() << ".dot";
-//         ControlGraphVisualizer vis(jit.controlGraph, ss.str());
+//         ControlGraphVisualizer vis(jit.controlGraph, jit.function->getName(), "dots/");
 //         vis.run();
 //     }
 
@@ -765,9 +763,7 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 //     outs() << "Compiling block " << blockFunctionName << "\n";
 
 //     {
-//         std::ostringstream ss;
-//         ss << "dots/" << blockFunctionName << ".dot";
-//         ControlGraphVisualizer vis(blockContext.controlGraph, ss.str());
+//         ControlGraphVisualizer vis(blockContext.controlGraph, blockFunctionName, "dots/");
 //         vis.run();
 //     }
 

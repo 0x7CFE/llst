@@ -168,6 +168,10 @@ METHOD Object
 	^ (self == arg) not
 !
 METHOD Object
+yourself
+    ^self
+!
+METHOD Object
 class
 	<2 self>
 !
@@ -1662,6 +1666,13 @@ pushConstants |testBlock|
     ['9' asNumber ] assertEq: 9 withComment: '9'.
 !
 
+METHOD StatementsTest
+duplicate |x|
+    [ x <- '42'; yourself ] assertEq: '42' withComment: '0'.
+    [ x <- '42'; asNumber; yourself ] assertEq: 42 withComment: '1'.
+    [ x <- '42'. (x; yourself) = x ] assertWithComment: '2'.
+!
+
 METHOD Undefined
 sortTest | list |
     list <- List new.
@@ -1769,8 +1780,12 @@ runAllTests
     ArrayTest new runAll.
     PrimitiveTest new runAll.
     MagnitudeTest new runAll.
+    "CompareTest new runAll."
+    StringTest new runAll.
     ListTest new runAll.
     MethodLookupTest new runAll.
+    StatementsTest new runAll.
+    BranchTest new runAll.
 !
 
 

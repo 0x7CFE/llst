@@ -85,15 +85,33 @@ add_subdirectory(src)
 add_subdirectory(include)
 include_directories(include)
 
-# Base set of sources needed in every build
-set(CPP_FILES
-    src/args.cpp
+add_library(stapi
+    src/TSmalltalkInstruction.cpp
+    src/InstructionDecoder.cpp
+    src/ParsedBytecode.cpp
+    src/ParsedMethod.cpp
+    src/ParsedBlock.cpp
+
+    src/ControlGraph.cpp
+    src/ControlGraphVisualizer.cpp
+)
+
+set(MM_CPP_FILES
     src/BakerMemoryManager.cpp
-    src/CompletionEngine.cpp
     src/GenerationalMemoryManager.cpp
-    src/Image.cpp
-    src/main.cpp
     src/NonCollectMemoryManager.cpp
+)
+if (USE_LLVM)
+    list(APPEND MM_CPP_FILES src/LLVMMemoryManager.cpp)
+endif()
+
+add_library(memory_managers ${MM_CPP_FILES})
+
+# Base set of sources needed in every build
+add_library(standart_set
+    src/args.cpp
+    src/CompletionEngine.cpp
+    src/Image.cpp
     src/primitives.cpp
     src/TDictionary.cpp
     src/TSymbol.cpp
@@ -110,9 +128,7 @@ set(CPP_FILES
 )
 
 if (USE_LLVM)
-    # LLVM specific sources
-    list(APPEND CPP_FILES
-        src/LLVMMemoryManager.cpp
+    add_library(jit
         src/MethodCompiler.cpp
         src/JITRuntime.cpp
         src/llstPass.cpp
@@ -120,9 +136,13 @@ if (USE_LLVM)
     )
 endif()
 
-add_executable(llst ${CPP_FILES})
-target_link_libraries(llst ${LLVM_LIBS_TO_LINK} ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+add_executable(llst src/main.cpp src/vm.cpp)
+target_link_libraries(llst standart_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 add_dependencies(llst image)
+
+if (USE_LLVM)
+    target_link_libraries(llst jit ${LLVM_LIBS} ${LLVM_LD_FLAGS})
+endif()
 
 set(changelog_compressed "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
 gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" ${changelog_compressed})

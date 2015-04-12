@@ -10,5 +10,12 @@ macro(cxx_test pretty_name bin_name sources libs)
     add_dependencies(check ${bin_name})
 endmacro()
 
-include_directories(${CMAKE_SOURCE_DIR}/include ${GTEST_INCLUDE_DIR})
+include_directories(${CMAKE_SOURCE_DIR}/include ${GTEST_INCLUDE_DIR}/include)
 
+cxx_test(TSmalltalkInstruction test_tsmalltalk_instruction "${CMAKE_CURRENT_SOURCE_DIR}/tsmalltalk_instruction.cpp" "stapi;-pthread")
+cxx_test(InstructionDecoder test_instruction_decoder "${CMAKE_CURRENT_SOURCE_DIR}/instruction_decoder.cpp" "stapi;-pthread")
+cxx_test(ControlGraph test_control_graph "${CMAKE_CURRENT_SOURCE_DIR}/control_graph.cpp" "stapi;-pthread")
+cxx_test(ABABProblem test_abab_problem "${CMAKE_CURRENT_SOURCE_DIR}/abab_problem.cpp" "stapi;-pthread")
+cxx_test(StackSemantics test_stack_semantics "${CMAKE_CURRENT_SOURCE_DIR}/stack_semantics.cpp" "stapi;-pthread")
+# TODO cxx_test(StackUnderflow test_stack_underflow "${CMAKE_CURRENT_SOURCE_DIR}/stack_underflow.cpp" "stapi;-pthread")
+cxx_test(DecodeAllMethods test_decode_all_methods "${CMAKE_CURRENT_SOURCE_DIR}/decode_all_methods.cpp" "stapi;memory_managers;standart_set;-pthread")
