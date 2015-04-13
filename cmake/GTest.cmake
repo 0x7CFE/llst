@@ -28,7 +28,7 @@ function(add_gtest_as_external)
         PREFIX ${CMAKE_CURRENT_BINARY_DIR}/gtest
         INSTALL_COMMAND ""
         CMAKE_ARGS
-            -Dgtest_disable_pthreads=On
+            -Dgtest_disable_pthreads=Off
             -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
             # We don't want to check compiler by subproject again
             -DCMAKE_CXX_COMPILER=${CMAKE_CXX_COMPILER}
@@ -39,7 +39,7 @@ function(add_gtest_as_external)
             -DCMAKE_C_COMPILER_ID_RUN=TRUE
             -DCMAKE_C_COMPILER_WORKS=TRUE
             -DCMAKE_C_COMPILER_FORCED=TRUE
-            -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}
+            -DCMAKE_CXX_FLAGS=${CMAKE_CXX_FLAGS}\ -Wno-missing-field-initializers
     )
     ExternalProject_Get_Property(gtest-external source_dir binary_dir)
     set(GTEST_INCLUDE_DIR "${source_dir}/include" CACHE PATH "Path to directory." FORCE)

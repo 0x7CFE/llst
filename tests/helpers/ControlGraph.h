@@ -34,9 +34,9 @@ public:
         }
         {
             SCOPED_TRACE("There must be no terminators but the last one");
-            int terminatorsCount = 0;
+            uint32_t terminatorsCount = 0;
             st::BasicBlock::iterator iInstruction = BB.begin();
-            st::BasicBlock::iterator iEnd         = BB.end()-1;
+            st::BasicBlock::iterator iEnd         = BB.end()-1; // except the last inst
 
             while (iInstruction != iEnd) {
                 bool isTerminator = (*iInstruction).isTerminator();
@@ -45,7 +45,7 @@ public:
                 EXPECT_FALSE(isTerminator);
                 ++iInstruction;
             }
-            EXPECT_EQ(0, terminatorsCount);
+            EXPECT_EQ(0u, terminatorsCount);
         }
 
         return true;
@@ -76,7 +76,7 @@ public:
     virtual bool visitDomain(st::ControlDomain& domain) {
         st::BasicBlock* currentBB = domain.getBasicBlock();
         if (currentBB->getOffset() != 0) {
-            EXPECT_GT(currentBB->getReferers().size(), 0)
+            EXPECT_GT(currentBB->getReferers().size(), 0u)
                 << "All BB but the 1st must have referrers. "
                 << "BB offset: " << currentBB->getOffset();
         }
@@ -100,7 +100,7 @@ public:
                 st::TSmalltalkInstruction branch = inst->getInstruction();
                 const st::TNodeSet& outEdges = node.getOutEdges();
                 if (branch.getArgument() == special::branchIfTrue || branch.getArgument() == special::branchIfFalse) {
-                    EXPECT_EQ(outEdges.size(), 2);
+                    EXPECT_EQ(2u, outEdges.size());
                     if (outEdges.size() == 2) {
                         st::TNodeSet::const_iterator edgeIter = outEdges.begin();
                         st::ControlNode* target1 = *(edgeIter++);
@@ -127,7 +127,7 @@ public:
                     }
                 }
                 if (branch.getArgument() == special::branch) {
-                    EXPECT_EQ(outEdges.size(), 1);
+                    EXPECT_EQ(1u, outEdges.size());
                     if (outEdges.size() == 1) {
                         st::ControlNode* target = *(outEdges.begin());
                         st::ControlDomain* targetDomain = target->getDomain();
@@ -160,15 +160,15 @@ public:
                 case opcode::pushLiteral:
                 case opcode::pushConstant:
                 case opcode::pushBlock:
-                    EXPECT_EQ( inst->getArgumentsCount(), 0);
+                    EXPECT_EQ(0u, inst->getArgumentsCount());
                     break;
                 case opcode::sendUnary:
                 case opcode::assignInstance:
                 case opcode::assignTemporary:
-                    EXPECT_EQ( inst->getArgumentsCount(), 1);
+                    EXPECT_EQ(1u, inst->getArgumentsCount());
                     break;
                 case opcode::sendBinary:
-                    EXPECT_EQ( inst->getArgumentsCount(), 2);
+                    EXPECT_EQ(2u, inst->getArgumentsCount());
                     break;
                 case opcode::doSpecial: {
                     switch (inst->getInstruction().getArgument()) {
@@ -178,13 +178,11 @@ public:
                         case special::branchIfTrue:
                         case special::branchIfFalse:
                         case special::duplicate:
-                            EXPECT_EQ( inst->getArgumentsCount(), 1);
+                        case special::sendToSuper:
+                            EXPECT_EQ(1u, inst->getArgumentsCount());
                             break;
                         case special::branch:
-                            EXPECT_EQ( inst->getArgumentsCount(), 0);
-                            break;
-                        case special::sendToSuper:
-                            EXPECT_EQ( inst->getArgumentsCount(), 1);
+                            EXPECT_EQ(0u, inst->getArgumentsCount());
                             break;
                     }
                 } break;
@@ -192,19 +190,19 @@ public:
                     EXPECT_EQ(inst->getInstruction().getArgument(), inst->getArgumentsCount());
                     break;
                 default:
-                    EXPECT_GE( inst->getArgumentsCount(), 1);
+                    EXPECT_GE(inst->getArgumentsCount(), 1u);
                     break;
             }
             if (inst->getInstruction().isValueProvider() && inst->getInstruction().getOpcode() != opcode::pushBlock) {
                 const st::TNodeSet& consumers = inst->getConsumers();
-                EXPECT_GT(consumers.size(), 0);
+                EXPECT_GT(consumers.size(), 0u);
             }
         }
         if (st::PhiNode* phi = node.cast<st::PhiNode>()) {
             const st::PhiNode::TIncomingList& incomingList = phi->getIncomingList();
             const st::TNodeSet& outEdges = phi->getOutEdges();
-            EXPECT_GT(incomingList.size(), 0) << "The phi must have at least 1 incoming edge";
-            EXPECT_GE(outEdges.size(), 1) << "There must be a node using the given phi";
+            EXPECT_GT(incomingList.size(), 0u) << "The phi must have at least 1 incoming edge";
+            EXPECT_GE(outEdges.size(), 1u) << "There must be a node using the given phi";
         }
         if (st::TauNode* tau = node.cast<st::TauNode>()) {
             EXPECT_TRUE(tau == NULL /* always fails */); // TODO

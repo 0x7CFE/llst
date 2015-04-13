@@ -40,7 +40,7 @@ void checkSendBinaryArg(st::InstructionNode* inst, int idx)
     {
         case 0: {
             // The first arg is a phi containing phis ><
-            ASSERT_EQ(2, phiArg->getInEdges().size());
+            ASSERT_EQ(2u, phiArg->getInEdges().size());
             st::ControlNode* phi1 = * phiArg->getInEdges().begin();
             st::ControlNode* phi2 = * ++ phiArg->getInEdges().begin();
             phisToCheck.push_back(phi1->cast<st::PhiNode>());
@@ -52,7 +52,7 @@ void checkSendBinaryArg(st::InstructionNode* inst, int idx)
         default:
             FAIL() << "idx should be 0 or 1";
     }
-    ASSERT_GT(phisToCheck.size(), 0);
+    ASSERT_GT(phisToCheck.size(), 0u);
 
     {
         for(std::size_t phiIdx = 0; phiIdx < phisToCheck.size(); phiIdx++) {
@@ -83,8 +83,8 @@ TEST_P(P_DecodeBytecode, ABAB)
                 {
                     sendBinaryFound = true;
 
-                    EXPECT_EQ( 4, inst->getInEdges().size()); // 2 branches + 2 phis
-                    EXPECT_EQ( 2, inst->getArgumentsCount() );
+                    EXPECT_EQ(4u, inst->getInEdges().size()); // 2 branches + 2 phis
+                    EXPECT_EQ(2u, inst->getArgumentsCount());
                     EXPECT_NE(inst->getArgument(0), inst->getArgument(1));
 
                     {
