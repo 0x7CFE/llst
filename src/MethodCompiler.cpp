@@ -172,7 +172,7 @@ public:
                     return st::GraphWalker::vrSkipPath;
                 } */
             }
-        } else if (st::PhiNode* const phi = node->cast<st::PhiNode>()) {
+        } else if (node->getNodeType() == st::ControlNode::ntPhi) {
             // Phi node may not cause gc, protects it's value separately
             // and do not have outgoing edges that we may traverse.
 
