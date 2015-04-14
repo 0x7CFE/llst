@@ -185,7 +185,7 @@ public:
     }
 
 private:
-    st::PathVerifier& m_verifier;
+//     st::PathVerifier& m_verifier;
     bool m_detected;
 };
 

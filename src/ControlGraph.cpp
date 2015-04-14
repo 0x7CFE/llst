@@ -97,7 +97,6 @@ private:
 
     ControlGraph*  const m_graph;
     ControlDomain* m_currentDomain;
-    bool m_skipStubInstructions;
 };
 
 InstructionNode* GraphConstructor::createNode(const TSmalltalkInstruction& instruction)
@@ -505,28 +504,6 @@ public:
                         m_nodesToRemove.push_back(instruction);
                     }
                 }
-            }
-        } else if (PhiNode* const phi = node.cast<PhiNode>()) {
-            assert(incomings.size());
-
-            // We may remove the phi node if all of it's incoming entries map to the same node
-            /*const PhiNode::TIncomingList& incomings = phi->getIncomingList();
-            const ControlNode* const testNode = incomings[0].node;
-            bool  unique = true;
-
-            for (std::size_t index = 1; index < incomings.size(); index++) {
-                if (incomings[index].node != testNode) {
-                    unique = false;
-                    break;
-                }
-            }*/
-
-            if (phi->getInEdges().size() == 1) {
-                if (traces_enabled)
-                    std::printf("GraphOptimizer::visitNode : phi node %u has only one input and may be removed\n", phi->getIndex());
-
-                // FIXME Should be modified according to new phi linking rules
-                // m_nodesToRemove.push_back(phi);
             }
         }
 
