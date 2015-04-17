@@ -20,9 +20,15 @@ branches:
     - /^.*travis.*$/
 
 env:
-  matrix:
-    - USE_LLVM=Off # if you rename On/Off,
-    - USE_LLVM=On  # fix all scripts (e.g. install-dependencies.sh)
+  matrix: # fix all scripts (e.g. install-dependencies.sh) if you rename LLVM_USE[On/Off]
+    - USE_LLVM=Off
+      BUILD_TYPE=Debug
+    - USE_LLVM=Off
+      BUILD_TYPE=Release
+    - USE_LLVM=On
+      BUILD_TYPE=Debug
+    - USE_LLVM=On
+      BUILD_TYPE=Release
 
 before_install:
   - ./.travis/${TRAVIS_OS_NAME}/install-dependencies.sh
@@ -30,12 +36,11 @@ before_install:
 before_script:
   - mkdir -p build
   - cd build
-  - cmake .. -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=Release -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CXX}_LLVM_${USE_LLVM}"
+  - cmake .. -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CXX}_LLVM_${USE_LLVM}_${BUILD_TYPE}"
 
 script:
   - ctest -M Experimental -T Start -T Build -T Test -T Submit
 
 after_script:
-  - cd build
-  - make check # If ctest built the project unsuccessfully, `make check` will report errors to Travis
+  - make check --keep-going # If ctest built the project unsuccessfully, `make check` will report errors to Travis
 
