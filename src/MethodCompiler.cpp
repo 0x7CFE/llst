@@ -140,7 +140,7 @@ Value* MethodCompiler::protectProducerNode(TJITContext& jit, st::ControlNode* no
 
 class Detector {
 public:
-    Detector(st::PathVerifier& verifier) : m_verifier(verifier), m_detected(false) {}
+    Detector() : m_detected(false) {}
 
     bool isDetected() const { return m_detected; }
 
@@ -151,28 +151,8 @@ public:
 
                 m_detected = true;
                 return st::GraphWalker::vrStopWalk;
-
-                /* / Walking through the nodes seeking for consumer
-                // If it is found then candidate node may affect
-                // the consumer. Procucer should be protected.
-                m_verifier.run(candidate);
-
-                if (m_verifier.isVerified()) {
-                    // We found a node that may cause GC and it is really
-                    // on the path between procducer and one of the consumers.
-                    // We've just proved that the value should be protected.
-
-                    m_detected = true;
-                    return st::GraphWalker::vrStopWalk;
-
-                } else {
-                    // Node may cause GC but control flow will never reach any of tracked consumers.
-                    // This means that we may safely ignore this node and all it's subpaths.
-
-                    return st::GraphWalker::vrSkipPath;
-                } */
             }
-        } else if (st::PhiNode* const phi = node->cast<st::PhiNode>()) {
+        } else if (node->getNodeType() == st::ControlNode::ntPhi) {
             // Phi node may not cause gc, protects it's value separately
             // and do not have outgoing edges that we may traverse.
 
@@ -185,7 +165,6 @@ public:
     }
 
 private:
-    st::PathVerifier& m_verifier;
     bool m_detected;
 };
 
@@ -282,10 +261,7 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
     // a complex case that affects several domains and probably phi nodes.
     // We need to perform a generic lookup walking through the whole graph.
 
-    st::PathVerifier verifier(consumers);
-    verifier.addStopNode(producer);
-
-    Detector detector(verifier);
+    Detector detector;
 
     Walker walker(detector);
     walker.addStopNode(producer);
@@ -308,16 +284,6 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 
 //     outs() << "Producer " << producer->getIndex() << " is safe and do not need a protection (2)\n";
     return false;
-
-    // Changing direction to forward and performing last check starting from procucer.
-    // We need to reset the stop list because now we'll use differennt edges.
-//     walker.resetStopNodes();
-//
-//     // When performing a forward run we need to end at consumers
-//     walker.addStopNodes(consumers);
-//     walker.run(producer, st::GraphWalker::wdForward);
-
-//     return detector.isDetected();
 }
 
 void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)

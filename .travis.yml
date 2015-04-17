@@ -40,7 +40,5 @@ before_script:
 
 script:
   - ctest -M Experimental -T Start -T Build -T Test -T Submit
-
-after_script:
-  - make check --keep-going # If ctest built the project unsuccessfully, `make check` will report errors to Travis
+  - make all --keep-going && make check # If ctest built the project unsuccessfully, `make all && make check` will report errors to Travis
 
