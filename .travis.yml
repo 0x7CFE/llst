@@ -33,10 +33,9 @@ before_script:
   - cmake .. -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=Release -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CXX}_LLVM_${USE_LLVM}"
 
 script:
-  - make ExperimentalBuild
+  - ctest -M Experimental -T Start -T Build -T Test -T Submit
 
 after_script:
   - cd build
-  - make ExperimentalTest
-  - make ExperimentalSubmit
+  - make check # If ctest built the project unsuccessfully, `make check` will report errors to Travis
 
