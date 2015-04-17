@@ -42,6 +42,5 @@ script:
   - ctest -M Experimental -T Start -T Build -T Test -T Submit
 
 after_script:
-  - cd build
-  - make check # If ctest built the project unsuccessfully, `make check` will report errors to Travis
+  - make check --keep-going # If ctest built the project unsuccessfully, `make check` will report errors to Travis
 
