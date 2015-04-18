@@ -760,8 +760,17 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         } break;
 
         case 247: { // Jit once: aBlock
-            TBlock* const block = ec.stackPop<TBlock>();
-            return JITRuntime::Instance()->invokeBlock(block, ec.currentContext, true);
+            try {
+                TBlock* const block = ec.stackPop<TBlock>();
+                return JITRuntime::Instance()->invokeBlock(block, ec.currentContext, true);
+            } catch(TBlockReturn& blockReturn) {
+                ec.currentContext = blockReturn.targetContext;
+                return blockReturn.value;
+            } catch(TContext* errorContext) {
+                process->context = errorContext;
+                failed = true;
+                return globals.nilObject;
+            }
         }
 #endif
 
