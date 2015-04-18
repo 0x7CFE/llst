@@ -132,25 +132,25 @@ template<> hptr<TBlock> SmalltalkVM::newObject<TBlock>(std::size_t /*dataSize*/,
 
 void SmalltalkVM::TVMExecutionContext::stackPush(TObject* object)
 {
-    assert(object != 0);
+    assert(object);
+
     //NOTE: boundary check
     //      The Timothy A. Budd's version of compiler produces
     //      bytecode which can overflow the stack of the context
-    {
-        uint32_t stackSize = currentContext->stack->getSize();
-        if( stackTop >= stackSize ) {
-            //resize the current stack
-            hptr<TObjectArray> newStack = m_vm->newObject<TObjectArray>(stackSize*2);
-            std::copy(newStack->getFields(), newStack->getFields()+stackSize, currentContext->stack->getFields());
-//             for(uint32_t i = 0; i < stackSize; i++) {
-//                 TObject* value = currentContext->stack->getField(i);
-//                 newStack->putField(i, value);
-//             }
-            currentContext->stack = newStack;
-            std::cerr << currentContext->method->name->toString() << "!";
-            //std::cerr << std::endl << "VM: Stack overflow in '" << currentContext->method->name->toString() << "'" << std::endl;
-        }
+
+    TObjectArray&  oldStack  = *currentContext->stack;
+    const uint32_t stackSize = oldStack.getSize();
+
+    if (stackTop >= stackSize) {
+        hptr<TObjectArray> newStack = m_vm->newObject<TObjectArray>(stackSize + 7);
+
+        for (uint32_t i = 0; i < stackSize; i++)
+            newStack[i] = oldStack[i];
+
+        currentContext->stack = newStack;
+        std::cerr << currentContext->method->name->toString() << "!";
     }
+
     currentContext->stack->putField(stackTop++, object);
 }
 
