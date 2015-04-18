@@ -702,12 +702,9 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
 
 void MethodCompiler::doPushBlock(TJITContext& jit)
 {
-    st::PushBlockNode* pushBlockNode = jit.currentNode->cast<st::PushBlockNode>();
-    st::ParsedBlock*   parsedBlock   = pushBlockNode->getParsedBlock();
+    st::PushBlockNode* const pushBlockNode = jit.currentNode->cast<st::PushBlockNode>();
+    st::ParsedBlock*   const parsedBlock   = pushBlockNode->getParsedBlock();
 
-    TJITBlockContext blockContext(this, jit.parsedMethod, parsedBlock);
-
-    // Creating block function named Class>>method@offset
     const uint16_t blockOffset = parsedBlock->getStartOffset();
     std::ostringstream ss;
     ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
@@ -720,62 +717,88 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
 //         vis.run();
 //     }
 
-    std::vector<Type*> blockParams;
-    blockParams.push_back(m_baseTypes.block->getPointerTo()); // block object with context information
-
-    FunctionType* blockFunctionType = FunctionType::get(
-        m_baseTypes.object->getPointerTo(), // block return value
-        blockParams,               // parameters
-        false                      // we're not dealing with vararg
-    );
-
-    blockContext.function = m_JITModule->getFunction(blockFunctionName);
-    if (! blockContext.function) { // Checking if not already created
-        blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
-
-        blockContext.function->setGC("shadow-stack");
-        m_blockFunctions[blockFunctionName] = blockContext.function;
-
-        // Creating the basic block and inserting it into the function
-        blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
-        blockContext.builder = new IRBuilder<>(blockContext.preamble);
-        writePreamble(blockContext, /*isBlock*/ true);
-        scanForBranches(blockContext, blockContext.parsedBlock);
-
-        ss.str("");
-        ss << "offset" << blockOffset;
-        BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
-        assert(blockBody);
-        blockBody->setName(ss.str());
-
-        blockContext.builder->CreateBr(blockBody);
-        blockContext.builder->SetInsertPoint(blockBody);
-
-        writeFunctionBody(blockContext);
-
-//         outs() << *blockContext.function << "\n";
-
-        // Running optimization passes on a block function
-        JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
-
-//         outs() << *blockContext.function << "\n";
-    }
+    // If block function is not already created, create it
+    if (! m_JITModule->getFunction(blockFunctionName))
+        compileBlock(jit, blockFunctionName, parsedBlock);
 
 //     outs() << "Done compiling block " << blockFunctionName << "\n";
 
     // Create block object and fill it with context information
-    Value* args[] = {
+    Value* const args[] = {
         jit.getCurrentContext(),                   // creatingContext
         jit.builder->getInt8(jit.currentNode->getInstruction().getArgument()), // arg offset
         jit.builder->getInt16(blockOffset)
     };
+
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
     blockObject = jit.builder->CreateBitCast(blockObject, m_baseTypes.object->getPointerTo());
     blockObject->setName("block.");
 
-    Value* blockHolder = protectProducerNode(jit, jit.currentNode, blockObject);
+    Value* const blockHolder = protectProducerNode(jit, jit.currentNode, blockObject);
     setNodeValue(jit, jit.currentNode, blockHolder);
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, blockHolder));
+}
+
+llvm::Function* MethodCompiler::compileBlock(TBlock* block)
+{
+    TJITContext methodContext(this, block->method);
+    const uint16_t blockOffset = block->blockBytePointer;
+
+    std::ostringstream ss;
+    ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << blockOffset;
+    const std::string blockFunctionName = ss.str();
+
+    st::ParsedBlock* const parsedBlock = methodContext.parsedMethod->getParsedBlockByOffset(blockOffset);
+    assert(parsedBlock);
+
+    return compileBlock(methodContext, blockFunctionName, parsedBlock);
+}
+
+llvm::Function* MethodCompiler::compileBlock(TJITContext& jit, const std::string& blockFunctionName, st::ParsedBlock* parsedBlock)
+{
+    const uint16_t blockOffset = parsedBlock->getStartOffset();
+    TJITBlockContext blockContext(this, jit.parsedMethod, parsedBlock);
+
+    std::vector<Type*> blockParams;
+    blockParams.push_back(m_baseTypes.block->getPointerTo()); // block object with context information
+
+    FunctionType* const blockFunctionType = FunctionType::get(
+        m_baseTypes.object->getPointerTo(), // block return value
+        blockParams,                        // parameters
+        false                               // we're not dealing with vararg
+    );
+
+    // Creating block function named Class>>method@offset
+    blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
+
+    blockContext.function->setGC("shadow-stack");
+    m_blockFunctions[blockFunctionName] = blockContext.function;
+
+    // Creating the basic block and inserting it into the function
+    blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
+    blockContext.builder = new IRBuilder<>(blockContext.preamble);
+    writePreamble(blockContext, /*isBlock*/ true);
+    scanForBranches(blockContext, blockContext.parsedBlock);
+
+    std::stringstream ss;
+    ss.str("");
+    ss << "offset" << blockOffset;
+    BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
+    assert(blockBody);
+    blockBody->setName(ss.str());
+
+    blockContext.builder->CreateBr(blockBody);
+    blockContext.builder->SetInsertPoint(blockBody);
+
+    writeFunctionBody(blockContext);
+
+    //         outs() << *blockContext.function << "\n";
+
+    // Running optimization passes on a block function
+    JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
+
+    //         outs() << *blockContext.function << "\n";
+
+    return blockContext.function;
 }
 
 void MethodCompiler::doAssignTemporary(TJITContext& jit)

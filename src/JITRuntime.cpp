@@ -206,6 +206,11 @@ JITRuntime::~JITRuntime() {
     delete m_methodCompiler;
 }
 
+void JITRuntime::flushBlockFunctionCache()
+{
+    std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
+}
+
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
     hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
@@ -286,27 +291,31 @@ void JITRuntime::optimizeFunction(Function* function, bool runModulePass)
         m_modulePassManager->run(*m_JITModule);
 }
 
-TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
+TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool once)
 {
     // Guessing the block function name
     const uint16_t blockOffset = block->blockBytePointer;
 
-    TBlockFunction compiledBlockFunction = lookupBlockFunctionInCache(block->method, blockOffset);
+    TBlockFunction compiledBlockFunction = once ? 0 : lookupBlockFunctionInCache(block->method, blockOffset);
+    Function* blockFunction = 0;
 
     if (! compiledBlockFunction) {
         std::ostringstream ss;
         ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << blockOffset;
         std::string blockFunctionName = ss.str();
 
-        Function* blockFunction = m_JITModule->getFunction(blockFunctionName);
+        blockFunction = m_JITModule->getFunction(blockFunctionName);
         if (!blockFunction) {
             // Block functions are created when wrapping method gets compiled.
             // If function was not found then the whole method needs compilation.
 
             // Compiling function and storing it to the table for further use
-            Function* methodFunction = m_methodCompiler->compileMethod(block->method);
-            blockFunction = m_JITModule->getFunction(blockFunctionName);
-            if (!methodFunction || !blockFunction) {
+
+//             Function* methodFunction = m_methodCompiler->compileMethod(block->method);
+//             blockFunction = m_JITModule->getFunction(blockFunctionName);
+            blockFunction = m_methodCompiler->compileBlock(block);
+
+            if (/*!methodFunction ||*/ !blockFunction) {
                 // Something is really wrong!
                 outs() << "JIT: Fatal error in invokeBlock for " << blockFunctionName << "\n";
                 std::exit(1);
@@ -325,6 +334,12 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext)
 
     block->previousContext = callingContext->previousContext;
     TObject* result = compiledBlockFunction(block);
+
+    if (once) {
+        m_executionEngine->freeMachineCodeForFunction(blockFunction);
+        blockFunction->eraseFromParent();
+        flushBlockFunctionCache();
+    }
 
     return result;
 }
