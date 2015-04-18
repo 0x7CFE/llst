@@ -437,7 +437,6 @@ private:
     static const unsigned int LOOKUP_CACHE_SIZE = 512;
     TFunctionCacheEntry      m_functionLookupCache[LOOKUP_CACHE_SIZE];
     TBlockFunctionCacheEntry m_blockFunctionLookupCache[LOOKUP_CACHE_SIZE];
-
     uint32_t m_cacheHits;
     uint32_t m_cacheMisses;
     uint32_t m_blockCacheHits;
@@ -451,6 +450,7 @@ private:
     TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
     void updateFunctionCache(TMethod* method, TMethodFunction function);
     void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
+    void flushBlockFunctionCache();
 
     void initializePassManager();
 

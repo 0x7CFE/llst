@@ -206,6 +206,11 @@ JITRuntime::~JITRuntime() {
     delete m_methodCompiler;
 }
 
+void JITRuntime::flushBlockFunctionCache()
+{
+    std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
+}
+
 TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
 {
     hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
@@ -324,9 +329,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool o
         }
 
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
-
-        if (!once)
-            updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
+        updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
     }
 
     block->previousContext = callingContext->previousContext;
@@ -335,6 +338,7 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool o
     if (once) {
         m_executionEngine->freeMachineCodeForFunction(blockFunction);
         blockFunction->eraseFromParent();
+        flushBlockFunctionCache();
     }
 
     return result;
