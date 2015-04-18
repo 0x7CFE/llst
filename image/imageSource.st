@@ -1551,7 +1551,12 @@ sendMessage: aSelector withArguments: anArguments
 
 METHOD MetaJit
 do: aBlock
-    self sendMessage: #value withArguments: (Array with: aBlock).
+    ^self sendMessage: #value withArguments: (Array with: aBlock).
+!
+
+METHOD MetaJit
+once: aBlock
+    <247 aBlock>
 !
 
 METHOD MetaJit

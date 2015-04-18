@@ -296,7 +296,10 @@ private:
     void doPushTemporary(TJITContext& jit);
     void doPushLiteral(TJITContext& jit);
     void doPushConstant(TJITContext& jit);
+
     void doPushBlock(TJITContext& jit);
+    llvm::Function* compileBlock(TJITContext& jit, const std::string& blockFunctionName, st::ParsedBlock* parsedBlock);
+
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
     void doMarkArguments(TJITContext& jit);
@@ -339,6 +342,8 @@ public:
         llvm::Function* methodFunction = 0,
         llvm::Value** contextHolder = 0
     );
+
+    llvm::Function* compileBlock(TBlock* block);
 
     // TStackObject is a pair of entities allocated on a thread stack space
     // objectSlot is a container for actual object's data
@@ -407,7 +412,6 @@ private:
     TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex = 0);
 
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    TObject* invokeBlock(TBlock* block, TContext* callingContext);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
@@ -507,6 +511,9 @@ private:
     void cleanupDirectHolders(llvm::IRBuilder<>& builder, TDirectBlock& directBlock);
     bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
+
+    TObject* invokeBlock(TBlock* block, TContext* callingContext, bool once = false);
+
     void patchHotMethods();
     void printMethod(TMethod* method) {
         std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();

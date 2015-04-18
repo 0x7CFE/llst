@@ -758,6 +758,11 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
                 return globals.nilObject;
             }
         } break;
+
+        case 247: { // Jit once: aBlock
+            TBlock* const block = ec.stackPop<TBlock>();
+            return JITRuntime::Instance()->invokeBlock(block, ec.currentContext, true);
+        }
 #endif
 
         case 251: {
