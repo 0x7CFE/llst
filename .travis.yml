@@ -7,8 +7,16 @@ compiler:
 os:
   - linux
 
+sudo: false
 cache:
   apt: true
+addons:
+  apt:
+    packages:
+    - g++-multilib
+    - linux-libc-dev:i386
+    - libreadline-dev:i386
+    - llvm-3.3-dev:i386
 
 notifications:
   email: false
@@ -29,9 +37,6 @@ env:
       BUILD_TYPE=Debug
     - USE_LLVM=On
       BUILD_TYPE=Release
-
-before_install:
-  - ./.travis/${TRAVIS_OS_NAME}/install-dependencies.sh
 
 before_script:
   - mkdir -p build
