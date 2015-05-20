@@ -125,6 +125,8 @@ add_library(standart_set
 
     src/ControlGraph.cpp
     src/ControlGraphVisualizer.cpp
+    src/Timer.cpp
+    src/GCLogger.cpp
 )
 
 if (USE_LLVM)
