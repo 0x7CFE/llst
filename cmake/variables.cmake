@@ -5,6 +5,7 @@ set (CMAKE_C_FLAGS_DEBUG_INIT "-ggdb3 -O0")
 set (CMAKE_C_FLAGS_MINSIZEREL_INIT "-Os")
 set (CMAKE_C_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
 set (CMAKE_C_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+set (CMAKE_C_FLAGS_COVERAGE "--coverage -fkeep-inline-functions")
 
 # C++ compiler.
 set (CMAKE_CXX_FLAGS_INIT "-Wall -Wextra -fexceptions -frtti")
@@ -12,6 +13,7 @@ set (CMAKE_CXX_FLAGS_DEBUG_INIT "-ggdb3 -O0")
 set (CMAKE_CXX_FLAGS_MINSIZEREL_INIT "-Os")
 set (CMAKE_CXX_FLAGS_RELEASE_INIT "-O3 -DNDEBUG")
 set (CMAKE_CXX_FLAGS_RELWITHDEBINFO_INIT "-O2 -g")
+set (CMAKE_CXX_FLAGS_COVERAGE "--coverage -fkeep-inline-functions")
 
 # Flags used by the linker.
 set (CMAKE_EXE_LINKER_FLAGS_RELEASE_INIT "-s")
