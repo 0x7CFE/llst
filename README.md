@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/0x7CFE/llst.svg?branch=develop)](https://travis-ci.org/0x7CFE/llst)
+[![Coverage Status](https://coveralls.io/repos/0x7CFE/llst/badge.svg?branch=develop)](https://coveralls.io/r/0x7CFE/llst?branch=develop)
+
 Overview
 =================
 LLST stands for LLVM Smalltalk or Low Level Smalltalk (which intends it's use in embedded environments).
