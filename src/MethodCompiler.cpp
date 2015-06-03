@@ -92,7 +92,6 @@ Function* MethodCompiler::createFunction(TMethod* method)
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
     function->addFnAttr(Attribute::InlineHint);
-//     function->addFnAttr(Attribute::AlwaysInline);
     return function;
 }
 
@@ -234,18 +233,12 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 
             while (true) {
                 if (node == consumer) {
-//                     outs() << "Producer " << producer->getIndex() << " is safe and do not need a protection (1)\n";
-
                     return false;
                 }
 
                 assert(node->getNodeType() == st::ControlNode::ntInstruction);
                 st::InstructionNode* const candidate = node->cast<st::InstructionNode>();
                 if (candidate->getInstruction().mayCauseGC()) {
-//                  outs() << "Producer " << producer->getIndex()
-//                         << " should be protected because node "
-//                         << candidate->getIndex() << " may cause GC\n";
-
                     return true;
                 }
 
@@ -273,14 +266,10 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
         walker.run(consumer, st::GraphWalker::wdBackward);
 
         if (detector.isDetected()) {
-//             outs() << "Producer " << producer->getIndex()
-//                    << " should be protected because detector says that it is required\n";
-
             return true;
         }
     }
 
-//     outs() << "Producer " << producer->getIndex() << " is safe and do not need a protection (2)\n";
     return false;
 }
 
@@ -367,7 +356,6 @@ void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* sourc
                 m_jit.function                         // method's function
             );
 
-//             compiler->m_targetToBlockMap[basicBlock.getOffset()] = newBlock;
             basicBlock.setValue(newBlock);
 
             return true;
@@ -407,13 +395,6 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Creating the function named as "Class>>method" or using provided one
     jit.function = methodFunction ? methodFunction : createFunction(method);
-
-//     outs() << "Compiling " << jit.function->getName() << "\n";
-
-//     {
-//         ControlGraphVisualizer vis(jit.controlGraph, jit.function->getName(), "dots/");
-//         vis.run();
-//     }
 
     // Creating the preamble basic block and inserting it into the function
     // It will contain basic initialization code (args, temps and so on)
@@ -462,9 +443,6 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Cleaning up
     m_blockFunctions.clear();
-//     m_targetToBlockMap.clear();
-
-//     outs() << "Done compiling method " << jit.function->getName() << "\n";
 
     return jit.function;
 }
@@ -478,7 +456,6 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
     private:
         virtual bool visitDomain(st::ControlDomain& domain) {
             llvm::BasicBlock* newBlock = domain.getBasicBlock()->getValue();
-            // llvm::BasicBlock* newBlock = m_jit.compiler->m_targetToBlockMap[domain.getBasicBlock()->getOffset()];
 
             newBlock->moveAfter(m_jit.builder->GetInsertBlock()); // for a pretty sequenced BB output
             m_jit.builder->SetInsertPoint(newBlock, newBlock->getFirstInsertionPt());
@@ -708,18 +685,9 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
     std::string blockFunctionName = ss.str();
 
-//     outs() << "Compiling block " << blockFunctionName << "\n";
-
-//     {
-//         ControlGraphVisualizer vis(blockContext.controlGraph, blockFunctionName, "dots/");
-//         vis.run();
-//     }
-
     // If block function is not already created, create it
     if (! m_JITModule->getFunction(blockFunctionName))
         compileBlock(jit, blockFunctionName, parsedBlock);
-
-//     outs() << "Done compiling block " << blockFunctionName << "\n";
 
     // Create block object and fill it with context information
     Value* const args[] = {
@@ -780,7 +748,7 @@ llvm::Function* MethodCompiler::compileBlock(TJITContext& jit, const std::string
     std::stringstream ss;
     ss.str("");
     ss << "offset" << blockOffset;
-    BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
+    BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue();
     assert(blockBody);
     blockBody->setName(ss.str());
 
@@ -789,12 +757,8 @@ llvm::Function* MethodCompiler::compileBlock(TJITContext& jit, const std::string
 
     writeFunctionBody(blockContext);
 
-    //         outs() << *blockContext.function << "\n";
-
     // Running optimization passes on a block function
     JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
-
-    //         outs() << *blockContext.function << "\n";
 
     return blockContext.function;
 }
@@ -842,15 +806,12 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
         jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(--index), argument);
     }
     Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-    //Value* const argsHolder = protectProducerNode(jit, jit.currentNode, argumentsArray);
-    //argsHolder->setName("pArgs.");
 
     Value* const argumentsPointer = jit.builder->CreateBitCast(argumentsObject, jit.builder->getInt8PtrTy());
     Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_start);
     jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->getInt64(sizeInBytes), argumentsPointer);
 
     setNodeValue(jit, jit.currentNode, argumentsArray);
-    //     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, argsHolder));
 }
 
 void MethodCompiler::doSendUnary(TJITContext& jit)
@@ -869,7 +830,6 @@ void MethodCompiler::doSendUnary(TJITContext& jit)
     // FIXME Do not protect the result object because it will always be the literal value
     Value* const result = jit.builder->CreateSelect(condition, m_globals.trueObject, m_globals.falseObject);
     setNodeValue(jit, jit.currentNode, result);
-    //jit.pushValue(result);
 }
 
 llvm::Value* MethodCompiler::getArgument(TJITContext& jit, std::size_t index/* = 0*/) {
@@ -993,8 +953,6 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     BasicBlock* const sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
     BasicBlock* const resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
 
-//     jit.currentNode->getDomain()->getBasicBlock()->setEndValue(resultBlock);
-
     // Depending on the contents we may either do the integer operations
     // directly or create a send message call using operand objects
     jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
@@ -1083,7 +1041,6 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
 
     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, phi);
     setNodeValue(jit, jit.currentNode, resultHolder);
-    //jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
 
@@ -1275,10 +1232,6 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
     if (instruction.getOpcode() == opcode::pushArgument && instruction.getArgument() == 0)
     {
         TClass* const receiverClass = jit.originMethod->klass;
-
-//         TODO if (sendToSuper)
-//             receiverClass = receiverClass->parentClass;
-
         if (receiverClass->package == globals.nilObject) {
             if (doSendMessageToLiteral(jit, receiverNode, receiverClass))
                 return;
@@ -1330,31 +1283,22 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
 
     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
     setNodeValue(jit, jit.currentNode, resultHolder);
-//     jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
 }
 
 void MethodCompiler::doSpecial(TJITContext& jit)
 {
     const uint8_t opcode = jit.currentNode->getInstruction().getArgument();
 
-//     BasicBlock::iterator iPreviousInst = jit.builder->GetInsertPoint();
-//     if (iPreviousInst != jit.builder->GetInsertBlock()->begin())
-//         --iPreviousInst;
-
     switch (opcode) {
         case special::selfReturn:
-//             if (! iPreviousInst->isTerminator())
             jit.builder->CreateRet(jit.getSelf());
             break;
 
         case special::stackReturn:
-//             if ( !iPreviousInst->isTerminator() && jit.hasValue() )
             jit.builder->CreateRet(getArgument(jit)); // jit.popValue());
             break;
 
-        case special::blockReturn:
-            /*if ( !iPreviousInst->isTerminator() && jit.hasValue())*/ {
-                // Peeking the return value from the stack
+        case special::blockReturn: {
                 Value* const value = getArgument(jit); // jit.popValue();
 
                 // Loading the target context information
@@ -1444,7 +1388,6 @@ void MethodCompiler::doSpecial(TJITContext& jit)
             Value* const result = jit.builder->CreateCall(m_runtimeAPI.sendMessage, sendMessageArgs);
             Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
             setNodeValue(jit, jit.currentNode, resultHolder);
-//             jit.pushValue(new TDeferredValue(&jit, TDeferredValue::loadHolder, resultHolder));
         } break;
 
         default:
@@ -1505,9 +1448,6 @@ void MethodCompiler::doPrimitive(TJITContext& jit)
 
     // FIXME Are we really allowed to use the value without holder?
     setNodeValue(jit, jit.currentNode, m_globals.nilObject);
-//     jit.currentNode->getDomain()->getBasicBlock()->setEndValue(primitiveFailedBB);
-
-//     jit.pushValue(m_globals.nilObject);
 }
 
 
