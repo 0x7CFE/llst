@@ -122,6 +122,7 @@ std::string args::getHelp()
         "  -h, --heap <number>              Starting <number> of the heap in bytes\n"
         "  -H, --heap_max <number>          Maximum allowed heap size\n"
         "  -i, --image <path>               Path to image\n"
+        "      --mm_type arg (=copy)        Choose memory manager. nc - NonCollect, copy - Stop-and-Copy\n"
         "  -V, --version                    Display the version number and copyrights of the invoked LLST\n"
         "      --help                       Display this information and quit";
 }
