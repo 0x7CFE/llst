@@ -40,13 +40,7 @@ ControlGraphVisualizer::ControlGraphVisualizer(st::ControlGraph* graph, const st
 }
 
 bool ControlGraphVisualizer::visitDomain(st::ControlDomain& /*domain*/) {
-//     if (!firstDomain)
-//         m_stream << "\t}                         \n" << std::endl; // closing subgraph
-
     firstDomain = false;
-
-//     m_stream << "\n\tsubgraph cluster_" << domain.getBasicBlock()->getOffset() << " {\n";
-//     return st::NodeVisitor::visitDomain(domain);
     return false;
 }
 
@@ -113,9 +107,6 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
 
             m_stream << "\t\t" << incoming.domain->getTerminator()->getIndex() << " -> " << phi->getIndex() << " ["
                 << "style=\"invis\" constraint=true ];\n";
-
-//             m_stream << "\t\t" << node.getIndex() << " -> " << incoming.value->getIndex() << " ["
-//                      << " labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"dashed\" constraint=false ];\n";
         }
     }
 
@@ -191,9 +182,6 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
 }
 
 void ControlGraphVisualizer::finish() {
-//     if (!firstDomain)
-//         m_stream << "\t}                         \n";
-
     m_stream << "}                         \n";
     m_stream.close();
 }
