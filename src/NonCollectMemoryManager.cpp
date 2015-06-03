@@ -45,7 +45,7 @@
 
 
 NonCollectMemoryManager::NonCollectMemoryManager() :
-    m_memoryInfo(), m_heapSize(0), m_heapBase(0), m_heapPointer(0), 
+    m_memoryInfo(), m_heapSize(0), m_heapBase(0), m_heapPointer(0),
     m_staticHeapSize(0), m_staticHeapBase(0), m_staticHeapPointer(0)
 {}
 
