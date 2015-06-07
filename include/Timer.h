@@ -52,10 +52,10 @@ public:
     template <typename RATIO2> TDuration<RATIO2> convertTo() const {
         return TDuration<RATIO2>(value * (RATIO::num * RATIO2::den) / (double)(RATIO::den * RATIO2::num));
     }
-    int toInt() {
+    int toInt() const {
         return floor(value);
     }
-    double toDouble() {
+    double toDouble() const {
         return value;
     }
     std::string toString(
