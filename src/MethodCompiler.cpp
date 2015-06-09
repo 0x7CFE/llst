@@ -338,7 +338,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
 void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t byteCount /*= 0*/)
 {
     // Iterating over method's basic blocks and creating their representation in LLVM
-    // Created blocks are collected in the m_targetToBlockMap map with bytecode offset as a key
+    // Created blocks are used to map bytecode BBs and LLVM BBs
 
     class Visitor : public st::BasicBlockVisitor {
     public:
@@ -423,12 +423,10 @@ Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodF
 
     // Scans the bytecode for the branch sites and
     // collects branch targets. Creates target basic blocks beforehand.
-    // Target blocks are collected in the m_targetToBlockMap map with
-    // target bytecode offset as a key.
     scanForBranches(jit, jit.parsedMethod);
 
     // Switching builder context to the first basic block from the preamble
-    BasicBlock* const body = jit.parsedMethod->getBasicBlockByOffset(0)->getValue(); // m_targetToBlockMap[0];
+    BasicBlock* const body = jit.parsedMethod->getBasicBlockByOffset(0)->getValue();
     assert(body);
     body->setName("offset0");
 
@@ -919,7 +917,7 @@ void MethodCompiler::encodePhiIncomings(TJITContext& jit, st::PhiNode* phiNode)
     for (std::size_t index = 0; index < incomingList.size(); index++) {
         const st::PhiNode::TIncoming& incoming = incomingList[index];
 
-        BasicBlock* const incomingBlock = incoming.domain->getBasicBlock()->getEndValue(); // m_targetToBlockMap[incoming.domain->getBasicBlock()->getOffset()];
+        BasicBlock* const incomingBlock = incoming.domain->getBasicBlock()->getEndValue();
         assert(incomingBlock);
 
         // This call may change the insertion point if one of the incoming values is a value holder,
@@ -1336,7 +1334,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
             // Finding appropriate branch target
             // from the previously stored basic blocks
-            BasicBlock* const target = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(targetOffset)->getValue(); // m_targetToBlockMap[targetOffset];
+            BasicBlock* const target = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(targetOffset)->getValue();
             assert(target);
 
             jit.builder->CreateBr(target);
@@ -1350,11 +1348,11 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 
             // Finding appropriate branch target
             // from the previously stored basic blocks
-            BasicBlock* const targetBlock = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(targetOffset)->getValue(); // m_targetToBlockMap[targetOffset];
+            BasicBlock* const targetBlock = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(targetOffset)->getValue();
 
             // This is a block that goes right after the branch instruction.
             // If branch condition is not met execution continues right after
-            BasicBlock* const skipBlock = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(skipOffset)->getValue(); // m_targetToBlockMap[skipOffset];
+            BasicBlock* const skipBlock = jit.controlGraph->getParsedBytecode()->getBasicBlockByOffset(skipOffset)->getValue();
 
             // Creating condition check
             Value* const boolObject = (opcode == special::branchIfTrue) ? m_globals.trueObject : m_globals.falseObject;
