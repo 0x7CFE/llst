@@ -1,0 +1,152 @@
+
+[Current]
+
+[v_0.4]
+
+2015-05-20  Vlad  <vlastachu@gmail.com>
+    * Add GC log in the format of java gcviewer (#47)
+    Add class Timer
+    Add class GCLogger
+    Add CLI arg to choose GC
+    Inject GCLogger into GC to trace events
+2015-04-19  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Graph-based API and code generation (#32)
+    Added basic types for Smalltalk instruction API (TSmalltalkInstruction, BasicBlock, ParsedMethod, ParsedBlock). This API allows easy interaction and navigation within compiled method bytecodes.
+
+    No in-place decoding is needed. Once parsed, method became available for analysis and iteration.
+    A set of visitor classes is provided for that, such as InstructionVisitor, BasicBlockVisitor, etc.
+
+    The following entities may be easily enumerated and iterated:
+    - Continious regions of non-terminator instructions within a Smalltalk method (like basic blocks)
+    - Smalltalk instructions within a single basic block
+    - Lexical smalltalk blocks within a Smalltalk method (nested blocks are also supported)
+    - Relations of basic blocks, such as list of basic blocks that jump into current and so on
+
+    * On top of instruction API, high level control graph API is provided. It exploits stack relations of instructions within a method and represents them as a links between individual instruction nodes.
+
+    Therefore, the whole method logic is represented as a graph where nodes are single instructions, links between nodes representing various instruction relations, such as:
+    - Instruction order within a control flow
+    - Argument references
+    - Phi value aggregation
+    - Conditional and unconditional jumps
+
+    For example, MarkArguments 2 instruction will have two links to the instructions that provide an actual value (even if they're reasonably far away). MarkArguments itself provide a value that is used by the following SendMessage instruction. This allows us to analyze far instruction relations in a method. Thus, each and every instruction node and it's relations represents ALL information required to encode it without knowing any context (like stack position, offsets and so on).
+
+    For visualization and debugging purposes special visualization pass was implemented. GraphVisualizer traverses the ready ControlGraph and outputs nodes and edges in the  Graphviz DOT format. Later it can be easily rendered into a raster or vector image using the `dot' utility.
+
+    Finally, graph API is now fully used in JIT VM. New methods are analyzed and their graph is built. Then all codegeneration operations use graph representation of Smalltalk instructions and lower them into corresponding IR. A lot of optimization possibilities are now unlocked: instruction reordering, literal and self calls, compile time type deduction and inference became possible. Some of them already implemented and working.
+
+    Graph representation may answer the question whether a value should be protected by GC root. Using the control graph we may easily say are there dangerous instructions between value producing and consuming nodes. By `dangerous' instruction I mean one that may trigger garbage collection. GC may break unprotected pointer which, for example, may reside in hardware register. So, less protection means less memory accesses and better execution performance.
+2015-04-19  Roman Proskuryakov  <humbug@deeptown.org>
+    * Unit tests for graph-based API (#32)
+    TSmalltalkInstruction
+    InstructionDecoder
+    ControlGraph
+    ABABProblem
+    StackSemantics
+    DecodeAllMethods (decode all methods and check whether it fails or not)
+2015-04-11  Roman Proskuryakov  <humbug@deeptown.org>
+    * CMake improvements (#61)
+    Add CTest support
+    Nice find_package(llvm)
+    Download and build Google Test Framework if installed is of incorrect arhitecture
+    Hide CMake variables from user (mark them as advanced)
+2015-04-10  Roman Proskuryakov  <humbug@deeptown.org>
+    * Simple man page (#62)
+    Add description of the project
+    Describe CLI args
+2015-03-26  Roman Proskuryakov  <humbug@deeptown.org>
+    * Integrate Travis CI (#65)
+    Build Debug, Release, +llvm, -llvm, run tests on Linux
+    Submit build results to CDash
+    Submit coverage to Coveralls.io
+
+[v_0.3]
+2015-01-30  Roman Proskuryakov  <humbug@deeptown.org>
+    * Move to LLVM 3.3 (#49)
+2015-01-30  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Fix Baker MM reallocation (#14)
+2014-04-09  Roman Proskuryakov  <humbug@deeptown.org>
+    * Production-like project building (#50)
+    Add CMake check for libreadline, libtinfo, llvm, pthreads, pod2man, gzip
+    Add target uninstall
+2014-03-25  Roman Proskuryakov  <humbug@deeptown.org>
+    * Fix padding when allocate memory (#28)
+    The code generated page fault during execution of movdqa instruction
+    This SSE instruction requered the data to be alined by 16 bytes.
+    The code corresponding to the bug is:
+    @SmalltalkVM::newOrdinaryObject
+        for (uint32_t index = 0; index < fieldsCount; index++)
+            instance->putField(index, globals.nilObject);
+    movdqa moves a double quadword from src to dst. The compiler optimized this loop into a set of movdqa instructions.
+    That means that 'instance' was aligned neither by 16 bytes nor by 4 bytes.
+    When BakerMemoryManager::growHeap does its job it divides newHeapSize by 2.
+     newHeapSize/2 must be equal to correctPadding(newHeapSize/2). But it is not.
+2014-01-08  Roman Proskuryakov  <humbug@deeptown.org>
+    * Optional libreadline (#52)
+2014-01-06  Roman Proskuryakov  <humbug@deeptown.org>
+    * Add CPack support (make .deb package, compress and install changelog, fix lintian warnings) (#43)
+    * Build project on Raspberry Pi, Debian, Ubuntu 64, Mac OS X 10.8, FreeBSD, Cygwin, MinGW (#46)
+    * Make Image-loadImage cross-platform (#46)
+    It worked fine for GNU/Linux, FreeBSD, but the is no mmap in MS \|/iNdOwS.
+    The function is rewritten with std::ifstream.
+
+2013-11-28  Daniil Burdakov  <icqkill@gmail.com>
+    * Add class TInteger (#51)
+2013-11-28  Roman Proskuryakov  <humbug@deeptown.org>
+    * Add CLI args (--help, --version, etc) (#33)
+
+[v_0.2.1]
+
+2013-12-01  Roman Proskuryakov  <humbug@deeptown.org>
+    * Fix build on Arch Linux (#45)
+
+[v_0.2]
+
+2013-11-17  Roman Proskuryakov  <humbug@deeptown.org>
+    * Add naive implementation of LLVM JIT
+    * Add stub with examples how to use LLVM
+2013-11-17  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Inject Baker GC into JIT
+    * Add JIT runtime stats
+    * Add README.md (#23)
+    * Fix copyleft notice in all source files (#10)
+2013-11-14  Roman Proskuryakov  <humbug@deeptown.org>
+    * Add clang++ support (#39)
+2013-11-13  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Make LLVM optional in CMake build scripts (#9)
+2013-11-12  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Untrack image/LitttleSmalltalk.image by git (#22)
+2013-11-08  Roman Proskuryakov  <humbug@deeptown.org>
+    * Reduce the number of C-style casts (#38)
+2013-11-06  Roman Proskuryakov  <humbug@deeptown.org>
+    * Add GC that never frees unused memory (#36)
+2013-10-31  Roman Proskuryakov  <humbug@deeptown.org>
+    * Fix Smalltalk methods with tests (List>>remove, Array>>sort, Object>><, etc) (#35)
+2013-09-30  Roman Proskuryakov  <humbug@deeptown.org>
+    * Fix TDictionary-find caused by bad implementation of binary search (#1, #20, #30)
+2013-09-19  Roman Proskuryakov  <humbug@deeptown.org>
+    * Fix Smalltalk Magnitude operator > with tests (#19)
+    * Remove zeroing memory in TObject constructor (~9% speedup)
+2013-09-05  Roman Proskuryakov  <humbug@deeptown.org>
+    * Fix TContext stack overflow caused by incorrect calculation of max stack size
+2013-08-05  Roman Proskuryakov  <humbug@deeptown.org>
+    * Add ImageWriter to flush image from memory into file
+2013-07-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Add Bison and flex grammar for future implementation of imageBuilder
+2013-07-06  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Add round-robin sheduler to emulate Smalltalk multithreading
+2013-07-04  Roman Proskuryakov  <humbug@deeptown.org>
+    * Teach BakerMemoryManager-releaseExternalHeapPointer to remove elements from list by constant time
+2013-07-01  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Add hptr<> to store gc roots using stack objects (massive speedup)
+2013-04-26  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Add GC with generations (broken)
+2013-04-18  Dmitry Kashitsyn  <korvin@deeptown.org>
+    * Add console autocompletion using libreadline (#40)
+
+[v_0.1]
+2012-12-28  Dmitry Kashitsyn, Roman Proskuryakov  <korvin@deeptown.org>, <humbug@deeptown.org>
+    * Add first implementation of Smalltalk Virtual Machine
+    * Add implementation of Baker GC
+    * Add naive Smalltalk tests
