@@ -28,6 +28,7 @@ INSTANTIATE_TEST_CASE_P(_, P_DecodeBytecode,
 
 void checkSendBinaryArg(st::InstructionNode* inst, int idx)
 {
+    ASSERT_TRUE(idx == 0 || idx == 1);
     st::ControlNode* arg = inst->getArgument(idx);
     {
         SCOPED_TRACE("Each argument of sendBinary is a phi node");
@@ -49,8 +50,6 @@ void checkSendBinaryArg(st::InstructionNode* inst, int idx)
         case 1: {
             phisToCheck.push_back(phiArg);
         } break;
-        default:
-            FAIL() << "idx should be 0 or 1";
     }
     ASSERT_GT(phisToCheck.size(), 0u);
 
@@ -58,12 +57,13 @@ void checkSendBinaryArg(st::InstructionNode* inst, int idx)
         for(std::size_t phiIdx = 0; phiIdx < phisToCheck.size(); phiIdx++) {
             SCOPED_TRACE("Each edge of arg-phi is a PushConstant");
             st::PhiNode* phi = phisToCheck[phiIdx];
-            for(st::TNodeSet::iterator i = phi->getInEdges().begin(); i != phi->getInEdges().end(); i++) {
-                st::ControlNode* edge = *i;
-                ASSERT_EQ( st::ControlNode::ntInstruction, edge->getNodeType() );
-                if (st::InstructionNode* edgeInst = edge->cast<st::InstructionNode>()) {
-                    ASSERT_EQ( opcode::pushConstant, edgeInst->getInstruction().getOpcode() );
-                }
+            st::PhiNode::TIncomingList incomingList = phi->getIncomingList();
+            for(size_t i = 0; i < incomingList.size(); i++) {
+                st::PhiNode::TIncoming incoming = incomingList[i];
+                ASSERT_EQ( st::ControlNode::ntInstruction, incoming.node->getNodeType() );
+                st::InstructionNode* inst = incoming.node->cast<st::InstructionNode>();
+                ASSERT_FALSE(inst == NULL);
+                ASSERT_EQ( opcode::pushConstant, inst->getInstruction().getOpcode() );
             }
         }
     }
