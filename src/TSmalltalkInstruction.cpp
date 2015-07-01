@@ -90,9 +90,6 @@ bool st::TSmalltalkInstruction::mayCauseGC() const {
     // NOTE We expect that markArguments is encoded
     //      directly, so no heap allocation occur
 
-    if (isTrivial() || isTerminator())
-        return false;
-
     switch (m_opcode) {
         case opcode::pushBlock:
 //         case opcode::sendUnary:
