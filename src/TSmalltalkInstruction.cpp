@@ -37,6 +37,7 @@ bool st::TSmalltalkInstruction::isBranch() const
 }
 
 bool st::TSmalltalkInstruction::isValueProvider() const {
+    assert(m_opcode != opcode::extended);
     switch (m_opcode) {
         case opcode::pushInstance:
         case opcode::pushArgument:
@@ -71,11 +72,9 @@ bool st::TSmalltalkInstruction::isValueProvider() const {
                     return false;
             }
 
-        case opcode::extended:
-            assert(false);
+        default:
+            return false;
     }
-
-    return false;
 }
 
 bool st::TSmalltalkInstruction::isTrivial() const {
@@ -131,6 +130,7 @@ bool st::TSmalltalkInstruction::mayCauseGC() const {
 }
 
 bool st::TSmalltalkInstruction::isValueConsumer() const {
+    assert(m_opcode != opcode::extended);
     switch (m_opcode) {
         case opcode::pushInstance:
         case opcode::pushArgument:
@@ -162,13 +162,9 @@ bool st::TSmalltalkInstruction::isValueConsumer() const {
             // TODO User defined primitives
             return true;
 
-        case opcode::extended:
         default:
-            assert(false);
+            return false;
     }
-
-    assert(false);
-    return false;
 }
 
 std::string st::TSmalltalkInstruction::toString() const

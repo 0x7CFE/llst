@@ -341,6 +341,11 @@ public:
     nodes_iterator nodes_end() { return m_nodes.end(); }
 
     ControlNode* newNode(ControlNode::TNodeType type) {
+        assert(type == ControlNode::ntInstruction
+            || type == ControlNode::ntPhi
+            || type == ControlNode::ntTau
+        );
+
         ControlNode* node = 0;
 
         switch (type) {
@@ -355,9 +360,6 @@ public:
             case ControlNode::ntTau:
                 node = new TauNode(m_lastNodeIndex);
                 break;
-
-            default:
-                assert(false);
         }
 
         m_lastNodeIndex++;

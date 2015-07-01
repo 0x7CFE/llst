@@ -145,6 +145,10 @@ public:
     bool isDetected() const { return m_detected; }
 
     st::GraphWalker::TVisitResult checkNode(st::ControlNode* node) {
+        assert(node->getNodeType() == st::ControlNode::ntInstruction
+            || node->getNodeType() == st::ControlNode::ntPhi
+        );
+
         if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
             if (candidate->getInstruction().mayCauseGC()) {
                 outs() << "Detector noticed node " << candidate->getIndex() << " that may cause GC\n";
@@ -157,10 +161,7 @@ public:
             // and do not have outgoing edges that we may traverse.
 
             return st::GraphWalker::vrSkipPath;
-        } else {
-            assert(false);
         }
-
         return st::GraphWalker::vrKeepWalking;
     }
 
@@ -238,17 +239,14 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
                     return false;
                 }
 
-                if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
-                    if (candidate->getInstruction().mayCauseGC()) {
-//                         outs() << "Producer " << producer->getIndex()
-//                                << " should be protected because node "
-//                                << candidate->getIndex() << " may cause GC\n";
+                assert(node->getNodeType() == st::ControlNode::ntInstruction);
+                st::InstructionNode* const candidate = node->cast<st::InstructionNode>();
+                if (candidate->getInstruction().mayCauseGC()) {
+//                  outs() << "Producer " << producer->getIndex()
+//                         << " should be protected because node "
+//                         << candidate->getIndex() << " may cause GC\n";
 
-                        return true;
-                    }
-                } else {
-                    // There should be instruction nodes only
-                    assert(false);
+                    return true;
                 }
 
                 assert(node->getOutEdges().size() == 1);
