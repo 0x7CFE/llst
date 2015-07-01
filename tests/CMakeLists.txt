@@ -12,6 +12,8 @@ endmacro()
 
 include_directories(${CMAKE_SOURCE_DIR}/include ${GTEST_INCLUDE_DIR})
 
+add_subdirectory(radix_tree)
+
 cxx_test(TSmalltalkInstruction test_tsmalltalk_instruction "${CMAKE_CURRENT_SOURCE_DIR}/tsmalltalk_instruction.cpp" "stapi")
 cxx_test(InstructionDecoder test_instruction_decoder "${CMAKE_CURRENT_SOURCE_DIR}/instruction_decoder.cpp" "stapi")
 cxx_test(ControlGraph test_control_graph "${CMAKE_CURRENT_SOURCE_DIR}/control_graph.cpp" "stapi")
