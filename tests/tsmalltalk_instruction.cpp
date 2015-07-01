@@ -90,6 +90,79 @@ TEST(TSmalltalkInstruction, isValueConsumer)
         EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::blockReturn).isValueConsumer());
         EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::selfReturn).isValueConsumer());
     }
+    {
+        SCOPED_TRACE("stack writers are not consumers");
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushInstance).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushArgument).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushTemporary).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushLiteral).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushBlock).isValueConsumer());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushConstant).isValueConsumer());
+    }
+}
+
+TEST(TSmalltalkInstruction, isTrivial)
+{
+    {
+        SCOPED_TRACE("trivial");
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushInstance).isTrivial());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushArgument).isTrivial());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushTemporary).isTrivial());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushLiteral).isTrivial());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushConstant).isTrivial());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::duplicate).isTrivial());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::markArguments).isTrivial());
+    }
+    {
+        SCOPED_TRACE("the other are not trivial");
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushBlock).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfTrue).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfFalse).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branch).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::popTop).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::stackReturn).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::blockReturn).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::selfReturn).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::sendToSuper).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::sendMessage).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::sendUnary).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::sendBinary).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::assignTemporary).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::assignInstance).isTrivial());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doPrimitive).isTrivial());
+    }
+}
+
+TEST(TSmalltalkInstruction, mayCauseGC)
+{
+    {
+        SCOPED_TRACE("may cause gc");
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::pushBlock).mayCauseGC());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::sendMessage).mayCauseGC());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::sendBinary).mayCauseGC());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doPrimitive).mayCauseGC());
+        EXPECT_TRUE(st::TSmalltalkInstruction(opcode::doSpecial, special::sendToSuper).mayCauseGC());
+    }
+    {
+        SCOPED_TRACE("never cause gc");
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushInstance).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushArgument).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushTemporary).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushLiteral).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::pushConstant).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfTrue).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfFalse).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::branch).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::popTop).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::stackReturn).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::blockReturn).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::selfReturn).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::doSpecial, special::duplicate).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::sendUnary).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::assignTemporary).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::assignInstance).mayCauseGC());
+        EXPECT_FALSE(st::TSmalltalkInstruction(opcode::markArguments).mayCauseGC());
+    }
 }
 
 TEST(TSmalltalkInstruction, serializeIsInverseToCtor)
