@@ -165,6 +165,42 @@ TEST(TSmalltalkInstruction, mayCauseGC)
     }
 }
 
+TEST(TSmalltalkInstruction, toString)
+{
+    {
+        SCOPED_TRACE("nonexistent instructions");
+        EXPECT_ANY_THROW(st::TSmalltalkInstruction(42).toString());
+        EXPECT_ANY_THROW(st::TSmalltalkInstruction(opcode::doSpecial, 42).toString());
+        EXPECT_ANY_THROW(st::TSmalltalkInstruction(opcode::sendUnary, 42).toString());
+        EXPECT_ANY_THROW(st::TSmalltalkInstruction(opcode::sendBinary, 42).toString());
+        EXPECT_ANY_THROW(st::TSmalltalkInstruction(opcode::pushConstant, 42).toString());
+    }
+    {
+        SCOPED_TRACE("existent instructions");
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::pushBlock).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::pushInstance).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::pushArgument).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::pushTemporary).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::pushLiteral).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::pushConstant).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::sendMessage).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::sendBinary).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::sendUnary).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doPrimitive).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::assignTemporary).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::assignInstance).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::markArguments).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfTrue).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::branchIfFalse).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::branch).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::popTop).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::stackReturn).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::blockReturn).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::selfReturn).toString());
+        EXPECT_NO_THROW(st::TSmalltalkInstruction(opcode::doSpecial, special::duplicate).toString());
+    }
+}
+
 TEST(TSmalltalkInstruction, serializeIsInverseToCtor)
 {
     using namespace opcode;
