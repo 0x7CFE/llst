@@ -19,6 +19,15 @@ TEST_P(P_InitVM_Image, smallint)
         ASSERT_EQ(3, result.getValue());
     }
     {
+        SCOPED_TRACE("1-2");
+        args->putField(0, TInteger(1) );
+        args->putField(1, TInteger(2) );
+        bool primitiveFailed;
+        TInteger result = callPrimitive(primitive::smallIntSub, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(-1, result.getValue());
+    }
+    {
         SCOPED_TRACE("1/0");
         args->putField(0, TInteger(1) );
         args->putField(1, TInteger(0) );
@@ -36,6 +45,23 @@ TEST_P(P_InitVM_Image, smallint)
         ASSERT_EQ(2, result.getValue());
     }
     {
+        SCOPED_TRACE("1%0");
+        args->putField(0, TInteger(1) );
+        args->putField(1, TInteger(0) );
+        bool primitiveFailed;
+        callPrimitive(primitive::smallIntMod, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
+    }
+    {
+        SCOPED_TRACE("3%2");
+        args->putField(0, TInteger(3) );
+        args->putField(1, TInteger(2) );
+        bool primitiveFailed;
+        TInteger result = callPrimitive(primitive::smallIntMod, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(1, result.getValue());
+    }
+    {
         SCOPED_TRACE("2*3");
         args->putField(0, TInteger(2) );
         args->putField(1, TInteger(3) );
@@ -43,6 +69,86 @@ TEST_P(P_InitVM_Image, smallint)
         TInteger result = callPrimitive(primitive::smallIntMul, args, primitiveFailed);
         ASSERT_FALSE(primitiveFailed);
         ASSERT_EQ(6, result.getValue());
+    }
+    {
+        SCOPED_TRACE("1<2");
+        args->putField(0, TInteger(1) );
+        args->putField(1, TInteger(2) );
+        bool primitiveFailed;
+        TObject* result = callPrimitive(primitive::smallIntLess, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(globals.trueObject, result);
+    }
+    {
+        SCOPED_TRACE("1<1");
+        args->putField(0, TInteger(1) );
+        args->putField(1, TInteger(1) );
+        bool primitiveFailed;
+        TObject* result = callPrimitive(primitive::smallIntLess, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(globals.falseObject, result);
+    }
+    {
+        SCOPED_TRACE("3=3");
+        args->putField(0, TInteger(3) );
+        args->putField(1, TInteger(3) );
+        bool primitiveFailed;
+        TObject* result = callPrimitive(primitive::smallIntEqual, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(globals.trueObject, result);
+    }
+    {
+        SCOPED_TRACE("0=42");
+        args->putField(0, TInteger(0) );
+        args->putField(1, TInteger(42) );
+        bool primitiveFailed;
+        TObject* result = callPrimitive(primitive::smallIntEqual, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(globals.falseObject, result);
+    }
+    {
+        SCOPED_TRACE("1|2");
+        args->putField(0, TInteger(1) );
+        args->putField(1, TInteger(2) );
+        bool primitiveFailed;
+        TInteger result = callPrimitive(primitive::smallIntBitOr, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(3, result.getValue());
+    }
+    {
+        SCOPED_TRACE("14&3");
+        args->putField(0, TInteger(14) );
+        args->putField(1, TInteger(3) );
+        bool primitiveFailed;
+        TInteger result = callPrimitive(primitive::smallIntBitAnd, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(2, result.getValue());
+    }
+    {
+        SCOPED_TRACE("7>>1");
+        args->putField(0, TInteger(7) );
+        args->putField(1, TInteger(-1) );
+        bool primitiveFailed;
+        TInteger result = callPrimitive(primitive::smallIntBitShift, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(3, result.getValue());
+    }
+    {
+        SCOPED_TRACE("5<<1");
+        args->putField(0, TInteger(5) );
+        args->putField(1, TInteger(1) );
+        bool primitiveFailed;
+        TInteger result = callPrimitive(primitive::smallIntBitShift, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ(10, result.getValue());
+    }
+    {
+        SCOPED_TRACE("1<<31");
+        args->putField(0, TInteger(1) );
+        args->putField(1, TInteger(31) );
+        bool primitiveFailed;
+        callPrimitive(primitive::smallIntBitShift, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
     }
     m_image->deleteObject(args);
 }
