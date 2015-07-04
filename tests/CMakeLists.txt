@@ -21,3 +21,4 @@ cxx_test(ABABProblem test_abab_problem "${CMAKE_CURRENT_SOURCE_DIR}/abab_problem
 cxx_test(StackSemantics test_stack_semantics "${CMAKE_CURRENT_SOURCE_DIR}/stack_semantics.cpp" "stapi")
 # TODO cxx_test(StackUnderflow test_stack_underflow "${CMAKE_CURRENT_SOURCE_DIR}/stack_underflow.cpp" "stapi")
 cxx_test(DecodeAllMethods test_decode_all_methods "${CMAKE_CURRENT_SOURCE_DIR}/decode_all_methods.cpp" "stapi;memory_managers;standart_set")
+cxx_test("VM::primitives" test_vm_primitives "${CMAKE_CURRENT_SOURCE_DIR}/vm_primitives.cpp" "memory_managers;standart_set")
