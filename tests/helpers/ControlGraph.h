@@ -7,6 +7,8 @@
 
 #include <algorithm>
 
+#include "AssertFail.h"
+
 class H_LastInstIsTerminator: public st::BasicBlockVisitor
 {
 public:

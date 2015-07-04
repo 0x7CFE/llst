@@ -5,13 +5,6 @@
 #include <instructions.h>
 #include <analysis.h>
 
-void __assert_fail(const char *__assertion, const char *__file, unsigned int __line, const char */*__function*/)
-{
-    std::stringstream ss;
-    ss << "Assertion '" << __assertion << "' failed in '" << __file << "' at: " << __line;
-    throw ss.str();
-}
-
 class P_DecodeBytecode : public ::testing::TestWithParam<std::tr1::tuple<std::string /*name*/, std::string /*bytecode*/> >
 {
 public:
