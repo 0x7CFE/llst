@@ -152,3 +152,78 @@ TEST_P(P_InitVM_Image, smallint)
     }
     m_image->deleteObject(args);
 }
+
+TEST_P(P_InitVM_Image, stringAt)
+{
+    {
+        SCOPED_TRACE("inbounds");
+        std::string sample = "Hello world";
+        TString* str = m_image->newString(sample);
+        for (std::size_t i = 0; i < sample.size(); i++)
+        {
+            SCOPED_TRACE(i);
+            TObjectArray* args = m_image->newArray(2);
+            args->putField(0, str );
+            args->putField(1, TInteger(i+1) );
+            bool primitiveFailed;
+            TInteger result = callPrimitive(primitive::stringAt, args, primitiveFailed);
+            ASSERT_FALSE(primitiveFailed);
+            ASSERT_EQ(sample[i], result.getValue());
+            m_image->deleteObject(args);
+        }
+        m_image->deleteObject(str);
+    }
+    {
+        SCOPED_TRACE("out of bounds");
+        std::string sample = "Hello world";
+        TString* str = m_image->newString(sample);
+        TObjectArray* args = m_image->newArray(2);
+        args->putField(0, str );
+        args->putField(1, TInteger(42) );
+        bool primitiveFailed;
+        callPrimitive(primitive::stringAt, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
+        m_image->deleteObject(args);
+        m_image->deleteObject(str);
+    }
+    {
+        SCOPED_TRACE("string replaced with smallint");
+        std::string sample = "Hello world";
+        TString* str = m_image->newString(sample);
+        TObjectArray* args = m_image->newArray(2);
+        args->putField(0, TInteger(0) );
+        args->putField(1, TInteger(0) );
+        bool primitiveFailed;
+        callPrimitive(primitive::stringAt, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
+        m_image->deleteObject(args);
+        m_image->deleteObject(str);
+    }
+    {
+        SCOPED_TRACE("string replaced with array");
+        std::string sample = "Hello world";
+        TString* str = m_image->newString(sample);
+        TObjectArray* args = m_image->newArray(2);
+        args->putField(0, m_image->newArray(42) );
+        args->putField(1, TInteger(0) );
+        bool primitiveFailed;
+        callPrimitive(primitive::stringAt, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
+        m_image->deleteObject(args->getField(0));
+        m_image->deleteObject(args);
+        m_image->deleteObject(str);
+    }
+    {
+        SCOPED_TRACE("index is not a smallint");
+        std::string sample = "Hello world";
+        TString* str = m_image->newString(sample);
+        TObjectArray* args = m_image->newArray(2);
+        args->putField(0, TInteger(0) );
+        args->putField(1, str );
+        bool primitiveFailed;
+        callPrimitive(primitive::stringAt, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
+        m_image->deleteObject(args);
+        m_image->deleteObject(str);
+    }
+}

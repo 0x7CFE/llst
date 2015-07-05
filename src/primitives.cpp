@@ -87,7 +87,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
                 //valueObject is not used in primitive stringAtPut
             }
 
-            if (! isSmallInteger(indexObject)) {
+            if (isSmallInteger(string) || string->getClass() != globals.stringClass || !isSmallInteger(indexObject)) {
                 primitiveFailed = true;
                 break;
             }
