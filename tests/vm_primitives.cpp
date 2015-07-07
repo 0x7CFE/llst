@@ -249,13 +249,13 @@ TEST_P(P_InitVM_Image, stringAtPut)
         std::string sample = "Hello world";
         TString* str = m_image->newString(sample);
         TObjectArray* args = m_image->newArray(3);
-        args->putField(0, m_image->newArray(42) );
-        args->putField(1, TInteger(0) );
+        args->putField(0, TInteger(0) );
+        args->putField(1, m_image->newArray(42) );
         args->putField(2, TInteger(0) );
         bool primitiveFailed;
         callPrimitive(primitive::stringAtPut, args, primitiveFailed);
         ASSERT_TRUE(primitiveFailed);
-        m_image->deleteObject(args->getField(0));
+        m_image->deleteObject(args->getField(1));
         m_image->deleteObject(args);
         m_image->deleteObject(str);
     }
@@ -266,9 +266,9 @@ TEST_P(P_InitVM_Image, stringAtPut)
         TObjectArray* args = m_image->newArray(3);
         args->putField(0, TInteger(0) );
         args->putField(1, str );
-        args->putField(2, TInteger(0) );
+        args->putField(2, str );
         bool primitiveFailed;
-        callPrimitive(primitive::stringAt, args, primitiveFailed);
+        callPrimitive(primitive::stringAtPut, args, primitiveFailed);
         ASSERT_TRUE(primitiveFailed);
         m_image->deleteObject(args);
         m_image->deleteObject(str);
@@ -278,13 +278,42 @@ TEST_P(P_InitVM_Image, stringAtPut)
         std::string sample = "Hello world";
         TString* str = m_image->newString(sample);
         TObjectArray* args = m_image->newArray(3);
-        args->putField(0, TInteger(0) );
+        args->putField(0, m_image->newArray(42) );
         args->putField(1, str );
-        args->putField(2, m_image->newArray(42) );
+        args->putField(2, TInteger(0) );
         bool primitiveFailed;
-        callPrimitive(primitive::stringAt, args, primitiveFailed);
+        callPrimitive(primitive::stringAtPut, args, primitiveFailed);
         ASSERT_TRUE(primitiveFailed);
-        m_image->deleteObject(args->getField(2));
+        m_image->deleteObject(args->getField(0));
+        m_image->deleteObject(args);
+        m_image->deleteObject(str);
+    }
+    {
+        SCOPED_TRACE("out of bounds");
+        std::string sample = "Hello world";
+        TString* str = m_image->newString(sample);
+        TObjectArray* args = m_image->newArray(3);
+        args->putField(0, str );
+        args->putField(1, TInteger(42) );
+        args->putField(2, TInteger(0) );
+        bool primitiveFailed;
+        callPrimitive(primitive::stringAtPut, args, primitiveFailed);
+        ASSERT_TRUE(primitiveFailed);
+        m_image->deleteObject(args);
+        m_image->deleteObject(str);
+    }
+    {
+        SCOPED_TRACE("inbounds");
+        std::string sample = "Hello world ";
+        TString* str = m_image->newString(sample);
+        TObjectArray* args = m_image->newArray(3);
+        args->putField(0, TInteger('!') );
+        args->putField(1, str );
+        args->putField(2, TInteger(12) );
+        bool primitiveFailed;
+        callPrimitive(primitive::stringAtPut, args, primitiveFailed);
+        ASSERT_FALSE(primitiveFailed);
+        ASSERT_EQ("Hello world!", std::string((const char*)str->getBytes(), str->getSize()));
         m_image->deleteObject(args);
         m_image->deleteObject(str);
     }
