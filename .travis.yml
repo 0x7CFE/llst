@@ -9,8 +9,9 @@ os:
 
 sudo: false
 cache:
-  - apt
-  - pip
+  apt: true
+  directories:
+    - $HOME/.cache/pip
 addons:
   apt:
     packages:
@@ -41,7 +42,7 @@ env:
     - USE_LLVM=Off
       BUILD_TYPE=Coverage
 
-install:
+before_install:
   - pip install --user cpp-coveralls
 
 before_script:
@@ -50,8 +51,8 @@ before_script:
   - cmake .. -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CXX}_LLVM_${USE_LLVM}_${BUILD_TYPE}"
 
 script:
-  - ctest -M Experimental -T Start -T Build -T Test -T Submit
-  - cmake --build . -- all --keep-going && cmake --build . --target check # If ctest built the project unsuccessfully, `make all && make check` will report errors to Travis
+  - cmake --build . -- all --keep-going
+  - cmake --build . --target check
 
 after_success:
   - if [ ${CXX} == g++ ] && [ ${BUILD_TYPE} == Coverage ]; then ~/.local/bin/coveralls --repo_token "INxVunXhVXbQWjVbwoIisKeXSJqCRGnI2" --exclude build/tests/gtest -E ".*CMake.*CompilerId.c" --gcov-options "\-lp" -r ../; fi
