@@ -514,12 +514,12 @@ public:
         // Removing nodes that were optimized out
         TNodeList::iterator iNode = m_nodesToRemove.begin();
         for (; iNode != m_nodesToRemove.end(); ++iNode) {
+            assert((*iNode)->getNodeType() == ControlNode::ntInstruction
+                || (*iNode)->getNodeType() == ControlNode::ntPhi);
             if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>())
                 removeInstruction(instruction);
             else if (PhiNode* const phi = (*iNode)->cast<PhiNode>())
                 removePhi(phi);
-            else
-                assert(false);
         }
     }
 

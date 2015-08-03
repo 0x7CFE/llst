@@ -7,14 +7,15 @@
 
 #include <algorithm>
 
+#include "AssertFail.h"
+
 class H_LastInstIsTerminator: public st::BasicBlockVisitor
 {
 public:
     H_LastInstIsTerminator(st::ParsedBytecode* parsedBytecode) : st::BasicBlockVisitor(parsedBytecode) {}
     virtual bool visitBlock(st::BasicBlock& BB) {
         std::size_t bbSize = BB.size();
-        if (bbSize == 0)
-            return true;
+        EXPECT_NE(0u, bbSize);
 
         st::TSmalltalkInstruction terminator(0);
         bool hasTerminator = BB.getTerminator(terminator);
@@ -34,18 +35,13 @@ public:
         }
         {
             SCOPED_TRACE("There must be no terminators but the last one");
-            uint32_t terminatorsCount = 0;
             st::BasicBlock::iterator iInstruction = BB.begin();
             st::BasicBlock::iterator iEnd         = BB.end()-1; // except the last inst
 
             while (iInstruction != iEnd) {
-                bool isTerminator = (*iInstruction).isTerminator();
-                if (isTerminator)
-                    terminatorsCount++;
-                EXPECT_FALSE(isTerminator);
+                EXPECT_FALSE((*iInstruction).isTerminator());
                 ++iInstruction;
             }
-            EXPECT_EQ(0u, terminatorsCount);
         }
 
         return true;
@@ -60,9 +56,8 @@ public:
         st::InstructionNode* terminator = domain.getTerminator();
         {
             SCOPED_TRACE("Each domain must have a terminator");
-            if (!terminator)
-                EXPECT_TRUE( terminator != NULL );
-            else
+            EXPECT_TRUE( terminator != NULL );
+            if (terminator)
                 EXPECT_TRUE( terminator->getInstruction().isTerminator() );
         }
         return true;
@@ -76,9 +71,7 @@ public:
     virtual bool visitDomain(st::ControlDomain& domain) {
         st::BasicBlock* currentBB = domain.getBasicBlock();
         if (currentBB->getOffset() != 0) {
-            EXPECT_GT(currentBB->getReferers().size(), 0u)
-                << "All BB but the 1st must have referrers. "
-                << "BB offset: " << currentBB->getOffset();
+            EXPECT_GT(currentBB->getReferers().size(), 0u) << "All BB but the 1st must have referrers. BB offset: " << currentBB->getOffset();
         }
         st::ControlDomain::iterator iNode = domain.begin();
         const st::ControlDomain::iterator iEnd = domain.end();
@@ -133,8 +126,7 @@ public:
                         st::ControlDomain* targetDomain = target->getDomain();
                         EXPECT_EQ(target, targetDomain->getEntryPoint());
                         uint16_t targetOffset = targetDomain->getBasicBlock()->getOffset();
-                        EXPECT_EQ(targetOffset, branch.getExtra())
-                            << "Unconditional branch must point exactly to its the only one out edge";
+                        EXPECT_EQ(targetOffset, branch.getExtra()) << "Unconditional branch must point exactly to its the only one out edge";
                         st::BasicBlock::TBasicBlockSet& referrers = target->getDomain()->getBasicBlock()->getReferers();
                         EXPECT_NE(referrers.end(), referrers.find(currentBB));
                     }
@@ -204,9 +196,7 @@ public:
             EXPECT_GT(incomingList.size(), 0u) << "The phi must have at least 1 incoming edge";
             EXPECT_GE(outEdges.size(), 1u) << "There must be a node using the given phi";
         }
-        if (st::TauNode* tau = node.cast<st::TauNode>()) {
-            EXPECT_TRUE(tau == NULL /* always fails */); // TODO
-        }
+        EXPECT_NE(st::ControlNode::ntTau, node.getNodeType()); // TODO: Tau logic is not done yet
         return true;
     }
 };
@@ -225,11 +215,7 @@ public:
             allNodes.begin(), allNodes.end(),
             std::back_inserter(orphans)
         );
-        for (TOrphans::const_iterator it = orphans.begin(); it != orphans.end(); ++it) {
-            st::ControlNode* node = *it;
-            FAIL() << "Orphan node index: " << node->getIndex()
-               << " from BB offset: " << node->getDomain()->getBasicBlock()->getOffset();
-        }
+        EXPECT_EQ(0u, orphans.size());
     }
 private:
     st::TNodeSet getLinkedNodes() const {
@@ -283,8 +269,9 @@ public:
                 for(std::size_t i = 0; i < argSize; ++i) {
                     st::ControlNode* argNode = instNode->getArgument(i);
                     if (st::InstructionNode* arg = argNode->cast<st::InstructionNode>()) {
-                        EXPECT_TRUE(arg->getInstruction().isValueProvider())
-                            << "'" << arg->getInstruction().toString() << "' should provide value for '" << inst.toString() << "'";
+                        std::string provider = arg->getInstruction().toString();
+                        std::string consumer = inst.toString();
+                        EXPECT_TRUE(arg->getInstruction().isValueProvider()) << "'" << provider << "' should provide value for '" << consumer << "'";
                     }
                 }
             }
@@ -292,11 +279,7 @@ public:
         if (st::PhiNode* phiNode = node.cast<st::PhiNode>()) {
             const st::TNodeSet& inEdges = phiNode->getInEdges();
             for(st::TNodeSet::const_iterator it = inEdges.begin(); it != inEdges.end(); ++it) {
-                st::ControlNode* edge = *it;
-                if (st::InstructionNode* inst = edge->cast<st::InstructionNode>()) {
-                    EXPECT_TRUE(inst->getInstruction().isValueProvider())
-                        << "'" << inst->getInstruction().toString() << "' should provide value for 'Phi index: " << phiNode->getPhiIndex() << "'";
-                }
+                EXPECT_NE(st::ControlNode::ntInstruction, (*it)->getNodeType());
             }
         }
         return true;
@@ -349,8 +332,7 @@ public:
             st::PhiNode::TIncomingList incomingList = phi->getIncomingList();
             st::PhiNode::TIncomingList::iterator uniqueEnd = std::unique(incomingList.begin(), incomingList.end(), CompareIncoming::cmp);
             std::size_t uniqueSize = std::distance(incomingList.begin(), uniqueEnd);
-            EXPECT_EQ(uniqueSize, phi->getIncomingList().size())
-                << "The incomings of phi must differ between each other";
+            EXPECT_EQ(uniqueSize, phi->getIncomingList().size()) << "The incomings of phi must differ between each other";
         }
         return true;
     }

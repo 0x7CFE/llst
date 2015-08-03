@@ -37,6 +37,7 @@ bool st::TSmalltalkInstruction::isBranch() const
 }
 
 bool st::TSmalltalkInstruction::isValueProvider() const {
+    assert(m_opcode != opcode::extended);
     switch (m_opcode) {
         case opcode::pushInstance:
         case opcode::pushArgument:
@@ -51,31 +52,16 @@ bool st::TSmalltalkInstruction::isValueProvider() const {
         case opcode::doPrimitive:
             return true;
 
-        case opcode::assignTemporary:
-        case opcode::assignInstance:
-            return false;
-
         case opcode::doSpecial:
             switch (m_argument) {
                 case special::duplicate:
                 case special::sendToSuper:
                     return true;
-
-                case special::selfReturn:
-                case special::stackReturn:
-                case special::blockReturn:
-                case special::popTop:
-                case special::branch:
-                case special::branchIfTrue:
-                case special::branchIfFalse:
-                    return false;
             }
 
-        case opcode::extended:
-            assert(false);
+        default:
+            return false;
     }
-
-    return false;
 }
 
 bool st::TSmalltalkInstruction::isTrivial() const {
@@ -104,26 +90,17 @@ bool st::TSmalltalkInstruction::mayCauseGC() const {
     // NOTE We expect that markArguments is encoded
     //      directly, so no heap allocation occur
 
-    if (isTrivial() || isTerminator())
-        return false;
-
     switch (m_opcode) {
-        case opcode::assignTemporary:
-        case opcode::assignInstance:
-            return false;
-
         case opcode::pushBlock:
 //         case opcode::sendUnary:
         case opcode::sendBinary:
         case opcode::sendMessage:
+        case opcode::doPrimitive:
             return true;
 
         case opcode::doSpecial:
             // The only special that may cause GC
             return m_argument == special::sendToSuper;
-
-        case opcode::doPrimitive:
-            return true;
 
         default:
             return false;
@@ -131,21 +108,19 @@ bool st::TSmalltalkInstruction::mayCauseGC() const {
 }
 
 bool st::TSmalltalkInstruction::isValueConsumer() const {
+    assert(m_opcode != opcode::extended);
     switch (m_opcode) {
-        case opcode::pushInstance:
-        case opcode::pushArgument:
-        case opcode::pushTemporary:
-        case opcode::pushLiteral:
-        case opcode::pushConstant:
-        case opcode::pushBlock:
-            return false;
-
         case opcode::assignTemporary:
         case opcode::assignInstance:
         case opcode::sendUnary:
         case opcode::sendBinary:
         case opcode::sendMessage:
         case opcode::markArguments:
+            return true;
+
+        case opcode::doPrimitive:
+            // All system primitives consume a value
+            // TODO User defined primitives
             return true;
 
         case opcode::doSpecial:
@@ -157,18 +132,9 @@ bool st::TSmalltalkInstruction::isValueConsumer() const {
                     return true;
             }
 
-        case opcode::doPrimitive:
-            // All system primitives consume a value
-            // TODO User defined primitives
-            return true;
-
-        case opcode::extended:
         default:
-            assert(false);
+            return false;
     }
-
-    assert(false);
-    return false;
 }
 
 std::string st::TSmalltalkInstruction::toString() const

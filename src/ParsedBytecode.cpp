@@ -148,13 +148,11 @@ void ParsedBytecode::parse(uint16_t startOffset, uint16_t stopOffset) {
         // Final check for the last instruction of the method
         if (decoder.getBytePointer() >= stopPointer && instruction.isBranch()) {
             const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(instruction.getExtra());
-            if (iTargetBlock != m_offsetToBasicBlock.end()) {
-                iTargetBlock->second->getReferers().insert(currentBasicBlock);
+            assert(iTargetBlock != m_offsetToBasicBlock.end());
 
-                if (traces_enabled)
-                    std::printf("%.4u : block reference %p (%u) ->? %p (%u)\n", currentBytePointer, currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
-            } else
-                assert(false);
+            iTargetBlock->second->getReferers().insert(currentBasicBlock);
+            if (traces_enabled)
+                std::printf("%.4u : block reference %p (%u) ->? %p (%u)\n", currentBytePointer, currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
         }
     }
 
@@ -212,16 +210,14 @@ void ParsedBytecode::eraseBasicBlock(ParsedBytecode::iterator& iBlock)
 
 void ParsedBytecode::eraseReferer(uint16_t targetOffset, BasicBlock* referer) {
     const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(targetOffset);
-    if (iTargetBlock != m_offsetToBasicBlock.end()) {
-        BasicBlock* const target = iTargetBlock->second;
+    assert(iTargetBlock != m_offsetToBasicBlock.end());
 
-        if (traces_enabled)
-            std::printf("erasing reference %p (%u) -> %p (%u)\n", referer, referer->getOffset(), target, target->getOffset());
+    BasicBlock* const target = iTargetBlock->second;
 
-        target->getReferers().erase(referer);
-    } else {
-        assert(false);
-    }
+    if (traces_enabled)
+        std::printf("erasing reference %p (%u) -> %p (%u)\n", referer, referer->getOffset(), target, target->getOffset());
+
+    target->getReferers().erase(referer);
 }
 
 uint16_t ParsedBytecode::getNextBlockOffset(BasicBlock* currentBlock, uint16_t stopOffset) {
@@ -258,14 +254,12 @@ void ParsedBytecode::updateReferences(BasicBlock* currentBasicBlock, BasicBlock*
             if (terminator.getArgument() == special::branch) {
                 // Unconditional branch case
                 const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
-                if (iTargetBlock != m_offsetToBasicBlock.end()) {
-                    if (traces_enabled)
-                        std::printf("%.4u : block reference %p (%u) -> %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+                assert(iTargetBlock != m_offsetToBasicBlock.end());
 
-                    iTargetBlock->second->getReferers().insert(currentBasicBlock);
-                } else {
-                    assert(false);
-                }
+                if (traces_enabled)
+                    std::printf("%.4u : block reference %p (%u) -> %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+
+                iTargetBlock->second->getReferers().insert(currentBasicBlock);
             } else {
                 // Previous block referred some other block instead.
                 // Terminator is one of conditional branch instructions.
@@ -281,14 +275,12 @@ void ParsedBytecode::updateReferences(BasicBlock* currentBasicBlock, BasicBlock*
 
                 // Case when branch condition is met
                 const TOffsetToBasicBlockMap::iterator iTargetBlock = m_offsetToBasicBlock.find(terminator.getExtra());
-                if (iTargetBlock != m_offsetToBasicBlock.end()) {
-                    if (traces_enabled)
-                        std::printf("%.4u : block reference %p (%u) ->T %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+                assert(iTargetBlock != m_offsetToBasicBlock.end());
 
-                    iTargetBlock->second->getReferers().insert(currentBasicBlock);
-                } else {
-                    assert(false);
-                }
+                if (traces_enabled)
+                    std::printf("%.4u : block reference %p (%u) ->T %p (%u)\n", decoder.getBytePointer(), currentBasicBlock, currentBasicBlock->getOffset(), iTargetBlock->second, iTargetBlock->first);
+
+                iTargetBlock->second->getReferers().insert(currentBasicBlock);
             }
         }
     } else {
