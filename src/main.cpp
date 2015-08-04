@@ -49,18 +49,6 @@
 
 #include <visualization.h>
 
-void testControlGraph(Image* image) {
-    TClass*  objectClass = image->getGlobal<TClass>("Object");
-    TMethod* isKindOfMethod = objectClass->methods->find<TMethod>("isKindOf:");
-
-    st::ParsedMethod parsedMethod(isKindOfMethod);
-    st::ControlGraph controlGraph(&parsedMethod);
-    controlGraph.buildGraph();
-
-    ControlGraphVisualizer visualizer(&controlGraph, "graph");
-    visualizer.run();
-}
-
 int main(int argc, char **argv) {
     args llstArgs;
 
@@ -104,12 +92,6 @@ int main(int argc, char **argv) {
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     smalltalkImage->loadImage(llstArgs.imagePath);
 
-    testControlGraph(smalltalkImage.get());
-
-//     {
-//         Image::ImageWriter writer;
-//         writer.setGlobals(globals).writeTo("../image/MySmalltalkImage.image");
-//     }
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
     // Creating completion database and filling it with info
@@ -146,8 +128,6 @@ int main(int argc, char **argv) {
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
 
-    //llvm::outs() << *runtime.getModule();
-
     /* This code will run Smalltalk immediately in LLVM.
      * Don't forget to uncomment 'Undefined>>boot'
      */
@@ -156,6 +136,7 @@ int main(int argc, char **argv) {
     TExecuteProcessFunction executeProcess = reinterpret_cast<TExecuteProcessFunction>(runtime.getExecutionEngine()->getPointerToFunction(runtime.getModule()->getFunction("executeProcess")));
     SmalltalkVM::TExecuteResult result = (SmalltalkVM::TExecuteResult) executeProcess(initProcess);
     */
+
     // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:

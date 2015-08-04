@@ -310,18 +310,13 @@ TObject* JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, bool o
             // If function was not found then the whole method needs compilation.
 
             // Compiling function and storing it to the table for further use
-
-//             Function* methodFunction = m_methodCompiler->compileMethod(block->method);
-//             blockFunction = m_JITModule->getFunction(blockFunctionName);
             blockFunction = m_methodCompiler->compileBlock(block);
 
-            if (/*!methodFunction ||*/ !blockFunction) {
+            if (!blockFunction) {
                 // Something is really wrong!
                 outs() << "JIT: Fatal error in invokeBlock for " << blockFunctionName << "\n";
                 std::exit(1);
             }
-
-//             outs() << *blockFunction << "\n";
 
             verifyModule(*m_JITModule, AbortProcessAction);
 
@@ -380,8 +375,6 @@ TObject* JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TOb
                 // Compiling function and storing it to the table for further use
                 methodFunction = m_methodCompiler->compileMethod(method);
 
-//                 outs() << *methodFunction << "\n";
-
                 verifyModule(*m_JITModule, AbortProcessAction);
 
                 optimizeFunction(methodFunction, true);
@@ -432,9 +425,6 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
 
     if (!callSiteIndex)
         return;
-
-//     if (callingContext->getClass() == globals.blockClass)
-//         static_cast<TBlock*>(callingContext)->;
 
     TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
     // TODO reload cache if callerMethodFunction was popped out
@@ -502,8 +492,6 @@ void JITRuntime::patchHotMethods()
             ++iSite;
         }
 
-//         outs() << "Patched code: \n" << *hotMethod->methodFunction << "\n";
-
         outs() << "done. Verifying ...";
 
         verifyModule(*m_JITModule, AbortProcessAction);
@@ -532,8 +520,6 @@ void JITRuntime::patchHotMethods()
 
         verifyModule(*m_JITModule, AbortProcessAction);
 
-//         outs() << "Optimized code: \n" << *hotMethod->methodFunction;
-
         outs() << "done.\n";
     }
 
@@ -556,9 +542,6 @@ void JITRuntime::patchHotMethods()
 
         outs() << "Compiling machine code for " << hotMethod->methodFunction->getName().str() << " ...";
         m_executionEngine->recompileAndRelinkFunction(hotMethod->methodFunction);
-
-
-//         outs() << "Final code: \n" << *hotMethod->methodFunction;
 
         outs() << "done.\n";
     }
@@ -965,7 +948,7 @@ void JITRuntime::initializePassManager() {
     m_functionPassManager->add(createDeadStoreEliminationPass());
 
     m_functionPassManager->add(createLLSTPass()); // FIXME direct calls break the logic
-//     //If llstPass removed GC roots, we may try DCE again
+    //If llstPass removed GC roots, we may try DCE again
     m_functionPassManager->add(createDeadCodeEliminationPass());
     m_functionPassManager->add(createDeadStoreEliminationPass());
 

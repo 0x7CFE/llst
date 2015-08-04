@@ -530,4 +530,3 @@ TMemoryManagerInfo BakerMemoryManager::getStat()
 {
     return m_memoryInfo;
 }
-
