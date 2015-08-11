@@ -84,8 +84,6 @@ add_subdirectory(include)
 include_directories(include)
 
 add_library(stapi
-    src/TSmalltalkInstruction.cpp
-    src/InstructionDecoder.cpp
     src/ParsedBytecode.cpp
     src/ParsedMethod.cpp
     src/ParsedBlock.cpp
@@ -107,22 +105,17 @@ add_library(memory_managers ${MM_CPP_FILES})
 
 # Base set of sources needed in every build
 add_library(standart_set
+    src/vm.cpp
     src/args.cpp
     src/CompletionEngine.cpp
     src/Image.cpp
     src/primitives.cpp
     src/TDictionary.cpp
     src/TSymbol.cpp
-    src/vm.cpp
 
     src/TSmalltalkInstruction.cpp
     src/InstructionDecoder.cpp
-    src/ParsedMethod.cpp
-    src/ParsedBytecode.cpp
-    src/ParsedBlock.cpp
 
-    src/ControlGraph.cpp
-    src/ControlGraphVisualizer.cpp
     src/Timer.cpp
     src/GCLogger.cpp
 )
@@ -136,7 +129,7 @@ if (USE_LLVM)
     )
 endif()
 
-add_executable(llst src/main.cpp src/vm.cpp)
+add_executable(llst src/main.cpp)
 add_dependencies(llst image)
 
 if (USE_LLVM)
