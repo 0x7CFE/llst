@@ -4,7 +4,7 @@
 #include <set>
 #include <vector>
 
-#include <instructions.h>
+#include <stapi.h>
 
 namespace llvm {
     class Value;
