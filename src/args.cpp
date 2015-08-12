@@ -130,7 +130,7 @@ std::string args::getHelp()
 std::string args::getVersion()
 {
     return
-        "llst 0.3.0\n"
+        "llst 0.4.0\n"
         "Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>\n"
         "Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>\n"
         "This is free software; see the source for copying conditions.  There is NO\n"
