@@ -32,7 +32,6 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <vm.h>
 #include <memory.h>
 
 //#include <netinet/in.h> //TODO endianness

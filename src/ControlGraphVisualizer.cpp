@@ -1,7 +1,36 @@
 
 #include <visualization.h>
 #include <unistd.h>
+#include <errno.h>
+#include <cstdlib>
 #include <iomanip>
+
+void * gnu_xmalloc(size_t size)
+{
+    void* value = malloc(size);
+    if (value == 0) {
+        perror("virtual memory exhausted");
+        abort();
+    }
+    return value;
+}
+
+std::string gnu_getcwd() {
+    size_t size = 100;
+
+    while (true) {
+        char *buffer = reinterpret_cast<char *>( gnu_xmalloc(size) );
+        if ( getcwd(buffer, size) == buffer ) {
+            std::string result(buffer);
+            free(buffer);
+            return result;
+        }
+        free(buffer);
+        if (errno != ERANGE)
+            return "";
+        size *= 2;
+    }
+}
 
 std::string escape_path(const std::string& path) {
     if (path.empty())
@@ -30,7 +59,7 @@ ControlGraphVisualizer::ControlGraphVisualizer(st::ControlGraph* graph, const st
     m_stream.open(fullpath.c_str(), std::ios::out | std::ios::trunc);
     if (m_stream.fail()) {
         std::stringstream ss;
-        ss << "Cannot open/truncate '" << fullpath << "' in '" << get_current_dir_name() << "'";
+        ss << "Cannot open/truncate '" << fullpath << "' in '" << gnu_getcwd() << "'";
         throw std::ios_base::failure( ss.str() );
     }
     m_stream.exceptions(std::ifstream::failbit | std::ifstream::badbit);

@@ -1396,7 +1396,7 @@ void MethodCompiler::doSpecial(TJITContext& jit)
 uint16_t MethodCompiler::getSkipOffset(st::InstructionNode* branch)
 {
     assert(branch->getInstruction().isBranch());
-    assert(branch->getInstruction().opcode != special::branch);
+    assert(branch->getInstruction().getOpcode() != special::branch);
     assert(branch->getOutEdges().size() == 2);
 
     // One of the offsets we know. It is the target offset when condition is met.

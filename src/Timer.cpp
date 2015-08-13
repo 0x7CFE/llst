@@ -40,7 +40,7 @@ void Timer::start() {
     timeCreate = clock();
 }
 
-double Timer::getDiffSec() {
+double Timer::getDiffSec() const {
     return static_cast<double>((clock() - timeCreate))/CLOCKS_PER_SEC;
 }
 #endif

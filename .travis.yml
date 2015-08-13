@@ -6,6 +6,7 @@ compiler:
 
 os:
   - linux
+  - osx
 
 sudo: false
 cache:
@@ -29,6 +30,10 @@ branches:
     - develop
     - /^.*travis.*$/
 
+matrix:
+  allow_failures:
+    - os: osx
+
 env:
   matrix: # fix all scripts (e.g. install-dependencies.sh) if you rename LLVM_USE[On/Off]
     - USE_LLVM=Off
@@ -43,7 +48,7 @@ env:
       BUILD_TYPE=Coverage
 
 before_install:
-  - pip install --user cpp-coveralls
+  - source .travis/${TRAVIS_OS_NAME}/before_install.sh
 
 before_script:
   - mkdir -p build
