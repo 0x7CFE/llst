@@ -104,7 +104,7 @@ endif()
 add_library(memory_managers ${MM_CPP_FILES})
 
 # Base set of sources needed in every build
-add_library(standart_set
+add_library(standard_set
     src/vm.cpp
     src/args.cpp
     src/CompletionEngine.cpp
@@ -135,7 +135,7 @@ add_dependencies(llst image)
 if (USE_LLVM)
     target_link_libraries(llst jit ${LLVM_LIBS} ${LLVM_LD_FLAGS})
 endif()
-target_link_libraries(llst standart_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+target_link_libraries(llst standard_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 
 set(changelog_compressed "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
 gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" ${changelog_compressed})
