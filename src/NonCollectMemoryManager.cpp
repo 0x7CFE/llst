@@ -9,7 +9,7 @@
  *    production code. However, it may be helpful in various
  *    test scenarios where small tasks are performed in one shot.
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -41,12 +41,13 @@
 #include <memory.h>
 #include <cstdlib>
 #include <cstring>
+#include <iostream>
+
 
 NonCollectMemoryManager::NonCollectMemoryManager() :
-    m_heapSize(0), m_heapBase(0), m_heapPointer(0),
+    m_memoryInfo(), m_heapSize(0), m_heapBase(0), m_heapPointer(0),
     m_staticHeapSize(0), m_staticHeapBase(0), m_staticHeapPointer(0)
-{
-}
+{}
 
 NonCollectMemoryManager::~NonCollectMemoryManager()
 {
@@ -54,6 +55,7 @@ NonCollectMemoryManager::~NonCollectMemoryManager()
     for(std::size_t i = 0; i < m_usedHeaps.size(); i++)
         free( m_usedHeaps[i] );
 }
+
 
 bool NonCollectMemoryManager::initializeStaticHeap(size_t staticHeapSize)
 {
@@ -92,6 +94,10 @@ bool NonCollectMemoryManager::initializeHeap(size_t heapSize, size_t /*maxSize*/
 
 void NonCollectMemoryManager::growHeap()
 {
+    TMemoryManagerEvent event("GC");
+    event.heapInfo.usedHeapSizeBeforeCollect = m_usedHeaps.size()*m_heapSize;
+    m_memoryInfo.collectionsCount++;
+    event.begin = m_memoryInfo.timer.get<TSec>();
     uint8_t* heap = static_cast<uint8_t*>( std::malloc(m_heapSize) );
     if (!heap) {
         std::printf("MM: Cannot allocate %zu bytes\n", m_heapSize);
@@ -104,6 +110,14 @@ void NonCollectMemoryManager::growHeap()
     m_heapPointer = heap + m_heapSize;
 
     m_usedHeaps.push_back(heap);
+
+    //there is no collecting: after = before
+    event.heapInfo.usedHeapSizeAfterCollect = event.heapInfo.usedHeapSizeBeforeCollect;
+    event.heapInfo.totalHeapSize = m_usedHeaps.size()*m_heapSize;
+    event.timeDiff = m_memoryInfo.timer.get<TSec>() - event.begin;
+    m_memoryInfo.totalCollectionDelay += event.timeDiff.convertTo<TMicrosec>().toInt();
+    m_memoryInfo.events.push_front(event);
+    m_gcLogger->writeLogLine(event);
 }
 
 void* NonCollectMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*= 0*/ )
@@ -119,6 +133,8 @@ void* NonCollectMemoryManager::allocate(size_t requestedSize, bool* gcOccured /*
     }
 
     m_heapPointer -= requestedSize;
+
+    m_memoryInfo.allocationsCount++;
     return m_heapPointer;
 }
 
@@ -138,3 +154,9 @@ bool NonCollectMemoryManager::isInStaticHeap(void* location)
 {
     return (location >= m_staticHeapPointer) && (location < m_staticHeapBase + m_staticHeapSize);
 }
+
+TMemoryManagerInfo NonCollectMemoryManager::getStat() {
+    return m_memoryInfo;
+
+}
+

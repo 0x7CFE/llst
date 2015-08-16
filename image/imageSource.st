@@ -49,7 +49,7 @@ COMMENT RAWCLASS doesn't automatically build Meta class; CLASS does
 COMMENT-----------------------------------------------------------
 COMMENT		The strange circular world at the beginning
 COMMENT RAWCLASS Object MetaObject nil
-RAWCLASS Class      MetaClass Object      name parentClass methods size variables package
+RAWCLASS Class      MetaClass Object      name parentClass methods size variables children
 RAWCLASS MetaObject Class     Class
 RAWCLASS MetaClass  Class     MetaObject
 COMMENT--------------------------------------------------------
@@ -168,6 +168,10 @@ METHOD Object
 	^ (self == arg) not
 !
 METHOD Object
+yourself
+    ^self
+!
+METHOD Object
 class
 	<2 self>
 !
@@ -276,7 +280,7 @@ name: n parent: c variables: v
 	methods <- Dictionary new.
 	size <- v size + c size.
 	variables <- v.
-	package <- nil.
+	children <- nil.
 !
 METHOD Class
 size
@@ -302,6 +306,29 @@ METHOD Class
 subclasses
 	self subclasses: 0
 !
+
+METHOD Class
+children
+    ^children
+!
+
+METHOD Class
+registerChild: aClass
+    children isNil ifTrue: [ children <- List new ].
+    children addLast: aClass.
+!
+
+METHOD MetaClass
+fillChildren |parent|
+    globals do: [ :obj |
+        (obj isKindOf: Class)
+            ifTrue: [
+                parent <- obj parent.
+                parent notNil ifTrue: [ parent registerChild: obj ]
+        ]
+    ]
+!
+
 METHOD Class
 subclasses: indent
 	globals do: [ :obj |
@@ -322,7 +349,7 @@ hierarchy | class list |
 METHOD Class
 listMethods
 	methods keysDo:
-		[ :name | name printNl ]
+		[ :key | key printNl ]
 !
 METHOD Class
 allMethods | allMethods |
@@ -382,7 +409,6 @@ addMethod: text | meth |
 	meth notNil ifTrue: [
 		methods at: meth name put: meth.
 		Method flushCache.
-		'ok' printNl.
 		^ meth
 	].
 	^ nil
@@ -836,7 +862,7 @@ METHOD LoopTest
 symbolStressTest |x|
     x <- MyArray new: 100.
     100 times: [:idx| x at: idx put: (idx asString asSymbol) ]. "FIXME speedup"
-    [ x location: #0; ] assertEq: 0.
+    [ x location: #0 ] assertEq: 0.
 !
 
 COMMENT                                                                                                ----------ClassTest--------
@@ -1014,13 +1040,13 @@ CLASS ContextTest Test
 
 METHOD ContextTest
 backtrace
-    [ [] method name ] assertEq: 'backtrace' withComment: '1'.
-    [ [] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
+    [ [nil] method name ] assertEq: 'backtrace' withComment: '1'.
+    [ [nil] creatingContext method name ] assertEq: 'backtrace' withComment: '2'.
 !
 
 METHOD ContextTest
 instanceClass
-    [ [] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
+    [ [nil] creatingContext arguments at: 1 ; class printString ] assertEq: 'ContextTest'.
 !
 
 COMMENT                                                                                                 -------PrimitiveTest----------
@@ -1436,6 +1462,13 @@ millisecondsToRun: aBlock | timer |
 !
 
 METHOD Timer
+millisecondsToRun: aBlock | time |
+    time <- self value.
+    aBlock value.
+    ^self value - time.
+!
+
+METHOD Timer
 initValue
     ^initValue
 !
@@ -1518,7 +1551,21 @@ sendMessage: aSelector withArguments: anArguments
 
 METHOD MetaJit
 do: aBlock
-    self sendMessage: #value withArguments: (Array with: aBlock).
+    ^self sendMessage: #value withArguments: (Array with: aBlock).
+!
+
+METHOD MetaJit
+once: aBlock
+    <247 aBlock>
+!
+
+METHOD MetaJit
+shell | command |
+    'You have entered the JIT shell. Use Ctrl+D to exit.' printNl.
+
+    [ command <- String readline: '+>'. command notNil ]
+        whileTrue: [ command isEmpty
+            ifFalse: [ ('Jit once: [' + command + ']') doIt printNl ] ]
 !
 
 METHOD MetaJit
@@ -1529,6 +1576,11 @@ printStatistics
 METHOD MetaJit
 printMethod: aMethod
     <249 aMethod>
+!
+
+METHOD MetaJit
+printMethod: aSelector ofClass: aClass
+    self printMethod: (aClass methods at: aSelector)
 !
 
 METHOD MetaJit
@@ -1628,10 +1680,17 @@ pushConstants |testBlock|
     ['9' asNumber ] assertEq: 9 withComment: '9'.
 !
 
+METHOD StatementsTest
+duplicate |x|
+    [ x <- '42'; yourself ] assertEq: '42' withComment: '0'.
+    [ x <- '42'; asNumber; yourself ] assertEq: 42 withComment: '1'.
+    [ x <- '42'. (x; yourself) = x ] assertWithComment: '2'.
+!
+
 METHOD Undefined
 sortTest | list |
     list <- List new.
-    1 to: 100 do: [ :x | list add: 1000 atRandom ].
+    1 to: 10000 do: [ :x | list add: 1000 atRandom ].
     list <- list sort.
     ^list
 
@@ -1688,43 +1747,319 @@ sortBenchmark: data
     ^data sort
 !
 
-METHOD Undefined
+METHOD System
 runSortBenchmarkFor: data
     ^Timer millisecondsToRun: [ nil sortBenchmark: data ]
 !
 
-METHOD Undefined
-main    | command  data |
-    " initialize classes "
+METHOD MetaSystem
+rebuildImage | classes methods |
+    classes <- List new.
+    globals do: [ :global |
+        (global isKindOf: Class)
+            ifTrue: [ classes add: global ] ].
 
-    Char initialize.
+    methods <- List new.
+    classes do: [ :class | class methods do:
+        [ :method | methods add:
+            (self rebuildMethod: method for: class) ] ].
+!
+
+METHOD MetaSystem
+rebuildMethod: aMethod for: aClass
+    'Compiling ' print. aClass print. ':' print.
+    aMethod name print. '... ' printNl.
+
+    ^aClass parseMethod: aMethod text.
+!
+
+METHOD MetaSystem
+assignClass: aClass to: aMethod
+    super in: aMethod at: 6 put: aClass.
+!
+
+METHOD MetaSystem
+getMethodClass: aMethod
+    ^super in: aMethod at: 6
+!
+
+METHOD Undefined
+stackOverflowTest |x|
+    1 to: 100 do: [ 42 ]
+!
+
+METHOD Undefined
+runAllTests
     SmallIntTest new runAll.
     ArrayTest new runAll.
     PrimitiveTest new runAll.
     MagnitudeTest new runAll.
+    "CompareTest new runAll."
+    StringTest new runAll.
     ListTest new runAll.
     MethodLookupTest new runAll.
+    StatementsTest new runAll.
+    BranchTest new runAll.
+!
 
-    "Scheduler initialize.
-    Thread run: [ 1 to: 10 do: [ :x | 'A' printNl ] ].
-    Thread run: [ 1 to: 10 do: [ :x | 'B' printNl ] ].
-    Scheduler run."
 
-    "'Preparing test data ...' print.
-    data <- List new.
-    1 to: 1000 do: [ :x | data add: 100000 atRandom ].
-    'done' printNl.
+METHOD MetaSystem
+fixMethodClasses | classes |
+    classes <- List new.
+    globals do: [ :global |
+        (global isKindOf: Class)
+            ifTrue: [ classes add: global ] ].
 
-    'Soft run: ' print. (Timer millisecondsToRun: [ data sort ]) printNl.
-    'Cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
+    classes do: [ :class | class methods do:
+        [ :method | self assignClass: class to: method ] ]
+!
 
-    Jit patchHotMethods.
+METHOD Undefined
+inlineTest1
+    ^42
+!
 
-    'Patched cold jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl.
-    'Patched hot jit run: ' print. (Timer millisecondsToRun: [ Jit do: [ data sort ] ]) printNl."
+METHOD Undefined
+inlineTest2
+    ^'Hello world'
+!
 
-    "1 to: 100 do: [ :x | Jit do: [ nil loopBenchmark ] ]."
+METHOD Undefined
+inlineTest3
+    ^self inlineTest1
+!
+
+METHOD Undefined
+inlineTest4
+    ^'Hello world' printString
+!
+
+METHOD Undefined
+inlineTest |x y z t|
+    x <- self inlineTest1.
+    y <- self inlineTest2.
+    z <- self inlineTest3.
+    t <- self inlineTest4.
+!
+
+METHOD Undefined
+factTest: x
+    ^(x = 1) ifTrue: [1] ifFalse: [self factTest: x - 1]
+!
+
+METHOD Undefined
+factTest2: x
+    (x = 1) ifTrue: [^1] ifFalse: [^self factTest2: x - 1]
+!
+
+CLASS Benchmark    Object
+CLASS Mock         Object   field
+
+METHOD Mock
+selfReturn
+    ^self
+!
+
+METHOD Mock
+stackReturn
+    ^nil
+!
+
+METHOD Mock
+argReturn: arg
+    ^arg
+!
+
+METHOD Mock
+literalReturn
+    ^'Hello world!'
+!
+
+METHOD Mock
+fieldReturn
+    ^field
+!
+
+METHOD Mock
+blockReturn
+    [^self] value.
+!
+
+METHOD Mock
+invokeBlock: aBlock
+    aBlock value.
+!
+
+METHOD Mock
+selfSend
+    self selfReturn.
+!
+
+METHOD Mock
+invokePrimitive
+    <1 nil nil>.
+!
+
+METHOD Mock
+failPrimitive
+    <21 'Hello' 9>.
+!
+
+METHOD Mock
+doesNotUnderstand: aSelector
+    ^self
+!
+
+METHOD Mock
+invokeUnknownSelector
+    ^Mock new anUnknownSelector.
+!
+
+METHOD Mock
+setField: value
+    field <- value
+!
+
+METHOD Mock
+setTemporary: value | temp |
+    temp <- value
+    ^temp
+!
+
+METHOD Benchmark
+softRun: aBlock rounds: rounds text: text
+    | time delta |
+
+    System collectGarbage.
+
+    " Executing a block measuring total time "
+    time <- Timer get.
+    1 to: rounds do: [ :x | aBlock value ].
+    delta <- Timer get - time.
+
+    text print. $ print. delta printNl.
+    ^delta
+!
+
+METHOD Benchmark
+jitRun: aBlock rounds: rounds text: text
+    | time delta |
+
+    System collectGarbage.
+
+    " Executing a block that will do the job "
+    time <- Timer get.
+    Jit do: [ 1 to: rounds do: [ :x | aBlock value ] ].
+    delta <- Timer get - time.
+
+    text print. $ print. delta print. ' (jit)' printNl.
+    ^delta
+!
+
+METHOD Benchmark
+run: aBlock rounds: rounds text: text
+    self softRun: aBlock rounds: rounds text: text.
+    self jitRun:  aBlock rounds: rounds text: text.
+!
+
+METHOD Benchmark
+run: rounds | mock |
+    mock <- Mock new.
+
+    self run: [ 2 + 3 ] rounds: rounds text: 'Literal addition'.
+    self run: [ 2 + (mock argReturn: 3) ] rounds: rounds text: 'SmallInt + object'.
+    self run: [ (mock argReturn: 3) + 2] rounds: rounds text: 'object + SmallInt'.
+
+    self run: [ 1 to: rounds do: [ :x | 2 + 3 ] ] rounds: 1 text: 'Literal addition in a loop'.
+    self run: [ 1 to: rounds do: [ :x | 2 + (mock argReturn: 3) ] ] rounds: 1 text: 'SmallInt + object in a loop'.
+    self run: [ 1 to: rounds do: [ :x | (mock argReturn: 3) + 2 ] ] rounds: 1 text: 'object + SmallInt in a loop'.
+
+    self run: [ mock selfReturn ] rounds: rounds text: 'Self return'.
+    self run: [ mock stackReturn ] rounds: rounds text: 'Stack return'.
+    self run: [ mock argReturn: nil ] rounds: rounds text: 'Arg return'.
+    self run: [ mock literalReturn ] rounds: rounds text: 'Literal return'.
+    self run: [ mock fieldReturn ] rounds: rounds text: 'Field return'.
+
+    self run: [ mock setField: nil ] rounds: rounds text: 'Set field'.
+    self run: [ mock setTemporary: nil ] rounds: rounds text: 'Set temporary'.
+
+    self run: [ 'Hello world' size ] rounds: rounds text: 'Literal receiver'.
+
+    " Stupid imageBuilder crashes if method is too long :( "
+    self run2: rounds
+!
+
+METHOD Benchmark
+run2: rounds | mock |
+    mock <- Mock new.
+
+    self run: [ mock selfSend ] rounds: rounds text: 'Self dispatch'.
+
+    self run: [ mock invokeBlock: [nil] ] rounds: rounds text: 'Block invoke'.
+    self run: [ mock blockReturn ] rounds: rounds text: 'Block return'.
+
+    self run: [ mock selfReturn selfReturn selfReturn selfReturn selfReturn ] rounds: rounds text: 'Chain dispatch'.
+    self run: [ mock selfReturn; selfReturn; selfReturn; selfReturn; selfReturn ] rounds: rounds text: 'Cascade dispatch'.
+
+    self run: [ mock invokePrimitive ] rounds: rounds text: 'Primitive invocation'.
+    self run: [ mock failPrimitive ] rounds: rounds text: 'Failed primitive invocation'.
+
+    self run: [ mock invokeUnknownSelector ] rounds: rounds text: 'Dispatch of #doesNotUnderstand'.
+
+    self run3: rounds
+!
+
+METHOD Benchmark
+run3: rounds | array ordered indices |
+    array <- Array new: 10000.
+    indices <- Array new: 10000.
+    1 to: array size do: [ :x | indices at: x put: (array size atRandom) ].
+
+    self run: [ 1 to: array size do: [ :x | array at: x ] ] rounds: rounds / (array size) text: 'Array, linear read'.
+    self run: [ 1 to: array size do: [ :x | array at: (indices at: x) ] ] rounds: rounds / (array size) text: 'Array, random read'.
+
+    array <- Array new: 2.
+    self softRun: [ array insert: nil at: array size / 2 ] rounds: rounds text: 'Array, middle insert'.
+
+    array <- Array new: 2.
+    self jitRun: [ array insert: nil at: array size / 2 ] rounds: rounds text: 'Array, middle insert'.
+
+    ordered <- OrderedArray new: 0.
+    self softRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, creation'.
+    self softRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, selection'.
+
+    ordered <- OrderedArray new: 0.
+    self jitRun: [ 1 to: (indices size) do: [ :x | ordered add: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, creation'.
+    self jitRun: [ 1 to: (indices size) do: [ :x | ordered includes: (indices at: x) ] ] rounds: rounds / (indices size) text: 'OrderedArray, selection'.
+
+    self run4: rounds
+!
+
+METHOD Benchmark
+run4: rounds | list indices tree |
+    list <- List new.
+    self softRun: [ 1 to: rounds do: [ :x | list add: x ] ] rounds: 1 text: 'List front insert'.
+
+    list <- List new.
+    self jitRun: [ 1 to: rounds do: [ :x | list add: x ] ] rounds: 1 text: 'List front insert'.
+
+    indices <- Array new: 10000.
+    1 to: indices size do: [ :x | indices at: x put: (indices size atRandom) ].
+
+    tree <- Tree new.
+    self softRun: [ 1 to: indices size do: [ :x | tree add: (indices at: x) ] ] rounds: 1 text: 'Tree insert'.
+
+    tree <- Tree new.
+    self jitRun: [ 1 to: indices size do: [ :x | tree add: (indices at: x) ] ] rounds: 1 text: 'Tree insert'.
+
+    self run: [ tree collect: [ :x | x * 2 ] ] rounds: 1 text: 'Tree collect'.
+!
+
+METHOD Undefined
+main    | command  data x |
+    Char initialize.
+    Class fillChildren.
+    System fixMethodClasses.
 
     [ command <- String readline: '->'. command notNil ]
         whileTrue: [ command isEmpty ifFalse: [ command doIt printNl ] ]
@@ -2142,6 +2477,7 @@ temporarySize
 METHOD Method
 args: argNames inst: instNames temp: tempNames
 	" Hook for recording symbolic debug "
+	^self
 !
 COMMENT -----------Chars--------------
 METHOD MetaChar
@@ -2258,7 +2594,9 @@ asString
 !
 METHOD Char
 printString
-	^ String new: 2; at: 1 put: $$ ; at: 2 put: self
+    ^ String new: 2;
+        at: 1 put: $$;
+        at: 2 put: self
 !
 METHOD Char
 = aChar
@@ -2295,7 +2633,7 @@ at: value
 !
 METHOD Collection
 includes: aValue
-    self do: [ :element | element = aValue ifTrue: [ ^ true ]].
+    self do: [ :element | element = aValue ifTrue: [ ^ true ] ].
     ^ false
 !
 METHOD Collection
@@ -2411,9 +2749,8 @@ insertSort: criteria | result |
 
 METHOD Collection
 sort: criteria | left right mediane |
-    "(self size < 2) ifTrue: [^self]."
-    (self size < 32)
-        ifTrue: [ ^ self insertSort: criteria ].
+    (self size < 2) ifTrue: [^self].
+    "(self size < 32) ifTrue: [ ^ self insertSort: criteria ]."
 
     mediane <- self popFirst. "if self is instance of List then call List>>popFirst"
 
@@ -2579,16 +2916,16 @@ METHOD Array
 < arg		| selfsize argsize |
 	selfsize <- self size. argsize <- arg size.
 	1 to: (selfsize min: argsize)
-		do: [:i | (self at: i) ~= (arg at: i)
-			ifTrue: [ ^ (self at: i) < (arg at: i) ]].
+		do: [ :i | (self at: i) ~= (arg at: i)
+			ifTrue: [ ^ (self at: i) < (arg at: i) ] ].
 	^ selfsize < argsize
 !
 METHOD Array
 = anArray
 	self size = anArray size ifFalse: [ ^ false ].
 	1 to: self size do:
-		[:i | (self at: i) = (anArray at: i)
-			ifFalse: [ ^ false ]].
+		[ :i | (self at: i) = (anArray at: i)
+			ifFalse: [ ^ false ] ].
 	^ true
 !
 METHOD Array
@@ -2809,14 +3146,14 @@ asSymbol
 	^ Symbol new: self
 !
 METHOD String
-doIt	| meth command |
+doIt | meth command |
     command <- 'doItCommand '.
     ((self words at: 1) at: 1) = $| ifFalse: [ command <- command + ' ^ ' ].
 
-	meth <- Undefined parseMethod: command + self.
-	^ meth notNil
-		ifTrue: [ ^ Context new
-			  perform: meth withArguments: (Array new: 1) ]
+    meth <- Undefined parseMethod: command + self.
+    ^ meth notNil
+        ifTrue: [ ^ Context new
+                perform: meth withArguments: (Array new: 1) ]
 !
 METHOD String
 basicAt: index
@@ -3123,7 +3460,7 @@ keysDo: aBlock
 	1 to: keys size do: [:i| aBlock value: (keys at: i)]
 !
 METHOD Dictionary
-keysAsArray | i ret |
+keysAsArray | ret |
 	ret <- Array new: keys size.
 	1 to: keys size do: [:i| ret at: i put: (keys at: i)].
 	^ ret
@@ -3853,7 +4190,7 @@ copy
 METHOD Tree
 collect: transformBlock | newTree |
 	newTree <- Tree new.
-	self do: [:element| newTree add: (transformBlock value: element)]
+	self do: [:element| newTree add: (transformBlock value: element)].
 	^newTree
 !
 METHOD Tree
@@ -4356,10 +4693,6 @@ parse: c with: encoderClass	| encoder meth name |
 	self nextLex.
 	encoder <- encoderClass new.
 	name <- self readMethodName.
-	(c ~= Undefined) ifTrue: [
-		'Compiling ' print. c print. ':' print.
-		name print. '... ' print
-	].
 	encoder name: name.
 	self readMethodVariables.
 	self readBody compile: encoder block: false.
@@ -4384,13 +4717,16 @@ currentChar
 	^ text at: index ifAbsent: [ Char eof ]
 !
 METHOD Parser
-nextChar
-  | c |
-  c <- self currentChar.
-	(c = Char newline) ifTrue: [ lineNum <- lineNum + 1 ].
-	index <- index + 1.
-  (c = Char cr) ifTrue: [ ^self nextChar ]
-	^self currentChar
+nextChar | c |
+    c <- self currentChar.
+    (c = Char newline)
+        ifTrue: [ lineNum <- lineNum + 1 ].
+
+    index <- index + 1.
+    (c = Char cr)
+        ifTrue: [ ^self nextChar ].
+
+    ^self currentChar
 !
 METHOD Parser
 nextLex
@@ -4425,9 +4761,11 @@ lexInteger	| start |
 METHOD Parser
 lexAlnum | cc start |
 	start <- index.
-	[ ((cc <- self nextChar) isAlphanumeric) or: [ cc = $: ] ]
-			whileTrue: [ nil ].
-		" add any trailing colons "
+
+	[ cc <- self nextChar. cc isAlphanumeric or: [ cc = $: ] ]
+        whileTrue: [ nil ].
+
+    " add any trailing colons "
 	token <- text from: start to: index - 1
 !
 METHOD Parser
@@ -4539,16 +4877,19 @@ readStatement | lnum |
 !
 METHOD Parser
 readExpression   | node lnum |
-	self tokenIsName ifFalse: [ ^ self readCascade: self readTerm ].
-	node <- self nameNode: token asSymbol. self nextLex.
-	self tokenIsArrow
-		ifTrue: [ node assignable
-				ifFalse: [ self error: 'illegal assignment'].
-			lnum <- lineNum.
-			self nextLex.
-			^ (AssignNode at: lnum) target:
-				node expression: self readExpression ].
-	^ self readCascade: node
+    self tokenIsName ifFalse: [ ^ self readCascade: self readTerm ].
+    node <- self nameNode: token asSymbol. self nextLex.
+
+    self tokenIsArrow ifTrue: [
+        node assignable ifFalse: [ self error: 'illegal assignment'].
+
+        lnum <- lineNum.
+        self nextLex.
+
+        ^ (AssignNode at: lnum) target: node expression: self readExpression
+    ].
+
+    ^ self readCascade: node
 !
 METHOD Parser
 tokenIsArrow
@@ -4574,23 +4915,24 @@ readTerm   | node lnum |
 !
 METHOD Parser
 nameNode: name
-	" make a new name node "
-	name == #super
-		ifTrue: [ ^ (ArgumentNode at: lineNum) position: 0 ].
-	(1 to: tempNames size) do: [:i |
-		(name == (tempNames at: i))
-			ifTrue: [ ^ (TemporaryNode at: lineNum)
-				position: i ] ].
-	(1 to: argNames size) do: [:i |
-		(name == (argNames at: i))
-			ifTrue: [ ^ (ArgumentNode at: lineNum) position: i ] ].
-	(1 to: instNames size) do: [:i |
-		(name == (instNames at: i))
-			ifTrue: [ ^ (InstNode at: lineNum) position: i ] ].
-	^ (LiteralNode at: lineNum);
-		value: (globals at: name
-			ifAbsent: [ ^ self error:
-				'unrecognized name: ' + name printString ])
+    " make a new name node "
+    name == #super
+        ifTrue: [ ^ (ArgumentNode at: lineNum) position: 0 ].
+    (1 to: tempNames size) do: [:i |
+        (name == (tempNames at: i))
+            ifTrue: [ ^ (TemporaryNode at: lineNum)
+                position: i ] ].
+    (1 to: argNames size) do: [:i |
+        (name == (argNames at: i))
+            ifTrue: [ ^ (ArgumentNode at: lineNum) position: i ] ].
+    (1 to: instNames size) do: [:i |
+        (name == (instNames at: i))
+            ifTrue: [ ^ (InstNode at: lineNum) position: i ] ].
+
+    ^ (LiteralNode at: lineNum)
+        value: (globals at: name
+            ifAbsent: [ ^ self error:
+                'unrecognized name: ' + name printString ])
 !
 METHOD Parser
 readLiteral   | node |
@@ -4695,43 +5037,53 @@ readBlockTemporaries
 !
 METHOD Parser
 readCascade: base   | node list |
-	node <- self keywordContinuation: base.
-	tokenType = $;
-		ifTrue: [ node <- (CascadeNode at: lineNum) head: node.
-			list <- List new.
-			[ tokenType = $; ]
-				whileTrue: [ self nextLex.
-					list add:
-						(self keywordContinuation: nil ) ].
-			node list: list ].
-	^ node
+    node <- self keywordContinuation: base.
+
+    tokenType = $; ifTrue: [
+        node <- (CascadeNode at: lineNum) head: node.
+        list <- List new.
+
+        [ tokenType = $; ] whileTrue: [
+            self nextLex.
+            list add: (self keywordContinuation: nil)
+        ].
+
+        node list: list
+    ].
+
+    ^ node
 !
 METHOD Parser
 keywordContinuation: base  | receiver name args lnum |
-	receiver <- self binaryContinuation: base.
-	self tokenIsKeyword
-		ifFalse: [ ^ receiver ].
-	name <- ''.
-	args <- List new.
-	lnum <- lineNum.
-	[ self tokenIsKeyword ]
-		whileTrue: [ name <- name + token. self nextLex.
-			args add:
-				(self binaryContinuation: self readTerm) ].
-	^ (MessageNode at: lnum) receiver:
-		receiver name: name asSymbol arguments: args
+    receiver <- self binaryContinuation: base.
+    self tokenIsKeyword ifFalse: [ ^receiver ].
+
+    name <- ''.
+    args <- List new.
+    lnum <- lineNum.
+
+    [ self tokenIsKeyword ] whileTrue: [
+        name <- name + token. self nextLex.
+        args add: (self binaryContinuation: self readTerm) ].
+
+    ^ (MessageNode at: lnum)
+        receiver: receiver
+        name: name asSymbol
+        arguments: args
 !
 METHOD Parser
 binaryContinuation: base | receiver name lnum |
-	receiver <- self unaryContinuation: base.
-	[ self tokenIsBinary]
-		whileTrue: [ lnum <- lineNum.
-			name <- token asSymbol. self nextLex.
-			receiver <- (MessageNode at: lnum)
-				receiver: receiver name: name arguments:
-					(List with:
-						(self unaryContinuation: self readTerm)) ].
-	^ receiver
+    receiver <- self unaryContinuation: base.
+
+    [ self tokenIsBinary ] whileTrue: [
+        lnum <- lineNum.
+        name <- token asSymbol. self nextLex.
+        receiver <- (MessageNode at: lnum)
+            receiver: receiver
+            name: name
+            arguments: (List with: (self unaryContinuation: self readTerm)) ].
+
+    ^receiver
 !
 METHOD Parser
 unaryContinuation: base | receiver lnum |
@@ -4905,6 +5257,7 @@ compile: encoder block: inBlock | patchLocation |
 	super compile: encoder.
 	encoder genHigh: 12 low: temporaryLocation.
 	patchLocation <- encoder genVal: 0.
+
 	self compileInLine: encoder block: true.
 	encoder genHigh: 15 low: 2. " return top of stack "
 	encoder patch: patchLocation
@@ -4993,9 +5346,15 @@ sendMessage: encoder block: inBlock
 	encoder genHigh: 9 low: (encoder genLiteral: name)
 !
 METHOD MessageNode
-argumentsAreBlock
-	arguments do: [ :arg | arg isBlock ifFalse: [ ^ false ]].
-	^ true
+argumentsAreBlock |result|
+    "Version using block return"
+    arguments do: [ :arg | arg isBlock ifFalse: [ ^false ] ].
+    ^true
+
+    "Linear version"
+    "result <- true.
+    arguments do: [ :arg | arg isBlock ifFalse: [ result <- false ] ].
+    ^result"
 !
 METHOD MessageNode
 optimizeWhile: encoder block: inBlock | start save |
@@ -5048,6 +5407,7 @@ name: n
 METHOD Encoder
 lineNum: l
 	" Don't care, except in DebugEncoder subclass "
+	^self
 !
 METHOD Encoder
 pushArgs: n
@@ -5329,7 +5689,7 @@ name
 !
 METHOD MetaSystem
 collectGarbage
-    <254>
+    <254>.
     self primitiveFailed
 !
 METHOD MetaSystem

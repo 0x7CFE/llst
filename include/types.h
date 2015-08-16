@@ -3,7 +3,7 @@
  *
  *    Basic Smalltalk related types and structures
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -159,7 +159,8 @@ public:
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
 
-    template<typename T> T* cast() const { return static_cast<T*>(this); }
+    template<typename T> T* cast() { return static_cast<T*>(this); }
+    template<typename T> const T* cast() const { return static_cast<const T*>(this); }
 
     // Helper constant for template instantination
     enum { InstancesAreBinary = false };
@@ -182,6 +183,7 @@ public:
     const uint8_t* getBytes() const { return bytes; }
     const uint8_t& getByte(uint32_t index) const { return bytes[index]; }
     uint8_t& operator [] (uint32_t index) { return bytes[index]; }
+    const uint8_t& operator [] (uint32_t index) const { return bytes[index]; }
 
     void putByte(uint32_t index, uint8_t value) { bytes[index] = value; }
 
@@ -372,15 +374,6 @@ struct TProcess : public TObject {
     TObject*      result;
 
     static const char* InstanceClassName() { return "Process"; }
-};
-
-// TInstruction represents one decoded Smalltalk instruction.
-// Actual meaning of parts is determined during the execution.
-struct TInstruction {
-    uint8_t low;
-    uint8_t high;
-
-    std::string toString();
 };
 
 #endif

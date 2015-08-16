@@ -1,0 +1,63 @@
+language: cpp
+
+compiler:
+  - gcc
+  - clang
+
+os:
+  - linux
+  - osx
+
+sudo: false
+cache:
+  apt: true
+  directories:
+    - $HOME/.cache/pip
+addons:
+  apt:
+    packages:
+    - g++-multilib
+    - linux-libc-dev:i386
+    - libreadline-dev:i386
+    - llvm-3.3-dev:i386
+
+notifications:
+  email: false
+
+branches:
+  only:
+    - master
+    - develop
+    - /^.*travis.*$/
+
+matrix:
+  allow_failures:
+    - os: osx
+
+env:
+  matrix: # fix all scripts (e.g. install-dependencies.sh) if you rename LLVM_USE[On/Off]
+    - USE_LLVM=Off
+      BUILD_TYPE=Debug
+    - USE_LLVM=Off
+      BUILD_TYPE=Release
+    - USE_LLVM=On
+      BUILD_TYPE=Debug
+    - USE_LLVM=On
+      BUILD_TYPE=Release
+    - USE_LLVM=Off
+      BUILD_TYPE=Coverage
+
+before_install:
+  - source .travis/${TRAVIS_OS_NAME}/before_install.sh
+
+before_script:
+  - mkdir -p build
+  - cd build
+  - cmake .. -DUSE_LLVM=$USE_LLVM -DBUILD_TESTS=On -DCMAKE_BUILD_TYPE=${BUILD_TYPE} -DSITE="${TRAVIS_OS_NAME}@Travis" -DBUILDNAME="${TRAVIS_BRANCH}_${CXX}_LLVM_${USE_LLVM}_${BUILD_TYPE}"
+
+script:
+  - cmake --build . -- all --keep-going
+  - cmake --build . --target check
+
+after_success:
+  - if [ ${CXX} == g++ ] && [ ${BUILD_TYPE} == Coverage ]; then ~/.local/bin/coveralls --repo_token "INxVunXhVXbQWjVbwoIisKeXSJqCRGnI2" --exclude build/tests/gtest -E ".*CMake.*CompilerId.c" --gcov-options "\-lp" -r ../; fi

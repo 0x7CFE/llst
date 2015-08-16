@@ -3,7 +3,7 @@
  *
  *    Implementation of primitive handling functions which are part of soft VM
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -87,7 +87,7 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
                 //valueObject is not used in primitive stringAtPut
             }
 
-            if (! isSmallInteger(indexObject)) {
+            if ( !isSmallInteger(indexObject) || isSmallInteger(string) ) {
                 primitiveFailed = true;
                 break;
             }

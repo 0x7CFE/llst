@@ -1,3 +1,6 @@
+[![Build Status](https://travis-ci.org/0x7CFE/llst.svg?branch=develop)](https://travis-ci.org/0x7CFE/llst)
+[![Coverage Status](https://coveralls.io/repos/0x7CFE/llst/badge.svg?branch=develop)](https://coveralls.io/r/0x7CFE/llst?branch=develop)
+
 Overview
 =================
 LLST stands for LLVM Smalltalk or Low Level Smalltalk (which intends it's use in embedded environments).
@@ -53,7 +56,15 @@ By default LLST is built without LLVM support. If you wish to enable it, you sho
 ~/llst/build $ make
 ```
 
-You should have LLVM 3.1 installed and llvm-config or llvm-config-3.1 be accessible from your environment.
+You should have LLVM 3.3 installed and llvm-config or llvm-config-3.3 be accessible from your environment.
+
+Unit tests
+====
+
+```
+~/llst/build $ cmake -DBUILD_TESTS=ON ..
+~/llst/build $ make check
+```
 
 License
 =======

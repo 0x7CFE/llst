@@ -3,7 +3,7 @@
  *
  *    Program entry point
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -35,6 +35,7 @@
 #include <iostream>
 #include <cstdio>
 #include <memory>
+#include <tr1/memory>
 #include <cstdlib>
 
 #include <vm.h>
@@ -45,6 +46,8 @@
 #if defined(LLVM)
     #include <jit.h>
 #endif
+
+#include <visualization.h>
 
 int main(int argc, char **argv) {
     args llstArgs;
@@ -65,20 +68,30 @@ int main(int argc, char **argv) {
         return EXIT_SUCCESS;
     }
 
-#if defined(LLVM)
-    std::auto_ptr<IMemoryManager> memoryManager(new LLVMMemoryManager());
-#else
-    std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-#endif
+    IMemoryManager* mm;
+    if(llstArgs.memoryManagerType == "nc") {
+        mm = new NonCollectMemoryManager();
+    }
+    else if(llstArgs.memoryManagerType == "" || llstArgs.memoryManagerType == "copy") {
+        #if defined(LLVM)
+            mm = new LLVMMemoryManager();
+        #else
+            mm = new BakerMemoryManager();
+        #endif
+    }
+    else{
+        std::cout << "error: wrong option --mm_type=" << llstArgs.memoryManagerType << ";\n"
+                  << "defined options for memory manager type:\n"
+                  << "\"copy\" (default) - copying garbage collector;\n"
+                  << "\"nc\" - non-collecting memory manager.\n";
+        return EXIT_FAILURE;
+    }
+    std::auto_ptr<IMemoryManager> memoryManager(mm);
     memoryManager->initializeHeap(llstArgs.heapSize, llstArgs.maxHeapSize);
-
+    memoryManager->setLogger(std::tr1::shared_ptr<IGCLogger>(new GCLogger("gc.log")));
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     smalltalkImage->loadImage(llstArgs.imagePath);
 
-    {
-        Image::ImageWriter writer;
-        writer.setGlobals(globals).writeTo("../image/MySmalltalkImage.image");
-    }
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
     // Creating completion database and filling it with info
@@ -115,8 +128,6 @@ int main(int argc, char **argv) {
     // And starting the image execution!
     SmalltalkVM::TExecuteResult result = vm.execute(initProcess, 0);
 
-    //llvm::outs() << *runtime.getModule();
-
     /* This code will run Smalltalk immediately in LLVM.
      * Don't forget to uncomment 'Undefined>>boot'
      */
@@ -125,6 +136,7 @@ int main(int argc, char **argv) {
     TExecuteProcessFunction executeProcess = reinterpret_cast<TExecuteProcessFunction>(runtime.getExecutionEngine()->getPointerToFunction(runtime.getModule()->getFunction("executeProcess")));
     SmalltalkVM::TExecuteResult result = (SmalltalkVM::TExecuteResult) executeProcess(initProcess);
     */
+
     // Finally, parsing the result
     switch (result) {
         case SmalltalkVM::returnError:

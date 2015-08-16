@@ -3,7 +3,7 @@
  *
  *    Implementation of BakerMemoryManager class
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -46,14 +46,11 @@ bool is_aligned_properly(uint32_t x) {
 }
 
 BakerMemoryManager::BakerMemoryManager() :
-    m_collectionsCount(0), m_allocationsCount(0), m_totalCollectionDelay(0),
-    m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
+    m_memoryInfo(), m_heapSize(0), m_maxHeapSize(0), m_heapOne(0), m_heapTwo(0),
     m_activeHeapOne(true), m_inactiveHeapBase(0), m_inactiveHeapPointer(0),
     m_activeHeapBase(0), m_activeHeapPointer(0), m_staticHeapSize(0),
     m_staticHeapBase(0), m_staticHeapPointer(0), m_externalPointersHead(0)
-{
-    // Nothing to be done here
-}
+{}
 
 BakerMemoryManager::~BakerMemoryManager()
 {
@@ -198,7 +195,7 @@ void* BakerMemoryManager::allocate(std::size_t requestedSize, bool* gcOccured /*
         assert( is_aligned_properly(result) );
 
         if (gcOccured && !*gcOccured)
-            m_allocationsCount++;
+            m_memoryInfo.allocationsCount++;
         return result;
     }
 
@@ -379,10 +376,15 @@ BakerMemoryManager::TMovableObject* BakerMemoryManager::moveObject(TMovableObjec
     }
 }
 
+
 void BakerMemoryManager::collectGarbage()
 {
-    m_collectionsCount++;
-
+    //get statistic before collect
+    m_memoryInfo.collectionsCount++;
+    TMemoryManagerEvent event("GC");
+    event.begin = m_memoryInfo.timer.get<TSec>();
+    event.heapInfo.usedHeapSizeBeforeCollect =  (m_heapSize/2 - (m_activeHeapPointer - m_activeHeapBase));
+    event.heapInfo.totalHeapSize = m_heapSize;
     // First of all swapping the spaces
     if (m_activeHeapOne)
     {
@@ -402,21 +404,18 @@ void BakerMemoryManager::collectGarbage()
     // objects down the hierarchy to find active objects.
     // Then moving them to the new active heap.
 
-    // Storing timestamp on start
-    timeval tv1;
-    gettimeofday(&tv1, NULL);
-
     // Moving the live objects in the new heap
     moveObjects();
 
-    // Storing timestamp of the end
-    timeval tv2;
-    gettimeofday(&tv2, NULL);
 
     std::memset(m_inactiveHeapBase, 0, m_heapSize / 2);
 
     // Calculating total microseconds spent in the garbage collection procedure
-    m_totalCollectionDelay += (tv2.tv_sec - tv1.tv_sec) * 1000000 + (tv2.tv_usec - tv1.tv_usec);
+    event.heapInfo.usedHeapSizeAfterCollect =  (m_heapSize/2 - (m_activeHeapPointer - m_activeHeapBase));
+    event.timeDiff = m_memoryInfo.timer.get<TSec>() - event.begin;
+    m_memoryInfo.totalCollectionDelay += event.timeDiff.convertTo<TMicrosec>().toInt();
+    m_memoryInfo.events.push_front(event);
+    m_gcLogger->writeLogLine(event);
 }
 
 void BakerMemoryManager::moveObjects()
@@ -529,11 +528,5 @@ void BakerMemoryManager::releaseExternalHeapPointer(object_ptr& pointer) {
 
 TMemoryManagerInfo BakerMemoryManager::getStat()
 {
-    TMemoryManagerInfo info;
-    std::memset(&info, 0, sizeof(info));
-
-    info.allocationsCount     = m_allocationsCount;
-    info.collectionsCount     = m_collectionsCount;
-    info.totalCollectionDelay = m_totalCollectionDelay;
-    return info;
+    return m_memoryInfo;
 }

@@ -3,7 +3,7 @@
  *
  *    LLST virtual machine related classes and structures
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -39,6 +39,7 @@
 
 #include <types.h>
 #include <memory.h>
+#include <instructions.h>
 
 template <int I>
 struct Int2Type
@@ -74,8 +75,8 @@ private:
     public:
         hptr<TContext> currentContext;
 
-        TInstruction   instruction;
-        uint32_t       bytePointer;
+        st::TSmalltalkInstruction instruction;
+        uint16_t       bytePointer;
         uint32_t       stackTop;
 
         hptr<TObject>  returnedValue;
@@ -108,6 +109,7 @@ private:
         TVMExecutionContext(IMemoryManager* mm, SmalltalkVM* vm) :
             m_vm(vm),
             currentContext( static_cast<TContext*>(globals.nilObject), mm),
+            instruction(opcode::extended),
             returnedValue(globals.nilObject, mm)
         { }
     };

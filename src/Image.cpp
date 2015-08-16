@@ -3,7 +3,7 @@
  *
  *    Implementation of Image class which loads the file image into memory
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -32,7 +32,6 @@
  *    along with LLST.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <vm.h>
 #include <memory.h>
 
 //#include <netinet/in.h> //TODO endianness

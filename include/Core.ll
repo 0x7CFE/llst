@@ -9,7 +9,7 @@
 ;    small and almost all of them gets inlined, so it does not
 ;    affect the perfomance of JIT code.
 ;
-;    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+;    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
 ;
 ;    LLST is
 ;        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -153,7 +153,7 @@
 ;;;;;;;;;;;;;;;;;;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-define i1 @isSmallInteger(%TObject* %value) {
+define i1 @isSmallInteger(%TObject* %value) alwaysinline {
     ; return reinterpret_cast<int32_t>(value) & 1;
 
     %int = ptrtoint %TObject* %value to i32
@@ -161,7 +161,7 @@ define i1 @isSmallInteger(%TObject* %value) {
     ret i1 %result
 }
 
-define i32 @getIntegerValue(%TObject* %value) {
+define i32 @getIntegerValue(%TObject* %value) alwaysinline {
     ; return (int32_t) (value >> 1)
 
     %int = ptrtoint %TObject* %value to i32
@@ -169,7 +169,7 @@ define i32 @getIntegerValue(%TObject* %value) {
     ret i32 %result
 }
 
-define %TObject* @newInteger(i32 %value) {
+define %TObject* @newInteger(i32 %value) alwaysinline {
     ; return reinterpret_cast<TObject>( (value << 1) | 1 );
 
     %shled = shl i32 %value, 1
@@ -178,7 +178,7 @@ define %TObject* @newInteger(i32 %value) {
     ret %TObject* %result
 }
 
-define i32 @getSlotSize(i32 %fieldsCount) {
+define i32 @getSlotSize(i32 %fieldsCount) alwaysinline {
     ;sizeof(TObject) + fieldsCount * sizeof(TObject*)
 
     %fieldsSize = mul i32 4, %fieldsCount
@@ -188,21 +188,21 @@ define i32 @getSlotSize(i32 %fieldsCount) {
 }
 
 
-define i32 @getObjectSize(%TObject* %this) {
+define i32 @getObjectSize(%TObject* %this) alwaysinline {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %result = lshr i32 %data, 2
     ret i32 %result
 }
 
-define %TObject* @setObjectSize(%TObject* %this, i32 %size) {
+define %TObject* @setObjectSize(%TObject* %this, i32 %size) alwaysinline {
     %addr = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %ssize = shl i32 %size, 2
     store i32 %ssize, i32* %addr
     ret %TObject* %this
 }
 
-define i1 @isObjectRelocated(%TObject* %this) {
+define i1 @isObjectRelocated(%TObject* %this) alwaysinline {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %field = and i32 %data, 1
@@ -210,7 +210,7 @@ define i1 @isObjectRelocated(%TObject* %this) {
     ret i1 %result
 }
 
-define i1 @isObjectBinary(%TObject* %this) {
+define i1 @isObjectBinary(%TObject* %this) alwaysinline {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %field = and i32 %data, 2
@@ -218,14 +218,14 @@ define i1 @isObjectBinary(%TObject* %this) {
     ret i1 %result
 }
 
-define %TClass** @getObjectClassPtr(%TObject* %this) {
+define %TClass** @getObjectClassPtr(%TObject* %this) alwaysinline {
     %pclass = getelementptr inbounds %TObject* %this, i32 0, i32 1
     ret %TClass** %pclass
 }
 
 @SmallInt = external global %TClass
 
-define %TClass* @getObjectClass(%TObject* %this) {
+define %TClass* @getObjectClass(%TObject* %this) alwaysinline {
     ; TODO SmallInt case
     %test = call i1 @isSmallInteger(%TObject* %this)
     br i1 %test, label %is_smallint, label %is_object
@@ -237,38 +237,36 @@ is_object:
     ret %TClass* %class
 }
 
-
-define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) {
+define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) alwaysinline {
     %addr = call %TClass** @getObjectClassPtr(%TObject* %this)
     store %TClass* %class, %TClass** %addr
     ret %TObject* %this
 }
 
-define %TObject** @getObjectFields(%TObject* %this) {
-    %fields = getelementptr inbounds %TObject* %this, i32 0, i32 2
-    %result = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 0
-    ret %TObject** %result
-}
-
-define %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index) {
+define %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index) alwaysinline {
     %fields    = getelementptr inbounds %TObject* %object, i32 0, i32 2
     %fieldPtr  = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
     ret %TObject** %fieldPtr
 }
 
-define %TObject* @getObjectField(%TObject* %object, i32 %index) {
+define %TObject** @getObjectFields(%TObject* %this) alwaysinline {
+    %fieldsPtr = call %TObject** @getObjectFieldPtr(%TObject* %this, i32 0)
+    ret %TObject** %fieldsPtr
+}
+
+define %TObject* @getObjectField(%TObject* %object, i32 %index) alwaysinline {
     %fieldPtr  = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
     %result    = load %TObject** %fieldPtr
     ret %TObject* %result
 }
 
-define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) {
-    %fieldPtr  = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
+define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) alwaysinline {
+    %fieldPtr = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
     store %TObject* %value, %TObject** %fieldPtr
     ret %TObject** %fieldPtr
 }
 
-define %TObject* @getArgFromContext(%TContext* %context, i32 %index) {
+define %TObject* @getArgFromContext(%TContext* %context, i32 %index) alwaysinline {
     %argsPtr = getelementptr inbounds %TContext* %context, i32 0, i32 2
     %args    = load %TObjectArray** %argsPtr
     %argsObj = bitcast %TObjectArray* %args to %TObject*
@@ -276,7 +274,7 @@ define %TObject* @getArgFromContext(%TContext* %context, i32 %index) {
     ret %TObject* %arg
 }
 
-define %TObject* @getLiteralFromContext(%TContext* %context, i32 %index) {
+define %TObject* @getLiteralFromContext(%TContext* %context, i32 %index) alwaysinline {
     %methodPtr   = getelementptr inbounds %TContext* %context, i32 0, i32 1
     %method      = load %TMethod** %methodPtr
     %literalsPtr = getelementptr inbounds %TMethod* %method, i32 0, i32 3
@@ -286,11 +284,37 @@ define %TObject* @getLiteralFromContext(%TContext* %context, i32 %index) {
     ret %TObject* %literal
 }
 
-define %TObject* @getTempsFromContext(%TContext* %context) {
+define %TObject* @getTempsFromContext(%TContext* %context) alwaysinline {
     %tempsPtr = getelementptr inbounds %TContext* %context, i32 0, i32 3
     %temps    = load %TObjectArray** %tempsPtr
     %tempsObj = bitcast %TObjectArray* %temps to %TObject*
     ret %TObject* %tempsObj
+}
+
+define %TObject* @getTemporaryFromContext(%TContext* %context, i32 %index) alwaysinline {
+    %temps = call %TObject* @getTempsFromContext(%TContext* %context)
+    %temporary = call %TObject* @getObjectField(%TObject* %temps, i32 %index)
+    ret %TObject* %temporary
+}
+
+define void @setTemporaryInContext(%TContext* %context, i32 %index, %TObject* %value) alwaysinline {
+    %temps = call %TObject* @getTempsFromContext(%TContext* %context)
+    call %TObject** @setObjectField(%TObject* %temps, i32 %index, %TObject* %value)
+    ret void
+}
+
+define %TObject* @getInstanceFromContext(%TContext* %context, i32 %index) alwaysinline {
+    %self = call %TObject* @getArgFromContext(%TContext* %context, i32 0)
+    %instance = call %TObject* @getObjectField(%TObject* %self, i32 %index)
+    ret %TObject* %instance
+}
+
+define void @setInstanceInContext(%TContext* %context, i32 %index, %TObject* %value) alwaysinline {
+    %self = call %TObject* @getArgFromContext(%TContext* %context, i32 0)
+    %instancePtr = call %TObject** @getObjectFieldPtr(%TObject* %self, i32 %index)
+    call void @checkRoot(%TObject* %value, %TObject** %instancePtr)
+    store %TObject* %value, %TObject** %instancePtr
+    ret void
 }
 
 define void @dummy() gc "shadow-stack" {

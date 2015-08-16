@@ -3,7 +3,7 @@
  *
  *    Helper functions for command line argument parsing
  *
- *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.3
+ *    LLST (LLVM Smalltalk or Low Level Smalltalk) version 0.4
  *
  *    LLST is
  *        Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>
@@ -46,6 +46,7 @@ void args::parse(int argc, char **argv)
         image = 'i',
         heap_max = 'H',
         heap = 'h',
+        mm_type = 'm',
 
         getopt_set_arg = 0,
         getopt_err = '?',
@@ -57,6 +58,7 @@ void args::parse(int argc, char **argv)
         {"heap_max",   required_argument, 0, heap_max},
         {"heap",       required_argument, 0, heap},
         {"image",      required_argument, 0, image},
+        {"mm_type",    required_argument, 0, mm_type},
         {"help",       no_argument,       0, help},
         {"version",    no_argument,       0, version},
         {0, 0, 0, 0}
@@ -76,6 +78,9 @@ void args::parse(int argc, char **argv)
 
             case image: {
                 imagePath = optarg;
+            } break;
+            case mm_type: {
+                memoryManagerType = optarg;
             } break;
             case heap: {
                 bool good_number = std::istringstream( optarg ) >> heapSize;
@@ -117,6 +122,7 @@ std::string args::getHelp()
         "  -h, --heap <number>              Starting <number> of the heap in bytes\n"
         "  -H, --heap_max <number>          Maximum allowed heap size\n"
         "  -i, --image <path>               Path to image\n"
+        "      --mm_type arg (=copy)        Choose memory manager. nc - NonCollect, copy - Stop-and-Copy\n"
         "  -V, --version                    Display the version number and copyrights of the invoked LLST\n"
         "      --help                       Display this information and quit";
 }
@@ -124,7 +130,7 @@ std::string args::getHelp()
 std::string args::getVersion()
 {
     return
-        "llst 0.3.0\n"
+        "llst 0.4.0\n"
         "Copyright (C) 2012-2015 by Dmitry Kashitsyn   <korvin@deeptown.org>\n"
         "Copyright (C) 2012-2015 by Roman Proskuryakov <humbug@deeptown.org>\n"
         "This is free software; see the source for copying conditions.  There is NO\n"
