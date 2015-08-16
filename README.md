@@ -1,5 +1,10 @@
-[![Build Status](https://travis-ci.org/0x7CFE/llst.svg?branch=develop)](https://travis-ci.org/0x7CFE/llst)
-[![Coverage Status](https://coveralls.io/repos/0x7CFE/llst/badge.svg?branch=develop)](https://coveralls.io/r/0x7CFE/llst?branch=develop)
+Branches
+========
+
+master (stable) | develop (unstable)
+--------------- | -----------------
+[![Build Status](https://travis-ci.org/0x7CFE/llst.svg?branch=master)](https://travis-ci.org/0x7CFE/llst) | [![Build Status](https://travis-ci.org/0x7CFE/llst.svg?branch=develop)](https://travis-ci.org/0x7CFE/llst)
+[![Coverage Status](https://coveralls.io/repos/0x7CFE/llst/badge.svg?branch=master)](https://coveralls.io/r/0x7CFE/llst?branch=master) | [![Coverage Status](https://coveralls.io/repos/0x7CFE/llst/badge.svg?branch=develop)](https://coveralls.io/r/0x7CFE/llst?branch=develop)
 
 Overview
 =================
