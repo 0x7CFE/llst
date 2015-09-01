@@ -550,10 +550,11 @@ private:
     }
 
     void removeInstruction(InstructionNode* node) {
+        const TNodeSet& outEdges = node->getOutEdges();
         // Trivial instructions should have only one outgoing edge
-        assert(node->getOutEdges().size() == 1);
+        assert(outEdges.size() == 1);
 
-        ControlNode* const nextNode = * node->getOutEdges().begin();
+        ControlNode* const nextNode = * outEdges.begin();
         assert(nextNode && nextNode->getNodeType() == ControlNode::ntInstruction);
 
         // Fixing domain entry point

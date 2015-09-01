@@ -54,7 +54,7 @@ struct TMemoryManagerHeapEvent {
     uint32_t totalHeapSize;
     TMemoryManagerHeapEvent() : eventName(), timeDiff(),
     usedHeapSizeBeforeCollect(0), usedHeapSizeAfterCollect(0), totalHeapSize(0) {}
-    TMemoryManagerHeapEvent(std::string name) : eventName(name), timeDiff(),
+    TMemoryManagerHeapEvent(const std::string& name) : eventName(name), timeDiff(),
     usedHeapSizeBeforeCollect(0), usedHeapSizeAfterCollect(0), totalHeapSize(0) {}
 };
 
@@ -84,12 +84,12 @@ struct TMemoryManagerEvent {
     TDuration<TSec> begin; //time spent from program start to event begin
     TDuration<TSec> timeDiff; //maybe null
     TMemoryManagerHeapInfo heapInfo; //maybe empty
-    TMemoryManagerEvent(const std::string name): eventName(name), begin(), timeDiff(), heapInfo() {}
+    TMemoryManagerEvent(const std::string& name): eventName(name), begin(), timeDiff(), heapInfo() {}
 };
 
 class IGCLogger {
 public:
-    virtual void writeLogLine(TMemoryManagerEvent event) = 0;
+    virtual void writeLogLine(const TMemoryManagerEvent& event) = 0;
     virtual ~IGCLogger() {};
 };
 
@@ -99,14 +99,14 @@ private:
 public:
     GCLogger(const char* fileName);
     virtual ~GCLogger();
-    virtual void writeLogLine(TMemoryManagerEvent event);
+    virtual void writeLogLine(const TMemoryManagerEvent& event);
 };
 
 class EmptyGCLogger : public IGCLogger
 {
 public:
     EmptyGCLogger(){}
-    virtual void writeLogLine(TMemoryManagerEvent){}
+    virtual void writeLogLine(const TMemoryManagerEvent&){}
     virtual ~EmptyGCLogger() {}
 };
 

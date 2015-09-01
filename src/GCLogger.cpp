@@ -12,7 +12,7 @@ GCLogger::~GCLogger() {
 enum MeasuringConstants { bytes_in_kb = 1024 };
 
 
-void GCLogger::writeLogLine(TMemoryManagerEvent event) {
+void GCLogger::writeLogLine(const TMemoryManagerEvent& event) {
     m_logFile << event.begin.toString(SNONE, 3)
               << ": [" << event.eventName << " ";
     if (!event.heapInfo.empty())
@@ -21,7 +21,7 @@ void GCLogger::writeLogLine(TMemoryManagerEvent event) {
         m_logFile << eh.usedHeapSizeBeforeCollect / bytes_in_kb << "K->"
                   << eh.usedHeapSizeAfterCollect / bytes_in_kb << "K("
                   << eh.totalHeapSize / bytes_in_kb << "K)";
-        for (std::list<TMemoryManagerHeapEvent>::iterator i = eh.heapEvents.begin(); i != eh.heapEvents.end(); i++) {
+        for (std::list<TMemoryManagerHeapEvent>::iterator i = eh.heapEvents.begin(); i != eh.heapEvents.end(); ++i) {
             m_logFile << "[" << i->eventName << ": "
                       << i->usedHeapSizeBeforeCollect / bytes_in_kb << "K->"
                       << i->usedHeapSizeAfterCollect / bytes_in_kb << "K("
