@@ -68,11 +68,11 @@ Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
 
 Value* MethodCompiler::TJITContext::getMethodClass()
 {
-    Value* context   = getCurrentContext();
-    Value* pmethod   = builder->CreateStructGEP(context, 1); // method*
-    Value* method    = builder->CreateLoad(pmethod);
-    Value* pklass    = builder->CreateStructGEP(method, 6); // class*
-    Value* klass     = builder->CreateLoad(pklass);
+    Value* const context = getCurrentContext();
+    Value* const pmethod = builder->CreateStructGEP(context, 1); // method*
+    Value* const method  = builder->CreateLoad(pmethod);
+    Value* const pklass  = builder->CreateStructGEP(method, 6); // class*
+    Value* const klass   = builder->CreateLoad(pklass);
 
     klass->setName("class.");
     return klass;
@@ -80,15 +80,15 @@ Value* MethodCompiler::TJITContext::getMethodClass()
 
 Function* MethodCompiler::createFunction(TMethod* method)
 {
-    Type* methodParams[] = { m_baseTypes.context->getPointerTo() };
-    FunctionType* functionType = FunctionType::get(
+    Type* const methodParams[] = { m_baseTypes.context->getPointerTo() };
+    FunctionType* const functionType = FunctionType::get(
         m_baseTypes.returnValueType, //m_baseTypes.object->getPointerTo(), // the type of function result
         methodParams,            // parameters
         false                    // we're not dealing with vararg
     );
 
     std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
-    Function* function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
+    Function* const function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
     function->addFnAttr(Attribute::InlineHint);
@@ -100,18 +100,18 @@ Function* MethodCompiler::createFunction(TMethod* method)
 Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
 {
     // Storing current edit location
-    BasicBlock* insertBlock = jit.builder->GetInsertBlock();
+    BasicBlock* const insertBlock    = jit.builder->GetInsertBlock();
     BasicBlock::iterator insertPoint = jit.builder->GetInsertPoint();
 
     // Switching to the preamble
     jit.builder->SetInsertPoint(jit.preamble, jit.preamble->begin());
 
     // Allocating the object holder
-    Value* holder = jit.builder->CreateAlloca(type, 0, "holder.");
+    Value* const holder = jit.builder->CreateAlloca(type, 0, "holder.");
 
     // Registering holder as a GC root
-    Value* stackRoot = jit.builder->CreateBitCast(holder, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
-    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
+    Value* const stackRoot = jit.builder->CreateBitCast(holder, jit.builder->getInt8PtrTy()->getPointerTo(), "root.");
+    Function* const gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::gcroot);
     jit.builder->CreateCall2(gcrootIntrinsic, stackRoot, ConstantPointerNull::get(jit.builder->getInt8PtrTy()));
 
     // Returning to the original edit location
@@ -123,7 +123,7 @@ Value* MethodCompiler::allocateRoot(TJITContext& jit, Type* type)
 Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
 {
     // Allocating holder
-    Value* holder = allocateRoot(jit, value->getType());
+    Value* const holder = allocateRoot(jit, value->getType());
 
     // Storing value to the holder to protect the pointer
     jit.builder->CreateStore(value, holder);
@@ -297,11 +297,12 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
     jit.contextHolder->setName("pContext");
 
     // Storing self pointer
-    Value* pargs     = jit.builder->CreateStructGEP(context, 2);
-    Value* arguments = jit.builder->CreateLoad(pargs);
-    Value* pobject   = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
-    Value* self      = jit.builder->CreateCall2(m_baseFunctions.getObjectField, pobject, jit.builder->getInt32(0));
-    jit.selfHolder   = jit.methodAllocatesMemory ? protectPointer(jit, self) : self;
+    Value* const pargs     = jit.builder->CreateStructGEP(context, 2);
+    Value* const arguments = jit.builder->CreateLoad(pargs);
+    Value* const pobject   = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
+    Value* const self      = jit.builder->CreateCall2(m_baseFunctions.getObjectField, pobject, jit.builder->getInt32(0));
+
+    jit.selfHolder = jit.methodAllocatesMemory ? protectPointer(jit, self) : self;
     jit.selfHolder->setName("pSelf");
 }
 
@@ -321,7 +322,7 @@ Value* MethodCompiler::TJITContext::getSelf()
         return selfHolder;
 }
 
-bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* = 0*/)
+bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t /*byteCount = 0*/)
 {
     // Here we trying to find out whether method code contains block return instruction.
     // This instruction is handled in a very different way than the usual opcodes.
@@ -337,7 +338,7 @@ bool MethodCompiler::scanForBlockReturn(TJITContext& jit, uint32_t byteCount/* =
     return detector.isBlockReturnFound();
 }
 
-void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t byteCount /*= 0*/)
+void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* source, uint32_t /*byteCount = 0*/)
 {
     // Iterating over method's basic blocks and creating their representation in LLVM
     // Created blocks are used to map bytecode BBs and LLVM BBs
@@ -351,8 +352,8 @@ void MethodCompiler::scanForBranches(TJITContext& jit, st::ParsedBytecode* sourc
             std::ostringstream offset;
             offset << "offset" << basicBlock.getOffset();
 
-            MethodCompiler* compiler = m_jit.compiler; // self reference
-            llvm::BasicBlock* newBlock = llvm::BasicBlock::Create(
+            MethodCompiler*   const compiler = m_jit.compiler; // self reference
+            llvm::BasicBlock* const newBlock = llvm::BasicBlock::Create(
                 compiler->m_JITModule->getContext(),   // creating context
                 offset.str(),                          // new block's name
                 m_jit.function                         // method's function
@@ -383,7 +384,7 @@ TObjectAndSize MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCo
         false                       // volatile operation
     );
 
-    Value* arrayObject = jit.builder->CreateBitCast(array.objectSlot, m_baseTypes.object->getPointerTo());
+    Value* const arrayObject = jit.builder->CreateBitCast(array.objectSlot, m_baseTypes.object->getPointerTo());
 
     jit.builder->CreateCall2(m_baseFunctions.setObjectSize, arrayObject, jit.builder->getInt32(elementsCount));
     jit.builder->CreateCall2(m_baseFunctions.setObjectClass, arrayObject, m_globals.arrayClass);
@@ -472,7 +473,7 @@ void MethodCompiler::writeFunctionBody(TJITContext& jit)
 
     private:
         virtual bool visitDomain(st::ControlDomain& domain) {
-            llvm::BasicBlock* newBlock = domain.getBasicBlock()->getValue();
+            llvm::BasicBlock* const newBlock = domain.getBasicBlock()->getValue();
 
             newBlock->moveAfter(m_jit.builder->GetInsertBlock()); // for a pretty sequenced BB output
             m_jit.builder->SetInsertPoint(newBlock, newBlock->getFirstInsertionPt());
@@ -568,12 +569,12 @@ void MethodCompiler::writeUnwindBlockReturn(TJITContext& jit)
 
     jit.unwindPhi = jit.builder->CreatePHI(m_baseTypes.returnValueType, 2);
 
-    Value* const targetContext  = jit.builder->CreateExtractValue(jit.unwindPhi, 1);
-    Value* const localContext   = jit.getCurrentContext();
+    Value* const targetContext    = jit.builder->CreateExtractValue(jit.unwindPhi, 1);
+    Value* const localContext     = jit.getCurrentContext();
+    Value* const compareTargets   = jit.builder->CreateICmpEQ(localContext, targetContext);
 
-    Value* const compareTargets = jit.builder->CreateICmpEQ(localContext, targetContext);
-    BasicBlock*  returnBlock    = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
-    BasicBlock*  unwindBlock    = BasicBlock::Create(m_JITModule->getContext(), "continueUnwind", jit.function);
+    BasicBlock* const returnBlock = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
+    BasicBlock* const unwindBlock = BasicBlock::Create(m_JITModule->getContext(), "continueUnwind", jit.function);
 
     jit.builder->CreateCondBr(compareTargets, returnBlock, unwindBlock);
 
@@ -592,9 +593,6 @@ void MethodCompiler::emitReturn(TJITContext& jit, Value* object, Value* targetCo
     if (!targetContext)
         targetContext = ConstantPointerNull::get(m_baseTypes.context->getPointerTo());
 
-//     Value* returnSlot  = jit.builder->CreateAlloca(m_baseTypes.returnValueType);
-//     Value* returnValue = jit.builder->CreateLoad(returnSlot); //UndefValue::get(m_baseTypes.returnValueType);
-
     Value* returnValue = UndefValue::get(m_baseTypes.returnValueType);
     returnValue = jit.builder->CreateInsertValue(returnValue, object, 0);
     returnValue = jit.builder->CreateInsertValue(returnValue, targetContext, 1);
@@ -606,23 +604,23 @@ void MethodCompiler::writeLandingPad(TJITContext& jit)
     jit.exceptionLandingPad = BasicBlock::Create(m_JITModule->getContext(), "landingPad", jit.function);
     jit.builder->SetInsertPoint(jit.exceptionLandingPad);
 
-    Type* caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
+    Type* const caughtType = StructType::get(jit.builder->getInt8PtrTy(), jit.builder->getInt32Ty(), NULL);
 
-    LandingPadInst* exceptionStruct = jit.builder->CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
+    LandingPadInst* const exceptionStruct = jit.builder->CreateLandingPad(caughtType, m_exceptionAPI.gcc_personality, 1);
     exceptionStruct->addClause(m_exceptionAPI.blockReturnType);
 
-    Value* exceptionObject  = jit.builder->CreateExtractValue(exceptionStruct, 0);
-    Value* thrownException  = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, exceptionObject);
-    Value* blockReturn      = jit.builder->CreateBitCast(thrownException, m_baseTypes.blockReturn->getPointerTo());
+    Value* const exceptionObject = jit.builder->CreateExtractValue(exceptionStruct, 0);
+    Value* const thrownException = jit.builder->CreateCall(m_exceptionAPI.cxa_begin_catch, exceptionObject);
+    Value* const blockReturn     = jit.builder->CreateBitCast(thrownException, m_baseTypes.blockReturn->getPointerTo());
 
-    Value* returnValue      = jit.builder->CreateLoad( jit.builder->CreateStructGEP(blockReturn, 0) );
-    Value* targetContext    = jit.builder->CreateLoad( jit.builder->CreateStructGEP(blockReturn, 1) );
+    Value* const returnValue     = jit.builder->CreateLoad( jit.builder->CreateStructGEP(blockReturn, 0) );
+    Value* const targetContext   = jit.builder->CreateLoad( jit.builder->CreateStructGEP(blockReturn, 1) );
 
     jit.builder->CreateCall(m_exceptionAPI.cxa_end_catch);
 
-    Value* compareTargets = jit.builder->CreateICmpEQ(jit.getCurrentContext(), targetContext);
-    BasicBlock* returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
-    BasicBlock* rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
+    Value* const compareTargets = jit.builder->CreateICmpEQ(jit.getCurrentContext(), targetContext);
+    BasicBlock* const returnBlock  = BasicBlock::Create(m_JITModule->getContext(), "return",  jit.function);
+    BasicBlock* const rethrowBlock = BasicBlock::Create(m_JITModule->getContext(), "rethrow", jit.function);
 
     jit.builder->CreateCondBr(compareTargets, returnBlock, rethrowBlock);
 
@@ -1098,8 +1096,8 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(0), leftValue);
     jit.builder->CreateCall3(m_baseFunctions.setObjectField, argumentsObject, jit.builder->getInt32(1), rightValue);
 
-    Value* argumentsArray    = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
-    Value* sendMessageArgs[] = {
+    Value* const argumentsArray    = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
+    Value* const sendMessageArgs[] = {
         jit.getCurrentContext(), // calling context
         m_globals.binarySelectors[jit.currentNode->getInstruction().getArgument()],
         argumentsArray,
@@ -1219,7 +1217,7 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
     // Allocating stack space for objects and registering GC protection holder
 
     MethodCompiler::TStackObject contextPair = allocateStackObject(*jit.builder, sizeof(TContext), 0);
-    Value* contextSlot   = contextPair.objectSlot;
+    Value* const contextSlot = contextPair.objectSlot;
     Value* tempsSlot = 0;
 
     if (hasTemporaries) {
@@ -1247,10 +1245,10 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
 
     // Initializing object fields
     // TODO Move the init sequence out of the block or check that it is correctly optimized in loops
-    Value* newContextObject  = jit.builder->CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
-    Value* newTempsObject    = hasTemporaries ? jit.builder->CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
-    Function* setObjectSize  = getBaseFunctions().setObjectSize;
-    Function* setObjectClass = getBaseFunctions().setObjectClass;
+    Value* const newContextObject  = jit.builder->CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
+    Value* const newTempsObject    = hasTemporaries ? jit.builder->CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
+    Function* const setObjectSize  = getBaseFunctions().setObjectSize;
+    Function* const setObjectClass = getBaseFunctions().setObjectClass;
 
     // Object size stored in the TSize field of any ordinary object contains
     // number of pointers except for the first two fields
@@ -1265,15 +1263,15 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
         jit.builder->CreateCall2(setObjectClass, newTempsObject, getJitGlobals().arrayClass);
     }
 
-    Function* setObjectField  = getBaseFunctions().setObjectField;
-    Value* methodRawPointer   = jit.builder->getInt32(reinterpret_cast<uint32_t>(directMethod));
-    Value* directMethodObject = jit.builder->CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
+    Function* const setObjectField  = getBaseFunctions().setObjectField;
+    Value* const methodRawPointer   = jit.builder->getInt32(reinterpret_cast<uint32_t>(directMethod));
+    Value* const directMethodObject = jit.builder->CreateIntToPtr(methodRawPointer, m_baseTypes.object->getPointerTo());
 
-    Value* previousContext = jit.getCurrentContext(); // jit.builder->CreateLoad(info.contextHolder);
-    Value* contextObject   = jit.builder->CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
+    Value* const previousContext    = jit.getCurrentContext(); // jit.builder->CreateLoad(info.contextHolder);
+    Value* const contextObject      = jit.builder->CreateBitCast(previousContext, m_baseTypes.object->getPointerTo());
 
     Value* const arguments = getArgument(jit);
-    Value* messageArgumentsObject = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
+    Value* const messageArgumentsObject = jit.builder->CreateBitCast(arguments, m_baseTypes.object->getPointerTo());
 
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(0), directMethodObject);
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(1), messageArgumentsObject);
@@ -1283,7 +1281,7 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
         jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), getJitGlobals().nilObject);
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(3), contextObject);
 
-    Value* newContext = jit.builder->CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
+    Value* const newContext = jit.builder->CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
     Value* result = 0;
 
     if (jit.methodHasBlockReturn) {
@@ -1302,7 +1300,7 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
     }
 
     AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
-    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
+    Function* const gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
     Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
     jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
@@ -2043,9 +2041,9 @@ void MethodCompiler::compileSmallIntPrimitive(TJITContext& jit,
             primitiveResult  = jit.builder->CreateCall(m_baseFunctions.newInteger, intResult);
         } break;
         case primitive::smallIntBitShift: {
-            BasicBlock* shiftRightBB  = BasicBlock::Create(m_JITModule->getContext(), ">>", jit.function);
-            BasicBlock* shiftLeftBB   = BasicBlock::Create(m_JITModule->getContext(), "<<", jit.function);
-            BasicBlock* shiftResultBB = BasicBlock::Create(m_JITModule->getContext(), "shiftResult", jit.function);
+            BasicBlock* const shiftRightBB  = BasicBlock::Create(m_JITModule->getContext(), ">>", jit.function);
+            BasicBlock* const shiftLeftBB   = BasicBlock::Create(m_JITModule->getContext(), "<<", jit.function);
+            BasicBlock* const shiftResultBB = BasicBlock::Create(m_JITModule->getContext(), "shiftResult", jit.function);
 
             Value* const rightIsNeg = jit.builder->CreateICmpSLT(rightOperand, jit.builder->getInt32(0));
             jit.builder->CreateCondBr(rightIsNeg, shiftRightBB, shiftLeftBB);
@@ -2086,7 +2084,7 @@ MethodCompiler::TStackObject MethodCompiler::allocateStackObject(llvm::IRBuilder
     objectSlot->setAlignment(4);
 
     // Allocating object holder in the preamble
-    AllocaInst* objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
+    AllocaInst* const objectHolder = builder.CreateAlloca(m_baseTypes.object->getPointerTo(), 0, "stackHolder.");
 
     // Initializing holder with null value
 //    builder.CreateStore(ConstantPointerNull::get(m_baseTypes.object->getPointerTo()), objectHolder, true);
