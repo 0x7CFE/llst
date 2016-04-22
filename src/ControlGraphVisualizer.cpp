@@ -99,17 +99,16 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
         if (isNodeProcessed(*iEdge))
             continue;
 
+        if (const st::InstructionNode* const instruction = (*iEdge)->cast<st::InstructionNode>()) {
+            // Branch edges are handled separately
+            if (instruction->getInstruction().isBranch())
+                continue;
+        }
+
         m_stream << "\t\t" << (*iEdge)->getIndex() << " -> " << node.getIndex() << edgeStyle(*iEdge, &node) << ";\n";
     }
 
-    // Processing outgoing edges
-    iEdge = outEdges.begin();
-    for (; iEdge != outEdges.end(); ++iEdge) {
-        if (isNodeProcessed(*iEdge))
-            continue;
-
-        m_stream << "\t\t" << node.getIndex() << " -> " << (*iEdge)->getIndex() << edgeStyle(&node, *iEdge) << ";\n";
-    }
+    bool outEdgesProcessed = false;
 
     // Processing argument edges
     if (const st::InstructionNode* const instruction = node.cast<st::InstructionNode>()) {
@@ -122,6 +121,19 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
 
             m_stream << " labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"dashed\" constraint=false];\n";
         }
+
+        if (const st::BranchNode* const branch = node.cast<st::BranchNode>()) {
+            m_stream << "\t\t" << node.getIndex() << " -> " << branch->getTargetNode()->getIndex() << " [";
+            m_stream << "label=target labelfloat=true color=\"grey\" style=\"dashed\"];\n";
+
+            if (branch->getSkipNode()) {
+                m_stream << "\t\t" << node.getIndex() << " -> " << branch->getSkipNode()->getIndex() << " [";
+                m_stream << "label=skip labelfloat=true color=\"grey\" style=\"dashed\"];\n";
+            }
+
+            outEdgesProcessed = true;
+        }
+
     } else if (const st::PhiNode* const phi = node.cast<st::PhiNode>()) {
 
         m_stream << "\t\t" << phi->getIndex() << " -> " << phi->getDomain()->getEntryPoint()->getIndex()  << " ["
@@ -136,6 +148,17 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
 
             m_stream << "\t\t" << incoming.domain->getTerminator()->getIndex() << " -> " << phi->getIndex() << " ["
                 << "style=\"invis\" constraint=true ];\n";
+        }
+    }
+
+    // Processing outgoing edges in generic way
+    if (!outEdgesProcessed) {
+        iEdge = outEdges.begin();
+        for (; iEdge != outEdges.end(); ++iEdge) {
+            if (isNodeProcessed(*iEdge))
+                continue;
+
+            m_stream << "\t\t" << node.getIndex() << " -> " << (*iEdge)->getIndex() << edgeStyle(&node, *iEdge) << ";\n";
         }
     }
 
