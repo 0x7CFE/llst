@@ -194,6 +194,21 @@ private:
     ParsedBlock* m_parsedBlock;
 };
 
+class BranchNode : public InstructionNode {
+public:
+    BranchNode(uint32_t index) : InstructionNode(index), m_targetNode(0), m_skipNode(0) {}
+
+    ControlNode* getTargetNode() const { return m_targetNode; }
+    ControlNode* getSkipNode() const { return m_skipNode; }
+
+    void setTargetNode(ControlNode* value) { m_targetNode = value; }
+    void setSkipNode(ControlNode* value) { m_skipNode = value; }
+
+private:
+    ControlNode* m_targetNode;
+    ControlNode* m_skipNode;
+};
+
 // Phi node act as a value aggregator from several domains.
 // When value is pushed on the stack in one basic block and
 // popped in another we say that actual values have a stack relation.
@@ -432,6 +447,9 @@ template<> TauNode* ControlGraph::newNode<TauNode>();
 
 template<> PushBlockNode* ControlNode::cast<PushBlockNode>();
 template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>();
+
+template<> BranchNode* ControlNode::cast<BranchNode>();
+template<> BranchNode* ControlGraph::newNode<BranchNode>();
 
 class DomainVisitor {
 public:
