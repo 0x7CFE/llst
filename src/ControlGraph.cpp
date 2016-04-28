@@ -686,14 +686,64 @@ private:
     TNodeSet m_nodesToRemove;
 };
 
+class TauLinker : public NodeVisitor {
+public:
+    TauLinker(ControlGraph* graph) : NodeVisitor(graph) {}
+
+private:
+    virtual bool visitNode(st::ControlNode& node) {
+        if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
+            if (instruction->getInstruction().getOpcode() == opcode::pushTemporary)
+                processPushTemporary(*instruction);
+        }
+
+        return true;
+    }
+
+    void processPushTemporary(InstructionNode& instruction) {
+        // Searching for all AssignTemporary's that provide a value for current node
+        AssignLocator locator(instruction.getInstruction().getArgument());
+        locator.run(&instruction);
+
+        TNodeList::const_iterator iNode = locator.assign_sites.begin();
+        for (; iNode != locator.assign_sites.end(); ++iNode) {
+            std::printf("Node %.2u is affected by node %.2u\n",
+                        instruction.getIndex(), (*iNode)->getIndex());
+        }
+    }
+
+    class AssignLocator : public BackwardWalker {
+    public:
+        AssignLocator(TSmalltalkInstruction::TArgument argument) : argument(argument) {}
+
+        virtual TVisitResult visitNode(st::ControlNode* node) {
+            if (const InstructionNode* const instruction = node->cast<InstructionNode>()) {
+                if (instruction->getInstruction().getOpcode() == opcode::assignTemporary) {
+                    if (instruction->getInstruction().getArgument() == argument) {
+                        assign_sites.push_back(node);
+                        return vrSkipPath;
+                    }
+                }
+            }
+
+            return vrKeepWalking;
+        }
+
+        const TSmalltalkInstruction::TArgument argument;
+        TNodeList assign_sites;
+    };
+};
+
 void ControlGraph::buildGraph()
 {
     if (traces_enabled)
         std::printf("Phase 1. Constructing control graph\n");
 
     // Iterating through basic blocks of parsed method and constructing node domains
-    GraphConstructor constructor(this);
-    constructor.run();
+    {
+        GraphConstructor constructor(this);
+        constructor.run();
+    }
 
     if (traces_enabled)
         std::printf("Phase 2. Linking control graph\n");
@@ -702,8 +752,10 @@ void ControlGraph::buildGraph()
     // They're linked using phi nodes or a direct link if possible.
     // Also branching edges are added so graph remains linked even if
     // no stack relations exist.
-    GraphLinker linker(this);
-    linker.run();
+    {
+        GraphLinker linker(this);
+        linker.run();
+    }
 
     if (traces_enabled)
         std::printf("Phase 3. Optimizing control graph\n");
@@ -711,4 +763,10 @@ void ControlGraph::buildGraph()
     // Optimizing graph by removing stalled nodes and merging linear branch sequences
     GraphOptimizer optimizer(this);
     optimizer.run();
+
+    // Linking PushTemporary and AssignTemporary pairs
+    {
+        TauLinker linker(this);
+        linker.run();
+    }
 }

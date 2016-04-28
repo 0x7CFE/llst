@@ -459,6 +459,8 @@ public:
     virtual bool visitDomain(ControlDomain& /*domain*/) { return true; }
     virtual void domainsVisited() { }
 
+    ControlGraph& getGraph();
+
     void run() {
         ControlGraph::iterator iDomain = m_graph->begin();
         const ControlGraph::iterator iEnd = m_graph->end();
@@ -568,7 +570,7 @@ private:
         const TNodeSet& nodes = (m_direction == wdForward) ?
             currentNode->getOutEdges() : currentNode->getInEdges();
 
-        for (TNodeSet::iterator iNode = nodes.begin(); iNode != nodes.end(); ++iNode) {
+        for (TNodeSet::const_iterator iNode = nodes.begin(); iNode != nodes.end(); ++iNode) {
             ControlNode* const node = *iNode;
 
             if (m_stopNodes.find(node) != m_stopNodes.end())
@@ -601,7 +603,16 @@ private:
 class ForwardWalker : public GraphWalker {
 public:
     void run(ControlNode* startNode) { GraphWalker::run(startNode, wdForward); }
+
+private:
+    void run(ControlNode* startNode, TWalkDirection direction);
 };
+
+class BackwardWalker : public GraphWalker {
+public:
+    void run(ControlNode* startNode) { GraphWalker::run(startNode, wdBackward); }
+};
+
 
 class PathVerifier : public ForwardWalker {
 public:
