@@ -236,7 +236,7 @@ public:
     void addIncoming(ControlDomain* domain, ControlNode* value) {
         TIncoming incoming;
         incoming.domain = domain;
-        incoming.node  = value;
+        incoming.node   = value;
 
         m_incomingList.push_back(incoming);
     }
@@ -538,9 +538,14 @@ public:
     GraphWalker() { }
     virtual ~GraphWalker() { }
 
-    void addStopNode(ControlNode* node) { m_stopNodes.insert(node); }
-    void addStopNodes(const TNodeSet& nodes) { m_stopNodes.insert(nodes.begin(), nodes.end()); }
-    void resetStopNodes() { m_stopNodes.clear(); }
+    void resetStopNodes() { m_colorMap.clear(); }
+    void addStopNode(ControlNode* node) { m_colorMap[node] = ncBlack; }
+
+    void addStopNodes(const TNodeSet& nodes) {
+        TNodeSet::const_iterator iNode = nodes.begin();
+        for (; iNode != nodes.end(); ++iNode)
+            m_colorMap[*iNode] = ncBlack;
+    }
 
     enum TVisitResult {
         vrKeepWalking = 0,
@@ -560,23 +565,39 @@ public:
         assert(startNode);
         m_direction = direction;
 
-        m_stopNodes.erase(startNode);
         walkIn(startNode);
         nodesVisited();
     }
 
+protected:
+    enum TNodeColor {
+        ncWhite = 0, // unvisited node
+        ncGrey,      // node in progress
+        ncBlack      // visited and settled node
+    };
+
+    typedef std::map<ControlNode*, TNodeColor> TColorMap;
+
+    TNodeColor getNodeColor(ControlNode* node) const {
+        TColorMap::const_iterator iColor = m_colorMap.find(node);
+        if (iColor != m_colorMap.end())
+            return iColor->second;
+        else
+            return ncWhite;
+    }
+
 private:
     bool walkIn(ControlNode* currentNode) {
+        m_colorMap[currentNode] = ncGrey;
+
         const TNodeSet& nodes = (m_direction == wdForward) ?
             currentNode->getOutEdges() : currentNode->getInEdges();
 
         for (TNodeSet::const_iterator iNode = nodes.begin(); iNode != nodes.end(); ++iNode) {
             ControlNode* const node = *iNode;
 
-            if (m_stopNodes.find(node) != m_stopNodes.end())
+            if (getNodeColor(node) != ncWhite)
                 continue;
-            else
-                m_stopNodes.insert(node);
 
             switch (const TVisitResult result = visitNode(node)) {
                 case vrKeepWalking:
@@ -592,12 +613,13 @@ private:
             }
         }
 
+        m_colorMap[currentNode] = ncBlack;
         return true;
     }
 
 private:
     TWalkDirection m_direction;
-    TNodeSet       m_stopNodes;
+    TColorMap      m_colorMap;
 };
 
 class ForwardWalker : public GraphWalker {
