@@ -669,7 +669,55 @@ private:
     bool m_verified;
 };
 
+class BackEdgeDetector {
+public:
+    struct TEdge {
+        InstructionNode* from;
+        InstructionNode* to;
 
+        TEdge(InstructionNode* from, InstructionNode* to)
+            : from(from), to(to)
+        {
+            assert(from);
+            assert(to);
+        }
+    };
+
+    typedef std::list<TEdge> TEdgeList;
+
+    const TEdgeList& getBackEdges() const { return m_backEdges; }
+
+    void run(ControlGraph& graph) {
+        m_backEdges.clear();
+
+        Walker walker(*this);
+        walker.run(*graph.nodes_begin(), GraphWalker::wdForward);
+    }
+
+private:
+    class Walker : public GraphWalker {
+    public:
+        Walker(BackEdgeDetector& detector) : detector(detector) {}
+
+        virtual TVisitResult visitNode(ControlNode* node) {
+            if (BranchNode* const branch = node->cast<BranchNode>()) {
+                InstructionNode* const target = branch->getTargetNode()->cast<InstructionNode>();
+                assert(target);
+
+                if (getNodeColor(target) == ncGrey)
+                    detector.m_backEdges.push_back(TEdge(branch, target));
+            }
+
+            return vrKeepWalking;
+        }
+
+    private:
+        BackEdgeDetector& detector;
+    };
+
+private:
+    TEdgeList m_backEdges;
+};
 
 } // namespace st
 
