@@ -622,21 +622,7 @@ private:
     TColorMap      m_colorMap;
 };
 
-class ForwardWalker : public GraphWalker {
-public:
-    void run(ControlNode* startNode) { GraphWalker::run(startNode, wdForward); }
-
-private:
-    void run(ControlNode* startNode, TWalkDirection direction);
-};
-
-class BackwardWalker : public GraphWalker {
-public:
-    void run(ControlNode* startNode) { GraphWalker::run(startNode, wdBackward); }
-};
-
-
-class PathVerifier : public ForwardWalker {
+class PathVerifier : public GraphWalker {
 public:
     PathVerifier(const TNodeSet& destinationNodes)
         : m_destinationNodes(destinationNodes), m_verified(false) {}
@@ -648,7 +634,7 @@ public:
         assert(startNode);
         m_verified = false;
 
-        ForwardWalker::run(startNode);
+        GraphWalker::run(startNode, wdForward);
     }
 
 private:

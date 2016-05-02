@@ -708,7 +708,7 @@ private:
     void processPushTemporary(InstructionNode& instruction) {
         // Searching for all AssignTemporary's that provide a value for current node
         AssignLocator locator(instruction.getInstruction().getArgument());
-        locator.run(&instruction);
+        locator.run(&instruction, GraphWalker::wdBackward);
 
         TNodeList::const_iterator iNode = locator.assign_sites.begin();
         for (; iNode != locator.assign_sites.end(); ++iNode) {
@@ -717,7 +717,7 @@ private:
         }
     }
 
-    class AssignLocator : public BackwardWalker {
+    class AssignLocator : public GraphWalker {
     public:
         AssignLocator(TSmalltalkInstruction::TArgument argument) : argument(argument) {}
 

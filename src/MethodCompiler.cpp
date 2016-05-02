@@ -181,7 +181,7 @@ private:
 
 bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
 {
-    class GCDetector : public st::ForwardWalker {
+    class GCDetector : public st::GraphWalker {
     public:
         GCDetector() : m_detected(false) {}
 
@@ -203,7 +203,7 @@ bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
     };
 
     GCDetector detector;
-    detector.run((*jit.controlGraph->begin())->getEntryPoint());
+    detector.run((*jit.controlGraph->begin())->getEntryPoint(), GCDetector::wdForward);
 
     return detector.isDetected();
 }
