@@ -569,8 +569,10 @@ private:
         // then we may remove such node (or a node pair)
 
         const TSmalltalkInstruction& nodeInstruction = instruction.getInstruction();
-        if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
-            return;
+        if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider()) {
+            if (! instruction.cast<PushBlockNode>())
+                return;
+        }
 
         const TNodeSet& consumers = instruction.getConsumers();
         if (consumers.empty()) {
@@ -588,6 +590,7 @@ private:
                             consumer->getIndex()
                         );
 
+                    // TODO Remove phi incoming and probably remove phi node along with it's consumer
                     m_nodesToRemove.insert(consumer);
                     m_nodesToRemove.insert(&instruction);
                 }
@@ -632,6 +635,8 @@ private:
         ControlDomain* const domain = node->getDomain();
         if (domain->getEntryPoint() == node)
             domain->setEntryPoint(nextNode->cast<InstructionNode>());
+
+        // TODO Phi node
 
         // Fixing incoming edges by remapping them to the next node
         TNodeSet::const_iterator iNode = node->getInEdges().begin();
