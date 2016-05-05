@@ -127,7 +127,7 @@ public:
     void setValue(llvm::Value* value) { m_value = value; }
     llvm::Value* getValue() const { return m_value; }
 
-    // Get a list of nodes which refer current node as argument
+    // Get a list of nodes which refer current node as argument and tau nodes
     void addConsumer(ControlNode* consumer) { m_consumers.insert(consumer); }
     void removeConsumer(ControlNode* consumer) { m_consumers.erase(consumer); }
     const TNodeSet& getConsumers() const { return m_consumers; }
@@ -143,10 +143,12 @@ private:
     TNodeSet       m_consumers;
 };
 
+class TauNode;
+
 // Instruction node represents a signle VM instruction and it's relations in code.
 class InstructionNode : public ControlNode {
 public:
-    InstructionNode(uint32_t index) : ControlNode(index), m_instruction(opcode::extended) { }
+    InstructionNode(uint32_t index) : ControlNode(index), m_instruction(opcode::extended), m_tau(0) { }
     virtual TNodeType getNodeType() const { return ntInstruction; }
 
     void setInstruction(TSmalltalkInstruction instruction) { m_instruction = instruction; }
@@ -175,9 +177,13 @@ public:
     iterator begin() { return m_arguments.begin(); }
     iterator end() { return m_arguments.end(); }
 
+    TauNode* getTauNode() const { return m_tau; }
+    void setTauNode(TauNode* value) { m_tau = value; }
+
 private:
     TSmalltalkInstruction m_instruction;
     TArgumentList         m_arguments;
+    TauNode*              m_tau;
 };
 
 // PushBlockNode represents a single PushBlock instruction.
@@ -257,8 +263,28 @@ private:
 // It will link variable type transitions across a method.
 class TauNode : public ControlNode {
 public:
-    TauNode(uint32_t index) : ControlNode(index) { }
+    TauNode(uint32_t index) : ControlNode(index), m_kind(tkUnknown) { }
     virtual TNodeType getNodeType() const { return ntTau; }
+
+    void addIncoming(ControlNode* node) {
+        m_incomingSet.insert(node);
+        node->addConsumer(this);
+    }
+
+    const TNodeSet& getIncomingSet() const { return m_incomingSet; }
+
+    enum TKind {
+        tkUnknown,
+        tkProvider,
+        tkAggregator
+    };
+
+    void setKind(TKind value) { m_kind = value; }
+    TKind getKind() const { return m_kind; }
+
+private:
+    TNodeSet m_incomingSet;
+    TKind    m_kind;
 };
 
 // Domain is a group of nodes within a graph
@@ -288,9 +314,10 @@ public:
     ControlNode* topValue(bool keep = false) {
         assert(! m_localStack.empty());
 
-        ControlNode* value = m_localStack.back();
+        ControlNode* const value = m_localStack.back();
         if (!keep)
             m_localStack.pop_back();
+
         return value;
     }
 
@@ -459,7 +486,7 @@ public:
     virtual bool visitDomain(ControlDomain& /*domain*/) { return true; }
     virtual void domainsVisited() { }
 
-    ControlGraph& getGraph();
+    ControlGraph& getGraph() { return *m_graph; }
 
     void run() {
         ControlGraph::iterator iDomain = m_graph->begin();
@@ -477,7 +504,7 @@ public:
         }
     }
 
-protected:
+private:
     ControlGraph* const m_graph;
 };
 
@@ -676,8 +703,10 @@ public:
     void run(ControlGraph& graph) {
         m_backEdges.clear();
 
-        Walker walker(*this);
-        walker.run(*graph.nodes_begin(), GraphWalker::wdForward);
+        if (graph.nodes_begin() == graph.nodes_end())
+            return;
+
+        Walker(*this).run(*graph.nodes_begin(), GraphWalker::wdForward);
     }
 
 private:
