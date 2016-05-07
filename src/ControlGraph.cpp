@@ -753,10 +753,15 @@ private:
     }
 
 private:
-    typedef std::set<TauNode*> TTauSet;
-    typedef std::map<TauNode*, TTauSet> TRedundantTauMap;
+    typedef std::pair<TauNode*, TauNode*> TTauPair;
+    typedef std::set<TTauPair> TTauPairSet;
+
+    typedef std::map<TauNode*, TTauPairSet> TRedundantTauMap;
     TRedundantTauMap m_redundantTaus;
+
+    typedef std::set<TauNode*> TTauSet;
     TTauSet m_processedTaus;
+
 
 private:
     void optimizeTau() {
@@ -769,36 +774,20 @@ private:
         for (; iProvider != m_redundantTaus.end(); ++iProvider) {
             printf("Now working on provider tau %.2u\n", (*iProvider).first->getIndex());
 
-            TTauSet& pendingTaus = iProvider->second;
-            TTauSet::iterator iPendingTau = pendingTaus.begin();
-
-            // Skipping nodes that were processed earlier
-            while (iPendingTau != pendingTaus.end()) {
-                if (m_processedTaus.find(*iPendingTau) != m_processedTaus.end()) {
-                    printf("Redundant tau %.2u was already processed earlier\n",
-                        (*iPendingTau)->getIndex());
-
-                    TTauSet::iterator iCurrent = iPendingTau++;
-                    pendingTaus.erase(*iCurrent);
-                } else {
-                    ++iPendingTau;
-                }
-            }
-
-            if (pendingTaus.size() < 2) {
-                printf("Nothing to be done for provider tau %.2u\n", (*iProvider).first->getIndex());
-                continue;
-            }
+            TTauPairSet& pendingTaus = iProvider->second;
+            TTauPairSet::iterator iPendingTau = pendingTaus.begin();
 
             iPendingTau = pendingTaus.begin();
-            TauNode* const remainingTau = *iPendingTau++;
-
             for ( ; iPendingTau != pendingTaus.end(); ++iPendingTau) {
-                TauNode* const redundantTau = *iPendingTau;
-                const TNodeSet& consumers = redundantTau->getConsumers();
+                TauNode* const remainingTau = iPendingTau->first;
+                TauNode* const redundantTau = iPendingTau->second;
 
-//                 printf("Remapping consumers of redundant tau %.2u to remaining tau %.2u\n",
-//                     (*iRedundantTau)->getIndex(), remainingTau->getIndex());
+                if (m_processedTaus.find(remainingTau) != m_processedTaus.end()) {
+                    printf("Tau %.2u was already processed earlier\n", remainingTau->getIndex());
+                    continue;
+                }
+
+                const TNodeSet& consumers = redundantTau->getConsumers();
 
                 // Remap all consumers to the remainingTau
                 TNodeSet::iterator iConsumer = consumers.begin();
@@ -842,6 +831,8 @@ private:
             assert(processedTau->consumers.empty());
             getGraph().eraseNode(processedTau);
         }
+
+        m_processedTaus.clear();
     }
 
     void detectRedundantTau() {
@@ -860,8 +851,6 @@ private:
                 if (! tau1)
                     continue;
 
-//                 printf("Tau1 is %.2u\n", tau1->getIndex());
-
                 TNodeSet::iterator iConsumer2 = iConsumer1;
                 ++iConsumer2;
 
@@ -870,14 +859,11 @@ private:
                     if (!tau2)
                         continue;
 
-//                     printf("Tau2 is %.2u\n", tau2->getIndex());
-
                     if (tau1->getIncomingSet() == tau2->getIncomingSet()) {
                         printf("Tau %.2u and %.2u may be optimized\n",
                             tau1->getIndex(), tau2->getIndex());
 
-                        m_redundantTaus[*iProvider].insert(tau1);
-                        m_redundantTaus[*iProvider].insert(tau2);
+                        m_redundantTaus[*iProvider].insert(std::make_pair(tau1, tau2));
                     }
                 }
             }
