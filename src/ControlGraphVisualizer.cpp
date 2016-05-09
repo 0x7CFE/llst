@@ -181,22 +181,23 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
         }
     } else if (const st::TauNode* const tau = node.cast<st::TauNode>()) {
 
-        st::TNodeSet::const_iterator iNode = tau->getIncomingSet().begin();
-        for (; iNode != tau->getIncomingSet().end(); ++iNode) {
-//             if ((*iNode)->getNodeType() == st::ControlNode::ntInstruction)
-//                 continue;
-
+        for (st::TauNode::TIncomingMap::const_iterator iNode = tau->getIncomingMap().begin();
+             iNode != tau->getIncomingMap().end();
+             ++iNode)
+        {
             if (tau->getKind() == st::TauNode::tkProvider) {
-                m_stream << "\t\t" << (*iNode)->getIndex() << " -> " << tau->getIndex() << " ["
+                m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
                     << "weight=15 dir=back labelfloat=true color=\"red\" fontcolor=\"red\" style=\"dashed\" constraint=true ];\n";
             } else {
-                m_stream << "\t\t" << (*iNode)->getIndex() << " -> " << tau->getIndex() << " ["
-                    << "weight=5 dir=back labelfloat=true color=\"grey\" fontcolor=\"green\" style=\"dashed\" constraint=true ];\n";
+                const bool byBackEdge = iNode->second;
+                m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
+                    << "weight=5 dir=back labelfloat=true color=\""
+                    << (byBackEdge ? "blue" : "grey")
+                    <<  "\" fontcolor=\"green\" style=\"dotted\" constraint=true ];\n";
             }
         }
 
-        iNode = tau->getConsumers().begin();
-        for (; iNode != tau->getConsumers().end(); ++iNode) {
+        for (st::TNodeSet::iterator iNode = tau->getConsumers().begin(); iNode != tau->getConsumers().end(); ++iNode) {
             if ((*iNode)->getNodeType() == st::ControlNode::ntTau)
                 continue;
 

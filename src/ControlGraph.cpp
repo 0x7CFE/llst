@@ -717,29 +717,8 @@ private:
                     m_pendingNodes.insert(instruction);
                     break;
 
-//                 case opcode::pushConstant:
-//                 case opcode::pushLiteral:
                 case opcode::assignTemporary:
                     createType(*instruction);
-                    break;
-
-//                 case opcode::pushArgument:
-//                 case opcode::sendUnary:
-//                 case opcode::sendBinary:
-//                 case opcode::sendMessage:
-//                     createType(*instruction);
-//                     break;
-
-                case opcode::doSpecial:
-                    switch (instruction->getInstruction().getArgument()) {
-//                         case special::duplicate:
-//                             inheritType();
-//                             break;
-
-                        case special::sendToSuper:
-                            createType(*instruction);
-                            break;
-                    }
                     break;
 
                 default:
@@ -776,6 +755,14 @@ private:
     typedef std::set<TauNode*, NodeIndexCompare> TTauSet;
     TTauSet m_processedTaus;
 
+    struct TAssignSite {
+        InstructionNode* instruction;
+        bool             byBackEdge;
+
+        TAssignSite(InstructionNode* instruction, bool byBackEdge)
+            : instruction(instruction), byBackEdge(byBackEdge) {}
+    };
+    typedef std::vector<TAssignSite> TAssignSiteList;
 
 private:
     void optimizeTau() {
@@ -819,13 +806,13 @@ private:
                 }
 
                 // Remove all incomings of the redundantTau
-                TNodeSet::iterator iIncoming = redundantTau->getIncomingSet().begin();
-                for ( ; iIncoming != redundantTau->getIncomingSet().end(); ++iIncoming) {
+                TauNode::TIncomingMap::const_iterator iIncoming = redundantTau->getIncomingMap().begin();
+                for ( ; iIncoming != redundantTau->getIncomingMap().end(); ++iIncoming) {
                     printf("Redundant tau %.2u is no longer consumer of %.2u\n",
                         redundantTau->getIndex(),
-                        (*iIncoming)->getIndex());
+                        iIncoming->first->getIndex());
 
-                    (*iIncoming)->removeConsumer(redundantTau);
+                    iIncoming->first->removeConsumer(redundantTau);
                 }
 
                 // Marking tau as processed
@@ -873,7 +860,7 @@ private:
                     if (!tau2)
                         continue;
 
-                    if (tau1->getIncomingSet() == tau2->getIncomingSet()) {
+                    if (tau1->getIncomingMap() == tau2->getIncomingMap()) {
                         printf("Tau %.2u and %.2u may be optimized\n",
                             tau1->getIndex(), tau2->getIndex());
 
@@ -903,15 +890,18 @@ private:
         AssignLocator locator(instruction.getInstruction().getArgument(), getBackEdges());
         locator.run(&instruction, GraphWalker::wdBackward);
 
-        TInstructionSet::const_iterator iNode = locator.assignSites.begin();
-        for (; iNode != locator.assignSites.end(); ++iNode) {
-            InstructionNode* const assignTemporary = (*iNode)->cast<InstructionNode>();
+        TAssignSiteList::const_iterator iAssignSite = locator.assignSites.begin();
+        for (; iAssignSite != locator.assignSites.end(); ++iAssignSite) {
+            InstructionNode* const assignTemporary = (*iAssignSite).instruction->cast<InstructionNode>();
             assert(assignTemporary);
 
             TauNode* const assignType = assignTemporary->getTauNode();
             assert(inheritedType);
 
             if (! instruction.getTauNode()) {
+                // FIXME Could it be that the only incoming is accessible by back edge?
+                //       Possbible scenario: push default nil, assigned later, branch up
+
                 assignType->addConsumer(&instruction);
                 instruction.setTauNode(assignType);
 
@@ -919,7 +909,7 @@ private:
                             assignType->getIndex(),
                             instruction.getIndex(),
                             assignTemporary->getIndex(),
-                            "?"
+                            (*iAssignSite).byBackEdge ? "below" : "above"
                            );
 
             } else {
@@ -931,7 +921,7 @@ private:
                     TauNode* const aggregator = getGraph().newNode<TauNode>();
                     aggregator->setKind(TauNode::tkAggregator);
                     aggregator->addIncoming(current);
-                    aggregator->addIncoming(assignType);
+                    aggregator->addIncoming(assignType, (*iAssignSite).byBackEdge);
 
                     aggregator->addConsumer(&instruction);
                     instruction.setTauNode(aggregator);
@@ -941,17 +931,17 @@ private:
                                 current->getIndex(),
                                 aggregator->getIndex(),
                                 assignTemporary->getIndex(),
-                                "?"
+                                (*iAssignSite).byBackEdge ? "below" : "above"
                                );
 
                 } else {
-                    current->addIncoming(assignType);
+                    current->addIncoming(assignType, (*iAssignSite).byBackEdge);
 
                     std::printf("Attached to existing tau: Node %.2u --> Tau %.2u, assign site %.2u is %s\n",
                                 instruction.getIndex(),
                                 current->getIndex(),
                                 assignTemporary->getIndex(),
-                                "?"
+                                (*iAssignSite).byBackEdge ? "below" : "above"
                                );
                 }
             }
@@ -988,7 +978,7 @@ private:
                                     instruction->getIndex(),
                                     hasBackEdge ? "yes" : "no");
 
-                        assignSites.insert(instruction);
+                        assignSites.push_back(TAssignSite(instruction, hasBackEdge));
                         return vrSkipPath;
                     }
                 }
@@ -1000,7 +990,7 @@ private:
         const TSmalltalkInstruction::TArgument argument;
         const TEdgeSet& backEdges;
 
-        TInstructionSet assignSites;
+        TAssignSiteList assignSites;
     };
 };
 

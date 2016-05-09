@@ -262,16 +262,19 @@ private:
 // Tau node is reserved for further use in type inference subsystem.
 // It will link variable type transitions across a method.
 class TauNode : public ControlNode {
+
 public:
     TauNode(uint32_t index) : ControlNode(index), m_kind(tkUnknown) { }
     virtual TNodeType getNodeType() const { return ntTau; }
 
-    void addIncoming(ControlNode* node) {
-        m_incomingSet.insert(node);
+    typedef std::map<ControlNode*, bool> TIncomingMap;
+
+    void addIncoming(ControlNode* node, bool byBackEdge = false) {
+        m_incomingMap[node] = byBackEdge;
         node->addConsumer(this);
     }
 
-    const TNodeSet& getIncomingSet() const { return m_incomingSet; }
+    const TIncomingMap& getIncomingMap() const { return m_incomingMap; }
 
     enum TKind {
         tkUnknown,
@@ -283,8 +286,8 @@ public:
     TKind getKind() const { return m_kind; }
 
 private:
-    TNodeSet m_incomingSet;
-    TKind    m_kind;
+    TIncomingMap m_incomingMap;
+    TKind m_kind;
 };
 
 // Domain is a group of nodes within a graph
