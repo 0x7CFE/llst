@@ -1012,7 +1012,7 @@ void ControlGraph::buildGraph()
         BackEdgeDetector detector;
         detector.run(*this);
 
-        BackEdgeDetector::TEdgeList::const_iterator iEdge = detector.getBackEdges().begin();
+        BackEdgeDetector::TEdgeSet::const_iterator iEdge = detector.getBackEdges().begin();
         for (; iEdge != detector.getBackEdges().end(); ++iEdge) {
             const BackEdgeDetector::TEdge& edge = *iEdge;
 

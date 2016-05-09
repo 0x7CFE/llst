@@ -580,7 +580,15 @@ public:
         vrStopWalk
     };
 
-    virtual TVisitResult visitNode(ControlNode* node) = 0;
+    struct TPathNode {
+        const ControlNode* const node;
+        const TPathNode*   const prev;
+
+        TPathNode(const ControlNode* node = 0, const TPathNode* prev = 0)
+            : node(node), prev(prev) {}
+    };
+
+    virtual TVisitResult visitNode(ControlNode& node, const TPathNode* path) = 0;
     virtual void nodesVisited() { }
 
     enum TWalkDirection {
@@ -592,7 +600,12 @@ public:
         assert(startNode);
         m_direction = direction;
 
-        walkIn(startNode);
+        TPathNode path(startNode);
+
+        if (visitNode(*startNode, &path) != vrKeepWalking)
+            return;
+
+        walkIn(startNode, &path);
         nodesVisited();
     }
 
@@ -614,7 +627,7 @@ protected:
     }
 
 private:
-    bool walkIn(ControlNode* currentNode) {
+    bool walkIn(ControlNode* currentNode, const TPathNode* path) {
         m_colorMap[currentNode] = ncGrey;
 
         const TNodeSet& nodes = (m_direction == wdForward) ?
@@ -626,9 +639,11 @@ private:
             if (getNodeColor(node) != ncWhite)
                 continue;
 
-            switch (const TVisitResult result = visitNode(node)) {
+            const TPathNode newPath(node, path);
+
+            switch (const TVisitResult result = visitNode(*node, &newPath)) {
                 case vrKeepWalking:
-                    if (!walkIn(node))
+                    if (!walkIn(node, &newPath))
                         return false;
                     break;
 
@@ -665,11 +680,11 @@ public:
     }
 
 private:
-    virtual TVisitResult visitNode(ControlNode* node) {
+    virtual TVisitResult visitNode(ControlNode& node, const TPathNode*) {
         // Checking if there is a path between
         // start node and any of the destination nodes.
 
-        if (m_destinationNodes.find(node) != m_destinationNodes.end()) {
+        if (m_destinationNodes.find(&node) != m_destinationNodes.end()) {
             m_verified = true;
             return vrStopWalk;
         }
@@ -682,13 +697,13 @@ private:
     bool m_verified;
 };
 
-class BackEdgeDetector {
+class BackEdgeDetector : public GraphWalker {
 public:
     struct TEdge {
-        InstructionNode* from;
-        InstructionNode* to;
+        const InstructionNode* from;
+        const InstructionNode* to;
 
-        TEdge(InstructionNode* from, InstructionNode* to)
+        TEdge(const InstructionNode* from, const InstructionNode* to)
             : from(from), to(to)
         {
             assert(from);
@@ -696,9 +711,22 @@ public:
         }
     };
 
-    typedef std::list<TEdge> TEdgeList;
+    class EdgeCompare {
+    public:
+        bool operator() (const TEdge& a, const TEdge& b) const {
+            if (a.from < b.from)
+                return true;
 
-    const TEdgeList& getBackEdges() const { return m_backEdges; }
+            if (a.from > b.from)
+                return false;
+
+            return a.to < b.to;
+        }
+    };
+
+    typedef std::set<TEdge, EdgeCompare> TEdgeSet;
+
+    const TEdgeSet& getBackEdges() const { return m_backEdges; }
 
     void run(ControlGraph& graph) {
         m_backEdges.clear();
@@ -706,32 +734,24 @@ public:
         if (graph.nodes_begin() == graph.nodes_end())
             return;
 
-        Walker(*this).run(*graph.nodes_begin(), GraphWalker::wdForward);
+        GraphWalker::run(*graph.nodes_begin(), GraphWalker::wdForward);
+    }
+
+protected:
+    virtual TVisitResult visitNode(ControlNode& node, const TPathNode*) {
+        if (BranchNode* const branch = node.cast<BranchNode>()) {
+            InstructionNode* const target = branch->getTargetNode()->cast<InstructionNode>();
+            assert(target);
+
+            if (getNodeColor(target) == ncGrey)
+                m_backEdges.insert(TEdge(branch, target));
+        }
+
+        return vrKeepWalking;
     }
 
 private:
-    class Walker : public GraphWalker {
-    public:
-        Walker(BackEdgeDetector& detector) : detector(detector) {}
-
-        virtual TVisitResult visitNode(ControlNode* node) {
-            if (BranchNode* const branch = node->cast<BranchNode>()) {
-                InstructionNode* const target = branch->getTargetNode()->cast<InstructionNode>();
-                assert(target);
-
-                if (getNodeColor(target) == ncGrey)
-                    detector.m_backEdges.push_back(TEdge(branch, target));
-            }
-
-            return vrKeepWalking;
-        }
-
-    private:
-        BackEdgeDetector& detector;
-    };
-
-private:
-    TEdgeList m_backEdges;
+    TEdgeSet m_backEdges;
 };
 
 } // namespace st

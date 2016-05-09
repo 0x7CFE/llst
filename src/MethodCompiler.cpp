@@ -176,7 +176,10 @@ public:
 
 private:
     Detector& m_detector;
-    virtual TVisitResult visitNode(st::ControlNode* node) { return m_detector.checkNode(node); }
+
+    virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode*) {
+        return m_detector.checkNode(&node);
+    }
 };
 
 bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
@@ -185,8 +188,8 @@ bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
     public:
         GCDetector() : m_detected(false) {}
 
-        virtual TVisitResult visitNode(st::ControlNode* node) {
-            if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
+        virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode*) {
+            if (st::InstructionNode* const candidate = node.cast<st::InstructionNode>()) {
                 if (candidate->getInstruction().mayCauseGC()) {
                     m_detected = true;
                     return st::GraphWalker::vrStopWalk;
