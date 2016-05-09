@@ -691,11 +691,16 @@ private:
     TNodeSet m_nodesToRemove;
 };
 
-class TauLinker : public NodeVisitor {
+class TauLinker : private BackEdgeDetector {
 public:
-    TauLinker(ControlGraph* graph) : NodeVisitor(graph) {}
+    TauLinker(ControlGraph& graph) : m_graph(graph) {}
+
+    void run() { BackEdgeDetector::run(m_graph); }
 
 private:
+    ControlGraph& m_graph;
+    ControlGraph& getGraph() { return m_graph; }
+
     typedef std::set<InstructionNode*, NodeIndexCompare> TInstructionSet;
     TInstructionSet m_pendingNodes;
 
@@ -703,7 +708,9 @@ private:
     TTauList m_providers;
 
 private:
-    virtual bool visitNode(st::ControlNode& node) {
+    virtual st::GraphWalker::TVisitResult visitNode(st::ControlNode& node, const TPathNode* path) {
+        st::BackEdgeDetector::visitNode(node, path);
+
         if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
             switch (instruction->getInstruction().getOpcode()) {
                 case opcode::pushTemporary:
@@ -740,10 +747,17 @@ private:
             }
         }
 
-        return true;
+        return st::GraphWalker::vrKeepWalking;
     }
 
-    virtual void domainsVisited() {
+    virtual void nodesVisited() {
+        // Detected back edges
+        for (TEdgeSet::const_iterator iEdge = getBackEdges().begin(); iEdge != getBackEdges().end(); ++iEdge) {
+            std::printf("Back edge: Node %.2u --> Node %.2u\n",
+                        (*iEdge).from->getIndex(),
+                        (*iEdge).to->getIndex());
+        }
+
         // When all nodes visited, process the pending list
         TInstructionSet::iterator iNode = m_pendingNodes.begin();
         for (; iNode != m_pendingNodes.end(); ++iNode)
@@ -759,7 +773,7 @@ private:
     typedef std::map<TauNode*, TTauPairSet> TRedundantTauMap;
     TRedundantTauMap m_redundantTaus;
 
-    typedef std::set<TauNode*> TTauSet;
+    typedef std::set<TauNode*, NodeIndexCompare> TTauSet;
     TTauSet m_processedTaus;
 
 
@@ -886,33 +900,27 @@ private:
 
     void processPushTemporary(InstructionNode& instruction) {
         // Searching for all AssignTemporary's that provide a value for current node
-        AssignLocator locator(instruction.getInstruction().getArgument());
+        AssignLocator locator(instruction.getInstruction().getArgument(), getBackEdges());
         locator.run(&instruction, GraphWalker::wdBackward);
 
         TInstructionSet::const_iterator iNode = locator.assignSites.begin();
         for (; iNode != locator.assignSites.end(); ++iNode) {
-//             std::printf("Node %.2u is affected by node %.2u\n",
-//                         instruction.getIndex(), (*iNode)->getIndex());
-
             InstructionNode* const assignTemporary = (*iNode)->cast<InstructionNode>();
             assert(assignTemporary);
 
-            InstructionNode* const argument = assignTemporary->getArgument()->cast<InstructionNode>();
-            if (!argument)
-                continue;
-
-            TauNode* const inheritedType =  assignTemporary->getTauNode(); //argument->getTauNode();
+            TauNode* const assignType = assignTemporary->getTauNode();
             assert(inheritedType);
 
-            // FIXME Inherit type from argument
-
             if (! instruction.getTauNode()) {
-                inheritedType->addConsumer(&instruction);
-                instruction.setTauNode(inheritedType);
+                assignType->addConsumer(&instruction);
+                instruction.setTauNode(assignType);
 
-                std::printf("Inherit type: Tau %.2u <-- %.2u\n",
-                            inheritedType->getIndex(),
-                            instruction.getIndex());
+                std::printf("Inherit type: Tau %.2u <-- %.2u, assign site %.2u is %s\n",
+                            assignType->getIndex(),
+                            instruction.getIndex(),
+                            assignTemporary->getIndex(),
+                            "?"
+                           );
 
             } else {
                 TauNode* const current = instruction.getTauNode();
@@ -923,39 +931,63 @@ private:
                     TauNode* const aggregator = getGraph().newNode<TauNode>();
                     aggregator->setKind(TauNode::tkAggregator);
                     aggregator->addIncoming(current);
-                    aggregator->addIncoming(inheritedType);
+                    aggregator->addIncoming(assignType);
 
                     aggregator->addConsumer(&instruction);
                     instruction.setTauNode(aggregator);
 
-                    std::printf("Remapped tau: Node %.2u --> Tau %.2u to Tau %.2u\n",
+                    std::printf("Remapped tau: Node %.2u --> Tau %.2u to Tau %.2u, assign site %.2u is %s\n",
                                 instruction.getIndex(),
                                 current->getIndex(),
-                                aggregator->getIndex());
+                                aggregator->getIndex(),
+                                assignTemporary->getIndex(),
+                                "?"
+                               );
 
                 } else {
-                    current->addIncoming(inheritedType);
+                    current->addIncoming(assignType);
 
-                    std::printf("Attached to existing tau: Node %.2u --> Tau %.2u\n",
+                    std::printf("Attached to existing tau: Node %.2u --> Tau %.2u, assign site %.2u is %s\n",
                                 instruction.getIndex(),
-                                current->getIndex());
+                                current->getIndex(),
+                                assignTemporary->getIndex(),
+                                "?"
+                               );
                 }
-
-//                 std::printf("Inherit type: Tau %.2u <-- %.2u\n",
-//                             inheritedType->getIndex(),
-//                             instruction.getIndex());
             }
         }
     }
 
     class AssignLocator : public GraphWalker {
     public:
-        AssignLocator(TSmalltalkInstruction::TArgument argument) : argument(argument) {}
+        AssignLocator(TSmalltalkInstruction::TArgument argument, const TEdgeSet& backEdges)
+            : argument(argument), backEdges(backEdges) {}
 
-        virtual TVisitResult visitNode(st::ControlNode* node) {
-            if (InstructionNode* const instruction = node->cast<InstructionNode>()) {
+        virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode* path) {
+            if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
                 if (instruction->getInstruction().getOpcode() == opcode::assignTemporary) {
                     if (instruction->getInstruction().getArgument() == argument) {
+                        bool hasBackEdge = false;
+
+                        // Searching for back edges in the located path
+                        for (const TPathNode* p = path; p->prev; p = p->prev) {
+                            const TEdgeSet::const_iterator iEdge = backEdges.find(
+                                st::BackEdgeDetector::TEdge(
+                                    static_cast<const st::InstructionNode*>(p->node),
+                                    static_cast<const st::InstructionNode*>(p->prev->node)
+                                )
+                            );
+
+                            if (iEdge != backEdges.end()) {
+                                hasBackEdge = true;
+                                break;
+                            }
+                        }
+
+                        std::printf("Found assign site: Node %.2u, back edge: %s\n",
+                                    instruction->getIndex(),
+                                    hasBackEdge ? "yes" : "no");
+
                         assignSites.insert(instruction);
                         return vrSkipPath;
                     }
@@ -966,6 +998,8 @@ private:
         }
 
         const TSmalltalkInstruction::TArgument argument;
+        const TEdgeSet& backEdges;
+
         TInstructionSet assignSites;
     };
 };
@@ -1004,21 +1038,7 @@ void ControlGraph::buildGraph()
 
     // Linking PushTemporary and AssignTemporary pairs
     {
-        TauLinker linker(this);
+        TauLinker linker(*this);
         linker.run();
-    }
-
-    {
-        BackEdgeDetector detector;
-        detector.run(*this);
-
-        BackEdgeDetector::TEdgeSet::const_iterator iEdge = detector.getBackEdges().begin();
-        for (; iEdge != detector.getBackEdges().end(); ++iEdge) {
-            const BackEdgeDetector::TEdge& edge = *iEdge;
-
-            std::printf("Back edge %u.%.2u -> %u.%.2u\n",
-                        edge.from->getDomain()->getBasicBlock()->getOffset(), edge.from->getIndex(),
-                        edge.to->getDomain()->getBasicBlock()->getOffset(), edge.to->getIndex());
-        }
     }
 }
