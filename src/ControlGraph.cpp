@@ -366,8 +366,11 @@ void GraphLinker::processBranching()
 void GraphLinker::processArgumentRequests()
 {
     const ControlDomain::TRequestList& requestList = m_currentDomain->getRequestedArguments();
-    for (std::size_t index = 0; index < requestList.size(); index++)
-        processRequest(m_currentDomain, index, requestList[index]);
+    for (std::size_t index = 0, argIndex = 0; index < requestList.size(); index++) {
+        processRequest(m_currentDomain, argIndex, requestList[index]);
+        if (!requestList[index].keep)
+            argIndex++;
+    }
 }
 
 void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request)
@@ -431,6 +434,7 @@ ControlNode* GraphLinker::optimizePhi(PhiNode* phi)
 
     // This is the real value that should be returned
     ControlNode* const value = *incomingValues.begin();
+    assert(value);
 
     // Unlink and erase phi
     value->removeConsumer(phi);

@@ -334,13 +334,17 @@ public:
                 argument->addEdge(forNode);
 
         } else {
-            m_reqestedArguments.push_back((TArgumentRequest){index, forNode});
+            m_reqestedArguments.push_back(TArgumentRequest(index, forNode, keep));
         }
     }
 
     struct TArgumentRequest {
         std::size_t index;
         InstructionNode* requestingNode;
+        bool keep;
+
+        TArgumentRequest(std::size_t index, InstructionNode* requestingNode, bool keep)
+            : index(index), requestingNode(requestingNode), keep(keep) {}
     };
     typedef std::vector<TArgumentRequest> TRequestList;
 
