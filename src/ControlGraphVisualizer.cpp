@@ -74,17 +74,10 @@ bool ControlGraphVisualizer::visitDomain(st::ControlDomain& /*domain*/) {
 }
 
 std::string edgeStyle(st::ControlNode* from, st::ControlNode* to) {
-//     const st::InstructionNode* const fromInstruction = from->cast<st::InstructionNode>();
     const st::InstructionNode* const toInstruction   = to->cast<st::InstructionNode>();
 
     if (from->getNodeType() == st::ControlNode::ntPhi && to->getNodeType() == st::ControlNode::ntPhi)
         return "[style=invis color=red constraint=false]";
-
-//     if (from->getNodeType() == st::ControlNode::ntTau && to->getNodeType() == st::ControlNode::ntTau)
-//         return "[style=invis color=red constraint=false]";
-
-//     if (fromInstruction && fromInstruction->getInstruction().isBranch())
-//         return "[color=\"grey\" style=\"dashed\"]";
 
     if (toInstruction && toInstruction->getArgumentsCount() == 0)
         return "[weight=100 color=\"black\" style=\"dashed\" ]";
@@ -99,7 +92,7 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
     // Processing incoming edges
     st::TNodeSet::iterator iEdge = inEdges.begin();
     for (; iEdge != inEdges.end(); ++iEdge) {
-        if (isNodeProcessed(*iEdge))
+        if (isNodeProcessed(*iEdge) || (*iEdge)->getNodeType() == st::ControlNode::ntPhi)
             continue;
 
         if (const st::InstructionNode* const instruction = (*iEdge)->cast<st::InstructionNode>()) {
@@ -123,47 +116,22 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
                 m_stream << "label=" << index;
 
             m_stream << "dir=back weight=8 labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"dashed\" constraint=true];\n";
-
-
-            /*if (const st::InstructionNode* const instructionArg = instruction->getArgument(index)->cast<st::InstructionNode>()) {
-                if (const st::TauNode* const argumentTau = instructionArg->getTauNode()) {
-                    m_stream << "\t\t" << argumentTau->getIndex() << " -> " << instructionArg->getIndex() << " ["
-                        << "labelfloat=true color=\"green\" fontcolor=\"green\" style=\"dashed\" "
-                        << "constraint=false ];\n";
-                }
-            }*/
-
         }
 
         if (const st::BranchNode* const branch = node.cast<st::BranchNode>()) {
-            m_stream << "\t\t" << node.getIndex() << " -> " << branch->getTargetNode()->getIndex() << " [";
-            m_stream << "weight=20 label=target labelfloat=true color=\"grey\" style=\"dashed\"];\n";
+            m_stream
+                << "\t\t" << node.getIndex() << " -> " << branch->getTargetNode()->getIndex() << " ["
+                << (branch->getSkipNode() ? " label=target " : "")
+                << "weight=20 labelfloat=true color=\"grey\" fontcolor=\"grey\" style=\"dashed\"];\n";
 
             if (branch->getSkipNode()) {
-                m_stream << "\t\t" << node.getIndex() << " -> " << branch->getSkipNode()->getIndex() << " [";
-                m_stream << "weight=20 label=skip labelfloat=true color=\"grey\" style=\"dashed\"];\n";
+                m_stream
+                    << "\t\t" << node.getIndex() << " -> " << branch->getSkipNode()->getIndex() << " ["
+                    << "weight=20 label=skip labelfloat=true color=\"grey\" fontcolor=\"grey\" style=\"dashed\"];\n";
             }
 
             outEdgesProcessed = true;
         }
-
-        /*if (const st::TauNode* const tau = instruction->getTauNode()) {
-            const char* constraint = tau->getIncomingSet().size() == 1 ? "true" : "false";
-
-            m_stream << "\t\t" << instruction->getIndex() << " -> " << tau->getIndex() << " ["
-                << "labelfloat=true color=\"green\" fontcolor=\"green\" style=\"dashed\" "
-                << "constraint=" << constraint << " ];\n";
-        }*/
-
-        /*st::TNodeSet::const_iterator iNode = instruction->getConsumers().begin();
-        for (; iNode != instruction->getConsumers().end(); ++iNode) {
-            if ((*iNode)->getNodeType() != st::ControlNode::ntTau)
-                continue;
-
-            m_stream << "\t\t" << (*iNode)->getIndex() << " -> " << tau->getIndex() << " ["
-                << "labelfloat=true color=\"green\" fontcolor=\"green\" style=\"dashed\" constraint=false ];\n";
-        }*/
-
     } else if (const st::PhiNode* const phi = node.cast<st::PhiNode>()) {
 
         m_stream << "\t\t" << phi->getIndex() << " -> " << phi->getDomain()->getEntryPoint()->getIndex()  << " ["
