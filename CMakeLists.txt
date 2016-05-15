@@ -90,6 +90,7 @@ add_library(stapi
 
     src/ControlGraph.cpp
     src/ControlGraphVisualizer.cpp
+    src/TypeAnalyzer.cpp
 )
 
 set(MM_CPP_FILES
