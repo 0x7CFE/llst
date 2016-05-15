@@ -235,6 +235,7 @@ struct TSymbol : public TByteObject {
 // Strings are binary objects that hold raw character bytes.
 struct TString : public TByteObject {
     static const char* InstanceClassName() { return "String"; }
+    std::string toString() const { return std::string(reinterpret_cast<const char*>(bytes), getSize()); }
 };
 
 // Chars are intermediate representation of single printable character

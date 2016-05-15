@@ -2,6 +2,51 @@
 
 using namespace type;
 
+std::string Type::toString() const {
+    std::stringstream stream;
+
+    switch (m_kind) {
+        case tkUndefined: return "?";
+        case tkPolytype:  return "*";
+
+        case tkLiteral:
+            if (isSmallInteger(getValue()))
+                stream << TInteger(getValue()).getValue();
+            else if (getValue() == globals.nilObject)
+                return "nil";
+            else if (getValue() == globals.trueObject)
+                return "true";
+            else if (getValue() == globals.falseObject)
+                return "false";
+            else if (getValue()->getClass() == globals.stringClass)
+                stream << "'" << getValue()->cast<TString>()->toString() << "'";
+            else if (getValue()->getClass() == globals.badMethodSymbol->getClass())
+                stream << "'" << getValue()->cast<TSymbol>()->toString() << "'";
+            break;
+
+        case tkMonotype:
+            stream << "(" << getValue()->cast<TClass>()->name->toString() << ")";
+            break;
+
+        case tkArray:
+            stream << getValue()->cast<TClass>()->name->toString();
+        case tkComposite: {
+            stream << (m_kind == tkComposite ? "(" : "[");
+
+            for (std::size_t index = 0; index < getSubTypes().size(); index++) {
+                if (index)
+                    stream << ", ";
+
+                stream << m_subTypes[index].toString();
+            }
+
+            stream << (m_kind == tkComposite ? ")" : "]");
+        };
+    }
+
+    return stream.str();
+}
+
 void TypeAnalyzer::processInstruction(const InstructionNode& instruction) {
     const TSmalltalkInstruction::TArgument argument = instruction.getInstruction().getArgument();
 
