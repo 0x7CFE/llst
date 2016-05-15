@@ -248,7 +248,7 @@ public:
     }
 
     const TIncomingList& getIncomingList() const { return m_incomingList; }
-    TNodeSet getRealValues();
+    TNodeSet getRealValues() const;
 
     llvm::PHINode* getPhiValue() const { return m_phiValue; }
     void setPhiValue(llvm::PHINode* value) { m_phiValue = value; }
@@ -388,6 +388,7 @@ public:
     typedef TNodeList::iterator nodes_iterator;
     nodes_iterator nodes_begin() { return m_nodes.begin(); }
     nodes_iterator nodes_end() { return m_nodes.end(); }
+    bool isEmpty() const { return m_nodes.begin() == m_nodes.end(); }
 
     ControlNode* newNode(ControlNode::TNodeType type) {
         assert(type == ControlNode::ntInstruction

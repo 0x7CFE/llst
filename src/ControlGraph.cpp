@@ -63,7 +63,7 @@ template<> BranchNode* ControlGraph::newNode<BranchNode>() {
     return static_cast<BranchNode*>(node);
 }
 
-TNodeSet PhiNode::getRealValues() {
+TNodeSet PhiNode::getRealValues() const {
     TNodeSet values;
 
     for (std::size_t i = 0; i < m_incomingList.size(); i++) {
