@@ -90,8 +90,8 @@ public:
     Type& getReturnType() { return m_returnType; }
 
     Type& getInstructionType(std::size_t index) { return m_instructions[index]; }
+    Type& operator[] (std::size_t index) { return m_instructions[index]; }
     Type& operator[] (const ControlNode& node) { return getInstructionType(node.getIndex()); }
-
 
 private:
     const std::size_t m_index;
