@@ -21,7 +21,11 @@ std::string Type::toString() const {
             else if (getValue()->getClass() == globals.stringClass)
                 stream << "'" << getValue()->cast<TString>()->toString() << "'";
             else if (getValue()->getClass() == globals.badMethodSymbol->getClass())
-                stream << "'" << getValue()->cast<TSymbol>()->toString() << "'";
+                stream << "#" << getValue()->cast<TSymbol>()->toString();
+            else if (getValue()->getClass()->name->toString().find("Meta", 0, 4) != std::string::npos)
+                stream << getValue()->cast<TClass>()->name->toString();
+            else
+                stream << "~" << getValue()->getClass()->name->toString();
             break;
 
         case tkMonotype:
@@ -48,6 +52,8 @@ std::string Type::toString() const {
 }
 
 void TypeAnalyzer::processInstruction(const InstructionNode& instruction) {
+    std::printf("processing %.2u\n", instruction.getIndex());
+
     const TSmalltalkInstruction::TArgument argument = instruction.getInstruction().getArgument();
 
     switch (instruction.getInstruction().getOpcode()) {
@@ -59,12 +65,60 @@ void TypeAnalyzer::processInstruction(const InstructionNode& instruction) {
         case opcode::pushLiteral:   doPushLiteral(instruction);   break;
         case opcode::markArguments: doMarkArguments(instruction); break;
 
+        case opcode::sendUnary:     doSendUnary(instruction);     break;
         case opcode::sendBinary:    doSendBinary(instruction);    break;
+
+        case opcode::assignTemporary:
+            m_context[instruction.getTauNode()->getIndex()] = m_context[*instruction.getArgument()];
+            break;
 
         case opcode::sendMessage:
             // For now, treat method call as *
             m_context[instruction] = Type(Type::tkPolytype);
             break;
+
+        case opcode::doPrimitive:
+            m_context.getReturnType().addSubType(Type(Type::tkPolytype));
+            break;
+
+        case opcode::doSpecial: {
+            switch (argument) {
+                case special::branchIfFalse:
+                case special::branchIfTrue: {
+                    const bool branchIfTrue = (argument == special::branchIfTrue);
+
+                    const Type& argType = m_context[*instruction.getArgument()];
+                    const BranchNode* const branch = instruction.cast<BranchNode>();
+
+                    if (argType.getValue() == globals.trueObject || argType.getValue() == globals.trueObject->getClass())
+                        m_walker.addStopNode(branchIfTrue ? branch->getSkipNode() : branch->getTargetNode());
+                    else if (argType.getValue() == globals.falseObject || argType.getValue() == globals.falseObject->getClass())
+                        m_walker.addStopNode(branchIfTrue ? branch->getTargetNode() : branch->getSkipNode());
+
+                    break;
+                }
+
+                case special::stackReturn:
+                    m_context.getReturnType().addSubType(m_context[*instruction.getArgument()]);
+                    break;
+
+                case special::selfReturn:
+                    m_context.getReturnType().addSubType(m_context.getArgument(0));
+                    break;
+
+                case special::sendToSuper:
+                    // For now, treat method call as *
+                    m_context[instruction] = Type(Type::tkPolytype);
+                    break;
+
+                case special::duplicate:
+                    m_context[instruction] = m_context[*instruction.getArgument()];
+                    break;
+            }
+
+            break;
+        }
+
 
         default:
             break;
@@ -130,7 +184,7 @@ void TypeAnalyzer::doSendUnary(const InstructionNode& instruction) {
         default:
             // * isNil  = (Boolean)
             // * notNil = (Boolean)
-            result.set(globals.trueObject->getClass()->getClass());
+            result.set(globals.trueObject->getClass()->parentClass);
     }
 
 }
@@ -142,7 +196,7 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
 
     Type& result = m_context[instruction];
 
-    if (isSmallInteger(type1.getValue()) && isSmallInteger(type1.getValue())) {
+    if (isSmallInteger(type1.getValue()) && isSmallInteger(type2.getValue())) {
         const int32_t rightOperand = TInteger(type2.getValue());
         const int32_t leftOperand  = TInteger(type1.getValue());
 
@@ -175,7 +229,7 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
             case binaryBuiltIns::operatorLess:
             case binaryBuiltIns::operatorLessOrEq:
                 // (SmallInt) <= (SmallInt) = (Boolean)
-                result.set(globals.trueObject->getClass()->getClass());
+                result.set(globals.trueObject->getClass()->parentClass);
                 break;
 
             case binaryBuiltIns::operatorPlus:
@@ -197,16 +251,12 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
 }
 
 void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
-    const Type& argsType = m_context[*instruction.getArgument()];
     Type& result = m_context[instruction];
 
-    if (argsType.getKind() == Type::tkUndefined || argsType.getKind() == Type::tkPolytype) {
-        result.set(globals.arrayClass);
-        return;
+    for (std::size_t index = 0; index < instruction.getArgumentsCount(); index++) {
+        const Type& argsType = m_context[*instruction.getArgument(index)];
+        result.addSubType(argsType);
     }
-
-    for (std::size_t index = 0; index < argsType.getSubTypes().size(); index++)
-        result.addSubType(argsType[index]);
 
     result.set(globals.arrayClass, Type::tkArray);
 }
@@ -228,5 +278,5 @@ void TypeAnalyzer::processTau(const TauNode& tau) {
 }
 
 void TypeAnalyzer::walkComplete() {
-
+    std::printf("walk complete\n");
 }

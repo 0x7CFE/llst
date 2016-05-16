@@ -30,8 +30,8 @@ public:
     std::string toString() const;
 
     Type(TKind kind = tkUndefined) : m_kind(kind), m_value(0) {}
-    Type(TObject* literal) { set(literal); }
-    Type(TClass* klass) { set(klass); }
+    Type(TObject* literal, TKind kind = tkLiteral) { set(literal, kind); }
+    Type(TClass* klass, TKind kind = tkMonotype) { set(klass, kind); }
 
     void setKind(TKind kind) { m_kind = kind; }
     TKind getKind() const { return m_kind; }
@@ -65,15 +65,13 @@ private:
     TSubTypes m_subTypes;
 };
 
-typedef std::vector<Type> TTypeList;
+typedef std::size_t TNodeIndex;
+typedef std::map<TNodeIndex, Type> TTypeList;
 
 class CallContext {
 public:
-    CallContext(std::size_t index, const Type& arguments, std::size_t nodeCount)
-        : m_index(index), m_arguments(arguments)
-    {
-        m_instructions.resize(nodeCount);
-    }
+    CallContext(std::size_t index, const Type& arguments)
+        : m_index(index), m_arguments(arguments) {}
 
     std::size_t getIndex() const { return m_index; }
 
@@ -86,11 +84,12 @@ public:
             return polytype;
     }
     const Type& getArguments() const { return m_arguments; }
+    const TTypeList& getTypeList() const { return m_instructions; }
 
     Type& getReturnType() { return m_returnType; }
 
-    Type& getInstructionType(std::size_t index) { return m_instructions[index]; }
-    Type& operator[] (std::size_t index) { return m_instructions[index]; }
+    Type& getInstructionType(TNodeIndex index) { return m_instructions[index]; }
+    Type& operator[] (TNodeIndex index) { return m_instructions[index]; }
     Type& operator[] (const ControlNode& node) { return getInstructionType(node.getIndex()); }
 
 private:
@@ -110,19 +109,14 @@ public:
 class TypeAnalyzer {
 public:
     TypeAnalyzer(ControlGraph& graph, CallContext& context)
-        : m_graph(graph), m_context(context) {}
+        : m_graph(graph), m_context(context), m_walker(*this) {}
 
     void run() {
         if (m_graph.isEmpty())
             return;
 
-        Walker walker(*this);
-        walker.run(*m_graph.nodes_begin(), Walker::wdForward);
+        m_walker.run(*m_graph.nodes_begin(), Walker::wdForward);
     }
-
-private:
-    ControlGraph& m_graph;
-    CallContext&  m_context;
 
 private:
     void processInstruction(const InstructionNode& instruction);
@@ -169,6 +163,10 @@ private:
         TypeAnalyzer& analyzer;
     };
 
+private:
+    ControlGraph& m_graph;
+    CallContext&  m_context;
+    Walker        m_walker;
 };
 
 } // namespace type
