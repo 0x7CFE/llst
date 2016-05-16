@@ -105,6 +105,7 @@ public:
     // Dynamically cast node to a specified type.
     // If type does not match null is returned.
     template<class T> T* cast();
+    template<class T> const T* cast() const;
 
     uint32_t getIndex() const { return m_index; }
 
@@ -484,6 +485,7 @@ template<> PushBlockNode* ControlNode::cast<PushBlockNode>();
 template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>();
 
 template<> BranchNode* ControlNode::cast<BranchNode>();
+template<> const BranchNode* ControlNode::cast<BranchNode>() const;
 template<> BranchNode* ControlGraph::newNode<BranchNode>();
 
 class DomainVisitor {

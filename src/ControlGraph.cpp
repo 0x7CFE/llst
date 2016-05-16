@@ -57,6 +57,10 @@ template<> BranchNode* ControlNode::cast<BranchNode>() {
     return 0;
 }
 
+template<> const BranchNode* ControlNode::cast<BranchNode>() const {
+    return const_cast<ControlNode*>(this)->cast<BranchNode>();
+}
+
 template<> BranchNode* ControlGraph::newNode<BranchNode>() {
     BranchNode* const node = new BranchNode(m_lastNodeIndex++);
     m_nodes.push_back(node);
