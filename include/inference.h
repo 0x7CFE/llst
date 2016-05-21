@@ -252,22 +252,35 @@ private:
 
 class TypeSystem {
 public:
-    CallContext* newCallContext(TMethod* method, const Type& arguments = Type(Type::tkPolytype));
+    TypeSystem(SmalltalkVM& vm) : m_vm(vm), m_lastContextIndex(0) {}
 
-    CallContext* getCallContext(std::size_t index);
+    typedef TSymbol* TSelector;
+    CallContext* findCallContext(TSelector selector, const Type& arguments);
+
+    CallContext* analyzeCall(TSelector selector, const Type& arguments);
+    ControlGraph* getControlGraph(TMethod* method);
+
+private:
+    typedef std::pair<ParsedBytecode*, ControlGraph*> TGraphEntry;
+    typedef std::map<TMethod*, TGraphEntry> TGraphCache;
+
+    typedef std::map<Type, CallContext*> TContextMap;
+    typedef std::map<TSelector, TContextMap> TContextCache;
+
+private:
+    SmalltalkVM&  m_vm; // TODO Image must be enough
+
+    TGraphCache   m_graphCache;
+    TContextCache m_contextCache;
+    std::size_t   m_lastContextIndex;
 };
 
 class TypeAnalyzer {
 public:
-    TypeAnalyzer(ControlGraph& graph, CallContext& context)
-        : m_graph(graph), m_context(context), m_walker(*this) {}
+    TypeAnalyzer(TypeSystem& system, ControlGraph& graph, CallContext& context)
+        : m_system(system), m_graph(graph), m_context(context), m_walker(*this) {}
 
-    void run() {
-        if (m_graph.isEmpty())
-            return;
-
-        m_walker.run(*m_graph.nodes_begin(), Walker::wdForward);
-    }
+    void run();
 
 private:
     void processInstruction(const InstructionNode& instruction);
@@ -275,11 +288,18 @@ private:
     void processTau(const TauNode& tau);
     void walkComplete();
 
-    void doMarkArguments(const InstructionNode& instruction);
     void doPushConstant(const InstructionNode& instruction);
     void doPushLiteral(const InstructionNode& instruction);
+
+    void doPushTemporary(const InstructionNode& instruction);
+    void doAssignTemporary(const InstructionNode& instruction);
+
     void doSendUnary(const InstructionNode& instruction);
     void doSendBinary(const InstructionNode& instruction);
+
+    void doMarkArguments(const InstructionNode& instruction);
+    void doSendMessage(const InstructionNode& instruction);
+    void doPrimitive(const InstructionNode& instruction);
 
 private:
 
@@ -315,9 +335,13 @@ private:
     };
 
 private:
+    TypeSystem&   m_system;
     ControlGraph& m_graph;
     CallContext&  m_context;
     Walker        m_walker;
+
+    bool m_baseRun;
+    bool m_literalBranch;
 };
 
 } // namespace type
