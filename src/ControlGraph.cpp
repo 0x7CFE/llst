@@ -740,9 +740,12 @@ private:
     virtual void nodesVisited() {
         // Detected back edges
         for (TEdgeSet::const_iterator iEdge = getBackEdges().begin(); iEdge != getBackEdges().end(); ++iEdge) {
-            std::printf("Back edge: Node %.2u --> Node %.2u\n",
-                        (*iEdge).from->getIndex(),
-                        (*iEdge).to->getIndex());
+            if (traces_enabled) {
+                std::printf("Back edge: Node %.2u --> Node %.2u\n",
+                    (*iEdge).from->getIndex(),
+                    (*iEdge).to->getIndex()
+                );
+            }
         }
 
         // When all nodes visited, process the pending list
@@ -781,7 +784,8 @@ private:
     void eraseRedundantTau() {
         TRedundantTauMap::iterator iProvider = m_redundantTaus.begin();
         for (; iProvider != m_redundantTaus.end(); ++iProvider) {
-            printf("Now working on provider tau %.2u\n", (*iProvider).first->getIndex());
+            if (traces_enabled)
+                printf("Now working on provider tau %.2u\n", (*iProvider).first->getIndex());
 
             TTauPairSet& pendingTaus = iProvider->second;
             TTauPairSet::iterator iPendingTau = pendingTaus.begin();
@@ -792,7 +796,9 @@ private:
                 TauNode* const redundantTau = iPendingTau->second;
 
                 if (m_processedTaus.find(remainingTau) != m_processedTaus.end()) {
-                    printf("Tau %.2u was already processed earlier\n", remainingTau->getIndex());
+                    if (traces_enabled)
+                        printf("Tau %.2u was already processed earlier\n", remainingTau->getIndex());
+
                     continue;
                 }
 
@@ -803,10 +809,12 @@ private:
                 for ( ; iConsumer != consumers.end(); ++iConsumer) {
                     // FIXME Could there be non-instruction nodes?
                     if (InstructionNode* const instruction = (*iConsumer)->cast<InstructionNode>()) {
-                        printf("Remapping consumer %.2u from tau %.2u to remaining tau %.2u\n",
-                            instruction->getIndex(),
-                            redundantTau->getIndex(),
-                            remainingTau->getIndex());
+                        if (traces_enabled) {
+                            printf("Remapping consumer %.2u from tau %.2u to remaining tau %.2u\n",
+                                instruction->getIndex(),
+                                redundantTau->getIndex(),
+                                remainingTau->getIndex());
+                        }
 
                         instruction->setTauNode(remainingTau);
                         remainingTau->addConsumer(instruction);
@@ -816,16 +824,21 @@ private:
                 // Remove all incomings of the redundantTau
                 TauNode::TIncomingMap::const_iterator iIncoming = redundantTau->getIncomingMap().begin();
                 for ( ; iIncoming != redundantTau->getIncomingMap().end(); ++iIncoming) {
-                    printf("Redundant tau %.2u is no longer consumer of %.2u\n",
-                        redundantTau->getIndex(),
-                        iIncoming->first->getIndex());
+
+                    if (traces_enabled) {
+                        printf("Redundant tau %.2u is no longer consumer of %.2u\n",
+                            redundantTau->getIndex(),
+                            iIncoming->first->getIndex());
+                    }
 
                     iIncoming->first->removeConsumer(redundantTau);
                 }
 
                 // Marking tau as processed
                 m_processedTaus.insert(redundantTau);
-                printf("Marking redundant tau %.2u as processed\n", redundantTau->getIndex());
+
+                if (traces_enabled)
+                    printf("Marking redundant tau %.2u as processed\n", redundantTau->getIndex());
             }
         }
 
@@ -836,7 +849,9 @@ private:
         for (; iProcessedTau != m_processedTaus.end(); ++iProcessedTau) {
             TauNode* const processedTau = *iProcessedTau;
 
-            printf("Erasing processed tau %.2u\n", processedTau->getIndex());
+            if (traces_enabled)
+                printf("Erasing processed tau %.2u\n", processedTau->getIndex());
+
             assert(processedTau->consumers.empty());
             getGraph().eraseNode(processedTau);
         }
@@ -851,8 +866,8 @@ private:
             if (consumers.size() < 2)
                 continue;
 
-            printf("Looking for consumers of Tau %.2u (total %zu)\n",
-                (*iProvider)->getIndex(), consumers.size());
+            if (traces_enabled)
+                printf("Looking for consumers of Tau %.2u (total %zu)\n", (*iProvider)->getIndex(), consumers.size());
 
             TNodeSet::iterator iConsumer1 = consumers.begin();
             for ( ; iConsumer1 != consumers.end(); ++iConsumer1) {
@@ -869,8 +884,8 @@ private:
                         continue;
 
                     if (tau1->getIncomingMap() == tau2->getIncomingMap()) {
-                        printf("Tau %.2u and %.2u may be optimized\n",
-                            tau1->getIndex(), tau2->getIndex());
+                        if (traces_enabled)
+                            printf("Tau %.2u and %.2u may be optimized\n", tau1->getIndex(), tau2->getIndex());
 
                         m_redundantTaus[*iProvider].insert(std::make_pair(tau1, tau2));
                     }
@@ -887,10 +902,13 @@ private:
 
         m_providers.push_back(tau);
 
-        std::printf("New type: Node %u.%.2u --> Tau %.2u\n",
-                    instruction.getDomain()->getBasicBlock()->getOffset(),
-                    instruction.getIndex(),
-                    tau->getIndex());
+        if (traces_enabled) {
+            std::printf("New type: Node %u.%.2u --> Tau %.2u\n",
+                instruction.getDomain()->getBasicBlock()->getOffset(),
+                instruction.getIndex(),
+                tau->getIndex()
+            );
+        }
     }
 
     void processPushTemporary(InstructionNode& instruction) {
@@ -913,12 +931,14 @@ private:
                 assignType->addConsumer(&instruction);
                 instruction.setTauNode(assignType);
 
-                std::printf("Inherit type: Tau %.2u <-- %.2u, assign site %.2u is %s\n",
-                            assignType->getIndex(),
-                            instruction.getIndex(),
-                            assignTemporary->getIndex(),
-                            (*iAssignSite).byBackEdge ? "below" : "above"
-                           );
+                if (traces_enabled) {
+                    std::printf("Inherit type: Tau %.2u <-- %.2u, assign site %.2u is %s\n",
+                        assignType->getIndex(),
+                        instruction.getIndex(),
+                        assignTemporary->getIndex(),
+                        (*iAssignSite).byBackEdge ? "below" : "above"
+                    );
+                }
 
             } else {
                 TauNode* const current = instruction.getTauNode();
@@ -934,23 +954,27 @@ private:
                     aggregator->addConsumer(&instruction);
                     instruction.setTauNode(aggregator);
 
-                    std::printf("Remapped tau: Node %.2u --> Tau %.2u to Tau %.2u, assign site %.2u is %s\n",
-                                instruction.getIndex(),
-                                current->getIndex(),
-                                aggregator->getIndex(),
-                                assignTemporary->getIndex(),
-                                (*iAssignSite).byBackEdge ? "below" : "above"
-                               );
+                    if (traces_enabled) {
+                        std::printf("Remapped tau: Node %.2u --> Tau %.2u to Tau %.2u, assign site %.2u is %s\n",
+                            instruction.getIndex(),
+                            current->getIndex(),
+                            aggregator->getIndex(),
+                            assignTemporary->getIndex(),
+                            (*iAssignSite).byBackEdge ? "below" : "above"
+                        );
+                    }
 
                 } else {
                     current->addIncoming(assignType, (*iAssignSite).byBackEdge);
 
-                    std::printf("Attached to existing tau: Node %.2u --> Tau %.2u, assign site %.2u is %s\n",
-                                instruction.getIndex(),
-                                current->getIndex(),
-                                assignTemporary->getIndex(),
-                                (*iAssignSite).byBackEdge ? "below" : "above"
-                               );
+                    if (traces_enabled) {
+                        std::printf("Attached to existing tau: Node %.2u --> Tau %.2u, assign site %.2u is %s\n",
+                            instruction.getIndex(),
+                            current->getIndex(),
+                            assignTemporary->getIndex(),
+                            (*iAssignSite).byBackEdge ? "below" : "above"
+                        );
+                    }
                 }
             }
         }
@@ -982,9 +1006,10 @@ private:
                             }
                         }
 
-                        std::printf("Found assign site: Node %.2u, back edge: %s\n",
-                                    instruction->getIndex(),
-                                    hasBackEdge ? "yes" : "no");
+                        if (traces_enabled)
+                            std::printf("Found assign site: Node %.2u, back edge: %s\n",
+                                        instruction->getIndex(),
+                                        hasBackEdge ? "yes" : "no");
 
                         assignSites.push_back(TAssignSite(instruction, hasBackEdge));
                         return vrSkipPath;
@@ -1033,6 +1058,9 @@ void ControlGraph::buildGraph()
         GraphOptimizer optimizer(this);
         optimizer.run();
     }
+
+    if (traces_enabled)
+        std::printf("Phase 4. Linking PushTemporary and AssignTemporary nodes\n");
 
     // Linking PushTemporary and AssignTemporary pairs
     {
