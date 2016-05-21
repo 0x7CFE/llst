@@ -2,7 +2,7 @@
 
 using namespace type;
 
-std::string Type::toString() const {
+std::string Type::toString(bool subtypesOnly /*= false*/) const {
     std::stringstream stream;
 
     switch (m_kind) {
@@ -33,7 +33,8 @@ std::string Type::toString() const {
             break;
 
         case tkArray:
-            stream << getValue()->cast<TClass>()->name->toString();
+            if (subtypesOnly)
+                stream << getValue()->cast<TClass>()->name->toString();
         case tkComposite: {
             stream << (m_kind == tkComposite ? "(" : "[");
 
