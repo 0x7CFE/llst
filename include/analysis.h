@@ -461,6 +461,13 @@ public:
         return iDomain->second;
     }
 
+    struct TMetaInfo {
+        bool hasLoops;
+        bool hasBackEdgeTau;
+    };
+
+    TMetaInfo& getMeta() { return m_metaInfo; }
+
 private:
     ParsedMethod* m_parsedMethod;
     ParsedBlock*  m_parsedBlock;
@@ -471,6 +478,8 @@ private:
 
     typedef std::map<BasicBlock*, ControlDomain*> TDomainMap;
     TDomainMap    m_blocksToDomains;
+
+    TMetaInfo     m_metaInfo;
 };
 
 template<> InstructionNode* ControlNode::cast<InstructionNode>();

@@ -748,6 +748,8 @@ private:
             }
         }
 
+        getGraph().getMeta().hasLoops = !getBackEdges().empty();
+
         // When all nodes visited, process the pending list
         TInstructionSet::iterator iNode = m_pendingNodes.begin();
         for (; iNode != m_pendingNodes.end(); ++iNode)
@@ -923,6 +925,9 @@ private:
 
             TauNode* const assignType = assignTemporary->getTauNode();
             assert(inheritedType);
+
+            if ((*iAssignSite).byBackEdge)
+                getGraph().getMeta().hasBackEdgeTau = true;
 
             if (! instruction.getTauNode()) {
                 // FIXME Could it be that the only incoming is accessible by back edge?
