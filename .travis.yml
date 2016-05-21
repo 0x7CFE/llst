@@ -19,7 +19,7 @@ addons:
     - g++-multilib
     - linux-libc-dev:i386
     - libreadline-dev:i386
-    - llvm-3.3-dev:i386
+    - llvm-3.4-dev:i386
 
 notifications:
   email: false

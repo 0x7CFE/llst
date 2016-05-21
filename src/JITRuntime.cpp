@@ -153,10 +153,10 @@ void JITRuntime::initialize(SmalltalkVM* softVM)
     // These are then used as an allocator function return types
 
     TargetOptions Opts;
-    Opts.JITExceptionHandling = true;
+//    Opts.JITExceptionHandling = true;
     Opts.GuaranteedTailCallOpt = true;
 //    Opts.JITEmitDebugInfo = true;
-//     Opts.PrintMachineCode = true;
+//    Opts.PrintMachineCode = true;
 
     std::string error;
     m_executionEngine = EngineBuilder(m_JITModule)
