@@ -61,8 +61,8 @@ public:
 
     const TSubTypes& getSubTypes() const { return m_subTypes; }
 
-    void addSubType(const Type& type) {
-        if (std::find(m_subTypes.begin(), m_subTypes.end(), type) == m_subTypes.end())
+    void addSubType(const Type& type, bool compact = true) {
+        if (!compact || std::find(m_subTypes.begin(), m_subTypes.end(), type) == m_subTypes.end())
             m_subTypes.push_back(type);
     }
 
@@ -114,6 +114,7 @@ public:
         if (*this == other)
             return *this;
 
+        // FIXME May lose information
         if (m_kind == tkUndefined)
             return *this = other;
 
@@ -284,8 +285,11 @@ public:
 
 private:
     void processInstruction(const InstructionNode& instruction);
-    void processPhi(const PhiNode& phi);
     void processTau(const TauNode& tau);
+
+    Type& processPhi(const PhiNode& phi);
+    Type& getArgumentType(const InstructionNode& instruction, std::size_t index = 0);
+
     void walkComplete();
 
     void doPushConstant(const InstructionNode& instruction);
@@ -294,12 +298,15 @@ private:
     void doPushTemporary(const InstructionNode& instruction);
     void doAssignTemporary(const InstructionNode& instruction);
 
+    void doPushBlock(const InstructionNode& instruction);
+
     void doSendUnary(const InstructionNode& instruction);
     void doSendBinary(const InstructionNode& instruction);
-
     void doMarkArguments(const InstructionNode& instruction);
     void doSendMessage(const InstructionNode& instruction);
+
     void doPrimitive(const InstructionNode& instruction);
+    void doSpecial(const InstructionNode& instruction);
 
 private:
 
@@ -309,19 +316,8 @@ private:
 
     private:
         TVisitResult visitNode(ControlNode& node, const TPathNode*) {
-            switch (node.getNodeType()) {
-                case ControlNode::ntInstruction:
-                    analyzer.processInstruction(static_cast<const InstructionNode&>(node));
-                    break;
-
-                case ControlNode::ntPhi:
-                    analyzer.processPhi(static_cast<const PhiNode&>(node));
-                    break;
-
-                case ControlNode::ntTau:
-                    analyzer.processTau(static_cast<const TauNode&>(node));
-                    break;
-            }
+            if (const InstructionNode* const instruction = node.cast<InstructionNode>())
+                analyzer.processInstruction(*instruction);
 
             return vrKeepWalking;
         }

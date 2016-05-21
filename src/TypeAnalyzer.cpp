@@ -105,6 +105,16 @@ void TypeAnalyzer::run() {
     }
 }
 
+Type& TypeAnalyzer::getArgumentType(const InstructionNode& instruction, std::size_t index /*= 0*/) {
+    ControlNode* const argNode = instruction.getArgument(index);
+    Type& result = m_context[*argNode];
+
+    if (PhiNode* const phi = argNode->cast<PhiNode>())
+        result = processPhi(*phi);
+
+    return result;
+}
+
 void TypeAnalyzer::processInstruction(const InstructionNode& instruction) {
 //     std::printf("processing %.2u\n", instruction.getIndex());
 
@@ -117,58 +127,21 @@ void TypeAnalyzer::processInstruction(const InstructionNode& instruction) {
 
         case opcode::pushConstant:    doPushConstant(instruction);    break;
         case opcode::pushLiteral:     doPushLiteral(instruction);     break;
-        case opcode::markArguments:   doMarkArguments(instruction);   break;
-
-        case opcode::sendUnary:       doSendUnary(instruction);       break;
-        case opcode::sendBinary:      doSendBinary(instruction);      break;
 
         case opcode::pushTemporary:   doPushTemporary(instruction);   break;
         case opcode::assignTemporary: doAssignTemporary(instruction); break;
 
+        case opcode::pushBlock:       doPushBlock(instruction);       break;
+
+        case opcode::markArguments:   doMarkArguments(instruction);   break;
+        case opcode::sendUnary:       doSendUnary(instruction);       break;
+        case opcode::sendBinary:      doSendBinary(instruction);      break;
         case opcode::sendMessage:     doSendMessage(instruction);     break;
+
+
         case opcode::doPrimitive:     doPrimitive(instruction);       break;
 
-        case opcode::doSpecial: {
-            switch (argument) {
-                case special::branchIfFalse:
-                case special::branchIfTrue: {
-                    const bool branchIfTrue = (argument == special::branchIfTrue);
-                    const Type& argType = m_context[*instruction.getArgument()];
-
-                    const BranchNode* const branch = instruction.cast<BranchNode>();
-                    assert(branch);
-
-                    if (argType.getValue() == globals.trueObject || argType.getValue() == globals.trueObject->getClass())
-                        m_walker.addStopNode(branchIfTrue ? branch->getSkipNode() : branch->getTargetNode());
-                    else if (argType.getValue() == globals.falseObject || argType.getValue() == globals.falseObject->getClass())
-                        m_walker.addStopNode(branchIfTrue ? branch->getTargetNode() : branch->getSkipNode());
-                    else
-                        m_literalBranch = false;
-
-                    break;
-                }
-
-                case special::stackReturn:
-                    m_context.getReturnType().addSubType(m_context[*instruction.getArgument()]);
-                    break;
-
-                case special::selfReturn:
-                    m_context.getReturnType().addSubType(m_context.getArgument(0));
-                    break;
-
-                case special::sendToSuper:
-                    // For now, treat method call as *
-                    m_context[instruction] = Type(Type::tkPolytype);
-                    break;
-
-                case special::duplicate:
-                    m_context[instruction] = m_context[*instruction.getArgument()];
-                    break;
-            }
-
-            break;
-        }
-
+        case opcode::doSpecial:       doSpecial(instruction);         break;
 
         default:
             break;
@@ -298,17 +271,28 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
         return;
     }
 
-    // TODO In case of complex invocation encode resursive analysis of operator as a message
+    // In case of complex invocation encode resursive analysis of operator as a message
+    TSymbol* const selector = globals.binaryMessages[opcode]->cast<TSymbol>();
 
-    result = Type(Type::tkPolytype);
+    Type arguments(Type::tkArray);
+    arguments.addSubType(type1); // lhs
+    arguments.addSubType(type2); // rhs
+
+    if (CallContext* const context = m_system.analyzeCall(selector, arguments))
+        result = context->getReturnType();
+    else
+        result = Type(Type::tkPolytype);
 }
 
 void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
     Type& result = m_context[instruction];
 
+    if (!m_baseRun)
+        result.reset();
+
     for (std::size_t index = 0; index < instruction.getArgumentsCount(); index++) {
-        const Type& argsType = m_context[*instruction.getArgument(index)];
-        result.addSubType(argsType);
+        const Type& argument = m_context[*instruction.getArgument(index)];
+        result.addSubType(argument, false);
     }
 
     result.set(globals.arrayClass, Type::tkArray);
@@ -326,6 +310,10 @@ void TypeAnalyzer::doPushTemporary(const InstructionNode& instruction) {
     }
 }
 
+void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
+    m_context[instruction] = Type(globals.blockClass, Type::tkLiteral);
+}
+
 void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
     if (const TauNode* const tau = instruction.getTauNode()) {
         if (tau->getKind() == TauNode::tkProvider) {
@@ -341,11 +329,11 @@ void TypeAnalyzer::doSendMessage(const InstructionNode& instruction) {
     TSymbol* const selector     = literals[literalIndex];
     const Type&    arguments    = m_context[*instruction.getArgument()];
 
-    if (CallContext* const context = m_system.analyzeCall(selector, arguments)) {
-        m_context[instruction] = context->getReturnType();
-    } else {
-        m_context[instruction] = Type(Type::tkPolytype);
-    }
+    Type& result = m_context[instruction];
+    if (CallContext* const context = m_system.analyzeCall(selector, arguments))
+        result = context->getReturnType();
+    else
+        result = Type(Type::tkPolytype);
 }
 
 void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
@@ -357,6 +345,24 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
         case primitive::getClass:
             primitiveResult = m_context[*instruction.getArgument()];
             break;
+
+        case primitive::getSize: {
+            const Type& self = m_context[*instruction.getArgument(0)];
+
+            if (self.getKind() == Type::tkLiteral) {
+                TObject* const   value = self.getValue();
+                const std::size_t size = isSmallInteger(value) ? 0 : value->getSize();
+
+                primitiveResult = Type(TInteger(size));
+            } else {
+                primitiveResult = Type(globals.smallIntClass);
+            }
+
+            // TODO What about Monotype and TCLass::instanceSize?
+            //      Will not work for binary objects.
+
+            break;
+        }
 
         case primitive::smallIntSub: {
             const Type& self = m_context[*instruction.getArgument(0)];
@@ -382,15 +388,60 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
     m_walker.addStopNode(*instruction.getOutEdges().begin());
 }
 
-void TypeAnalyzer::processPhi(const PhiNode& phi) {
+void TypeAnalyzer::doSpecial(const InstructionNode& instruction) {
+    const TSmalltalkInstruction::TArgument argument = instruction.getInstruction().getArgument();
+
+    switch (argument) {
+        case special::branchIfFalse:
+        case special::branchIfTrue: {
+            const bool branchIfTrue = (argument == special::branchIfTrue);
+            const Type& argType = m_context[*instruction.getArgument()];
+
+            const BranchNode* const branch = instruction.cast<BranchNode>();
+            assert(branch);
+
+            if (argType.getValue() == globals.trueObject || argType.getValue() == globals.trueObject->getClass())
+                m_walker.addStopNode(branchIfTrue ? branch->getSkipNode() : branch->getTargetNode());
+            else if (argType.getValue() == globals.falseObject || argType.getValue() == globals.falseObject->getClass())
+                m_walker.addStopNode(branchIfTrue ? branch->getTargetNode() : branch->getSkipNode());
+            else
+                m_literalBranch = false;
+
+            break;
+        }
+
+        case special::stackReturn:
+            m_context.getReturnType().addSubType(getArgumentType(instruction));
+            break;
+
+        case special::selfReturn:
+            m_context.getReturnType().addSubType(m_context.getArgument(0));
+            break;
+
+        case special::sendToSuper:
+            // For now, treat method call as *
+            m_context[instruction] = Type(Type::tkPolytype);
+            break;
+
+        case special::duplicate:
+            m_context[instruction] = m_context[*instruction.getArgument()];
+            break;
+    }
+}
+
+Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
     Type& result = m_context[phi];
 
     const TNodeSet& incomings = phi.getRealValues();
     TNodeSet::iterator iNode = incomings.begin();
-    for (; iNode != incomings.end(); ++iNode)
-        result.addSubType(m_context[*(*iNode)->cast<InstructionNode>()]);
+    for (; iNode != incomings.end(); ++iNode) {
+        // FIXME We need to track the source of the phi's incoming.
+        //       We may ignore tkUndefined only if node lies on the dead path.
 
-    result.setKind(Type::tkComposite);
+        result |= m_context[*(*iNode)->cast<InstructionNode>()];
+    }
+
+    return result;
 }
 
 void TypeAnalyzer::processTau(const TauNode& tau) {
@@ -512,7 +563,7 @@ CallContext* TypeSystem::analyzeCall(TSelector selector, const Type& arguments) 
 
     std::printf("Analyzing %s::%s>>%s...\n",
                 arguments.toString().c_str(),
-                receiver->name->toString().c_str(),
+                method->klass->name->toString().c_str(),
                 selector->toString().c_str());
 
     // TODO Handle recursive and tail calls
@@ -523,7 +574,7 @@ CallContext* TypeSystem::analyzeCall(TSelector selector, const Type& arguments) 
 
     std::printf("%s::%s>>%s -> %s\n",
                 arguments.toString().c_str(),
-                receiver->name->toString().c_str(),
+                method->klass->name->toString().c_str(),
                 selector->toString().c_str(),
                 returnType.toString().c_str());
 
