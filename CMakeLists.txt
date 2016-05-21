@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.4)
 
 set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_SOURCE_DIR}/cmake/variables.cmake")
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-set (LLVM_PACKAGE_VERSION 3.3)
+set (LLVM_PACKAGE_VERSION 3.4)
 
 project(llst)
 

@@ -9,4 +9,4 @@ function brew_upgrade { brew outdated $1 || brew upgrade $1; }
 
 brew update
 brew install readline
-brew install llvm33
+brew install llvm34
