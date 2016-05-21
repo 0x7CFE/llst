@@ -854,7 +854,7 @@ private:
             if (traces_enabled)
                 printf("Erasing processed tau %.2u\n", processedTau->getIndex());
 
-            assert(processedTau->consumers.empty());
+            assert(processedTau->getIncomingMap().empty());
             getGraph().eraseNode(processedTau);
         }
 
@@ -924,7 +924,7 @@ private:
             assert(assignTemporary);
 
             TauNode* const assignType = assignTemporary->getTauNode();
-            assert(inheritedType);
+            assert(assignType);
 
             if ((*iAssignSite).byBackEdge)
                 getGraph().getMeta().hasBackEdgeTau = true;
