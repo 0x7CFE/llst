@@ -421,7 +421,10 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
             break;
         }
 
-        case primitive::smallIntSub: {
+        case primitive::smallIntSub:
+        case primitive::smallIntDiv:
+        case primitive::smallIntMod:
+        {
             const Type& self = m_context[*instruction.getArgument(0)];
             const Type& arg  = m_context[*instruction.getArgument(1)];
 
@@ -429,10 +432,14 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
                 const int lhs = TInteger(self.getValue()).getValue();
                 const int rhs = TInteger(arg.getValue()).getValue();
 
-                primitiveResult = Type(TInteger(lhs - rhs));
+                switch (opcode) {
+                    case primitive::smallIntSub: primitiveResult = Type(TInteger(lhs - rhs)); break;
+                    case primitive::smallIntDiv: primitiveResult = Type(TInteger(lhs / rhs)); break;
+                    case primitive::smallIntMod: primitiveResult = Type(TInteger(lhs % rhs)); break;
+                }
             } else {
                 // TODO Check for (SmallInt)
-                primitiveResult = Type();
+                primitiveResult = Type(globals.smallIntClass, Type::tkMonotype);
             }
 
             break;
