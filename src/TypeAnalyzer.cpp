@@ -25,6 +25,8 @@ std::string Type::toString(bool subtypesOnly /*= false*/) const {
                 stream << "#" << getValue()->cast<TSymbol>()->toString();
             else if (getValue()->getClass()->name->toString().find("Meta", 0, 4) != std::string::npos)
                 stream << getValue()->cast<TClass>()->name->toString();
+            else if (getValue()->getClass() == globals.stringClass->getClass()->getClass())
+                stream << getValue()->cast<TClass>()->name->toString();
             else
                 stream << "~" << getValue()->getClass()->name->toString();
             break;
@@ -342,9 +344,64 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
     Type primitiveResult;
 
     switch (opcode) {
-        case primitive::getClass:
-            primitiveResult = m_context[*instruction.getArgument()];
+        case primitive::allocateObject:
+        case primitive::allocateByteArray:
+        {
+            const Type& klassType = m_context[*instruction.getArgument()];
+
+            // instance <- Class new
+            //
+            // <7 Array 2> -> Array[nil, nil]
+            // <7 Object 2> -> Object[nil, nil]
+            // <7 Object (SmallInt)> -> (Object)
+            // <7 Object *> -> (Object)
+            // <7 (Class) 2> -> *[nil, nil] -> *
+            // <7 * 2> -> *[nil, nil] -> *
+            // <7 * (SmallInt)> -> *
+            // <7 * *> -> *
+
+            switch (klassType.getKind()) {
+                case Type::tkLiteral:
+                    // If we literally know the class we may define the instance's type
+                    primitiveResult = Type(klassType.getValue(), Type::tkMonotype);
+                    break;
+
+                default:
+                    // Otherwise it's completely unknown what will be the instance's type
+                    primitiveResult = Type(Type::tkPolytype);
+            }
+
             break;
+        }
+
+        case primitive::getClass: {
+            const Type& selfType = m_context[*instruction.getArgument()];
+            TObject* const self  = selfType.getValue();
+
+            switch (selfType.getKind()) {
+                case Type::tkLiteral: {
+                    // Here class itself is a literal, not a monotype
+                    TClass* selfClass = isSmallInteger(self) ? globals.smallIntClass : self->getClass();
+                    primitiveResult = Type(selfClass, Type::tkLiteral);
+                    break;
+                }
+
+                case Type::tkMonotype:
+                    // (Object) class -> Object
+                    primitiveResult = Type(self);
+                    break;
+
+                default: {
+                    // String -> MetaString -> Class
+                    // String class class = Class
+                    // TClass* const classClass = globals.stringClass->getClass()->getClass();
+                    // primitiveResult = Type(classClass, Type::tkMonotype);
+                    primitiveResult = Type(Type::tkPolytype);
+                }
+            }
+
+            break;
+        }
 
         case primitive::getSize: {
             const Type& self = m_context[*instruction.getArgument(0)];
