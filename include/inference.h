@@ -220,9 +220,9 @@ private:
 typedef std::size_t TNodeIndex;
 typedef std::map<TNodeIndex, Type> TTypeList;
 
-class CallContext {
+class InferContext {
 public:
-    CallContext(std::size_t index, const Type& arguments)
+    InferContext(std::size_t index, const Type& arguments)
         : m_index(index), m_arguments(arguments) {}
 
     std::size_t getIndex() const { return m_index; }
@@ -258,14 +258,15 @@ public:
     typedef TSymbol* TSelector;
     CallContext* findCallContext(TSelector selector, const Type& arguments);
 
-    CallContext* analyzeCall(TSelector selector, const Type& arguments);
+    InferContext* inferMessage(TSelector selector, const Type& arguments);
+
     ControlGraph* getControlGraph(TMethod* method);
 
 private:
     typedef std::pair<ParsedBytecode*, ControlGraph*> TGraphEntry;
     typedef std::map<TMethod*, TGraphEntry> TGraphCache;
 
-    typedef std::map<Type, CallContext*> TContextMap;
+    typedef std::map<Type, InferContext*> TContextMap;
     typedef std::map<TSelector, TContextMap> TContextCache;
 
 private:
@@ -278,7 +279,7 @@ private:
 
 class TypeAnalyzer {
 public:
-    TypeAnalyzer(TypeSystem& system, ControlGraph& graph, CallContext& context)
+    TypeAnalyzer(TypeSystem& system, ControlGraph& graph, InferContext& context)
         : m_system(system), m_graph(graph), m_context(context), m_walker(*this) {}
 
     void run();
@@ -333,7 +334,7 @@ private:
 private:
     TypeSystem&   m_system;
     ControlGraph& m_graph;
-    CallContext&  m_context;
+    InferContext&  m_context;
     Walker        m_walker;
 
     bool m_baseRun;

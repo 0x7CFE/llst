@@ -234,18 +234,18 @@ void TypeAnalyzer::doSendUnary(const InstructionNode& instruction) {
 }
 
 void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
-    const Type& type1 = m_context[*instruction.getArgument(0)];
-    const Type& type2 = m_context[*instruction.getArgument(1)];
+    const Type& lhsType = m_context[*instruction.getArgument(0)];
+    const Type& rhsType = m_context[*instruction.getArgument(1)];
     const binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(instruction.getInstruction().getArgument());
 
     Type& result = m_context[instruction];
 
-    if (isSmallInteger(type1.getValue()) && isSmallInteger(type2.getValue())) {
+    if (isSmallInteger(lhsType.getValue()) && isSmallInteger(rhsType.getValue())) {
         if (!m_baseRun)
             return;
 
-        const int32_t leftOperand  = TInteger(type1.getValue());
-        const int32_t rightOperand = TInteger(type2.getValue());
+        const int32_t leftOperand  = TInteger(lhsType.getValue());
+        const int32_t rightOperand = TInteger(rhsType.getValue());
 
         switch (opcode) {
             case binaryBuiltIns::operatorLess:
@@ -268,8 +268,8 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
     }
 
     // Literal int or (SmallInt) monotype
-    const bool isInt1 = isSmallInteger(type1.getValue()) || type1.getValue() == globals.smallIntClass;
-    const bool isInt2 = isSmallInteger(type2.getValue()) || type2.getValue() == globals.smallIntClass;
+    const bool isInt1 = isSmallInteger(lhsType.getValue()) || lhsType.getValue() == globals.smallIntClass;
+    const bool isInt2 = isSmallInteger(rhsType.getValue()) || rhsType.getValue() == globals.smallIntClass;
 
     if (isInt1 && isInt2) {
         switch (opcode) {
@@ -296,10 +296,10 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
     TSymbol* const selector = globals.binaryMessages[opcode]->cast<TSymbol>();
 
     Type arguments(Type::tkArray);
-    arguments.addSubType(type1); // lhs
-    arguments.addSubType(type2); // rhs
+    arguments.addSubType(lhsType);
+    arguments.addSubType(rhsType);
 
-    if (CallContext* const context = m_system.analyzeCall(selector, arguments))
+    if (InferContext* const context = m_system.inferMessage(selector, arguments))
         result = context->getReturnType();
     else
         result = Type(Type::tkPolytype);
@@ -351,7 +351,7 @@ void TypeAnalyzer::doSendMessage(const InstructionNode& instruction) {
     const Type&    arguments    = m_context[*instruction.getArgument()];
 
     Type& result = m_context[instruction];
-    if (CallContext* const context = m_system.analyzeCall(selector, arguments))
+    if (InferContext* const context = m_system.inferMessage(selector, arguments))
         result = context->getReturnType();
     else
         result = Type(Type::tkPolytype);
@@ -598,7 +598,7 @@ ControlGraph* TypeSystem::getControlGraph(TMethod* method) {
     return controlGraph;
 }
 
-CallContext* TypeSystem::analyzeCall(TSelector selector, const Type& arguments) {
+InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments) {
     if (!selector || arguments.getKind() != Type::tkArray || arguments.getSubTypes().empty())
         return 0;
 
@@ -638,10 +638,10 @@ CallContext* TypeSystem::analyzeCall(TSelector selector, const Type& arguments) 
     if (! method) // TODO Redirect to #doesNotUnderstand: statically
         return 0;
 
-    CallContext* const callContext = new CallContext(m_lastContextIndex++, arguments);
-    contextMap[arguments] = callContext;
+    InferContext* const inferContext = new InferContext(m_lastContextIndex++, arguments);
+    contextMap[arguments] = inferContext;
 
-    ControlGraph* const controlGraph = getControlGraph(method);
+    ControlGraph* const methodGraph = getControlGraph(method);
     assert(controlGraph);
 
     std::printf("Analyzing %s::%s>>%s...\n",
@@ -650,10 +650,10 @@ CallContext* TypeSystem::analyzeCall(TSelector selector, const Type& arguments) 
                 selector->toString().c_str());
 
     // TODO Handle recursive and tail calls
-    type::TypeAnalyzer analyzer(*this, *controlGraph, *callContext);
+    type::TypeAnalyzer analyzer(*this, *methodGraph, *inferContext);
     analyzer.run();
 
-    Type& returnType = callContext->getReturnType();
+    Type& returnType = inferContext->getReturnType();
 
     std::printf("%s::%s>>%s -> %s\n",
                 arguments.toString().c_str(),
@@ -661,5 +661,5 @@ CallContext* TypeSystem::analyzeCall(TSelector selector, const Type& arguments) 
                 selector->toString().c_str(),
                 returnType.toString().c_str());
 
-    return callContext;
+    return inferContext;
 }
