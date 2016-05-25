@@ -3,6 +3,22 @@
 
 using namespace type;
 
+static void printBlock(const Type& blockType, std::stringstream& stream) {
+    if (blockType.getSubTypes().size() < 2) {
+        stream << "(Block)";
+        return;
+    }
+
+    TMethod* const method = blockType.getSubTypes()[0].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(blockType.getSubTypes()[1].getValue());
+
+    // Class>>method@offset
+    stream
+        << method->klass->name->toString()
+        << ">>" << method->name->toString()
+        << "@" << offset;
+}
+
 std::string Type::toString(bool subtypesOnly /*= false*/) const {
     std::stringstream stream;
 
@@ -32,7 +48,10 @@ std::string Type::toString(bool subtypesOnly /*= false*/) const {
             break;
 
         case tkMonotype:
-            stream << "(" << getValue()->cast<TClass>()->name->toString() << ")";
+            if (getValue() == globals.blockClass)
+                printBlock(*this, stream);
+            else
+                stream << "(" << getValue()->cast<TClass>()->name->toString() << ")";
             break;
 
         case tkArray:
