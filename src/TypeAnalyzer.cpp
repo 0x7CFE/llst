@@ -554,26 +554,6 @@ void TypeAnalyzer::walkComplete() {
 //     std::printf("walk complete\n");
 }
 
-CallContext* TypeSystem::findCallContext(TSelector selector, const Type& arguments) {
-    assert(selector);
-
-    if (arguments.getKind() != Type::tkArray || arguments.getSubTypes().empty())
-        return 0;
-
-    if (arguments[0].getKind() == Type::tkUndefined || arguments[0].getKind() == Type::tkPolytype)
-        return 0;
-
-    const TContextCache::iterator iMap = m_contextCache.find(selector);
-    if (iMap == m_contextCache.end())
-        return 0;
-
-    const TContextMap::iterator iContext = iMap->second.find(arguments);
-    if (iContext == iMap->second.end())
-        return 0;
-
-    return iContext->second;
-}
-
 ControlGraph* TypeSystem::getControlGraph(TMethod* method) {
     TGraphCache::iterator iGraph = m_graphCache.find(method);
     if (iGraph != m_graphCache.end())

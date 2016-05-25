@@ -256,7 +256,6 @@ public:
     TypeSystem(SmalltalkVM& vm) : m_vm(vm), m_lastContextIndex(0) {}
 
     typedef TSymbol* TSelector;
-    CallContext* findCallContext(TSelector selector, const Type& arguments);
 
     InferContext* inferMessage(TSelector selector, const Type& arguments);
 
