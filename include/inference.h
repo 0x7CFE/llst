@@ -251,6 +251,17 @@ private:
     Type       m_returnType;
 };
 
+class BlockInferContext : public InferContext {
+public:
+    BlockInferContext(std::size_t index, const Type& arguments)
+        : InferContext(index, arguments) {}
+
+    Type& getBlockReturnType() { return m_blockReturnType; }
+
+private:
+    Type m_blockReturnType;
+};
+
 class TypeSystem {
 public:
     TypeSystem(SmalltalkVM& vm) : m_vm(vm), m_lastContextIndex(0) {}
@@ -258,6 +269,7 @@ public:
     typedef TSymbol* TSelector;
 
     InferContext* inferMessage(TSelector selector, const Type& arguments);
+    InferContext* inferBlock(const Type& block, const Type& arguments);
 
     ControlGraph* getControlGraph(TMethod* method);
 

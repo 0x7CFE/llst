@@ -332,7 +332,17 @@ void TypeAnalyzer::doPushTemporary(const InstructionNode& instruction) {
 }
 
 void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
-    m_context[instruction] = Type(globals.blockClass, Type::tkLiteral);
+    if (const PushBlockNode* const pushBlock = instruction.cast<PushBlockNode>()) {
+        TMethod* const origin = pushBlock->getParsedBlock()->getContainer()->getOrigin();
+        const uint16_t offset = pushBlock->getParsedBlock()->getStartOffset();
+
+        // Block[origin, offset]
+        Type& blockType = m_context[instruction];
+
+        blockType.set(globals.blockClass, Type::tkMonotype);
+        blockType.addSubType(origin);
+        blockType.addSubType(Type(TInteger(offset)));
+    }
 }
 
 void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
@@ -436,6 +446,24 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
 
             // TODO What about Monotype and TCLass::instanceSize?
             //      Will not work for binary objects.
+
+            break;
+        }
+
+        case primitive::blockInvoke: {
+            const Type& block = m_context[*instruction.getArgument(0)];
+            const Type& arg   = m_context[*instruction.getArgument(1)];
+
+            Type arguments(Type::tkArray);
+            arguments.addSubType(arg);
+
+            if (instruction.getArgumentsCount() == 3)
+                arguments.addSubType(m_context[*instruction.getArgument(2)]);
+
+            if (InferContext* invokeContext = m_system.inferBlock(block, arguments))
+                primitiveResult = invokeContext->getReturnType();
+            else
+                primitiveResult = Type(Type::tkPolytype);
 
             break;
         }
@@ -642,4 +670,44 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
                 returnType.toString().c_str());
 
     return inferContext;
+}
+
+InferContext* TypeSystem::inferBlock(const Type& block, const Type& arguments) {
+    if (block.getKind() != Type::tkMonotype || arguments.getSubTypes().empty())
+        return 0;
+
+    // TODO Cache
+    BlockInferContext* const inferContext = new BlockInferContext(m_lastContextIndex++, arguments);
+
+    TMethod* const method = block.getSubTypes()[0].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(block.getSubTypes()[1].getValue());
+
+    ControlGraph* const methodGraph = getControlGraph(method);
+    assert(controlGraph);
+
+    std::printf("Analyzing block %s::%s ...\n", arguments.toString().c_str(), block.toString().c_str());
+
+    st::ParsedMethod* const parsedMethod = methodGraph->getParsedMethod();
+    st::ParsedBlock*  const parsedBlock  = parsedMethod->getParsedBlockByOffset(offset);
+
+    // TODO Cache
+    ControlGraph* const blockGraph = new ControlGraph(parsedMethod, parsedBlock);
+    blockGraph->buildGraph();
+
+    {
+        std::ostringstream ss;
+        ss << method->klass->name->toString() << ">>" << method->name->toString() << "@" << offset;
+
+        ControlGraphVisualizer vis(blockGraph, ss.str(), "dots/");
+        vis.run();
+    }
+
+    type::TypeAnalyzer analyzer(*this, *blockGraph, *inferContext);
+    analyzer.run();
+
+    std::printf("%s::%s -> %s, ^%s\n", arguments.toString().c_str(), block.toString().c_str(),
+                inferContext->getReturnType().toString().c_str(),
+                inferContext->getBlockReturnType().toString().c_str());
+
+    return 0;
 }
