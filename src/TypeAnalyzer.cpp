@@ -636,7 +636,12 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
     TClass* receiver = 0;
 
     if (self.getKind() == Type::tkLiteral) {
-        receiver = isSmallInteger(self.getValue()) ? globals.smallIntClass : self.getValue()->getClass();
+        if (isSmallInteger(self.getValue()))
+            receiver = globals.smallIntClass;
+        else if (self.getValue()->getClass()->getClass() == globals.stringClass->getClass()->getClass())
+            receiver = self.getValue()->cast<TClass>();
+        else
+            receiver = self.getValue()->getClass();
     } else {
         receiver = self.getValue()->cast<TClass>();
     }
