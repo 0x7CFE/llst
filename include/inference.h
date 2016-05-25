@@ -293,7 +293,7 @@ public:
     TypeAnalyzer(TypeSystem& system, ControlGraph& graph, InferContext& context)
         : m_system(system), m_graph(graph), m_context(context), m_walker(*this) {}
 
-    void run();
+    void run(const Type* blockType = 0);
 
 private:
     void processInstruction(const InstructionNode& instruction);
@@ -350,6 +350,8 @@ private:
 
     bool m_baseRun;
     bool m_literalBranch;
+
+    const Type* m_blockType;
 };
 
 } // namespace type

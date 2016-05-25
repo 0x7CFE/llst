@@ -74,9 +74,11 @@ std::string Type::toString(bool subtypesOnly /*= false*/) const {
     return stream.str();
 }
 
-void TypeAnalyzer::run() {
+void TypeAnalyzer::run(const Type* blockType /*= 0*/) {
     if (m_graph.isEmpty())
         return;
+
+    m_blockType = blockType;
 
     // FIXME For correct inference we need to perform in-width traverse
 
@@ -328,6 +330,17 @@ void TypeAnalyzer::doPushTemporary(const InstructionNode& instruction) {
             processTau(*tau);
 
         m_context[instruction] = tauType;
+    } else if (m_blockType) {
+        // Block invocation primitive pass block arguments through creating method's temporaries.
+        // To simplify inference, we pass their types as context arguments.
+
+        const uint16_t argIndex = TInteger(m_blockType->getSubTypes()[2].getValue());
+        const TSmalltalkInstruction::TArgument tempIndex = instruction.getInstruction().getArgument();
+
+        if (tempIndex >= argIndex)
+            m_context[instruction] = m_context.getArgument(tempIndex - argIndex);
+        else
+            m_context[instruction] = Type(Type::tkPolytype);
     }
 }
 
@@ -335,6 +348,7 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
     if (const PushBlockNode* const pushBlock = instruction.cast<PushBlockNode>()) {
         TMethod* const origin = pushBlock->getParsedBlock()->getContainer()->getOrigin();
         const uint16_t offset = pushBlock->getParsedBlock()->getStartOffset();
+        const uint16_t argIndex = instruction.getInstruction().getArgument();
 
         // Block[origin, offset]
         Type& blockType = m_context[instruction];
@@ -342,6 +356,7 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         blockType.set(globals.blockClass, Type::tkMonotype);
         blockType.addSubType(origin);
         blockType.addSubType(Type(TInteger(offset)));
+        blockType.addSubType(Type(TInteger(argIndex)));
     }
 }
 
@@ -708,11 +723,11 @@ InferContext* TypeSystem::inferBlock(const Type& block, const Type& arguments) {
     }
 
     type::TypeAnalyzer analyzer(*this, *blockGraph, *inferContext);
-    analyzer.run();
+    analyzer.run(&block);
 
     std::printf("%s::%s -> %s, ^%s\n", arguments.toString().c_str(), block.toString().c_str(),
                 inferContext->getReturnType().toString().c_str(),
                 inferContext->getBlockReturnType().toString().c_str());
 
-    return 0;
+    return inferContext;
 }
