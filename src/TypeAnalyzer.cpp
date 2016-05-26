@@ -298,8 +298,8 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
     TSymbol* const selector = globals.binaryMessages[opcode]->cast<TSymbol>();
 
     Type arguments(Type::tkArray);
-    arguments.addSubType(lhsType);
-    arguments.addSubType(rhsType);
+    arguments.addSubType(lhsType, false);
+    arguments.addSubType(rhsType, false);
 
     if (InferContext* const context = m_system.inferMessage(selector, arguments))
         result = context->getReturnType();
@@ -354,9 +354,9 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         Type& blockType = m_context[instruction];
 
         blockType.set(globals.blockClass, Type::tkMonotype);
-        blockType.addSubType(origin);
-        blockType.addSubType(Type(TInteger(offset)));
-        blockType.addSubType(Type(TInteger(argIndex)));
+        blockType.addSubType(origin, false);
+        blockType.addSubType(Type(TInteger(offset)), false);
+        blockType.addSubType(Type(TInteger(argIndex)), false);
     }
 }
 
@@ -473,7 +473,7 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
             arguments.addSubType(arg);
 
             if (instruction.getArgumentsCount() == 3)
-                arguments.addSubType(m_context[*instruction.getArgument(2)]);
+                arguments.addSubType(m_context[*instruction.getArgument(2)], false);
 
             if (InferContext* invokeContext = m_system.inferBlock(block, arguments))
                 primitiveResult = invokeContext->getReturnType();
