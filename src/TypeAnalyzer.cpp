@@ -298,8 +298,8 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
     TSymbol* const selector = globals.binaryMessages[opcode]->cast<TSymbol>();
 
     Type arguments(Type::tkArray);
-    arguments.addSubType(lhsType, false);
-    arguments.addSubType(rhsType, false);
+    arguments.pushSubType(lhsType);
+    arguments.pushSubType(rhsType);
 
     if (InferContext* const context = m_system.inferMessage(selector, arguments))
         result = context->getReturnType();
@@ -315,7 +315,7 @@ void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
 
     for (std::size_t index = 0; index < instruction.getArgumentsCount(); index++) {
         const Type& argument = m_context[*instruction.getArgument(index)];
-        result.addSubType(argument, false);
+        result.pushSubType(argument);
     }
 
     result.set(globals.arrayClass, Type::tkArray);
@@ -354,9 +354,9 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         Type& blockType = m_context[instruction];
 
         blockType.set(globals.blockClass, Type::tkMonotype);
-        blockType.addSubType(origin, false);
-        blockType.addSubType(Type(TInteger(offset)), false);
-        blockType.addSubType(Type(TInteger(argIndex)), false);
+        blockType.pushSubType(origin);
+        blockType.pushSubType(Type(TInteger(offset)));
+        blockType.pushSubType(Type(TInteger(argIndex)));
     }
 }
 
@@ -470,10 +470,10 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
             const Type& arg   = m_context[*instruction.getArgument(1)];
 
             Type arguments(Type::tkArray);
-            arguments.addSubType(arg);
+            arguments.pushSubType(arg);
 
             if (instruction.getArgumentsCount() == 3)
-                arguments.addSubType(m_context[*instruction.getArgument(2)], false);
+                arguments.pushSubType(m_context[*instruction.getArgument(2)]);
 
             if (InferContext* invokeContext = m_system.inferBlock(block, arguments))
                 primitiveResult = invokeContext->getReturnType();
