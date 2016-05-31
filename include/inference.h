@@ -271,7 +271,7 @@ public:
     typedef TSymbol* TSelector;
 
     InferContext* inferMessage(TSelector selector, const Type& arguments);
-    InferContext* inferBlock(const Type& block, const Type& arguments);
+    BlockInferContext* inferBlock(const Type& block, const Type& arguments);
 
     ControlGraph* getControlGraph(TMethod* method);
 

@@ -475,7 +475,7 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
             if (instruction.getArgumentsCount() == 3)
                 arguments.pushSubType(m_context[*instruction.getArgument(2)]);
 
-            if (InferContext* invokeContext = m_system.inferBlock(block, arguments))
+            if (BlockInferContext* invokeContext = m_system.inferBlock(block, arguments))
                 primitiveResult = invokeContext->getReturnType();
             else
                 primitiveResult = Type(Type::tkPolytype);
@@ -707,7 +707,7 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
     return inferContext;
 }
 
-InferContext* TypeSystem::inferBlock(const Type& block, const Type& arguments) {
+BlockInferContext* TypeSystem::inferBlock(const Type& block, const Type& arguments) {
     if (block.getKind() != Type::tkMonotype || arguments.getSubTypes().empty())
         return 0;
 
