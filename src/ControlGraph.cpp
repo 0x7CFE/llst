@@ -5,6 +5,21 @@ using namespace st;
 
 static const bool traces_enabled = false;
 
+ControlGraph::TMetaInfo::TMetaInfo() :
+    isBlock(false),
+    hasBlockReturn(false),
+    hasLiteralBlocks(false),
+    hasLoops(false),
+    hasBackEdgeTau(false),
+    usesSelf(false),
+    usesSuper(false),
+    readsArguments(false),
+    readsFields(false),
+    writesFields(false),
+    hasPrimitive(false)
+{
+}
+
 bool NodeIndexCompare::operator() (const ControlNode* a, const ControlNode* b) const
 {
     return a->getIndex() < b->getIndex();
@@ -31,6 +46,10 @@ template<> PushBlockNode* ControlNode::cast<PushBlockNode>() {
         return 0;
 
     return static_cast<PushBlockNode*>(this);
+}
+
+template<> const PushBlockNode* ControlNode::cast<PushBlockNode>() const {
+    return const_cast<ControlNode*>(this)->cast<PushBlockNode>();
 }
 
 template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>() {
@@ -146,15 +165,24 @@ void GraphConstructor::processNode(InstructionNode* node)
         m_currentDomain->setEntryPoint(node);
 
     switch (instruction.getOpcode()) {
+        case opcode::pushArgument:
+            if (instruction.getArgument() == 0)
+                m_graph->getMeta().usesSelf = true;
+            m_graph->getMeta().readsArguments = true;
+
+        case opcode::pushInstance:
+            m_graph->getMeta().readsFields = true;
+
+        case opcode::pushTemporary:
+            m_graph->getMeta().readsTemporaries.insert(node->getInstruction().getArgument());
         case opcode::pushConstant:
         case opcode::pushLiteral:
-        case opcode::pushArgument:
-        case opcode::pushTemporary:   // TODO Link with tau node
-        case opcode::pushInstance:
             m_currentDomain->pushValue(node);
             break;
 
         case opcode::pushBlock: {
+            m_graph->getMeta().hasLiteralBlocks = true;
+
             const uint16_t blockEndOffset    = node->getInstruction().getExtra();
             ParsedMethod* const parsedMethod = m_graph->getParsedMethod();
             ParsedBlock*  const parsedBlock  = parsedMethod->getParsedBlockByEndOffset(blockEndOffset);
@@ -163,8 +191,13 @@ void GraphConstructor::processNode(InstructionNode* node)
             m_currentDomain->pushValue(node);
         } break;
 
-        case opcode::assignTemporary: // TODO Link with tau node
+        case opcode::assignTemporary:
+            m_graph->getMeta().writesTemporaries.insert(node->getInstruction().getArgument());
+            m_currentDomain->requestArgument(0, node, true);
+            break;
+
         case opcode::assignInstance:
+            m_graph->getMeta().writesFields = true;
             m_currentDomain->requestArgument(0, node, true);
             break;
 
@@ -191,6 +224,7 @@ void GraphConstructor::processNode(InstructionNode* node)
             break;
 
         case opcode::doPrimitive:
+            m_graph->getMeta().hasPrimitive = true;
             processPrimitives(node);
             m_currentDomain->pushValue(node);
             break;
@@ -205,8 +239,9 @@ void GraphConstructor::processSpecials(InstructionNode* node)
     const TSmalltalkInstruction& instruction = node->getInstruction();
 
     switch (instruction.getArgument()) {
-        case special::stackReturn:
         case special::blockReturn:
+            m_graph->getMeta().hasBlockReturn = true;
+        case special::stackReturn:
             m_currentDomain->requestArgument(0, node);
 
         case special::selfReturn:
@@ -215,6 +250,7 @@ void GraphConstructor::processSpecials(InstructionNode* node)
             break;
 
         case special::sendToSuper:
+            m_graph->getMeta().usesSuper = true;
             m_currentDomain->requestArgument(0, node);
             m_currentDomain->pushValue(node);
             break;

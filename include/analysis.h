@@ -370,7 +370,10 @@ public:
         : m_parsedMethod(parsedMethod), m_parsedBlock(0), m_lastNodeIndex(0) { }
 
     ControlGraph(ParsedMethod* parsedMethod, ParsedBlock* parsedBlock)
-        : m_parsedMethod(parsedMethod), m_parsedBlock(parsedBlock), m_lastNodeIndex(0) { }
+        : m_parsedMethod(parsedMethod), m_parsedBlock(parsedBlock), m_lastNodeIndex(0)
+    {
+        m_metaInfo.isBlock = true;
+    }
 
     ParsedMethod* getParsedMethod() const { return m_parsedMethod; }
 
@@ -462,8 +465,27 @@ public:
     }
 
     struct TMetaInfo {
+        bool isBlock;
+        bool hasBlockReturn;
+        bool hasLiteralBlocks;
+
         bool hasLoops;
         bool hasBackEdgeTau;
+
+        bool usesSelf;
+        bool usesSuper;
+
+        bool readsArguments;
+        bool readsFields;
+        bool writesFields;
+
+        bool hasPrimitive;
+
+        typedef std::set<std::size_t> TIndexSet;
+        TIndexSet readsTemporaries;
+        TIndexSet writesTemporaries;
+
+        TMetaInfo();
     };
 
     TMetaInfo& getMeta() { return m_metaInfo; }
@@ -492,6 +514,7 @@ template<> TauNode* ControlGraph::newNode<TauNode>();
 
 template<> PushBlockNode* ControlNode::cast<PushBlockNode>();
 template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>();
+template<> const PushBlockNode* ControlNode::cast<PushBlockNode>() const;
 
 template<> BranchNode* ControlNode::cast<BranchNode>();
 template<> const BranchNode* ControlNode::cast<BranchNode>() const;
