@@ -9,14 +9,19 @@ static void printBlock(const Type& blockType, std::stringstream& stream) {
         return;
     }
 
-    TMethod* const method = blockType.getSubTypes()[0].getValue()->cast<TMethod>();
-    const uint16_t offset = TInteger(blockType.getSubTypes()[1].getValue());
+    TMethod* const method = blockType[0].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(blockType[1].getValue());
 
     // Class>>method@offset
     stream
         << method->klass->name->toString()
         << ">>" << method->name->toString()
-        << "@" << offset;
+        << "@" << offset
+        << blockType[3].toString()
+        << blockType[4].toString();
+
+    if (blockType.getSubTypes().size() > 5)
+        stream << blockType[5].toString();
 }
 
 std::string Type::toString(bool subtypesOnly /*= false*/) const {
@@ -138,7 +143,7 @@ Type& TypeAnalyzer::getArgumentType(const InstructionNode& instruction, std::siz
     return result;
 }
 
-void TypeAnalyzer::processInstruction(const InstructionNode& instruction) {
+void TypeAnalyzer::processInstruction(InstructionNode& instruction) {
 //     std::printf("processing %.2u\n", instruction.getIndex());
 
     const TSmalltalkInstruction::TArgument argument = instruction.getInstruction().getArgument();
@@ -337,10 +342,24 @@ void TypeAnalyzer::doPushTemporary(const InstructionNode& instruction) {
         const uint16_t argIndex = TInteger(m_blockType->getSubTypes()[2].getValue());
         const TSmalltalkInstruction::TArgument tempIndex = instruction.getInstruction().getArgument();
 
-        if (tempIndex >= argIndex)
+        if (tempIndex >= argIndex) {
             m_context[instruction] = m_context.getArgument(tempIndex - argIndex);
-        else
+        } else {
+            if (m_blockType->getSubTypes().size() > 5) {
+                const Type& readIndices  = (*m_blockType)[3];
+                const Type& contextTypes = (*m_blockType)[5];
+
+                for (std::size_t i = 0; i < readIndices.getSubTypes().size(); i++) {
+                    if (TInteger(readIndices[i].getValue()) == tempIndex) {
+                        m_context[instruction] = contextTypes[i];
+                        return;
+                    }
+                }
+
+            }
+
             m_context[instruction] = Type(Type::tkPolytype);
+        }
     }
 }
 
@@ -350,13 +369,42 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         const uint16_t offset = pushBlock->getParsedBlock()->getStartOffset();
         const uint16_t argIndex = instruction.getInstruction().getArgument();
 
-        // Block[origin, offset]
         Type& blockType = m_context[instruction];
 
         blockType.set(globals.blockClass, Type::tkMonotype);
-        blockType.pushSubType(origin);
-        blockType.pushSubType(Type(TInteger(offset)));
-        blockType.pushSubType(Type(TInteger(argIndex)));
+        blockType.pushSubType(origin);                   // [0]
+        blockType.pushSubType(Type(TInteger(offset)));   // [1]
+        blockType.pushSubType(Type(TInteger(argIndex))); // [2]
+
+        // TODO Cache and reuse in TypeSystem::inferBlock()
+        ControlGraph* const blockGraph = new ControlGraph(pushBlock->getParsedBlock()->getContainer(), pushBlock->getParsedBlock());
+        blockGraph->buildGraph();
+
+        typedef ControlGraph::TMetaInfo::TIndexList TIndexList;
+        const TIndexList& readsTemporaries = blockGraph->getMeta().readsTemporaries;
+        const TIndexList& writesTemporaries = blockGraph->getMeta().writesTemporaries;
+
+        Type readIndices(globals.arrayClass, Type::tkArray);
+        Type writeIndices(globals.arrayClass, Type::tkArray);
+
+        for (std::size_t index = 0; index < readsTemporaries.size(); index++) {
+            // We're interested only in temporaries from lexical context, not block arguments
+            if (readsTemporaries[index] >= argIndex)
+                continue;
+
+            readIndices.pushSubType(Type(TInteger(readsTemporaries[index])));
+        }
+
+        for (std::size_t index = 0; index < writesTemporaries.size(); index++) {
+            // We're interested only in temporaries from lexical context, not block arguments
+            if (writesTemporaries[index] >= argIndex)
+                continue;
+
+            writeIndices.pushSubType(Type(TInteger(writesTemporaries[index])));
+        }
+
+        blockType.pushSubType(readIndices);  // [3]
+        blockType.pushSubType(writeIndices); // [4]
     }
 }
 
@@ -368,12 +416,109 @@ void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
     }
 }
 
-void TypeAnalyzer::doSendMessage(const InstructionNode& instruction) {
+class TypeLocator : public GraphWalker {
+public:
+    TypeLocator(std::size_t tempIndex, const ControlGraph::TEdgeSet& backEdges, InferContext& context, bool noBackEdges)
+        : tempIndex(tempIndex), backEdges(backEdges), context(context), noBackEdges(noBackEdges), firstResult(true) {}
+
+    virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode* path) {
+        if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
+            // TODO Also handle previously discovered non-trivial assign sites
+
+            if (instruction->getInstruction().getOpcode() == opcode::assignTemporary) {
+                if (instruction->getInstruction().getArgument() == tempIndex) {
+                    TauNode* const tau = instruction->getTauNode();
+                    if (! tau)
+                        return vrSkipPath;
+
+                    // Searching for back edges in the located path
+                    bool hasBackEdge = false;
+                    for (const TPathNode* p = path; p->prev; p = p->prev) {
+                        const ControlGraph::TEdgeSet::const_iterator iEdge = backEdges.find(
+                            st::BackEdgeDetector::TEdge(
+                                static_cast<const st::InstructionNode*>(p->node),
+                                                        static_cast<const st::InstructionNode*>(p->prev->node)
+                            )
+                        );
+
+                        if (iEdge != backEdges.end()) {
+                            hasBackEdge = true;
+                            break;
+                        }
+                    }
+
+                    std::printf("TypeLocator : Found assign site: Node %.2u :: %s, back edge: %s\n",
+                        instruction->getIndex(),
+                        context[*tau].toString().c_str(),
+                        hasBackEdge ? "yes" : "no");
+
+                    if (hasBackEdge && noBackEdges)
+                        return vrSkipPath;
+
+                    if (firstResult) {
+                        result = context[*tau];
+                        firstResult = false;
+                    } else {
+                        result &= context[*tau];
+                    }
+
+                    return vrSkipPath;
+                }
+            }
+        }
+
+        return vrKeepWalking;
+    }
+
+    const TSmalltalkInstruction::TArgument tempIndex;
+    const ControlGraph::TEdgeSet& backEdges;
+    InferContext& context;
+    bool noBackEdges;
+
+    Type result;
+    bool firstResult;
+};
+
+void TypeAnalyzer::processBlocks(InstructionNode& instruction, Type& arguments) {
+    TMethod* const currentMethod = m_graph.getParsedMethod()->getOrigin();
+
+    // We interested in literal blocks with context info from the same method
+    for (std::size_t argIndex = 0; argIndex < arguments.getSubTypes().size(); argIndex++) {
+        Type& blockType = arguments[argIndex];
+
+        if (blockType.getValue() != globals.blockClass || blockType.getKind() != Type::tkMonotype)
+            continue; // Not a block we may handle
+
+        if (blockType.getSubTypes().empty() || blockType[0].getValue() != currentMethod)
+            continue; // Non-literal or non-local block
+
+        // Indexes of temporaries from the lexical context. See TypeAnalyzer::pushBlock()
+        const Type& readIndices = blockType[3];
+        Type& temps = blockType.pushSubType(Type(globals.arrayClass, Type::tkArray));
+
+        for (std::size_t i = 0; i < readIndices.getSubTypes().size(); i++) {
+            // Detect types of temporaries accessible from the current call site
+            TypeLocator locator(
+                TInteger(readIndices[i].getValue()), // look for temporary with this index
+                m_graph.getMeta().backEdges,
+                m_context,
+                m_baseRun                            // base run = skip back edges
+            );
+
+            locator.run(&instruction, st::GraphWalker::wdBackward);
+            temps.pushSubType(locator.result);
+        }
+    }
+}
+
+void TypeAnalyzer::doSendMessage(InstructionNode& instruction) {
     TSymbolArray&  literals     = *m_graph.getParsedMethod()->getOrigin()->literals;
     const uint32_t literalIndex = instruction.getInstruction().getArgument();
 
-    TSymbol* const selector     = literals[literalIndex];
-    const Type&    arguments    = m_context[*instruction.getArgument()];
+    TSymbol* const selector = literals[literalIndex];
+    Type& arguments = m_context[*instruction.getArgument()];
+
+    processBlocks(instruction, arguments);
 
     Type& result = m_context[instruction];
     if (InferContext* const context = m_system.inferMessage(selector, arguments))
@@ -714,8 +859,8 @@ BlockInferContext* TypeSystem::inferBlock(const Type& block, const Type& argumen
     // TODO Cache
     BlockInferContext* const inferContext = new BlockInferContext(m_lastContextIndex++, arguments);
 
-    TMethod* const method = block.getSubTypes()[0].getValue()->cast<TMethod>();
-    const uint16_t offset = TInteger(block.getSubTypes()[1].getValue());
+    TMethod* const method = block[0].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(block[1].getValue());
 
     ControlGraph* const methodGraph = getControlGraph(method);
     assert(controlGraph);

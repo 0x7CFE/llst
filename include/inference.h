@@ -61,7 +61,7 @@ public:
 
     const TSubTypes& getSubTypes() const { return m_subTypes; }
 
-    void pushSubType(const Type& type) { m_subTypes.push_back(type); }
+    Type& pushSubType(const Type& type) { m_subTypes.push_back(type); return m_subTypes.back(); }
 
     void addSubType(const Type& type) {
         if (std::find(m_subTypes.begin(), m_subTypes.end(), type) == m_subTypes.end())
@@ -69,6 +69,7 @@ public:
     }
 
     const Type& operator [] (std::size_t index) const { return m_subTypes[index]; }
+    Type& operator [] (std::size_t index) { return m_subTypes[index]; }
 
     bool operator < (const Type& other) const {
         if (m_kind != other.m_kind)
@@ -298,7 +299,7 @@ public:
     void run(const Type* blockType = 0);
 
 private:
-    void processInstruction(const InstructionNode& instruction);
+    void processInstruction(InstructionNode& instruction);
     void processTau(const TauNode& tau);
 
     Type& processPhi(const PhiNode& phi);
@@ -317,10 +318,13 @@ private:
     void doSendUnary(const InstructionNode& instruction);
     void doSendBinary(const InstructionNode& instruction);
     void doMarkArguments(const InstructionNode& instruction);
-    void doSendMessage(const InstructionNode& instruction);
+    void doSendMessage(InstructionNode& instruction);
 
     void doPrimitive(const InstructionNode& instruction);
     void doSpecial(const InstructionNode& instruction);
+
+private:
+    void processBlocks(InstructionNode& instruction, Type& arguments);
 
 private:
 
@@ -330,7 +334,7 @@ private:
 
     private:
         TVisitResult visitNode(ControlNode& node, const TPathNode*) {
-            if (const InstructionNode* const instruction = node.cast<InstructionNode>())
+            if (InstructionNode* const instruction = node.cast<InstructionNode>())
                 analyzer.processInstruction(*instruction);
 
             return vrKeepWalking;
