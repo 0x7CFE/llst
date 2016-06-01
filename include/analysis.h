@@ -481,9 +481,14 @@ public:
 
         bool hasPrimitive;
 
-        typedef std::set<std::size_t> TIndexSet;
-        TIndexSet readsTemporaries;
-        TIndexSet writesTemporaries;
+        typedef std::vector<std::size_t> TIndexList;
+        TIndexList readsTemporaries;
+        TIndexList writesTemporaries;
+
+        static void insertIndex(std::size_t index, TIndexList& list) {
+            if (std::find(list.begin(), list.end(), index) == list.end())
+                list.push_back(index);
+        }
 
         TMetaInfo();
     };

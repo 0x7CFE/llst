@@ -174,7 +174,7 @@ void GraphConstructor::processNode(InstructionNode* node)
             m_graph->getMeta().readsFields = true;
 
         case opcode::pushTemporary:
-            m_graph->getMeta().readsTemporaries.insert(node->getInstruction().getArgument());
+            ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().readsTemporaries);
         case opcode::pushConstant:
         case opcode::pushLiteral:
             m_currentDomain->pushValue(node);
@@ -192,7 +192,7 @@ void GraphConstructor::processNode(InstructionNode* node)
         } break;
 
         case opcode::assignTemporary:
-            m_graph->getMeta().writesTemporaries.insert(node->getInstruction().getArgument());
+            ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().writesTemporaries);
             m_currentDomain->requestArgument(0, node, true);
             break;
 
