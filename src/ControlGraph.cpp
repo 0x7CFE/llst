@@ -785,6 +785,7 @@ private:
         }
 
         getGraph().getMeta().hasLoops = !getBackEdges().empty();
+        m_graph.getMeta().backEdges = getBackEdges();
 
         // When all nodes visited, process the pending list
         TInstructionSet::iterator iNode = m_pendingNodes.begin();

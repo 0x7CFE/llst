@@ -3,6 +3,7 @@
 
 #include <set>
 #include <vector>
+#include <algorithm>
 
 #include <stapi.h>
 
@@ -464,6 +465,33 @@ public:
         return iDomain->second;
     }
 
+    struct TEdge {
+        const InstructionNode* from;
+        const InstructionNode* to;
+
+        TEdge(const InstructionNode* from, const InstructionNode* to)
+        : from(from), to(to)
+        {
+            assert(from);
+            assert(to);
+        }
+    };
+
+    class EdgeCompare {
+    public:
+        bool operator() (const TEdge& a, const TEdge& b) const {
+            if (a.from < b.from)
+                return true;
+
+            if (a.from > b.from)
+                return false;
+
+            return a.to < b.to;
+        }
+    };
+
+    typedef std::set<TEdge, EdgeCompare> TEdgeSet;
+
     struct TMetaInfo {
         bool isBlock;
         bool hasBlockReturn;
@@ -480,6 +508,8 @@ public:
         bool writesFields;
 
         bool hasPrimitive;
+
+        TEdgeSet backEdges;
 
         typedef std::vector<std::size_t> TIndexList;
         TIndexList readsTemporaries;
@@ -746,32 +776,8 @@ private:
 
 class BackEdgeDetector : public GraphWalker {
 public:
-    struct TEdge {
-        const InstructionNode* from;
-        const InstructionNode* to;
-
-        TEdge(const InstructionNode* from, const InstructionNode* to)
-            : from(from), to(to)
-        {
-            assert(from);
-            assert(to);
-        }
-    };
-
-    class EdgeCompare {
-    public:
-        bool operator() (const TEdge& a, const TEdge& b) const {
-            if (a.from < b.from)
-                return true;
-
-            if (a.from > b.from)
-                return false;
-
-            return a.to < b.to;
-        }
-    };
-
-    typedef std::set<TEdge, EdgeCompare> TEdgeSet;
+    typedef ControlGraph::TEdge TEdge;
+    typedef ControlGraph::TEdgeSet TEdgeSet;
 
     const TEdgeSet& getBackEdges() const { return m_backEdges; }
 
