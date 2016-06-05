@@ -4,24 +4,25 @@
 using namespace type;
 
 static void printBlock(const Type& blockType, std::stringstream& stream) {
-    if (blockType.getSubTypes().size() < 2) {
+    if (blockType.getSubTypes().size() < Type::bstCaptureIndex) {
         stream << "(Block)";
         return;
     }
 
-    TMethod* const method = blockType[0].getValue()->cast<TMethod>();
-    const uint16_t offset = TInteger(blockType[1].getValue());
+    TMethod* const method = blockType[Type::bstOrigin].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(blockType[Type::bstOffset].getValue());
 
-    // Class>>method@offset
+    // Class>>method@offset#I[R][W]C
     stream
         << method->klass->name->toString()
         << ">>" << method->name->toString()
-        << "@" << offset
-        << blockType[3].toString()
-        << blockType[4].toString();
+        << "@" << offset                                       // block offset within a method
+        << "#" << blockType[Type::bstContextIndex].toString()  // creating context index
+        << blockType[Type::bstReadsTemps].toString()           // read temporaries indices
+        << blockType[Type::bstWritesTemps].toString();         // write temporaries indices
 
-    if (blockType.getSubTypes().size() > 5)
-        stream << blockType[5].toString();
+    if (blockType.getSubTypes().size() > Type::bstCaptureIndex)
+        stream << blockType[Type::bstCaptureIndex].toString(); // capture context index
 }
 
 std::string Type::toString(bool subtypesOnly /*= false*/) const {
@@ -146,15 +147,10 @@ Type& TypeAnalyzer::getArgumentType(const InstructionNode& instruction, std::siz
 void TypeAnalyzer::processInstruction(InstructionNode& instruction) {
 //     std::printf("processing %.2u\n", instruction.getIndex());
 
-    const TSmalltalkInstruction::TArgument argument = instruction.getInstruction().getArgument();
-
     switch (instruction.getInstruction().getOpcode()) {
-        case opcode::pushArgument:
-            m_context[instruction] = m_context.getArgument(argument);
-            break;
-
         case opcode::pushConstant:    doPushConstant(instruction);    break;
         case opcode::pushLiteral:     doPushLiteral(instruction);     break;
+        case opcode::pushArgument:    doPushArgument(instruction);    break;
 
         case opcode::pushTemporary:   doPushTemporary(instruction);   break;
         case opcode::assignTemporary: doAssignTemporary(instruction); break;
@@ -204,6 +200,18 @@ void TypeAnalyzer::doPushLiteral(const InstructionNode& instruction) {
     m_context[instruction] = Type(literal);
 }
 
+void TypeAnalyzer::doPushArgument(const InstructionNode& instruction) {
+    const TSmalltalkInstruction::TArgument index = instruction.getInstruction().getArgument();
+
+    if (m_blockType) {
+        if (InferContext* const methodContext = getMethodContext()) {
+            m_context[instruction] = methodContext->getArgument(index);
+        }
+    } else {
+        m_context[instruction] = m_context.getArgument(index);
+    }
+}
+
 void TypeAnalyzer::doSendUnary(const InstructionNode& instruction) {
     const Type& argType = m_context[*instruction.getArgument()];
     const unaryBuiltIns::Opcode opcode = static_cast<unaryBuiltIns::Opcode>(instruction.getInstruction().getArgument());
@@ -240,7 +248,7 @@ void TypeAnalyzer::doSendUnary(const InstructionNode& instruction) {
 
 }
 
-void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
+void TypeAnalyzer::doSendBinary(InstructionNode& instruction) {
     const Type& lhsType = m_context[*instruction.getArgument(0)];
     const Type& rhsType = m_context[*instruction.getArgument(1)];
     const binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(instruction.getInstruction().getArgument());
@@ -306,7 +314,9 @@ void TypeAnalyzer::doSendBinary(const InstructionNode& instruction) {
     arguments.pushSubType(lhsType);
     arguments.pushSubType(rhsType);
 
-    if (InferContext* const context = m_system.inferMessage(selector, arguments))
+    captureContext(instruction, arguments);
+
+    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack))
         result = context->getReturnType();
     else
         result = Type(Type::tkPolytype);
@@ -326,41 +336,71 @@ void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
     result.set(globals.arrayClass, Type::tkArray);
 }
 
+InferContext* TypeAnalyzer::getMethodContext() {
+    for (TContextStack* stack = m_contextStack.parent; stack; stack = stack->parent) {
+        const TInteger contextIndex((*m_blockType)[Type::bstContextIndex].getValue());
+
+        if (stack->context.getIndex() == static_cast<std::size_t>(contextIndex))
+            return &stack->context;
+    }
+
+    return 0;
+}
+
 void TypeAnalyzer::doPushTemporary(const InstructionNode& instruction) {
     if (const TauNode* const tau = instruction.getTauNode()) {
         const Type& tauType = m_context[*tau];
 
-        //if (tauType.getKind() == Type::tkUndefined)
         if (tau->getKind() == TauNode::tkAggregator)
             processTau(*tau);
 
         m_context[instruction] = tauType;
-    } else if (m_blockType) {
-        // Block invocation primitive pass block arguments through creating method's temporaries.
-        // To simplify inference, we pass their types as context arguments.
 
-        const uint16_t argIndex = TInteger(m_blockType->getSubTypes()[2].getValue());
-        const TSmalltalkInstruction::TArgument tempIndex = instruction.getInstruction().getArgument();
+    } else if (m_blockType) {
+        const uint16_t argIndex  = TInteger((*m_blockType)[Type::bstArgIndex].getValue());
+        const uint16_t tempIndex = instruction.getInstruction().getArgument();
 
         if (tempIndex >= argIndex) {
             m_context[instruction] = m_context.getArgument(tempIndex - argIndex);
         } else {
-            if (m_blockType->getSubTypes().size() > 5) {
-                const Type& readIndices  = (*m_blockType)[3];
-                const Type& contextTypes = (*m_blockType)[5];
+            if (InferContext* const methodContext = getMethodContext()) {
+                const TInteger captureIndex((*m_blockType)[Type::bstCaptureIndex].getValue());
+                InferContext::TTypeMap& closureTypes = methodContext->getBlockClosures()[captureIndex];
 
-                for (std::size_t i = 0; i < readIndices.getSubTypes().size(); i++) {
-                    if (TInteger(readIndices[i].getValue()) == tempIndex) {
-                        m_context[instruction] = contextTypes[i];
-                        return;
-                    }
-                }
-
+                m_context[instruction] = closureTypes[tempIndex];
             }
-
-            m_context[instruction] = Type(Type::tkPolytype);
         }
+    } else {
+        // Method variables are initialized to nil by default
+        m_context[instruction] = Type(Type::tkPolytype);
     }
+}
+
+void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
+    const TauNode* const tau = instruction.getTauNode();
+    assert(tau);
+    assert(tau->getKind() == TauNode::tkProvider);
+
+    const ControlNode& argument = *instruction.getArgument();
+    m_context[*tau] = m_context[argument];
+
+    if (!m_blockType)
+        return;
+
+    InferContext* const methodContext = getMethodContext();
+    if (!methodContext)
+        return;
+
+    const TInteger captureIndex((*m_blockType)[Type::bstCaptureIndex].getValue());
+
+    InferContext::TTypeMap& closureTypes = methodContext->getBlockClosures()[captureIndex];
+    const uint16_t tempIndex = instruction.getInstruction().getArgument();
+
+    InferContext::TTypeMap::iterator iType = closureTypes.find(tempIndex);
+    if (iType == closureTypes.end())
+        closureTypes[tempIndex]  = m_context[argument];
+    else
+        closureTypes[tempIndex] &= m_context[argument];
 }
 
 void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
@@ -372,16 +412,17 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         Type& blockType = m_context[instruction];
 
         blockType.set(globals.blockClass, Type::tkMonotype);
-        blockType.pushSubType(origin);                   // [0]
-        blockType.pushSubType(Type(TInteger(offset)));   // [1]
-        blockType.pushSubType(Type(TInteger(argIndex))); // [2]
+        blockType.pushSubType(origin);                                 // [Type::bstOrigin]
+        blockType.pushSubType(Type(TInteger(offset)));                 // [Type::bstOffset]
+        blockType.pushSubType(Type(TInteger(argIndex)));               // [Type::bstArgIndex]
+        blockType.pushSubType(Type(TInteger(m_context.getIndex())));   // [Type::bstContextIndex]
 
         // TODO Cache and reuse in TypeSystem::inferBlock()
         ControlGraph* const blockGraph = new ControlGraph(pushBlock->getParsedBlock()->getContainer(), pushBlock->getParsedBlock());
         blockGraph->buildGraph();
 
         typedef ControlGraph::TMetaInfo::TIndexList TIndexList;
-        const TIndexList& readsTemporaries = blockGraph->getMeta().readsTemporaries;
+        const TIndexList& readsTemporaries  = blockGraph->getMeta().readsTemporaries;
         const TIndexList& writesTemporaries = blockGraph->getMeta().writesTemporaries;
 
         Type readIndices(globals.arrayClass, Type::tkArray);
@@ -403,16 +444,8 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
             writeIndices.pushSubType(Type(TInteger(writesTemporaries[index])));
         }
 
-        blockType.pushSubType(readIndices);  // [3]
-        blockType.pushSubType(writeIndices); // [4]
-    }
-}
-
-void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
-    if (const TauNode* const tau = instruction.getTauNode()) {
-        if (tau->getKind() == TauNode::tkProvider) {
-            m_context[*tau] = m_context[*instruction.getArgument()];
-        }
+        blockType.pushSubType(readIndices);  // [Type::bstReadsTemps]
+        blockType.pushSubType(writeIndices); // [Type::bstWritesTemps]
     }
 }
 
@@ -420,6 +453,8 @@ class TypeLocator : public GraphWalker {
 public:
     TypeLocator(std::size_t tempIndex, const ControlGraph::TEdgeSet& backEdges, InferContext& context, bool noBackEdges)
         : tempIndex(tempIndex), backEdges(backEdges), context(context), noBackEdges(noBackEdges), firstResult(true) {}
+
+
 
     virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode* path) {
         if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
@@ -479,7 +514,7 @@ public:
     bool firstResult;
 };
 
-void TypeAnalyzer::processBlocks(InstructionNode& instruction, Type& arguments) {
+void TypeAnalyzer::captureContext(InstructionNode& instruction, Type& arguments) {
     TMethod* const currentMethod = m_graph.getParsedMethod()->getOrigin();
 
     // We interested in literal blocks with context info from the same method
@@ -489,24 +524,39 @@ void TypeAnalyzer::processBlocks(InstructionNode& instruction, Type& arguments) 
         if (blockType.getValue() != globals.blockClass || blockType.getKind() != Type::tkMonotype)
             continue; // Not a block we may handle
 
-        if (blockType.getSubTypes().empty() || blockType[0].getValue() != currentMethod)
+        if (blockType.getSubTypes().empty() || blockType[Type::bstOrigin].getValue() != currentMethod)
             continue; // Non-literal or non-local block
 
         // Indexes of temporaries from the lexical context. See TypeAnalyzer::pushBlock()
-        const Type& readIndices = blockType[3];
-        Type& temps = blockType.pushSubType(Type(globals.arrayClass, Type::tkArray));
+        const Type& readIndices = blockType[Type::bstReadsTemps];
 
+        // Index of the capture site
+        if (readIndices.getSubTypes().size())
+            blockType.pushSubType(Type(TInteger(instruction.getIndex()))); // [Type::bstCaptureIndex]
+
+        // Prepare captured context by writing inferred variable types at the capture point
         for (std::size_t i = 0; i < readIndices.getSubTypes().size(); i++) {
             // Detect types of temporaries accessible from the current call site
+            // TODO Move out of the loop
+            const std::size_t variableIndex = TInteger(readIndices[i].getValue());
+
             TypeLocator locator(
-                TInteger(readIndices[i].getValue()), // look for temporary with this index
+                variableIndex, // look for temporary with this index
                 m_graph.getMeta().backEdges,
                 m_context,
-                m_baseRun                            // base run = skip back edges
+                m_baseRun      // base run = skip back edges
             );
 
             locator.run(&instruction, st::GraphWalker::wdBackward);
-            temps.pushSubType(locator.result);
+
+            InferContext::TTypeMap& typeMap = m_context.getBlockClosures()[instruction.getIndex()];
+            InferContext::TTypeMap::iterator iType = typeMap.find(variableIndex);
+
+            if (iType != typeMap.end())
+                iType->second &= locator.result;
+            else
+                typeMap[variableIndex] = locator.result;
+
         }
     }
 }
@@ -518,10 +568,10 @@ void TypeAnalyzer::doSendMessage(InstructionNode& instruction) {
     TSymbol* const selector = literals[literalIndex];
     Type& arguments = m_context[*instruction.getArgument()];
 
-    processBlocks(instruction, arguments);
+    captureContext(instruction, arguments);
 
     Type& result = m_context[instruction];
-    if (InferContext* const context = m_system.inferMessage(selector, arguments))
+    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack))
         result = context->getReturnType();
     else
         result = Type(Type::tkPolytype);
@@ -611,17 +661,17 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
         }
 
         case primitive::blockInvoke: {
-            const Type& block = m_context[*instruction.getArgument(0)];
-            const Type& arg   = m_context[*instruction.getArgument(1)];
-
+            Type& block = m_context[*instruction.getArgument(0)];
             Type arguments(Type::tkArray);
-            arguments.pushSubType(arg);
+
+            if (instruction.getArgumentsCount() == 2)
+                arguments.pushSubType(m_context[*instruction.getArgument(1)]);
 
             if (instruction.getArgumentsCount() == 3)
                 arguments.pushSubType(m_context[*instruction.getArgument(2)]);
 
-            if (BlockInferContext* invokeContext = m_system.inferBlock(block, arguments))
-                primitiveResult = invokeContext->getReturnType();
+            if (InferContext* const blockContext = m_system.inferBlock(block, arguments, &m_contextStack))
+                primitiveResult = blockContext->getReturnType();
             else
                 primitiveResult = Type(Type::tkPolytype);
 
@@ -781,7 +831,7 @@ ControlGraph* TypeSystem::getControlGraph(TMethod* method) {
     return controlGraph;
 }
 
-InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments) {
+InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments, TContextStack* parent) {
     if (!selector || arguments.getKind() != Type::tkArray || arguments.getSubTypes().empty())
         return 0;
 
@@ -826,7 +876,7 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
     if (! method) // TODO Redirect to #doesNotUnderstand: statically
         return 0;
 
-    InferContext* const inferContext = new InferContext(m_lastContextIndex++, arguments);
+    InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
     contextMap[arguments] = inferContext;
 
     ControlGraph* const methodGraph = getControlGraph(method);
@@ -838,7 +888,8 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
                 selector->toString().c_str());
 
     // TODO Handle recursive and tail calls
-    type::TypeAnalyzer analyzer(*this, *methodGraph, *inferContext);
+    TContextStack contextStack(*inferContext, parent);
+    type::TypeAnalyzer analyzer(*this, *methodGraph, contextStack);
     analyzer.run();
 
     Type& returnType = inferContext->getReturnType();
@@ -852,15 +903,16 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
     return inferContext;
 }
 
-BlockInferContext* TypeSystem::inferBlock(const Type& block, const Type& arguments) {
+InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContextStack* parent) {
     if (block.getKind() != Type::tkMonotype || arguments.getSubTypes().empty())
         return 0;
 
-    // TODO Cache
-    BlockInferContext* const inferContext = new BlockInferContext(m_lastContextIndex++, arguments);
 
-    TMethod* const method = block[0].getValue()->cast<TMethod>();
-    const uint16_t offset = TInteger(block[1].getValue());
+    TMethod* const method = block[Type::bstOrigin].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(block[Type::bstOffset].getValue());
+
+    // TODO Cache
+    InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
 
     ControlGraph* const methodGraph = getControlGraph(method);
     assert(controlGraph);
@@ -882,12 +934,12 @@ BlockInferContext* TypeSystem::inferBlock(const Type& block, const Type& argumen
         vis.run();
     }
 
-    type::TypeAnalyzer analyzer(*this, *blockGraph, *inferContext);
+    TContextStack contextStack(*inferContext, parent);
+    type::TypeAnalyzer analyzer(*this, *blockGraph, contextStack);
     analyzer.run(&block);
 
-    std::printf("%s::%s -> %s, ^%s\n", arguments.toString().c_str(), block.toString().c_str(),
-                inferContext->getReturnType().toString().c_str(),
-                inferContext->getBlockReturnType().toString().c_str());
+    std::printf("%s::%s -> %s\n", arguments.toString().c_str(), block.toString().c_str(),
+                inferContext->getReturnType().toString().c_str());
 
     return inferContext;
 }

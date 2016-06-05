@@ -21,6 +21,16 @@ public:
         tkPolytype
     };
 
+    enum TBlockSubtypes {
+        bstOrigin = 0,
+        bstOffset,
+        bstArgIndex,
+        bstContextIndex,
+        bstReadsTemps,
+        bstWritesTemps,
+        bstCaptureIndex
+    };
+
     // Return a string representation of a type:
     // Kind             Representation      Example
     // tkUndefined      ?                   ?
@@ -225,9 +235,10 @@ typedef std::map<TNodeIndex, Type> TTypeList;
 
 class InferContext {
 public:
-    InferContext(std::size_t index, const Type& arguments)
-        : m_index(index), m_arguments(arguments) {}
+    InferContext(TMethod* method, std::size_t index, const Type& arguments)
+        : m_method(method), m_index(index), m_arguments(arguments) {}
 
+    TMethod* getMethod() const { return m_method; }
     std::size_t getIndex() const { return m_index; }
 
     const Type& getArgument(std::size_t index) const {
@@ -238,6 +249,7 @@ public:
         else
             return polytype;
     }
+
     const Type& getArguments() const { return m_arguments; }
     const TTypeList& getTypeList() const { return m_instructions; }
 
@@ -247,22 +259,30 @@ public:
     Type& operator[] (TNodeIndex index) { return m_instructions[index]; }
     Type& operator[] (const ControlNode& node) { return getInstructionType(node.getIndex()); }
 
+    // variable index -> aggregated type
+    typedef std::map<std::size_t, Type>     TTypeMap;
+
+    // capture site index -> captured context types
+    typedef std::map<std::size_t, TTypeMap> TBlockClosures;
+
+    TBlockClosures& getBlockClosures() { return m_blockClosures; }
+
 private:
+    TMethod* const    m_method;
     const std::size_t m_index;
-    const Type m_arguments;
-    TTypeList  m_instructions;
-    Type       m_returnType;
+    const Type        m_arguments;
+    TTypeList         m_instructions;
+    Type              m_returnType;
+
+    TBlockClosures    m_blockClosures;
 };
 
-class BlockInferContext : public InferContext {
-public:
-    BlockInferContext(std::size_t index, const Type& arguments)
-        : InferContext(index, arguments) {}
+struct TContextStack {
+    InferContext&  context;
+    TContextStack* parent;
 
-    Type& getBlockReturnType() { return m_blockReturnType; }
-
-private:
-    Type m_blockReturnType;
+    TContextStack(InferContext& context, TContextStack* parent = 0)
+        : context(context), parent(parent) {}
 };
 
 class TypeSystem {
@@ -271,8 +291,9 @@ public:
 
     typedef TSymbol* TSelector;
 
-    InferContext* inferMessage(TSelector selector, const Type& arguments);
-    BlockInferContext* inferBlock(const Type& block, const Type& arguments);
+
+    InferContext* inferMessage(TSelector selector, const Type& arguments, TContextStack* parent);
+    InferContext* inferBlock(Type& block, const Type& arguments, TContextStack* parent);
 
     ControlGraph* getControlGraph(TMethod* method);
 
@@ -280,7 +301,7 @@ private:
     typedef std::pair<ParsedBytecode*, ControlGraph*> TGraphEntry;
     typedef std::map<TMethod*, TGraphEntry> TGraphCache;
 
-    typedef std::map<Type, InferContext*> TContextMap;
+    typedef std::map<Type, InferContext*>    TContextMap;
     typedef std::map<TSelector, TContextMap> TContextCache;
 
 private:
@@ -293,8 +314,14 @@ private:
 
 class TypeAnalyzer {
 public:
-    TypeAnalyzer(TypeSystem& system, ControlGraph& graph, InferContext& context)
-        : m_system(system), m_graph(graph), m_context(context), m_walker(*this) {}
+    TypeAnalyzer(TypeSystem& system, ControlGraph& graph, TContextStack& contextStack) :
+        m_system(system),
+        m_graph(graph),
+        m_contextStack(contextStack),
+        m_context(contextStack.context),
+        m_walker(*this)
+    {
+    }
 
     void run(const Type* blockType = 0);
 
@@ -309,6 +336,7 @@ private:
 
     void doPushConstant(const InstructionNode& instruction);
     void doPushLiteral(const InstructionNode& instruction);
+    void doPushArgument(const InstructionNode& instruction);
 
     void doPushTemporary(const InstructionNode& instruction);
     void doAssignTemporary(const InstructionNode& instruction);
@@ -316,7 +344,7 @@ private:
     void doPushBlock(const InstructionNode& instruction);
 
     void doSendUnary(const InstructionNode& instruction);
-    void doSendBinary(const InstructionNode& instruction);
+    void doSendBinary(InstructionNode& instruction);
     void doMarkArguments(const InstructionNode& instruction);
     void doSendMessage(InstructionNode& instruction);
 
@@ -324,7 +352,8 @@ private:
     void doSpecial(const InstructionNode& instruction);
 
 private:
-    void processBlocks(InstructionNode& instruction, Type& arguments);
+    void captureContext(InstructionNode& instruction, Type& arguments);
+    InferContext* getMethodContext();
 
 private:
 
@@ -349,10 +378,11 @@ private:
     };
 
 private:
-    TypeSystem&   m_system;
-    ControlGraph& m_graph;
+    TypeSystem&    m_system;
+    ControlGraph&  m_graph;
+    TContextStack& m_contextStack;
     InferContext&  m_context;
-    Walker        m_walker;
+    Walker         m_walker;
 
     bool m_baseRun;
     bool m_literalBranch;
