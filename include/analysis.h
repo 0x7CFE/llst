@@ -807,6 +807,35 @@ private:
     TEdgeSet m_backEdges;
 };
 
+class TauLinker : private BackEdgeDetector {
+public:
+    TauLinker(ControlGraph& graph) : m_graph(graph) {}
+
+    void run() { BackEdgeDetector::run(m_graph); }
+
+private:
+    virtual st::GraphWalker::TVisitResult visitNode(st::ControlNode& node, const TPathNode* path);
+    virtual void nodesVisited();
+
+private:
+    void optimizeTau();
+    void eraseRedundantTau();
+    void detectRedundantTau();
+
+    void createType(InstructionNode& instruction);
+    void processPushTemporary(InstructionNode& instruction);
+
+private:
+    ControlGraph& m_graph;
+    ControlGraph& getGraph() { return m_graph; }
+
+    typedef std::set<InstructionNode*, NodeIndexCompare> TInstructionSet;
+    TInstructionSet m_pendingNodes;
+
+    typedef std::list<TauNode*> TTauList;
+    TTauList m_providers;
+};
+
 } // namespace st
 
 #endif
