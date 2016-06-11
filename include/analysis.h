@@ -391,8 +391,11 @@ public:
 
     typedef std::list<ControlNode*> TNodeList;
     typedef TNodeList::iterator nodes_iterator;
+    typedef TNodeList::reverse_iterator reverse_iterator;
     nodes_iterator nodes_begin() { return m_nodes.begin(); }
     nodes_iterator nodes_end() { return m_nodes.end(); }
+    reverse_iterator nodes_rbegin() { return m_nodes.rbegin(); }
+    reverse_iterator nodes_rend() { return m_nodes.rend(); }
     bool isEmpty() const { return m_nodes.begin() == m_nodes.end(); }
 
     ControlNode* newNode(ControlNode::TNodeType type) {
@@ -440,6 +443,8 @@ public:
         m_nodes.remove(node);
         delete node;
     }
+
+    void eraseTauNodes();
 
     ~ControlGraph() {
         TDomainSet::iterator iDomain = m_domains.begin();

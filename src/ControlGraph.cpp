@@ -776,3 +776,26 @@ void ControlGraph::buildGraph()
         linker.run();
     }
 }
+
+void ControlGraph::eraseTauNodes() {
+    if (isEmpty())
+        return;
+
+    for (ControlGraph::reverse_iterator iNode = nodes_rbegin(); iNode != nodes_rend(); ) {
+        if (TauNode* const tau = (*iNode)->cast<TauNode>()) {
+            if (traces_enabled)
+                std::printf("Erasing tau %.2u\n", tau->getIndex());
+
+            const TNodeSet& consumers = tau->getConsumers();
+            for (TNodeSet::iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
+                if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>()) {
+                    assert(instruction->getTauNode() == tau);
+                    instruction->setTauNode(0);
+                }
+            }
+
+            ++iNode;
+            eraseNode(tau);
+        }
+    }
+}
