@@ -93,8 +93,8 @@ void TypeAnalyzer::run(const Type* blockType /*= 0*/) {
     m_walker.run(*m_graph.nodes_begin(), Walker::wdForward);
 
     std::cout << "Base run:" << std::endl;
-    type::TTypeList::const_iterator iType = m_context.getTypeList().begin();
-    for (; iType != m_context.getTypeList().end(); ++iType)
+    type::TTypeList::const_iterator iType = m_context.getTypes().begin();
+    for (; iType != m_context.getTypes().end(); ++iType)
         std::cout << iType->first << " " << iType->second.toString() << std::endl;
 
     // If single return is detected, replace composite with it's subtype
@@ -121,8 +121,8 @@ void TypeAnalyzer::run(const Type* blockType /*= 0*/) {
         m_walker.run(*m_graph.nodes_begin(), Walker::wdForward);
 
         std::cout << "Induction run:" << std::endl;
-        type::TTypeList::const_iterator iType = m_context.getTypeList().begin();
-        for (; iType != m_context.getTypeList().end(); ++iType)
+        type::TTypeList::const_iterator iType = m_context.getTypes().begin();
+        for (; iType != m_context.getTypes().end(); ++iType)
             std::cout << iType->first << " " << iType->second.toString() << std::endl;
 
         if (returnType.getSubTypes().size() == 1)

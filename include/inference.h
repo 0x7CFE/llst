@@ -251,7 +251,7 @@ public:
     }
 
     const Type& getArguments() const { return m_arguments; }
-    const TTypeList& getTypeList() const { return m_instructions; }
+    const TTypeList& getTypes() const { return m_types; }
 
     Type& getReturnType() { return m_returnType; }
 
@@ -271,7 +271,7 @@ private:
     TMethod* const    m_method;
     const std::size_t m_index;
     const Type        m_arguments;
-    TTypeList         m_instructions;
+    TTypeList         m_types;
     Type              m_returnType;
 
     TBlockClosures    m_blockClosures;
