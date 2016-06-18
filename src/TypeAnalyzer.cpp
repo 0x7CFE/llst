@@ -915,10 +915,10 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
             Type& block = m_context[*instruction.getArgument(0)];
             Type arguments(Type::tkArray);
 
-            if (instruction.getArgumentsCount() == 2)
+            if (instruction.getArgumentsCount() > 1)
                 arguments.pushSubType(m_context[*instruction.getArgument(1)]);
 
-            if (instruction.getArgumentsCount() == 3)
+            if (instruction.getArgumentsCount() > 2)
                 arguments.pushSubType(m_context[*instruction.getArgument(2)]);
 
             if (InferContext* const blockContext = m_system.inferBlock(block, arguments, &m_contextStack))
