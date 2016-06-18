@@ -939,6 +939,7 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
         {
             const Type& self = m_context[*instruction.getArgument(0)];
             const Type& arg  = m_context[*instruction.getArgument(1)];
+            static const Type smallInt(globals.smallIntClass, Type::tkMonotype);
 
             if (isSmallInteger(self.getValue()) && isSmallInteger(arg.getValue())) {
                 const int lhs = TInteger(self.getValue()).getValue();
@@ -959,10 +960,10 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
                         primitiveResult = (lhs < rhs) ? globals.trueObject : globals.falseObject;
                         break;
                 }
+            } else if ((self & smallInt) == smallInt && (arg & smallInt) == smallInt) {
+                primitiveResult = smallInt;
             } else {
-                // TODO Check for (SmallInt)
                 primitiveResult = Type(Type::tkPolytype);
-                // primitiveResult = Type(globals.smallIntClass, Type::tkMonotype);
             }
 
             break;
