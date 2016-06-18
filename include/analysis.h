@@ -264,12 +264,12 @@ private:
 // Tau node is reserved for further use in type inference subsystem.
 // It will link variable type transitions across a method.
 class TauNode : public ControlNode {
-
 public:
     TauNode(uint32_t index) : ControlNode(index), m_kind(tkUnknown) { }
     virtual TNodeType getNodeType() const { return ntTau; }
 
-    typedef std::map<ControlNode*, bool> TIncomingMap;
+    typedef std::map<ControlNode*, bool, NodeIndexCompare> TIncomingMap;
+    typedef std::map<ControlNode*, std::size_t, NodeIndexCompare> TIncomingIndexMap;
 
     void addIncoming(ControlNode* node, bool byBackEdge = false) {
         m_incomingMap[node] = byBackEdge;
@@ -516,6 +516,7 @@ public:
         bool isBlock;
         bool hasBlockReturn;
         bool hasLiteralBlocks;
+        bool hasMutatingBlocks;
 
         bool hasLoops;
         bool hasBackEdgeTau;
@@ -697,13 +698,13 @@ public:
         wdBackward
     };
 
-    void run(ControlNode* startNode, TWalkDirection direction) {
+    void run(ControlNode* startNode, TWalkDirection direction, bool visitStart = true) {
         assert(startNode);
         m_direction = direction;
 
         TPathNode path(startNode);
 
-        if (visitNode(*startNode, &path) != vrKeepWalking)
+        if (visitStart && visitNode(*startNode, &path) != vrKeepWalking)
             return;
 
         walkIn(startNode, &path);
@@ -858,7 +859,7 @@ public:
     void reset();
 
 private:
-    virtual st::GraphWalker::TVisitResult visitNode(st::ControlNode& node, const TPathNode* path);
+    virtual GraphWalker::TVisitResult visitNode(ControlNode& node, const TPathNode* path);
     virtual void nodesVisited();
 
 private:

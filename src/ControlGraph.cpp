@@ -9,6 +9,7 @@ ControlGraph::TMetaInfo::TMetaInfo() :
     isBlock(false),
     hasBlockReturn(false),
     hasLiteralBlocks(false),
+    hasMutatingBlocks(false),
     hasLoops(false),
     hasBackEdgeTau(false),
     usesSelf(false),
@@ -202,7 +203,13 @@ void GraphConstructor::processNode(InstructionNode* node)
             break;
 
         case opcode::pushBlock: {
-            m_graph->getMeta().hasLiteralBlocks = true;
+            // FIXME m_graph->getMeta().hasLiteralBlocks = true;
+            //
+            // NOTE  Technically, we may set the meta here,
+            //       but we may get false-positive value
+            //       due to a known bug in the imageBuilder
+            //       which leaves dead PushBlock instructions
+            //       when inlining key selectors.
 
             const uint16_t blockEndOffset    = node->getInstruction().getExtra();
             ParsedMethod* const parsedMethod = m_graph->getParsedMethod();
@@ -790,12 +797,6 @@ void ControlGraph::buildGraph()
 
     if (traces_enabled)
         std::printf("Phase 4. Linking PushTemporary and AssignTemporary nodes\n");
-
-    // Linking PushTemporary and AssignTemporary pairs
-    {
-        TauLinker linker(*this);
-        linker.run();
-    }
 }
 
 void ControlGraph::eraseTauNodes() {

@@ -231,7 +231,7 @@ private:
 };
 
 typedef std::size_t TNodeIndex;
-typedef std::map<TNodeIndex, Type> TTypeList;
+typedef std::map<TNodeIndex, Type> TTypeMap;
 
 class InferContext {
 public:
@@ -251,27 +251,31 @@ public:
     }
 
     const Type& getArguments() const { return m_arguments; }
-    const TTypeList& getTypes() const { return m_types; }
+    const TTypeMap& getTypes() const { return m_types; }
+    void resetTypes() { m_types.clear(); }
 
     Type& getReturnType() { return m_returnType; }
 
-    Type& getInstructionType(TNodeIndex index) { return m_instructions[index]; }
-    Type& operator[] (TNodeIndex index) { return m_instructions[index]; }
+    Type& getInstructionType(TNodeIndex index) { return m_types[index]; }
+    Type& operator[] (TNodeIndex index) { return m_types[index]; }
     Type& operator[] (const ControlNode& node) { return getInstructionType(node.getIndex()); }
 
     // variable index -> aggregated type
-    typedef std::map<std::size_t, Type>     TTypeMap;
+    typedef std::size_t TVariableIndex;
+    typedef std::map<TVariableIndex, Type> TVariableMap;
 
     // capture site index -> captured context types
-    typedef std::map<std::size_t, TTypeMap> TBlockClosures;
+    typedef std::size_t TSiteIndex;
+    typedef std::map<TSiteIndex, TVariableMap> TBlockClosures;
 
     TBlockClosures& getBlockClosures() { return m_blockClosures; }
+    void resetClosures() { m_blockClosures.clear(); }
 
 private:
     TMethod* const    m_method;
     const std::size_t m_index;
     const Type        m_arguments;
-    TTypeList         m_types;
+    TTypeMap          m_types;
     Type              m_returnType;
 
     TBlockClosures    m_blockClosures;
@@ -319,6 +323,7 @@ public:
         m_graph(graph),
         m_contextStack(contextStack),
         m_context(contextStack.context),
+        m_tauLinker(m_graph),
         m_walker(*this)
     {
     }
@@ -326,6 +331,9 @@ public:
     void run(const Type* blockType = 0);
 
 private:
+    std::string getMethodName();
+    bool basicRun();
+
     void processInstruction(InstructionNode& instruction);
     void processTau(const TauNode& tau);
 
@@ -355,6 +363,8 @@ private:
     void captureContext(InstructionNode& instruction, Type& arguments);
     InferContext* getMethodContext();
 
+    void fillLinkerClosures();
+
 private:
 
     class Walker : public GraphWalker {
@@ -382,7 +392,12 @@ private:
     ControlGraph&  m_graph;
     TContextStack& m_contextStack;
     InferContext&  m_context;
+
+    TauLinker      m_tauLinker;
     Walker         m_walker;
+
+    typedef std::map<InferContext::TSiteIndex, InstructionNode*> TSiteMap;
+    TSiteMap m_siteMap;
 
     bool m_baseRun;
     bool m_literalBranch;
