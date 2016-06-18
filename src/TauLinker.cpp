@@ -415,10 +415,10 @@ void TauLinker::processClosure(InstructionNode& instruction) {
         TAssignSiteList::const_iterator iAssignSite = locator.assignSites.begin();
         for (; iAssignSite != locator.assignSites.end(); ++iAssignSite) {
             InstructionNode* const assignNode = (*iAssignSite).instruction->cast<InstructionNode>();
-            assert(assignTemporary);
+            assert(assignNode);
 
             TauNode* const assignTau = assignNode->getTauNode();
-            assert(assignType);
+            assert(assignTau);
 
             if ((*iAssignSite).byBackEdge)
                 getGraph().getMeta().hasBackEdgeTau = true;

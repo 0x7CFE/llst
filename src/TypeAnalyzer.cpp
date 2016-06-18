@@ -1139,7 +1139,7 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
                 selector->toString().c_str());
 
     ControlGraph* const methodGraph = getControlGraph(method);
-    assert(controlGraph);
+    assert(methodGraph);
 
     // TODO Handle recursive and tail calls
     TContextStack contextStack(*inferContext, parent);
@@ -1168,7 +1168,7 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
     InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
 
     ControlGraph* const methodGraph = getControlGraph(method);
-    assert(controlGraph);
+    assert(methodGraph);
 
     std::printf("Analyzing block %s::%s ...\n", arguments.toString().c_str(), block.toString().c_str());
 
