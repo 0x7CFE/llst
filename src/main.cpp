@@ -92,6 +92,7 @@ int main(int argc, char **argv) {
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     smalltalkImage->loadImage(llstArgs.imagePath);
 
+
     SmalltalkVM vm(smalltalkImage.get(), memoryManager.get());
 
     // Creating completion database and filling it with info
@@ -103,6 +104,8 @@ int main(int argc, char **argv) {
     JITRuntime runtime;
     runtime.initialize(&vm);
 #endif
+
+//     testCompiler(smalltalkImage.get(), runtime);
 
     // Creating runtime context
     hptr<TContext> initContext = vm.newObject<TContext>();

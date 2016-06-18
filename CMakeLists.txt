@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 2.8.4)
 
 set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_SOURCE_DIR}/cmake/variables.cmake")
 set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-set (LLVM_PACKAGE_VERSION 3.3)
+set (LLVM_PACKAGE_VERSION 3.4)
 
 project(llst)
 
@@ -127,13 +127,16 @@ if (USE_LLVM)
         src/llstPass.cpp
         src/llstDebuggingPass.cpp
     )
+
+    add_library(trampoline "src/trampoline.cpp")
+    set_source_files_properties(src/trampoline.cpp PROPERTIES COMPILE_FLAGS "-freg-struct-return")
 endif()
 
 add_executable(llst src/main.cpp)
 add_dependencies(llst image)
 
 if (USE_LLVM)
-    target_link_libraries(llst jit ${LLVM_LIBS} ${LLVM_LD_FLAGS})
+    target_link_libraries(llst jit trampoline ${LLVM_LIBS} ${LLVM_LD_FLAGS})
 endif()
 target_link_libraries(llst standard_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 

@@ -90,7 +90,7 @@ struct TObjectTypes {
     llvm::StructType* byteObject;
     llvm::StructType* blockReturn;
     llvm::StructType* process;
-
+    llvm::StructType* returnValueType;
 
     void initializeFromModule(llvm::Module* module) {
         object      = module->getTypeByName("TObject");
@@ -106,6 +106,12 @@ struct TObjectTypes {
         byteObject  = module->getTypeByName("TByteObject");
         blockReturn = module->getTypeByName("TBlockReturn");
         process     = module->getTypeByName("TProcess");
+
+        returnValueType = llvm::StructType::get(
+            object->getPointerTo(),
+            context->getPointerTo(),
+            NULL
+        );
     }
 };
 
@@ -206,6 +212,9 @@ public:
 
         llvm::BasicBlock*   preamble;
         llvm::BasicBlock*   exceptionLandingPad;
+        llvm::BasicBlock*   unwindBlockReturn;
+        llvm::PHINode*      unwindPhi;
+
         bool                methodHasBlockReturn;
         bool                methodAllocatesMemory;
 
@@ -221,7 +230,7 @@ public:
 
         TJITContext(MethodCompiler* compiler, TMethod* method, bool parse = true)
         : currentNode(0), originMethod(method), function(0), builder(0),
-            preamble(0), exceptionLandingPad(0), methodHasBlockReturn(false),
+            preamble(0), exceptionLandingPad(0), unwindBlockReturn(0), unwindPhi(0), methodHasBlockReturn(false),
             methodAllocatesMemory(true), compiler(compiler), contextHolder(0), selfHolder(0)
         {
             if (parse) {
@@ -289,6 +298,8 @@ private:
     void writeFunctionBody(TJITContext& jit);
     void writeInstruction(TJITContext& jit);
     void writeLandingPad(TJITContext& jit);
+    void writeUnwindBlockReturn(TJITContext& jit);
+    void emitReturn(TJITContext& jit, llvm::Value* object, llvm::Value* targetContext = 0);
 
     void doPushInstance(TJITContext& jit);
     void doPushArgument(TJITContext& jit);
@@ -370,12 +381,25 @@ public:
     }
 };
 
+
+struct TReturnValue {
+    TObject*  value;
+    TContext* targetContext;
+
+    TReturnValue(TObject* value = 0, TContext* targetContext = 0)
+        : value(value), targetContext(targetContext) { }
+
+    static void* getBlockReturnType() {
+        return const_cast<void*>(reinterpret_cast<const void*>( &typeid(TReturnValue) ));
+    }
+};
+
 extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
+    TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+    TReturnValue invokeBlock(TBlock* block, TContext* callingContext);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
     const void*  getBlockReturnType();
     void         checkRoot(TObject* value, TObject** objectSlot);
@@ -389,10 +413,12 @@ extern "C" {
 
 class JITRuntime {
 public:
-    typedef TObject* (*TMethodFunction)(TContext*);
-    typedef TObject* (*TBlockFunction)(TBlock*);
+    typedef TReturnValue (*TMethodFunction)(TContext*);
+    typedef TReturnValue (*TBlockFunction)(TBlock*);
 
 private:
+    friend class SmalltalkVM;
+
     llvm::FunctionPassManager* m_functionPassManager;
     llvm::PassManager*         m_modulePassManager;
 
@@ -408,15 +434,16 @@ private:
 
     static JITRuntime* s_instance;
 
-    TObject* sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex = 0);
+    void sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex, TReturnValue& result);
+    void invokeBlock(TBlock* block, TContext* callingContext, TReturnValue& result);
 
     TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
-    friend TObject*     sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
+    friend TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
     friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
-    friend TObject*     invokeBlock(TBlock* block, TContext* callingContext);
+    friend TReturnValue invokeBlock(TBlock* block, TContext* callingContext);
     friend void         emitBlockReturn(TObject* value, TContext* targetContext);
 
     struct TFunctionCacheEntry
@@ -511,7 +538,7 @@ private:
     bool detectLiteralReceiver(llvm::Value* messageArguments);
 public:
 
-    TObject* invokeBlock(TBlock* block, TContext* callingContext, bool once = false);
+    void invokeBlock(TBlock* block, TContext* callingContext, TReturnValue& result, bool once = false);
 
     void patchHotMethods();
     void printMethod(TMethod* method) {
@@ -537,13 +564,9 @@ public:
     ~JITRuntime();
 };
 
-struct TBlockReturn {
-    TObject*  value;
-    TContext* targetContext;
-    TBlockReturn(TObject* value, TContext* targetContext)
-        : value(value), targetContext(targetContext) { }
+extern "C" {
 
-    static void* getBlockReturnType() {
-        return const_cast<void*>(reinterpret_cast<const void*>( &typeid(TBlockReturn) ));
-    }
-};
+void methodTrampoline(JITRuntime::TMethodFunction function, TContext* context, TReturnValue& result);
+void blockTrampoline(JITRuntime::TBlockFunction function, TBlock* block, TReturnValue& result);
+
+}
