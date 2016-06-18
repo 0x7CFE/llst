@@ -156,6 +156,9 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
             if (tau->getKind() == st::TauNode::tkProvider) {
                 m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
                     << "weight=15 dir=back labelfloat=true color=\"red\" fontcolor=\"red\" style=\"dashed\" constraint=true ];\n";
+//             } else if (tau->getKind() == st::TauNode::tkClosure) {
+//                 m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
+//                     << "weight=15 dir=back labelfloat=true color=\"orange\" fontcolor=\"orange\" style=\"dashed\" constraint=true ];\n";
             } else {
                 const bool byBackEdge = iNode->second;
                 m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
@@ -169,7 +172,23 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
             if ((*iNode)->getNodeType() == st::ControlNode::ntTau)
                 continue;
 
-            m_stream << "\t\t" << tau->getIndex() << " -> " << (*iNode)->getIndex() << " ["
+            if (tau->getKind() == st::TauNode::tkClosure) {
+                if (static_cast<const st::ClosureTauNode*>(tau)->getOrigin() == *iNode) {
+                    m_stream << "\t\t";
+
+                    if (tau->getIncomingMap().empty())
+                        m_stream  << (*iNode)->getIndex() << " -> " << tau->getIndex();
+                    else
+                        m_stream  << tau->getIndex() << " -> " << (*iNode)->getIndex();
+
+                    m_stream << " [ weight=25 dir=back labelfloat=true color=\"orange\" fontcolor=\"orange\" style=\"dashed\" constraint=true ];\n";
+
+                    continue;
+                }
+            }
+
+            m_stream
+                << "\t\t" << tau->getIndex() << " -> " << (*iNode)->getIndex() << " ["
                 << "weight=15 dir=back labelfloat=true color=\"green\" fontcolor=\"green\" style=\"dashed\" constraint=true ];\n";
         }
     }
@@ -208,7 +227,17 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
 
         case st::ControlNode::ntTau:
             label = "Tau ";
-            color = (node->cast<st::TauNode>()->getKind() == st::TauNode::tkProvider) ? "red" : "green";
+
+            switch (node->cast<st::TauNode>()->getKind()) {
+                case st::TauNode::tkProvider: color = "red"; break;
+                case st::TauNode::tkClosure: color = "orange"; break;
+
+                case st::TauNode::tkAggregator:
+                default:
+                    color = "green"; break;
+                    break;
+            }
+
             shape = "oval";
             break;
 
