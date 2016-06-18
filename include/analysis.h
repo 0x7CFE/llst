@@ -279,9 +279,10 @@ public:
     const TIncomingMap& getIncomingMap() const { return m_incomingMap; }
 
     enum TKind {
-        tkUnknown,
+        tkUnknown = 0,
         tkProvider,
-        tkAggregator
+        tkAggregator,
+        tkClosure
     };
 
     void setKind(TKind value) { m_kind = value; }
@@ -290,6 +291,20 @@ public:
 private:
     TIncomingMap m_incomingMap;
     TKind m_kind;
+};
+
+class ClosureTauNode : public TauNode {
+public:
+    ClosureTauNode(uint32_t index) : TauNode(index), m_origin(0) { }
+
+    typedef std::size_t TIndex;
+    typedef std::vector<TIndex> TIndexList;
+
+    InstructionNode* getOrigin() const { return m_origin; }
+    void setOrigin(InstructionNode* node) { m_origin = node; }
+
+private:
+    InstructionNode* m_origin;
 };
 
 // Domain is a group of nodes within a graph
@@ -560,6 +575,10 @@ template<> BranchNode* ControlNode::cast<BranchNode>();
 template<> const BranchNode* ControlNode::cast<BranchNode>() const;
 template<> BranchNode* ControlGraph::newNode<BranchNode>();
 
+template<> ClosureTauNode* ControlNode::cast<ClosureTauNode>();
+template<> ClosureTauNode* ControlGraph::newNode<ClosureTauNode>();
+template<> const ClosureTauNode* ControlNode::cast<ClosureTauNode>() const;
+
 class DomainVisitor {
 public:
     DomainVisitor(ControlGraph* graph) : m_graph(graph) { }
@@ -818,6 +837,26 @@ public:
 
     void run() { BackEdgeDetector::run(m_graph); }
 
+    void addClosureNode(
+        const InstructionNode& node,
+        const ClosureTauNode::TIndexList& readIndices,
+        const ClosureTauNode::TIndexList& writeIndices);
+
+    struct TClosureInfo {
+        ClosureTauNode::TIndexList readIndices;
+        ClosureTauNode::TIndexList writeIndices;
+
+        bool writesIndex(ClosureTauNode::TIndex index) const {
+            return std::find(writeIndices.begin(), writeIndices.end(), index) != writeIndices.end();
+        }
+    };
+
+    typedef std::map<const InstructionNode*, TClosureInfo> TClosureMap;
+    const TClosureMap& getClosures() const { return m_closures; }
+
+    void eraseTauNodes();
+    void reset();
+
 private:
     virtual st::GraphWalker::TVisitResult visitNode(st::ControlNode& node, const TPathNode* path);
     virtual void nodesVisited();
@@ -829,6 +868,7 @@ private:
 
     void createType(InstructionNode& instruction);
     void processPushTemporary(InstructionNode& instruction);
+    void processClosure(InstructionNode& instruction);
 
 private:
     ControlGraph& m_graph;
@@ -839,6 +879,8 @@ private:
 
     typedef std::list<TauNode*> TTauList;
     TTauList m_providers;
+
+    TClosureMap m_closures;
 };
 
 } // namespace st

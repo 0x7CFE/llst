@@ -58,6 +58,27 @@ template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>() {
     return static_cast<PushBlockNode*>(node);
 }
 
+template<> ClosureTauNode* ControlGraph::newNode<ClosureTauNode>() {
+    ClosureTauNode* const node = new ClosureTauNode(m_lastNodeIndex++);
+    m_nodes.push_back(node);
+    return static_cast<ClosureTauNode*>(node);
+}
+
+template<> ClosureTauNode* ControlNode::cast<ClosureTauNode>() {
+    if (this->getNodeType() != ntTau)
+        return 0;
+
+    TauNode* const node = static_cast<TauNode*>(this);
+    if (node->getKind() != TauNode::tkClosure)
+        return 0;
+
+    return static_cast<ClosureTauNode*>(this);
+}
+
+template<> const ClosureTauNode* ControlNode::cast<ClosureTauNode>() const {
+    return const_cast<ControlNode*>(this)->cast<ClosureTauNode>();
+}
+
 template<> BranchNode* ControlNode::cast<BranchNode>() {
     if (this->getNodeType() != ntInstruction)
         return 0;
@@ -796,6 +817,8 @@ void ControlGraph::eraseTauNodes() {
 
             ++iNode;
             eraseNode(tau);
+        } else {
+            ++iNode;
         }
     }
 }
