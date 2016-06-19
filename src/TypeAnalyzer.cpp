@@ -812,9 +812,11 @@ void TypeAnalyzer::captureContext(InstructionNode& instruction, Type& arguments)
     }
 }
 
-void TypeAnalyzer::doSendMessage(InstructionNode& instruction) {
+void TypeAnalyzer::doSendMessage(InstructionNode& instruction, bool sendToSuper /*= false*/) {
     TSymbolArray&  literals     = *m_graph.getParsedMethod()->getOrigin()->literals;
-    const uint32_t literalIndex = instruction.getInstruction().getArgument();
+    const uint32_t literalIndex = sendToSuper ?
+        instruction.getInstruction().getExtra() :
+        instruction.getInstruction().getArgument();
 
     TSymbol* const selector = literals[literalIndex];
     Type& arguments = m_context[*instruction.getArgument()];
@@ -822,7 +824,7 @@ void TypeAnalyzer::doSendMessage(InstructionNode& instruction) {
     captureContext(instruction, arguments);
 
     Type& result = m_context[instruction];
-    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack))
+    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack, sendToSuper))
         result = context->getReturnType();
     else
         result = Type(Type::tkPolytype);
@@ -972,11 +974,11 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
 
     m_context.getReturnType().addSubType(primitiveResult);
 
-    // This should depend on the primitive inference outcome
+    // TODO This should depend on the primitive inference outcome
     m_walker.addStopNode(*instruction.getOutEdges().begin());
 }
 
-void TypeAnalyzer::doSpecial(const InstructionNode& instruction) {
+void TypeAnalyzer::doSpecial(InstructionNode& instruction) {
     const TSmalltalkInstruction::TArgument argument = instruction.getInstruction().getArgument();
 
     switch (argument) {
@@ -1007,8 +1009,7 @@ void TypeAnalyzer::doSpecial(const InstructionNode& instruction) {
             break;
 
         case special::sendToSuper:
-            // For now, treat method call as *
-            m_context[instruction] = Type(Type::tkPolytype);
+            doSendMessage(instruction, true);
             break;
 
         case special::duplicate:
@@ -1086,7 +1087,12 @@ ControlGraph* TypeSystem::getControlGraph(TMethod* method) {
     return controlGraph;
 }
 
-InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments, TContextStack* parent) {
+InferContext* TypeSystem::inferMessage(
+    TSelector selector,
+    const Type& arguments,
+    TContextStack* parent,
+    bool sendToSuper /*= false*/)
+{
     if (!selector || arguments.getKind() != Type::tkArray || arguments.getSubTypes().empty())
         return 0;
 
@@ -1109,16 +1115,18 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
 
     TContextMap& contextMap = m_contextCache[selector];
 
-    const TContextMap::iterator iContext = contextMap.find(arguments);
-    if (iContext != contextMap.end())
-        return iContext->second;
+    if (! sendToSuper) {
+        const TContextMap::iterator iContext = contextMap.find(arguments);
+        if (iContext != contextMap.end())
+            return iContext->second;
+    }
 
     TClass* receiver = 0;
 
     if (self.getKind() == Type::tkLiteral) {
         if (isSmallInteger(self.getValue()))
             receiver = globals.smallIntClass;
-        else if (self.getValue()->getClass()->getClass() == globals.stringClass->getClass()->getClass())
+        else if (self.getValue()->getClass() == globals.stringClass->getClass()->getClass())
             receiver = self.getValue()->cast<TClass>();
         else
             receiver = self.getValue()->getClass();
@@ -1126,18 +1134,27 @@ InferContext* TypeSystem::inferMessage(TSelector selector, const Type& arguments
         receiver = self.getValue()->cast<TClass>();
     }
 
+    if (sendToSuper)
+        receiver = receiver->parentClass;
+
     TMethod* const method = m_vm.lookupMethod(selector, receiver);
 
-    if (! method) // TODO Redirect to #doesNotUnderstand: statically
+    if (! method) { // TODO Redirect to #doesNotUnderstand: statically
+        std::printf("Lookup failed for %s::?>>%s...\n",
+                    arguments.toString().c_str(),
+                    selector->toString().c_str());
+
         return 0;
+    }
 
     InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
     contextMap[arguments] = inferContext;
 
-    std::printf("Analyzing %s::%s>>%s...\n",
+    std::printf("Analyzing %s::%s>>%s...\n%s!\n",
                 arguments.toString().c_str(),
                 method->klass->name->toString().c_str(),
-                selector->toString().c_str());
+                selector->toString().c_str(),
+                method->text->toString().c_str());
 
     ControlGraph* const methodGraph = getControlGraph(method);
     assert(methodGraph);

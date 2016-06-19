@@ -295,8 +295,12 @@ public:
 
     typedef TSymbol* TSelector;
 
+    InferContext* inferMessage(
+        TSelector selector,
+        const Type& arguments,
+        TContextStack* parent,
+        bool sendToSuper = false);
 
-    InferContext* inferMessage(TSelector selector, const Type& arguments, TContextStack* parent);
     InferContext* inferBlock(Type& block, const Type& arguments, TContextStack* parent);
 
     ControlGraph* getControlGraph(TMethod* method);
@@ -354,10 +358,10 @@ private:
     void doSendUnary(const InstructionNode& instruction);
     void doSendBinary(InstructionNode& instruction);
     void doMarkArguments(const InstructionNode& instruction);
-    void doSendMessage(InstructionNode& instruction);
+    void doSendMessage(InstructionNode& instruction, bool sendToSuper = false);
 
     void doPrimitive(const InstructionNode& instruction);
-    void doSpecial(const InstructionNode& instruction);
+    void doSpecial(InstructionNode& instruction);
 
 private:
     void captureContext(InstructionNode& instruction, Type& arguments);
