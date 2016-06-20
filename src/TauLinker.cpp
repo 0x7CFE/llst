@@ -318,6 +318,9 @@ void TauLinker::detectRedundantTau() {
 }
 
 void TauLinker::createType(InstructionNode& instruction) {
+    if (instruction.getTauNode())
+        return;
+
     TauNode* const tau = getGraph().newNode<TauNode>();
     tau->setKind(TauNode::tkProvider);
     tau->addIncoming(&instruction);
@@ -337,6 +340,9 @@ void TauLinker::createType(InstructionNode& instruction) {
 }
 
 void TauLinker::processPushTemporary(InstructionNode& instruction) {
+    if (instruction.getTauNode())
+        return;
+
     // Searching for all AssignTemporary's and closures that provide a value for current node
     AssignLocator locator(instruction.getInstruction().getArgument(), getBackEdges(), getClosures());
     locator.run(&instruction, GraphWalker::wdBackward, false);
@@ -380,6 +386,9 @@ void TauLinker::processPushTemporary(InstructionNode& instruction) {
 }
 
 void TauLinker::processClosure(InstructionNode& instruction) {
+    if (instruction.getTauNode())
+        return;
+
     if (traces_enabled)
         std::printf("Analyzing closure %.2u\n", instruction.getIndex());
 
