@@ -808,9 +808,18 @@ void ControlGraph::eraseTauNodes() {
             if (traces_enabled)
                 std::printf("Erasing tau %.2u\n", tau->getIndex());
 
+            const TauNode::TIncomingMap& incomings = tau->getIncomingMap();
+            TauNode::TIncomingMap::const_iterator iIncoming = incomings.begin();
+            for (; iIncoming != incomings.end(); ++iIncoming) {
+                if (InstructionNode* const instruction = iIncoming->first->cast<InstructionNode>())
+                    instruction->setTauNode(0);
+
+                iIncoming->first->removeConsumer(tau);
+            }
+
             const TNodeSet& consumers = tau->getConsumers();
-            for (TNodeSet::iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
-                if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>()) {
+            for (TNodeSet::const_iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
+                if (InstructionNode* const instruction = (*iConsumer)->cast<InstructionNode>()) {
                     assert(instruction->getTauNode() == tau);
                     instruction->setTauNode(0);
                 }
