@@ -254,7 +254,12 @@ public:
     const TTypeMap& getTypes() const { return m_types; }
     void resetTypes() { m_types.clear(); }
 
-    Type& getReturnType() { return m_returnType; }
+    Type& getRawReturnType() { return m_returnType; }
+
+    const Type& getReturnType() const {
+        const std::size_t subtypesCount = m_returnType.getSubTypes().size();
+        return (subtypesCount == 1) ? m_returnType[0] : m_returnType;
+    }
 
     Type& getInstructionType(TNodeIndex index) { return m_types[index]; }
     Type& operator[] (TNodeIndex index) { return m_types[index]; }

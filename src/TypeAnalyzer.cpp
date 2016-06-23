@@ -146,15 +146,7 @@ bool TypeAnalyzer::basicRun() {
     m_walker.resetStopNodes();
     m_walker.run(*m_graph.nodes_begin(), Walker::wdForward);
 
-    Type& returnType = m_context.getReturnType();
-    const bool singleReturn = (returnType.getSubTypes().size() == 1);
-
-    if (singleReturn)
-        returnType = returnType[0];
-    else
-        returnType.setKind(Type::tkComposite);
-
-    return singleReturn;
+    return m_context.getRawReturnType().getSubTypes().size() == 1;
 }
 
 std::string TypeAnalyzer::getMethodName() {
@@ -972,7 +964,7 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
         }
     }
 
-    m_context.getReturnType().addSubType(primitiveResult);
+    m_context.getRawReturnType().addSubType(primitiveResult);
 
     // TODO This should depend on the primitive inference outcome
     m_walker.addStopNode(*instruction.getOutEdges().begin());
@@ -1001,11 +993,11 @@ void TypeAnalyzer::doSpecial(InstructionNode& instruction) {
         }
 
         case special::stackReturn:
-            m_context.getReturnType().addSubType(getArgumentType(instruction));
+            m_context.getRawReturnType().addSubType(getArgumentType(instruction));
             break;
 
         case special::selfReturn:
-            m_context.getReturnType().addSubType(m_context.getArgument(0));
+            m_context.getRawReturnType().addSubType(m_context.getArgument(0));
             break;
 
         case special::sendToSuper:
@@ -1164,7 +1156,7 @@ InferContext* TypeSystem::inferMessage(
     type::TypeAnalyzer analyzer(*this, *methodGraph, contextStack);
     analyzer.run();
 
-    Type& returnType = inferContext->getReturnType();
+    const Type& returnType = inferContext->getReturnType();
 
     std::printf("%s::%s>>%s -> %s\n",
                 arguments.toString().c_str(),
@@ -1210,7 +1202,7 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
     analyzer.run(&block);
 
     std::printf("%s::%s -> %s\n", arguments.toString().c_str(), block.toString().c_str(),
-                inferContext->getReturnType().toString().c_str());
+                inferContext->getRawReturnType().toString().c_str());
 
     return inferContext;
 }
