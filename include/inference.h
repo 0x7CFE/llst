@@ -357,6 +357,7 @@ public:
     void run(const Type* blockType = 0);
 
 private:
+    void dumpTypes(const InferContext& context);
     std::string getMethodName();
     bool basicRun();
 

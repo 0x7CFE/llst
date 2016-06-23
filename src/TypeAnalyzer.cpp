@@ -159,6 +159,13 @@ std::string TypeAnalyzer::getMethodName() {
     return ss.str();
 }
 
+void TypeAnalyzer::dumpTypes(const InferContext& context) {
+    TTypeMap::const_iterator iType = context.getTypes().begin();
+    for (; iType != context.getTypes().end(); ++iType)
+        std::cout << iType->first << " " << iType->second.toString() << std::endl;
+
+    std::cout << "Return type: " << context.getReturnType().toString() << std::endl;
+}
 
 void TypeAnalyzer::run(const Type* blockType /*= 0*/) {
     if (m_graph.isEmpty())
