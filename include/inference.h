@@ -235,8 +235,13 @@ typedef std::map<TNodeIndex, Type> TTypeMap;
 
 class InferContext {
 public:
-    InferContext(TMethod* method, std::size_t index, const Type& arguments)
-        : m_method(method), m_index(index), m_arguments(arguments) {}
+    InferContext(TMethod* method, std::size_t index, const Type& arguments) :
+        m_method(method),
+        m_index(index),
+        m_arguments(arguments),
+        m_returnType(Type::tkComposite),
+        m_recursionKind(rkUnknown)
+    {}
 
     TMethod* getMethod() const { return m_method; }
     std::size_t getIndex() const { return m_index; }
@@ -276,6 +281,15 @@ public:
     TBlockClosures& getBlockClosures() { return m_blockClosures; }
     void resetClosures() { m_blockClosures.clear(); }
 
+    enum TRecursionKind {
+        rkUnknown = 0,
+        rkYes,
+        rkNo
+    };
+
+    TRecursionKind getRecursionKind() const { return m_recursionKind; }
+    void setRecursionKind(TRecursionKind value) { m_recursionKind = value; }
+
 private:
     TMethod* const    m_method;
     const std::size_t m_index;
@@ -284,6 +298,7 @@ private:
     Type              m_returnType;
 
     TBlockClosures    m_blockClosures;
+    TRecursionKind    m_recursionKind;
 };
 
 struct TContextStack {

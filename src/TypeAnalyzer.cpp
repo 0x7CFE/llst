@@ -1109,8 +1109,27 @@ InferContext* TypeSystem::inferMessage(
 
     if (! sendToSuper) {
         const TContextMap::iterator iContext = contextMap.find(arguments);
-        if (iContext != contextMap.end())
-            return iContext->second;
+        if (iContext != contextMap.end()) {
+            InferContext* const cachedContext = iContext->second;
+
+            if (cachedContext->getRecursionKind() == InferContext::rkUnknown) {
+                for (TContextStack* stack = parent; stack; stack = stack->parent) {
+                    if (stack->context.getIndex() == cachedContext->getIndex()) {
+                        std::printf("*** Context %s::%s>>%s recursively calls itself!\n",
+                                    cachedContext->getArguments().toString().c_str(),
+                                    cachedContext->getMethod()->klass->name->toString().c_str(),
+                                    selector->toString().c_str());
+
+                        cachedContext->setRecursionKind(InferContext::rkYes);
+                        return cachedContext;
+                    }
+                }
+
+                cachedContext->setRecursionKind(InferContext::rkNo);
+            }
+
+            return cachedContext;
+        }
     }
 
     TClass* receiver = 0;
