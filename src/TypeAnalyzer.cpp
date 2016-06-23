@@ -1225,3 +1225,25 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
 
     return inferContext;
 }
+
+void type::TypeSystem::dumpAllContexts() const {
+    std::cout << "Full context dump: " << std::endl;
+
+    TContextCache::const_iterator iSelectorMap = m_contextCache.begin();
+    for (; iSelectorMap != m_contextCache.end(); ++iSelectorMap) {
+        const TSymbol* const selector = iSelectorMap->first;
+
+        TContextMap::const_iterator iContext = iSelectorMap->second.begin();
+        for (; iContext != iSelectorMap->second.end(); ++iContext) {
+            const Type& arguments = iContext->first;
+            const InferContext* const context = iContext->second;
+
+            std::printf("%s::%s>>%s -> %s\n",
+                        arguments.toString().c_str(),
+                        context->getMethod()->klass->name->toString().c_str(),
+                        selector->toString().c_str(),
+                        context->getReturnType().toString().c_str());
+        }
+    }
+}
+

@@ -325,6 +325,8 @@ public:
 
     ControlGraph* getControlGraph(TMethod* method);
 
+    void dumpAllContexts() const;
+
 private:
     typedef std::pair<ParsedBytecode*, ControlGraph*> TGraphEntry;
     typedef std::map<TMethod*, TGraphEntry> TGraphCache;
