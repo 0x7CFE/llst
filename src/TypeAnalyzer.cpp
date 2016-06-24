@@ -468,8 +468,19 @@ void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
         result.reset();
 
     for (std::size_t index = 0; index < instruction.getArgumentsCount(); index++) {
-        const Type& argument = m_context[*instruction.getArgument(index)];
-        result.pushSubType(argument);
+        ControlNode* const argument = instruction.getArgument(index);
+        TTypeMap::const_iterator iType = m_context.getTypes().find(argument->getIndex());
+
+        if (iType == m_context.getTypes().end()) {
+            if (PhiNode* const phi = argument->cast<PhiNode>())
+                processPhi(*phi);
+
+            const Type& type = m_context[*argument];
+            result.pushSubType(type);
+
+        } else {
+            result.pushSubType(iType->second);
+        }
     }
 
     result.set(globals.arrayClass, Type::tkArray);
@@ -1019,6 +1030,7 @@ void TypeAnalyzer::doSpecial(InstructionNode& instruction) {
 
 Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
     Type& result = m_context[phi];
+    bool first = true;
 
     const TNodeSet& incomings = phi.getRealValues();
     TNodeSet::iterator iNode = incomings.begin();
@@ -1026,7 +1038,18 @@ Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
         // FIXME We need to track the source of the phi's incoming.
         //       We may ignore tkUndefined only if node lies on the dead path.
 
-        result |= m_context[*(*iNode)->cast<InstructionNode>()];
+        const InstructionNode* const incoming = (*iNode)->cast<InstructionNode>();
+        const TauNode* const incomingTau = incoming->getTauNode();
+        const Type& incomingType = incomingTau ? m_context[*incomingTau] : m_context[*incoming];
+
+        if (first) {
+            first   = false;
+            result  = incomingType;
+        } else {
+            std::cout << "phi: " << result.toString() << " | " << incomingType.toString();
+            result |= incomingType;
+            std::cout << " = " << result.toString() << std::endl;
+        }
     }
 
     return result;

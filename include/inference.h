@@ -19,6 +19,7 @@ public:
         tkComposite,
         tkArray,
         tkPolytype
+        // TODO tkBlock
     };
 
     enum TBlockSubtypes {
@@ -123,24 +124,35 @@ public:
     Type operator | (const Type& other) const { return Type(*this) |= other; }
     Type operator & (const Type& other) const { return Type(*this) &= other; }
 
+    //     ?         |      _      ->     _
+    //     *         |      _      ->     (*, _)
+
+    //     1         |      1      ->     1
+    //     1         |      2      ->     (1, 2)
+    //     A         |      B      ->     (A, B)
+    //    (A)        |     (B)     ->     (A, B)
+    //    (A)        |     (B,C)   ->     (A, B, C)
+    //    Block1     |     Block2  ->     (Block1, Block2)
     Type& operator |= (const Type& other) {
         if (*this == other)
             return *this;
 
-        // FIXME May lose information
-        if (m_kind == tkUndefined)
-            return *this = other;
-
         if (m_kind != tkComposite) {
-            m_subTypes.push_back(*this);
-            m_kind = tkComposite;
+            Type composite(tkComposite);
+            composite.addSubType(*this);
+            *this = composite;
         }
 
-        if (other.m_kind != tkComposite) {
+        if (other.m_value == globals.blockClass) {
             addSubType(other);
-        } else {
+            return *this;
+        }
+
+        if (other.m_kind == tkComposite) {
             for (std::size_t index = 0; index < other.m_subTypes.size(); index++)
                 addSubType(other[index]);
+
+            return *this;
         }
 
         return *this;
