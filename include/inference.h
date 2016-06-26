@@ -278,6 +278,18 @@ public:
         return (subtypesCount == 1) ? m_returnType[0] : m_returnType;
     }
 
+    Type getSingleReturnType() const {
+        const std::size_t subtypesCount = m_returnType.getSubTypes().size();
+        if (! subtypesCount)
+            return Type();
+
+        Type result = m_returnType.getSubTypes().at(0);
+        for (std::size_t i = 1; i < subtypesCount; i++)
+            result &= m_returnType.getSubTypes().at(i);
+
+        return result;
+    }
+
     Type& getInstructionType(TNodeIndex index) { return m_types[index]; }
     Type& operator[] (TNodeIndex index) { return m_types[index]; }
     Type& operator[] (const ControlNode& node) { return getInstructionType(node.getIndex()); }
