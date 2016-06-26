@@ -547,8 +547,8 @@ void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
     assert(tau);
     assert(tau->getKind() == TauNode::tkProvider);
 
-    const ControlNode* const argument = instruction.getArgument();
-    m_context[*tau] = m_context[*argument];
+    const Type& argumentType = getArgumentType(instruction);
+    m_context[*tau] = argumentType;
 
     if (!m_blockType)
         return;
@@ -566,14 +566,14 @@ void TypeAnalyzer::doAssignTemporary(const InstructionNode& instruction) {
 
     InferContext::TVariableMap::iterator iType = closureTypes.find(tempIndex);
     if (iType == closureTypes.end())
-        closureTypes[tempIndex]  = m_context[*argument];
+        closureTypes[tempIndex]  = argumentType;
     else
-        closureTypes[tempIndex] &= m_context[*argument];
+        closureTypes[tempIndex] &= argumentType;
 
     std::cout
         << "doAssignTemporary, writing temporary " << tempIndex
         << " in closure " << captureIndex.getValue()
-        << " type & " << m_context[*argument].toString()
+        << " type & " << argumentType.toString()
         << " = " << closureTypes[tempIndex].toString()
         << std::endl;
 }
