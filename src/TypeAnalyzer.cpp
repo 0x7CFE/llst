@@ -1052,7 +1052,7 @@ void TypeAnalyzer::doSpecial(InstructionNode& instruction) {
 
 Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
     Type& result = m_context[phi];
-    bool first = true;
+    bool typeAssigned = false;
 
     const TNodeSet& incomings = phi.getRealValues();
     TNodeSet::iterator iNode = incomings.begin();
@@ -1064,8 +1064,8 @@ Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
         const TauNode* const incomingTau = incoming->getTauNode();
         const Type& incomingType = incomingTau ? m_context[*incomingTau] : m_context[*incoming];
 
-        if (first) {
-            first   = false;
+        if (! typeAssigned) {
+            typeAssigned = true;
             result  = incomingType;
         } else {
             std::cout << "phi: " << result.toString() << " | " << incomingType.toString();
@@ -1073,6 +1073,9 @@ Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
             std::cout << " = " << result.toString() << std::endl;
         }
     }
+
+    if (result.getSubTypes().size() == 1)
+        result = result[0];
 
     return result;
 }
