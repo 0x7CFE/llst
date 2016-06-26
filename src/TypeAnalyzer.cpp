@@ -846,6 +846,18 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
     Type primitiveResult;
 
     switch (opcode) {
+        case primitive::objectsAreEqual: {
+            Type& object1 = m_context[*instruction.getArgument(0)];
+            Type& object2 = m_context[*instruction.getArgument(1)];
+
+            if (object1.getKind() == Type::tkLiteral && object2.getKind() == Type::tkLiteral)
+                primitiveResult = Type(object1.getValue() == object2.getValue() ? globals.trueObject : globals.falseObject);
+            else
+                primitiveResult = Type(globals.trueObject->getClass()->parentClass, Type::tkMonotype);
+
+            break;
+        }
+
         case primitive::allocateObject:
         case primitive::allocateByteArray:
         {
@@ -922,6 +934,16 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
 
             break;
         }
+
+        case primitive::arrayAt:
+        case primitive::arrayAtPut:
+        case primitive::bulkReplace:
+            primitiveResult = Type(Type::tkPolytype);
+            break;
+
+        case primitive::cloneByteObject:
+            primitiveResult = m_context[*instruction.getArgument(0)];
+            break;
 
         case primitive::blockInvoke: {
             Type& block = m_context[*instruction.getArgument(0)];
