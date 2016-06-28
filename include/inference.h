@@ -361,10 +361,10 @@ public:
         bool sendToSuper = false);
 
     InferContext* inferBlock(Type& block, const Type& arguments, TContextStack* parent);
-
     ControlGraph* getControlGraph(TMethod* method);
 
     void dumpAllContexts() const;
+    void drawCallGraph() const;
 
 private:
     typedef std::pair<ParsedBytecode*, ControlGraph*> TGraphEntry;

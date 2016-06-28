@@ -1331,3 +1331,65 @@ void type::TypeSystem::dumpAllContexts() const {
     }
 }
 
+void type::TypeSystem::drawCallGraph() const {
+    std::ofstream stream;
+    stream.open("dots/callgraph.dot", std::ios::out | std::ios::trunc);
+
+    stream << "digraph G2 {\n rankdir=LR;\n";
+
+    typedef std::set<std::size_t> TIndexSet;
+    TIndexSet parsedContexts;
+
+    TContextCache::const_iterator iSelectorMap = m_contextCache.begin();
+    for (; iSelectorMap != m_contextCache.end(); ++iSelectorMap) {
+        const TSymbol* const selector = iSelectorMap->first;
+
+        TContextMap::const_iterator iContext = iSelectorMap->second.begin();
+        for (; iContext != iSelectorMap->second.end(); ++iContext) {
+            const Type& arguments = iContext->first[0];
+            const bool sendToSuper = iContext->first[1].getValue() == globals.trueObject;
+            const InferContext* const context = iContext->second;
+
+            stream
+                << context->getIndex() << " [shape=\"box\" color=\""
+                << (sendToSuper ? "blue" : "black")
+                << "\" label=\""
+                << arguments.toString() << "::"
+                << context->getMethod()->klass->name->toString() << ">>"
+                << selector->toString().c_str() << "\n"
+                << "Index: " << context->getIndex() << ", Returns: "
+                << context->getReturnType().toString() << "\"];\n";
+
+            const InferContext::TContextSet& referers = context->getReferredContexts();
+            InferContext::TContextSet::const_iterator iReferer = referers.begin();
+            for (; iReferer != referers.end(); ++iReferer) {
+                stream << context->getIndex() << " -> " << (*iReferer)->getIndex() << ";\n";
+
+            }
+        }
+    }
+
+    TBlockCache::const_iterator iBlock = m_blockCache.begin();
+    for (; iBlock != m_blockCache.end(); ++iBlock) {
+        const Type& block = iBlock->first[0];
+        const Type& arguments = iBlock->first[1];
+        InferContext* blockContext = iBlock->second;
+
+        // TODO Block return
+        stream
+            << blockContext->getIndex() << " [shape=\"box\" color=\"red\" label=\""
+            << arguments.toString() << "::"
+            << block.toString() << "\n"
+            << "Index: " << blockContext->getIndex() << ", Returns: "
+            << blockContext->getReturnType().toString() << "\"];\n";
+
+        const InferContext::TContextSet& referers = blockContext->getReferredContexts();
+        InferContext::TContextSet::const_iterator iReferer = referers.begin();
+        for (; iReferer != referers.end(); ++iReferer)
+            stream << blockContext->getIndex() << " -> " << (*iReferer)->getIndex() << ";\n";
+
+    }
+
+    stream << "}\n";
+    stream.close();
+}
