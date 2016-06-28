@@ -373,11 +373,16 @@ private:
     typedef std::map<Type, InferContext*>    TContextMap;
     typedef std::map<TSelector, TContextMap> TContextCache;
 
+    // [Block, Args] -> block context
+    typedef std::map<Type, InferContext*> TBlockCache;
+
 private:
     SmalltalkVM&  m_vm; // TODO Image must be enough
 
     TGraphCache   m_graphCache;
     TContextCache m_contextCache;
+    TBlockCache   m_blockCache;
+
     std::size_t   m_lastContextIndex;
 };
 

@@ -1168,10 +1168,15 @@ InferContext* TypeSystem::inferMessage(
 
     TContextMap& contextMap = m_contextCache[selector];
 
-    if (! sendToSuper) {
-        const TContextMap::iterator iContext = contextMap.find(arguments);
+    Type key(Type::tkArray);
+    key.pushSubType(arguments);
+    key.pushSubType(sendToSuper ? globals.trueObject : globals.falseObject);
+
+    {
+        const TContextMap::iterator iContext = contextMap.find(key);
         if (iContext != contextMap.end()) {
             InferContext* const cachedContext = iContext->second;
+            std::printf("*** Found cached context for key: %s, cache: %p\n", key.toString().c_str(), &contextMap);
 
             if (cachedContext->getRecursionKind() == InferContext::rkUnknown) {
                 for (TContextStack* stack = parent; stack; stack = stack->parent) {
@@ -1191,6 +1196,8 @@ InferContext* TypeSystem::inferMessage(
 
             return cachedContext;
         }
+
+        std::printf("*** Not found cached context for key: %s, cache: %p\n", key.toString().c_str(), &contextMap);
     }
 
     TClass* receiver = 0;
@@ -1220,9 +1227,10 @@ InferContext* TypeSystem::inferMessage(
     }
 
     InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
-    contextMap[arguments] = inferContext;
+    contextMap[key] = inferContext;
 
-    std::printf("Analyzing %s::%s>>%s...\n%s!\n",
+    std::printf("(%u) Analyzing %s::%s>>%s ...\n%s!\n",
+                inferContext->getIndex(),
                 arguments.toString().c_str(),
                 method->klass->name->toString().c_str(),
                 selector->toString().c_str(),
@@ -1231,7 +1239,6 @@ InferContext* TypeSystem::inferMessage(
     ControlGraph* const methodGraph = getControlGraph(method);
     assert(methodGraph);
 
-    // TODO Handle recursive and tail calls
     TContextStack contextStack(*inferContext, parent);
     type::TypeAnalyzer analyzer(*this, *methodGraph, contextStack);
     analyzer.run();
@@ -1251,16 +1258,32 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
     if (block.getKind() != Type::tkMonotype)
         return 0;
 
+    // FIXME Prove that this is enough.
+    //       What about captured types/args?
+    Type key(Type::tkArray);
+    key.pushSubType(block);
+    key.pushSubType(arguments);
+
+    TBlockCache::iterator iBlock = m_blockCache.find(key);
+    if (iBlock != m_blockCache.end())
+        return iBlock->second;
+
     TMethod* const method = block[Type::bstOrigin].getValue()->cast<TMethod>();
     const uint16_t offset = TInteger(block[Type::bstOffset].getValue());
 
-    // TODO Cache
-    InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
+    InferContext* inferContext = new InferContext(method, m_lastContextIndex++, arguments);
+
+    m_blockCache[key] = inferContext;
+    std::printf("Cached block context %s -> %p (index %u), cache size %u\n",
+                key.toString().c_str(), inferContext, inferContext->getIndex(), m_blockCache.size());
 
     ControlGraph* const methodGraph = getControlGraph(method);
     assert(methodGraph);
 
-    std::printf("Analyzing block %s::%s ...\n", arguments.toString().c_str(), block.toString().c_str());
+    std::printf("(%u) Analyzing block %s::%s ...\n",
+                inferContext->getIndex(),
+                arguments.toString().c_str(),
+                block.toString().c_str());
 
     st::ParsedMethod* const parsedMethod = methodGraph->getParsedMethod();
     st::ParsedBlock*  const parsedBlock  = parsedMethod->getParsedBlockByOffset(offset);
