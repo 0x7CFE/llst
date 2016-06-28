@@ -95,6 +95,8 @@ public:
         for (std::size_t index = 0; index < m_subTypes.size(); index++) {
             if (m_subTypes[index] < other.m_subTypes[index])
                 return true;
+            else if (other.m_subTypes[index] < m_subTypes[index])
+                return false;
         }
 
         return false;
