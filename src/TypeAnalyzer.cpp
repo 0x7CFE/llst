@@ -455,10 +455,12 @@ void TypeAnalyzer::doSendBinary(InstructionNode& instruction) {
 
     captureContext(instruction, arguments);
 
-    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack))
+    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack)) {
         result = context->getReturnType();
-    else
+        m_context.getReferredContexts().insert(context);
+    } else {
         result = Type(Type::tkPolytype);
+    }
 }
 
 void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
@@ -834,10 +836,12 @@ void TypeAnalyzer::doSendMessage(InstructionNode& instruction, bool sendToSuper 
     captureContext(instruction, arguments);
 
     Type& result = m_context[instruction];
-    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack, sendToSuper))
+    if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack, sendToSuper)) {
         result = context->getReturnType();
-    else
+        m_context.getReferredContexts().insert(context);
+    } else {
         result = Type(Type::tkPolytype);
+    }
 }
 
 void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
@@ -955,10 +959,12 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
             if (instruction.getArgumentsCount() > 2)
                 arguments.pushSubType(m_context[*instruction.getArgument(2)]);
 
-            if (InferContext* const blockContext = m_system.inferBlock(block, arguments, &m_contextStack))
+            if (InferContext* const blockContext = m_system.inferBlock(block, arguments, &m_contextStack)) {
                 primitiveResult = blockContext->getReturnType();
-            else
+                m_context.getReferredContexts().insert(blockContext);
+            } else {
                 primitiveResult = Type(Type::tkPolytype);
+            }
 
             break;
         }

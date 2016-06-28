@@ -316,6 +316,18 @@ public:
     TRecursionKind getRecursionKind() const { return m_recursionKind; }
     void setRecursionKind(TRecursionKind value) { m_recursionKind = value; }
 
+
+    class ContextCompare {
+    public:
+        bool operator() (const InferContext* a, const InferContext* b) const {
+            return a->getIndex() < b->getIndex();
+        }
+    };
+
+    typedef std::set<InferContext*, ContextCompare> TContextSet;
+    TContextSet& getReferredContexts() { return m_referredContexts; }
+    const TContextSet& getReferredContexts() const { return m_referredContexts; }
+
 private:
     TMethod* const    m_method;
     const std::size_t m_index;
@@ -325,6 +337,7 @@ private:
 
     TBlockClosures    m_blockClosures;
     TRecursionKind    m_recursionKind;
+    TContextSet       m_referredContexts;
 };
 
 struct TContextStack {
