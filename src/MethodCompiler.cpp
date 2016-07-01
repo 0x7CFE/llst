@@ -206,7 +206,7 @@ bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
     };
 
     GCDetector detector;
-    detector.run((*jit.controlGraph->begin())->getEntryPoint(), GCDetector::wdForward);
+    detector.run((*jit.controlGraph->begin())->getEntryPoint(), GCDetector::wdForward, GCDetector::wtDepthFirst, true);
 
     return detector.isDetected();
 }
@@ -268,7 +268,7 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 
     for (st::TNodeSet::iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
         st::ControlNode* const consumer = *iConsumer;
-        walker.run(consumer, st::GraphWalker::wdBackward);
+        walker.run(consumer, st::GraphWalker::wdBackward, st::GraphWalker::wtDepthFirst, true);
 
         if (detector.isDetected()) {
             return true;

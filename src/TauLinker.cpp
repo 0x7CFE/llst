@@ -345,7 +345,7 @@ void TauLinker::processPushTemporary(InstructionNode& instruction) {
 
     // Searching for all AssignTemporary's and closures that provide a value for current node
     AssignLocator locator(instruction.getInstruction().getArgument(), getBackEdges(), getClosures());
-    locator.run(&instruction, GraphWalker::wdBackward, false);
+    locator.run(&instruction, GraphWalker::wdBackward, GraphWalker::wtDepthFirst, false);
 
     TauNode* aggregator = 0;
     if (locator.assignSites.size() > 1) {
@@ -412,7 +412,7 @@ void TauLinker::processClosure(InstructionNode& instruction) {
     for (ClosureTauNode::TIndex index = 0; index < closure.readIndices.size(); index++) {
         // Searching for all AssignTemporary's that provide a value for current node
         AssignLocator locator(closure.readIndices[index], getBackEdges(), getClosures());
-        locator.run(&instruction, GraphWalker::wdBackward, false);
+        locator.run(&instruction, GraphWalker::wdBackward, GraphWalker::wtDepthFirst, false);
 
         TauNode* aggregator = 0;
         if (locator.assignSites.size() > 1) {

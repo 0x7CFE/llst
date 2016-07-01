@@ -698,17 +698,43 @@ public:
         wdBackward
     };
 
-    void run(ControlNode* startNode, TWalkDirection direction, bool visitStart = true) {
+    enum TWalkType {
+        wtDepthFirst,
+        wtBreadthFirst
+    };
+
+    void run(ControlNode* startNode, TWalkDirection direction, TWalkType type, bool visitStart) {
         assert(startNode);
         m_direction = direction;
+        m_type = type;
 
-        TPathNode path(startNode);
+        if (type == wtDepthFirst)
+            depthRun(*startNode, visitStart);
+        else
+            breadthRun(*startNode, visitStart);
 
-        if (visitStart && visitNode(*startNode, &path) != vrKeepWalking)
+        nodesVisited();
+    }
+
+private:
+    void depthRun(ControlNode& startNode, bool visitStart) {
+        TPathNode path(&startNode);
+
+        if (visitStart && visitNode(startNode, &path) != vrKeepWalking)
             return;
 
-        walkIn(startNode, &path);
-        nodesVisited();
+        walkIn(&startNode, &path);
+    }
+
+    void breadthRun(ControlNode& startNode, bool visitStart) {
+        TNodeQueue queue;
+
+        if (visitStart)
+            queue.push_back(&startNode);
+        else
+            enqueueNode(startNode, queue);
+
+        walkQueue(queue);
     }
 
 protected:
@@ -761,8 +787,41 @@ private:
         return true;
     }
 
+    typedef std::list<ControlNode*> TNodeQueue;
+
+    void walkQueue(TNodeQueue& queue) {
+        while (! queue.empty()) {
+            ControlNode& currentNode = *queue.front(); queue.pop_front();
+
+            if (getNodeColor(&currentNode) == ncBlack)
+                continue;
+
+            switch (visitNode(currentNode, 0)) {
+                case vrStopWalk:
+                    return;
+
+                case vrKeepWalking:
+                    enqueueNode(currentNode, queue);
+
+                case vrSkipPath:
+                    break;
+            }
+
+            m_colorMap[&currentNode] = ncBlack;
+        }
+    }
+
+    void enqueueNode(const ControlNode& node, TNodeQueue& queue) {
+        const TNodeSet& nodes = (m_direction == wdForward) ?
+            node.getOutEdges() : node.getInEdges();
+
+        for (TNodeSet::const_iterator iNode = nodes.begin(); iNode != nodes.end(); ++iNode)
+            queue.push_back(*iNode);
+    }
+
 private:
     TWalkDirection m_direction;
+    TWalkType      m_type;
     TColorMap      m_colorMap;
 };
 
@@ -778,7 +837,7 @@ public:
         assert(startNode);
         m_verified = false;
 
-        GraphWalker::run(startNode, wdForward);
+        GraphWalker::run(startNode, wdForward, wtDepthFirst, true);
     }
 
 private:
@@ -812,7 +871,7 @@ public:
         if (graph.nodes_begin() == graph.nodes_end())
             return;
 
-        GraphWalker::run(*graph.nodes_begin(), GraphWalker::wdForward);
+        GraphWalker::run(*graph.nodes_begin(), GraphWalker::wdForward, wtDepthFirst, true);
     }
 
 protected:

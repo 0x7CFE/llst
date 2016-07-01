@@ -168,7 +168,7 @@ void TypeAnalyzer::fillLinkerClosures() {
 
 bool TypeAnalyzer::basicRun() {
     m_walker.resetStopNodes();
-    m_walker.run(*m_graph.nodes_begin(), Walker::wdForward);
+    m_walker.run(*m_graph.nodes_begin(), Walker::wdForward, GraphWalker::wtDepthFirst, true);
 
     return m_context.getRawReturnType().getSubTypes().size() == 1;
 }
@@ -834,7 +834,7 @@ void TypeAnalyzer::captureContext(InstructionNode& instruction, Type& arguments)
             );
 
             // Detect types of temporaries accessible from the current call site
-            locator.run(&instruction, st::GraphWalker::wdBackward, false);
+            locator.run(&instruction, st::GraphWalker::wdBackward, GraphWalker::wtDepthFirst, false);
 
             InferContext::TVariableMap& typeMap = m_context.getBlockClosures()[siteIndex];
             InferContext::TVariableMap::iterator iType = typeMap.find(variableIndex);
