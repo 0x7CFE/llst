@@ -874,6 +874,10 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
     Type primitiveResult;
 
     switch (opcode) {
+        case primitive::throwError:
+            m_walker.addStopNode(*instruction.getOutEdges().begin());
+            return;
+
         case primitive::objectsAreEqual: {
             Type& object1 = m_context[*instruction.getArgument(0)];
             Type& object2 = m_context[*instruction.getArgument(1)];
@@ -965,6 +969,8 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
 
         case primitive::arrayAt:
         case primitive::arrayAtPut:
+        case primitive::stringAt:
+        case primitive::stringAtPut:
         case primitive::bulkReplace:
             primitiveResult = Type(Type::tkPolytype);
             break;
@@ -1068,6 +1074,10 @@ void TypeAnalyzer::doSpecial(InstructionNode& instruction) {
 
         case special::selfReturn:
             m_context.getRawReturnType().addSubType(m_context.getArgument(0));
+            break;
+
+        case special::blockReturn:
+            getMethodContext()->getRawReturnType().addSubType(getArgumentType(instruction));
             break;
 
         case special::sendToSuper:
