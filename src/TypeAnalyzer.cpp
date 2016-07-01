@@ -168,7 +168,7 @@ void TypeAnalyzer::fillLinkerClosures() {
 
 bool TypeAnalyzer::basicRun() {
     m_walker.resetStopNodes();
-    m_walker.run(*m_graph.nodes_begin(), Walker::wdForward, GraphWalker::wtDepthFirst, true);
+    m_walker.run(*m_graph.nodes_begin(), Walker::wdForward, GraphWalker::wtBreadthFirst, true);
 
     return m_context.getRawReturnType().getSubTypes().size() == 1;
 }
