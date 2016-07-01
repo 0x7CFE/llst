@@ -482,6 +482,9 @@ void TypeAnalyzer::doSendBinary(InstructionNode& instruction) {
     if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack)) {
         result = context->getReturnType();
         m_context.getReferredContexts().insert(context);
+
+        if (result == Type(Type::tkComposite))
+            m_walker.addStopNode(*instruction.getOutEdges().begin());
     } else {
         result = Type(Type::tkPolytype);
     }
@@ -863,6 +866,9 @@ void TypeAnalyzer::doSendMessage(InstructionNode& instruction, bool sendToSuper 
     if (InferContext* const context = m_system.inferMessage(selector, arguments, &m_contextStack, sendToSuper)) {
         result = context->getReturnType();
         m_context.getReferredContexts().insert(context);
+
+        if (result == Type(Type::tkComposite))
+            m_walker.addStopNode(*instruction.getOutEdges().begin());
     } else {
         result = Type(Type::tkPolytype);
     }
