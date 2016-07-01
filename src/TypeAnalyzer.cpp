@@ -80,6 +80,30 @@ std::string Type::toString(bool subtypesOnly /*= false*/) const {
     return stream.str();
 }
 
+Type Type::flatten() const {
+    if (m_kind != tkComposite)
+        return *this;
+
+    TTypeSet typeSet;
+    flattenInto(typeSet);
+
+    Type result(tkComposite);
+    for (TTypeSet::iterator iType = typeSet.begin(); iType != typeSet.end(); ++iType)
+        result.pushSubType(*iType);
+
+    return result;
+}
+
+void Type::flattenInto(TTypeSet& typeSet) const {
+    if (m_kind != tkComposite) {
+        typeSet.insert(*this);
+        return;
+    }
+
+    for (std::size_t index = 0; index < m_subTypes.size(); index++)
+        m_subTypes[index].flattenInto(typeSet);
+}
+
 void TypeAnalyzer::fillLinkerClosures() {
     typedef InferContext::TBlockClosures::const_iterator TClosureIterator;
     InferContext::TBlockClosures& closures = m_context.getBlockClosures();
@@ -1082,6 +1106,8 @@ Type& TypeAnalyzer::processPhi(const PhiNode& phi) {
 
     if (result.getSubTypes().size() == 1)
         result = result[0];
+    else
+        result = result.flatten();
 
     return result;
 }
@@ -1243,6 +1269,7 @@ InferContext* TypeSystem::inferMessage(
     type::TypeAnalyzer analyzer(*this, *methodGraph, contextStack);
     analyzer.run();
 
+    inferContext->getRawReturnType() = inferContext->getRawReturnType().flatten();
     const Type& returnType = inferContext->getReturnType();
 
     std::printf("%s::%s>>%s -> %s\n",
@@ -1303,6 +1330,8 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
     TContextStack contextStack(*inferContext, parent);
     type::TypeAnalyzer analyzer(*this, *blockGraph, contextStack);
     analyzer.run(&block);
+
+    inferContext->getRawReturnType() = inferContext->getRawReturnType().flatten();
 
     std::printf("%s::%s -> %s\n", arguments.toString().c_str(), block.toString().c_str(),
                 inferContext->getRawReturnType().toString().c_str());

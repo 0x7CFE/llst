@@ -79,6 +79,8 @@ public:
             m_subTypes.push_back(type);
     }
 
+    Type flatten() const;
+
     const Type& operator [] (std::size_t index) const { return m_subTypes[index]; }
     Type& operator [] (std::size_t index) { return m_subTypes[index]; }
 
@@ -237,6 +239,10 @@ public:
         reset();
         return *this;
     }
+
+private:
+    typedef std::set<Type> TTypeSet;
+    void flattenInto(TTypeSet& typeSet) const;
 
 private:
     TKind     m_kind;
