@@ -81,6 +81,25 @@ public:
 
     Type flatten() const;
 
+    Type fold() const {
+        if (m_kind != tkComposite)
+            return *this;
+
+        const std::size_t subtypesCount = m_subTypes.size();
+        if (! subtypesCount)
+            return *this;
+
+        Type result = m_subTypes.at(0);
+        for (std::size_t i = 1; i < subtypesCount; i++) {
+            if (m_subTypes.at(i).m_kind == tkComposite)
+                result &= m_subTypes.at(i).fold();
+            else
+                result &= m_subTypes.at(i);
+        }
+
+        return result;
+    }
+
     const Type& operator [] (std::size_t index) const { return m_subTypes[index]; }
     Type& operator [] (std::size_t index) { return m_subTypes[index]; }
 
@@ -286,17 +305,7 @@ public:
         return (subtypesCount == 1) ? m_returnType[0] : m_returnType;
     }
 
-    Type getSingleReturnType() const {
-        const std::size_t subtypesCount = m_returnType.getSubTypes().size();
-        if (! subtypesCount)
-            return Type();
-
-        Type result = m_returnType.getSubTypes().at(0);
-        for (std::size_t i = 1; i < subtypesCount; i++)
-            result &= m_returnType.getSubTypes().at(i);
-
-        return result;
-    }
+    Type getSingleReturnType() const { return m_returnType.fold(); }
 
     Type& getInstructionType(TNodeIndex index) { return m_types[index]; }
     Type& operator[] (TNodeIndex index) { return m_types[index]; }
