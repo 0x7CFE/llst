@@ -1012,8 +1012,8 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
         case primitive::smallIntEqual:
         case primitive::smallIntLess:
         {
-            const Type& self = m_context[*instruction.getArgument(0)];
-            const Type& arg  = m_context[*instruction.getArgument(1)];
+            const Type& self = m_context[*instruction.getArgument(0)].fold();
+            const Type& arg  = m_context[*instruction.getArgument(1)].fold();
             static const Type smallInt(globals.smallIntClass, Type::tkMonotype);
 
             if (isSmallInteger(self.getValue()) && isSmallInteger(arg.getValue())) {
