@@ -376,7 +376,8 @@ public:
         bool sendToSuper = false);
 
     InferContext* inferBlock(Type& block, const Type& arguments, TContextStack* parent);
-    ControlGraph* getControlGraph(TMethod* method);
+    ControlGraph* getMethodGraph(TMethod* method);
+    ControlGraph* getBlockGraph(st::ParsedBlock* parsedBlock);
 
     void dumpAllContexts() const;
     void drawCallGraph() const;
@@ -391,14 +392,17 @@ private:
     // [Block, Args] -> block context
     typedef std::map<Type, InferContext*> TBlockCache;
 
+    typedef std::map<st::ParsedBlock*, ControlGraph*> TBlockGraphCache;
+
 private:
-    SmalltalkVM&  m_vm; // TODO Image must be enough
+    SmalltalkVM&     m_vm; // TODO Image must be enough
 
-    TGraphCache   m_graphCache;
-    TContextCache m_contextCache;
-    TBlockCache   m_blockCache;
+    TGraphCache      m_graphCache;
+    TContextCache    m_contextCache;
+    TBlockCache      m_blockCache;
+    TBlockGraphCache m_blockGraphCache;
 
-    std::size_t   m_lastContextIndex;
+    std::size_t      m_lastContextIndex;
 };
 
 class TypeAnalyzer {

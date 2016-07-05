@@ -518,7 +518,7 @@ void TypeAnalyzer::doMarkArguments(const InstructionNode& instruction) {
 InferContext* TypeAnalyzer::getMethodContext() {
     assert(m_blockType);
 
-    for (TContextStack* stack = m_contextStack.parent; stack; stack = stack->parent) {
+    for (TContextStack* stack = &m_contextStack; stack; stack = stack->parent) {
         const TInteger contextIndex((*m_blockType)[Type::bstContextIndex].getValue());
 
         if (stack->context.getIndex() == static_cast<std::size_t>(contextIndex))
@@ -626,9 +626,8 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         blockType.pushSubType(Type(TInteger(argIndex)));               // [Type::bstArgIndex]
         blockType.pushSubType(Type(TInteger(m_context.getIndex())));   // [Type::bstContextIndex]
 
-        // TODO Cache and reuse in TypeSystem::inferBlock()
-        ControlGraph* const blockGraph = new ControlGraph(pushBlock->getParsedBlock()->getContainer(), pushBlock->getParsedBlock());
-        blockGraph->buildGraph();
+        ControlGraph* const blockGraph = m_system.getBlockGraph(pushBlock->getParsedBlock());
+        assert(blockGraph);
 
         typedef ControlGraph::TMetaInfo::TIndexList TIndexList;
         const TIndexList& readsTemporaries  = blockGraph->getMeta().readsTemporaries;
@@ -1158,7 +1157,7 @@ void TypeAnalyzer::walkComplete() {
 //     std::printf("walk complete\n");
 }
 
-ControlGraph* TypeSystem::getControlGraph(TMethod* method) {
+ControlGraph* TypeSystem::getMethodGraph(TMethod* method) {
     TGraphCache::iterator iGraph = m_graphCache.find(method);
     if (iGraph != m_graphCache.end())
         return iGraph->second.second;
@@ -1180,6 +1179,19 @@ ControlGraph* TypeSystem::getControlGraph(TMethod* method) {
 //     }
 
     return controlGraph;
+}
+
+ControlGraph* TypeSystem::getBlockGraph(st::ParsedBlock* parsedBlock) {
+    TBlockGraphCache::const_iterator iGraph = m_blockGraphCache.find(parsedBlock);
+    if (iGraph != m_blockGraphCache.end())
+        return iGraph->second;
+
+    ControlGraph* const graph = new ControlGraph(parsedBlock->getContainer(), parsedBlock);
+    graph->buildGraph();
+
+    m_blockGraphCache[parsedBlock] = graph;
+
+    return graph;
 }
 
 InferContext* TypeSystem::inferMessage(
@@ -1278,7 +1290,7 @@ InferContext* TypeSystem::inferMessage(
                 selector->toString().c_str(),
                 method->text->toString().c_str());
 
-    ControlGraph* const methodGraph = getControlGraph(method);
+    ControlGraph* const methodGraph = getMethodGraph(method);
     assert(methodGraph);
 
     TContextStack contextStack(*inferContext, parent);
@@ -1320,7 +1332,7 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
     std::printf("Cached block context %s -> %p (index %u), cache size %u\n",
                 key.toString().c_str(), inferContext, inferContext->getIndex(), m_blockCache.size());
 
-    ControlGraph* const methodGraph = getControlGraph(method);
+    ControlGraph* const methodGraph = getMethodGraph(method);
     assert(methodGraph);
 
     std::printf("(%u) Analyzing block %s::%s ...\n",
@@ -1331,9 +1343,8 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
     st::ParsedMethod* const parsedMethod = methodGraph->getParsedMethod();
     st::ParsedBlock*  const parsedBlock  = parsedMethod->getParsedBlockByOffset(offset);
 
-    // TODO Cache
-    ControlGraph* const blockGraph = new ControlGraph(parsedMethod, parsedBlock);
-    blockGraph->buildGraph();
+    ControlGraph* const blockGraph = getBlockGraph(parsedBlock);
+    assert(blockGraph);
 
     {
         std::ostringstream ss;
