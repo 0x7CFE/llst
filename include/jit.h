@@ -35,6 +35,7 @@
 #include <types.h>
 #include "vm.h"
 #include "analysis.h"
+#include "inference.h"
 
 #include <typeinfo>
 
@@ -206,6 +207,7 @@ public:
         TPhiList            pendingPhiNodes;
 
         TMethod*            originMethod; // Smalltalk method we're currently processing
+        type::InferContext& inferContext;
 
         llvm::Function*     function;     // LLVM function that is created based on method
         llvm::IRBuilder<>*  builder;      // Builder inserts instructions into basic blocks
@@ -228,10 +230,26 @@ public:
         llvm::Value* getMethodClass();
         llvm::Value* getLiteral(uint32_t index);
 
-        TJITContext(MethodCompiler* compiler, TMethod* method, bool parse = true)
-        : currentNode(0), originMethod(method), function(0), builder(0),
-            preamble(0), exceptionLandingPad(0), unwindBlockReturn(0), unwindPhi(0), methodHasBlockReturn(false),
-            methodAllocatesMemory(true), compiler(compiler), contextHolder(0), selfHolder(0)
+        TJITContext(
+            MethodCompiler* compiler,
+            TMethod* method,
+            type::InferContext& context,
+            bool parse = true
+        ) :
+            currentNode(0),
+            originMethod(method),
+            inferContext(context),
+            function(0),
+            builder(0),
+            preamble(0),
+            exceptionLandingPad(0),
+            unwindBlockReturn(0),
+            unwindPhi(0),
+            methodHasBlockReturn(false),
+            methodAllocatesMemory(true),
+            compiler(compiler),
+            contextHolder(0),
+            selfHolder(0)
         {
             if (parse) {
                 parsedMethod = new st::ParsedMethod(method);
@@ -254,7 +272,7 @@ public:
             st::ParsedMethod* method,
             st::ParsedBlock*  block
         )
-            : TJITContext(compiler, 0, false), parsedBlock(block)
+            : TJITContext(compiler, 0, *(type::InferContext*)(0), false), parsedBlock(block)
         {
             parsedMethod = method;
             originMethod = parsedMethod->getOrigin();
@@ -282,6 +300,10 @@ private:
     TExceptionAPI  m_exceptionAPI;
     TBaseFunctions m_baseFunctions;
 
+private:
+    type::TypeSystem m_typeSystem;
+
+private:
     llvm::Value* getNodeValue(TJITContext& jit, st::ControlNode* node, llvm::BasicBlock* insertBlock = 0);
     llvm::Value* getPhiValue(TJITContext& jit, st::PhiNode* phi);
     void encodePhiIncomings(TJITContext& jit, st::PhiNode* phiNode);
@@ -316,7 +338,8 @@ private:
     void doSendUnary(TJITContext& jit);
     void doSendBinary(TJITContext& jit);
     void doSendMessage(TJITContext& jit);
-    bool doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode, TClass* receiverClass = 0);
+    void doSendGenericMessage(TJITContext& jit);
+    void doSendInferredMessage(TJITContext& jit, type::InferContext& context);
     void doSpecial(TJITContext& jit);
 
     void doPrimitive(TJITContext& jit);
@@ -334,7 +357,7 @@ private:
                                 llvm::BasicBlock* primitiveFailedBB);
 
     TObjectAndSize createArray(TJITContext& jit, uint32_t elementsCount);
-    llvm::Function* createFunction(TMethod* method);
+    llvm::Function* createFunction(TMethod* method, const std::string& functionName);
 
     uint16_t getSkipOffset(st::InstructionNode* branch);
 
@@ -349,6 +372,7 @@ public:
 
     llvm::Function* compileMethod(
         TMethod* method,
+        const type::Type& arguments,
         llvm::Function* methodFunction = 0,
         llvm::Value** contextHolder = 0
     );
@@ -371,14 +395,7 @@ public:
         llvm::Module* JITModule,
         TRuntimeAPI   runtimeApi,
         TExceptionAPI exceptionApi
-    )
-        : m_runtime(runtime), m_JITModule(JITModule),
-        m_runtimeAPI(runtimeApi), m_exceptionAPI(exceptionApi), m_callSiteIndex(1)
-    {
-        m_baseTypes.initializeFromModule(JITModule);
-        m_globals.initializeFromModule(JITModule);
-        m_baseFunctions.initializeFromModule(JITModule);
-    }
+    );
 };
 
 
@@ -446,9 +463,12 @@ private:
     friend TReturnValue invokeBlock(TBlock* block, TContext* callingContext);
     friend void         emitBlockReturn(TObject* value, TContext* targetContext);
 
+    static const unsigned int ARG_CACHE_SIZE = 8;
     struct TFunctionCacheEntry
     {
         TMethod* method;
+        TClass*  arguments[ARG_CACHE_SIZE];
+
         TMethodFunction function;
     };
 
@@ -472,9 +492,9 @@ private:
     uint32_t m_blockReturnsEmitted;
     uint32_t m_objectsAllocated;
 
-    TMethodFunction lookupFunctionInCache(TMethod* method);
+    TMethodFunction lookupFunctionInCache(TMethod* method, TObjectArray* arguments);
     TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
-    void updateFunctionCache(TMethod* method, TMethodFunction function);
+    void updateFunctionCache(TMethod* method, TMethodFunction function, TObjectArray* arguments);
     void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
     void flushBlockFunctionCache();
 

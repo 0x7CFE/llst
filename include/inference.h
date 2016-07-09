@@ -510,6 +510,18 @@ private:
     const Type* m_blockType;
 };
 
+inline type::Type createArgumentsType(TObjectArray* arguments) {
+    type::Type result(globals.arrayClass, type::Type::tkArray);
+
+    for (std::size_t i = 0; i < arguments->getSize(); i++) {
+        TObject* const argument = arguments->getField(i);
+        TClass* const klass = isSmallInteger(argument) ? globals.smallIntClass : argument->getClass();
+        result.pushSubType(type::Type(klass));
+    }
+
+    return result;
+}
+
 } // namespace type
 
 #endif // LLST_INFERENCE_H_INCLUDED

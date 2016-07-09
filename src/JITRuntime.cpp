@@ -234,18 +234,34 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     return newBlock;
 }
 
-JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method)
+JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method, TObjectArray* arguments)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
-    TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
-
-    if (entry.method == method) {
-        m_cacheHits++;
-        return entry.function;
-    } else {
+    if (!arguments || arguments->getSize() > ARG_CACHE_SIZE) {
         m_cacheMisses++;
         return 0;
     }
+
+    const uint32_t hash = (reinterpret_cast<uint32_t>(method) << 2) + arguments->getSize();
+    TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
+
+    if (entry.method != method) {
+        m_cacheMisses++;
+        return 0;
+    }
+
+    for (std::size_t i = 0; i < arguments->getSize(); i++) {
+        TClass*  const cachedClass  = entry.arguments[i];
+        TObject* const field        = arguments->getField(i);
+        TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+        if (currentClass != cachedClass) {
+            m_cacheMisses++;
+            return 0;
+        }
+    }
+
+    m_cacheHits++;
+    return entry.function;
 }
 
 JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset)
@@ -262,13 +278,27 @@ JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* conta
     }
 }
 
-void JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
+void JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function, TObjectArray* arguments)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
+    if (!arguments || arguments->getSize() > ARG_CACHE_SIZE)
+        return;
+
+    const std::size_t argSize = arguments->getSize();
+    const uint32_t hash = (reinterpret_cast<uint32_t>(method) << 2) + argSize;
     TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
 
     entry.method   = method;
     entry.function = function;
+
+    for (std::size_t i = 0; i < argSize; i++) {
+        TObject* const field        = arguments->getField(i);
+        TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+        entry.arguments[i] = currentClass;
+    }
+
+    if (argSize < ARG_CACHE_SIZE)
+        entry.arguments[argSize + 1] = 0;
 }
 
 void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
@@ -371,16 +401,20 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
         }
 
         // Searching for the jit compiled function
-        compiledMethodFunction = lookupFunctionInCache(method);
+        compiledMethodFunction = lookupFunctionInCache(method, messageArguments);
 
         if (! compiledMethodFunction) {
+            type::Type argumentsType = type::createArgumentsType(messageArguments);
+            if (receiverClass)
+                argumentsType[0].set(receiverClass);
+
             // If function was not found in the cache looking it in the LLVM directly
-            std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+            const std::string& functionName = type::getQualifiedMethodName(method, argumentsType);
             Function* methodFunction = m_JITModule->getFunction(functionName);
 
             if (! methodFunction) {
                 // Compiling function and storing it to the table for further use
-                methodFunction = m_methodCompiler->compileMethod(method);
+                methodFunction = m_methodCompiler->compileMethod(method, argumentsType);
 
 //                  outs() << *methodFunction << "\n";
 
@@ -391,7 +425,7 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
 
             // Calling the method and returning the result
             compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
-            updateFunctionCache(method, compiledMethodFunction);
+            updateFunctionCache(method, compiledMethodFunction, messageArguments);
 
 //             outs() << *methodFunction << "\n";
 
@@ -401,7 +435,7 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
         }
 
         // Updating call site statistics and scheduling method processing
-        updateHotSites(compiledMethodFunction, previousContext, message, receiverClass, callSiteIndex);
+        //updateHotSites(compiledMethodFunction, previousContext, message, receiverClass, callSiteIndex);
 
         // Preparing the context objects. Because we do not call the software
         // implementation here, we do not need to allocate the stack object
@@ -409,6 +443,7 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
         // initialization of various objects such as stackTop and bytePointer.
 
         // Creating context object and temporaries
+        // TODO Think about stack allocation
         hptr<TObjectArray> newTemps = m_softVM->newObject<TObjectArray>(method->temporarySize);
         newContext = m_softVM->newObject<TContext>();
 
@@ -439,7 +474,7 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     if (!callSiteIndex)
         return;
 
-    TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
+    TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method, 0);
     // TODO reload cache if callerMethodFunction was popped out
 
     if (!callerMethodFunction)
@@ -494,7 +529,7 @@ void JITRuntime::patchHotMethods()
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
         Value* contextHolder = 0;
-        m_methodCompiler->compileMethod(method, methodFunction, &contextHolder);
+        m_methodCompiler->compileMethod(method, type::Type(), methodFunction, &contextHolder);
 
         outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
 

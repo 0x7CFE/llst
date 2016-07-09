@@ -2,6 +2,7 @@
 #include <visualization.h>
 
 using namespace type;
+using namespace st;
 
 static void printBlock(const Type& blockType, std::stringstream& stream) {
     if (blockType.getSubTypes().size() < Type::bstCaptureIndex) {
