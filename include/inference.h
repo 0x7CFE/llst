@@ -70,6 +70,13 @@ public:
         m_value = klass;
     }
 
+    bool isUndefined() const { return m_kind == tkUndefined; }
+    bool isLiteral() const { return m_kind == tkLiteral; }
+    bool isMonotype() const { return m_kind == tkMonotype; }
+    bool isComposite() const { return m_kind == tkComposite; }
+    bool isArray() const { return m_kind == tkArray; }
+    bool isPolytype() const { return m_kind == tkPolytype; }
+
     const TSubTypes& getSubTypes() const { return m_subTypes; }
 
     Type& pushSubType(const Type& type) { m_subTypes.push_back(type); return m_subTypes.back(); }
@@ -272,6 +279,13 @@ private:
 typedef std::size_t TNodeIndex;
 typedef std::map<TNodeIndex, Type> TTypeMap;
 
+inline std::string getQualifiedMethodName(TMethod* method, const Type& arguments) {
+    return
+        arguments.toString(true) + "::" +
+        method->getClass()->name->toString() + ">>" +
+        method->name->toString();
+}
+
 class InferContext {
 public:
     InferContext(TMethod* method, std::size_t index, const Type& arguments) :
@@ -281,6 +295,8 @@ public:
         m_returnType(Type::tkComposite),
         m_recursionKind(rkUnknown)
     {}
+
+    std::string getQualifiedName() const { return getQualifiedMethodName(m_method, m_arguments); }
 
     TMethod* getMethod() const { return m_method; }
     std::size_t getIndex() const { return m_index; }
