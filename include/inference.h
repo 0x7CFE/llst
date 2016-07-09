@@ -8,7 +8,6 @@
 
 namespace type {
 
-using namespace st;
 
 class Type {
 public:
@@ -325,7 +324,7 @@ public:
 
     Type& getInstructionType(TNodeIndex index) { return m_types[index]; }
     Type& operator[] (TNodeIndex index) { return m_types[index]; }
-    Type& operator[] (const ControlNode& node) { return getInstructionType(node.getIndex()); }
+    Type& operator[] (const st::ControlNode& node) { return getInstructionType(node.getIndex()); }
 
     // variable index -> aggregated type
     typedef std::size_t TVariableIndex;
@@ -392,14 +391,14 @@ public:
         bool sendToSuper = false);
 
     InferContext* inferBlock(Type& block, const Type& arguments, TContextStack* parent);
-    ControlGraph* getMethodGraph(TMethod* method);
-    ControlGraph* getBlockGraph(st::ParsedBlock* parsedBlock);
+    st::ControlGraph* getMethodGraph(TMethod* method);
+    st::ControlGraph* getBlockGraph(st::ParsedBlock* parsedBlock);
 
     void dumpAllContexts() const;
     void drawCallGraph() const;
 
 private:
-    typedef std::pair<ParsedBytecode*, ControlGraph*> TGraphEntry;
+    typedef std::pair<st::ParsedBytecode*, st::ControlGraph*> TGraphEntry;
     typedef std::map<TMethod*, TGraphEntry> TGraphCache;
 
     typedef std::map<Type, InferContext*>    TContextMap;
@@ -408,7 +407,7 @@ private:
     // [Block, Args] -> block context
     typedef std::map<Type, InferContext*> TBlockCache;
 
-    typedef std::map<st::ParsedBlock*, ControlGraph*> TBlockGraphCache;
+    typedef std::map<st::ParsedBlock*, st::ControlGraph*> TBlockGraphCache;
 
 private:
     SmalltalkVM&     m_vm; // TODO Image must be enough
@@ -423,7 +422,7 @@ private:
 
 class TypeAnalyzer {
 public:
-    TypeAnalyzer(TypeSystem& system, ControlGraph& graph, TContextStack& contextStack) :
+    TypeAnalyzer(TypeSystem& system, st::ControlGraph& graph, TContextStack& contextStack) :
         m_system(system),
         m_graph(graph),
         m_contextStack(contextStack),
@@ -440,46 +439,46 @@ private:
     std::string getMethodName();
     bool basicRun();
 
-    void processInstruction(InstructionNode& instruction);
-    void processTau(const TauNode& tau);
+    void processInstruction(st::InstructionNode& instruction);
+    void processTau(const st::TauNode& tau);
 
-    Type& processPhi(const PhiNode& phi);
-    Type& getArgumentType(const InstructionNode& instruction, std::size_t index = 0);
+    Type& processPhi(const st::PhiNode& phi);
+    Type& getArgumentType(const st::InstructionNode& instruction, std::size_t index = 0);
 
     void walkComplete();
 
-    void doPushConstant(const InstructionNode& instruction);
-    void doPushLiteral(const InstructionNode& instruction);
-    void doPushArgument(const InstructionNode& instruction);
+    void doPushConstant(const st::InstructionNode& instruction);
+    void doPushLiteral(const st::InstructionNode& instruction);
+    void doPushArgument(const st::InstructionNode& instruction);
 
-    void doPushTemporary(const InstructionNode& instruction);
-    void doAssignTemporary(const InstructionNode& instruction);
+    void doPushTemporary(const st::InstructionNode& instruction);
+    void doAssignTemporary(const st::InstructionNode& instruction);
 
-    void doPushBlock(const InstructionNode& instruction);
+    void doPushBlock(const st::InstructionNode& instruction);
 
-    void doSendUnary(const InstructionNode& instruction);
-    void doSendBinary(InstructionNode& instruction);
-    void doMarkArguments(const InstructionNode& instruction);
-    void doSendMessage(InstructionNode& instruction, bool sendToSuper = false);
+    void doSendUnary(const st::InstructionNode& instruction);
+    void doSendBinary(st::InstructionNode& instruction);
+    void doMarkArguments(const st::InstructionNode& instruction);
+    void doSendMessage(st::InstructionNode& instruction, bool sendToSuper = false);
 
-    void doPrimitive(const InstructionNode& instruction);
-    void doSpecial(InstructionNode& instruction);
+    void doPrimitive(const st::InstructionNode& instruction);
+    void doSpecial(st::InstructionNode& instruction);
 
 private:
-    void captureContext(InstructionNode& instruction, Type& arguments);
+    void captureContext(st::InstructionNode& instruction, Type& arguments);
     InferContext* getMethodContext();
 
     void fillLinkerClosures();
 
 private:
 
-    class Walker : public GraphWalker {
+    class Walker : public st::GraphWalker {
     public:
         Walker(TypeAnalyzer& analyzer) : analyzer(analyzer) {}
 
     private:
-        TVisitResult visitNode(ControlNode& node, const TPathNode*) {
-            if (InstructionNode* const instruction = node.cast<InstructionNode>())
+        TVisitResult visitNode(st::ControlNode& node, const TPathNode*) {
+            if (st::InstructionNode* const instruction = node.cast<st::InstructionNode>())
                 analyzer.processInstruction(*instruction);
 
             return vrKeepWalking;
@@ -495,14 +494,14 @@ private:
 
 private:
     TypeSystem&    m_system;
-    ControlGraph&  m_graph;
+    st::ControlGraph&  m_graph;
     TContextStack& m_contextStack;
     InferContext&  m_context;
 
-    TauLinker      m_tauLinker;
+    st::TauLinker  m_tauLinker;
     Walker         m_walker;
 
-    typedef std::map<InferContext::TSiteIndex, InstructionNode*> TSiteMap;
+    typedef std::map<InferContext::TSiteIndex, st::InstructionNode*> TSiteMap;
     TSiteMap m_siteMap;
 
     bool m_baseRun;
@@ -513,4 +512,4 @@ private:
 
 } // namespace type
 
-#endif
+#endif // LLST_INFERENCE_H_INCLUDED
