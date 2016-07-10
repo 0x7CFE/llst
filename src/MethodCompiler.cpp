@@ -151,7 +151,7 @@ Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
 
 Value* MethodCompiler::protectProducerNode(TJITContext& jit, st::ControlNode* node, Value* value)
 {
-    if (shouldProtectProducer(jit, jit.currentNode))
+    if (shouldProtectProducer(jit, node))
         return protectPointer(jit, value);
     else
         return value; // return value as is
@@ -232,7 +232,7 @@ bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
 bool MethodCompiler::shouldProtectProducer(TJITContext& jit, st::ControlNode* producer)
 {
     if (&jit.inferContext) { // FIXME Remove after block infer context is initialized
-        const type::Type& type = jit.inferContext[*jit.currentNode];
+        const type::Type& type = jit.inferContext[*producer];
         if (type.isLiteral() || type.getValue() == globals.smallIntClass)
             return false;
     }
@@ -975,8 +975,8 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
 
     Value* const argumentsPointer = jit.builder->CreateBitCast(argumentsObject, jit.builder->getInt8PtrTy());
-    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_start);
-    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->getInt64(sizeInBytes), argumentsPointer);
+    Function* lifetimeStartIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_start);
+    jit.builder->CreateCall2(lifetimeStartIntrinsic, jit.builder->getInt64(sizeInBytes), argumentsPointer);
 
     setNodeValue(jit, jit.currentNode, argumentsArray);
 }
@@ -1190,6 +1190,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     jit.builder->SetInsertPoint(sendBinaryBlock);
     // We need to create an arguments array and fill it with argument objects
     // Then send the message just like ordinary one
+    // TODO direct call in case of inferred context
 
     // Now creating the argument array
     TObjectAndSize array = createArray(jit, 2);
@@ -1308,16 +1309,16 @@ void MethodCompiler::doSendInferredMessage(TJITContext& jit, type::InferContext&
 
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(0), directMethodObject);
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(1), messageArgumentsObject);
+    // Note: temporaries (2) will be allocated on the stack frame of the message handler
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(3), contextObject);
-    // Note: temporaries will be allocated on the stack frame of the message handler
 
     Value* const newContext = jit.builder->CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
     Value* const result = jit.builder->CreateCall(directFunction, newContext);
 
     AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
-    Function* const gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
+    Function* const lifetimeEndIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
     Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
-    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
+    jit.builder->CreateCall2(lifetimeEndIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
     Value* const targetContext  = jit.builder->CreateExtractValue(result, 1, "targetContext");
     Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);
