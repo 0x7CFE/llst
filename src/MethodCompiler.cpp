@@ -151,7 +151,7 @@ Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
 
 Value* MethodCompiler::protectProducerNode(TJITContext& jit, st::ControlNode* node, Value* value)
 {
-    if (shouldProtectProducer(jit.currentNode))
+    if (shouldProtectProducer(jit, jit.currentNode))
         return protectPointer(jit, value);
     else
         return value; // return value as is
@@ -229,8 +229,14 @@ bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
     return detector.isDetected();
 }
 
-bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
+bool MethodCompiler::shouldProtectProducer(TJITContext& jit, st::ControlNode* producer)
 {
+    if (&jit.inferContext) { // FIXME Remove after block infer context is initialized
+        const type::Type& type = jit.inferContext[*jit.currentNode];
+        if (type.isLiteral() || type.getValue() == globals.smallIntClass)
+            return false;
+    }
+
     // We should protect the value by holder if consumer of this value is far away.
     // By far away we mean that it crosses the barrier of potential garbage collection.
     // For example if value is consumed right next to the point it was produced, then
@@ -311,11 +317,8 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 
         context = jit.builder->CreateBitCast(blockContext, m_baseTypes.context->getPointerTo());
     }
-    context->setName("contextParameter");
 
-    // Protecting the context holder
-    jit.contextHolder = jit.methodAllocatesMemory ? protectPointer(jit, context) : context;
-    jit.contextHolder->setName("pContext");
+    jit.contextHolder = context;
 
     // Storing self pointer
     Value* const pargs     = jit.builder->CreateStructGEP(context, 2);
@@ -325,14 +328,42 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 
     jit.selfHolder = jit.methodAllocatesMemory ? protectPointer(jit, self) : self;
     jit.selfHolder->setName("pSelf");
+
+    // Allocating context object and temporaries on the methodFunction's stack.
+    // This operation does not affect garbage collector, so no pointer protection
+    // is required. Moreover, this is operation is much faster than heap allocation.
+    const std::size_t tempsCount = jit.originMethod->temporarySize;
+
+    if (tempsCount) {
+        const uint32_t tempsSize = sizeof(TObjectArray) + sizeof(TObject*) * tempsCount;
+
+        MethodCompiler::TStackObject tempsPair = allocateStackObject(*jit.builder, sizeof(TObjectArray), tempsCount);
+
+        jit.builder->CreateMemSet(
+            tempsPair.objectSlot,     // destination address
+            jit.builder->getInt8(0),  // fill with zeroes
+            tempsSize,                // size of object slot
+            0,                        // no alignment
+            false                     // volatile operation
+        );
+
+        Value* const newTempsObject = jit.builder->CreateBitCast(tempsPair.objectSlot, m_baseTypes.object->getPointerTo(), "temps.");
+
+        const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
+        jit.builder->CreateCall2(getBaseFunctions().setObjectSize, newTempsObject, jit.builder->getInt32(tempsFieldsCount));
+        jit.builder->CreateCall2(getBaseFunctions().setObjectClass, newTempsObject, getJitGlobals().arrayClass);
+
+        Value* const contextObject = jit.builder->CreateBitCast(context, m_baseTypes.object->getPointerTo());
+        jit.builder->CreateCall3(getBaseFunctions().setObjectField, contextObject, jit.builder->getInt32(2), newTempsObject);
+
+        jit.temporaries = newTempsObject;
+    }
+
 }
 
 Value* MethodCompiler::TJITContext::getCurrentContext()
 {
-    if (methodAllocatesMemory)
-        return builder->CreateLoad(contextHolder, "context.");
-    else
-        return contextHolder;
+    return contextHolder;
 }
 
 Value* MethodCompiler::TJITContext::getSelf()
@@ -703,10 +734,11 @@ void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
     Value* const temporary = jit.builder->CreateCall2(
-            m_baseFunctions.getTemporary,
-            jit.getCurrentContext(),
-            jit.builder->getInt32(index)
+        m_baseFunctions.getObjectField,
+        jit.temporaries,
+        jit.builder->getInt32(index)
     );
+
     temporary->setName(std::string("temp") + to_string(index) + ".");
 
     Value* const holder = protectProducerNode(jit, jit.currentNode, temporary);
@@ -904,10 +936,10 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
     Value* const  value = getArgument(jit);
 
     jit.builder->CreateCall3(
-            m_baseFunctions.setTemporary,
-            jit.getCurrentContext(),
-            jit.builder->getInt32(index),
-            value
+        m_baseFunctions.setObjectField,
+        jit.temporaries,
+        jit.builder->getInt32(index),
+        value
     );
 }
 
@@ -1073,29 +1105,52 @@ void MethodCompiler::setNodeValue(TJITContext& jit, st::ControlNode* node, llvm:
 
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
+    const type::Type& leftType   = jit.inferContext[*jit.currentNode->getArgument(0)];
+    const type::Type& rightType  = jit.inferContext[*jit.currentNode->getArgument(1)];
+    const type::Type& resultType = jit.inferContext[*jit.currentNode];
+
+    if (leftType.isLiteral() && rightType.isLiteral()) {
+        ConstantInt* const rawResult = jit.builder->getInt32(TInteger(resultType.getValue()));
+        Value* const result = jit.builder->CreateCall(m_baseFunctions.newInteger, rawResult);
+        setNodeValue(jit, jit.currentNode, result);
+        return;
+    }
+
+    // Literal int or (SmallInt) monotype
+    const bool leftTypeIsInt  = isSmallInteger(leftType.getValue())  || leftType.getValue()  == globals.smallIntClass;
+    const bool rightTypeIsInt = isSmallInteger(rightType.getValue()) || rightType.getValue() == globals.smallIntClass;
+    const bool encodeDirectIntegers = leftTypeIsInt && rightTypeIsInt;
+
     // 0, 1 or 2 for '<', '<=' or '+' respectively
     binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.currentNode->getInstruction().getArgument());
 
-    Value* const rightValue = getArgument(jit, 1); // jit.popValue();
     Value* const leftValue  = getArgument(jit, 0); // jit.popValue();
+    Value* const rightValue = getArgument(jit, 1); // jit.popValue();
 
-    // Checking if values are both small integers
-    Value* const rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
-    Value* const leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftValue);
-    Value* const isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
+    BasicBlock* integersBlock   = 0;
+    BasicBlock* sendBinaryBlock = 0;
+    BasicBlock* resultBlock     = 0;
 
-    BasicBlock* const integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
-    BasicBlock* const sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
-    BasicBlock* const resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
+    if (! encodeDirectIntegers) {
+        // Checking if values are both small integers
+        Value* const leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftValue);
+        Value* const rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
+        Value* const isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
 
-    // Depending on the contents we may either do the integer operations
-    // directly or create a send message call using operand objects
-    jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
+        integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
+        sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
+        resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
+
+        // Depending on the contents we may either do the integer operations
+        // directly or create a send message call using operand objects
+        jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
+
+        jit.builder->SetInsertPoint(integersBlock);
+    }
 
     // Now the integers part
-    jit.builder->SetInsertPoint(integersBlock);
-    Value* const rightInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
     Value* const leftInt  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftValue);
+    Value* const rightInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
 
     Value* intResult       = 0; // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
@@ -1121,6 +1176,11 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         // Returning a bool object depending on the compare operation result
         intResultObject = jit.builder->CreateSelect(intResult, m_globals.trueObject, m_globals.falseObject);
         intResultObject->setName("bool.");
+    }
+
+    if (encodeDirectIntegers) {
+        setNodeValue(jit, jit.currentNode, intResultObject);
+        return;
     }
 
     // Jumping out the integersBlock to the value aggregator
@@ -1205,23 +1265,14 @@ void MethodCompiler::doSendInferredMessage(TJITContext& jit, type::InferContext&
         outs() << *directFunction << "\n";
     }
 
-    // Allocating context object and temporaries on the methodFunction's stack.
-    // This operation does not affect garbage collector, so no pointer protection
-    // is required. Moreover, this is operation is much faster than heap allocation.
-    const bool hasTemporaries  = context.getMethod()->temporarySize > 0;
+    // Allocating context object on the methodFunction's stack. This operation
+    // does not affect garbage collector, so no pointer protection is required.
+    // Moreover, this is operation is much faster than heap allocation.
     const uint32_t contextSize = sizeof(TContext);
-    const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * directMethod->temporarySize : 0;
 
-    // Allocating stack space for objects and registering GC protection holder
-
+    // Allocating stack space for context and registering GC protection holder
     TStackObject contextPair = allocateStackObject(*jit.builder, sizeof(TContext), 0);
     Value* const contextSlot = contextPair.objectSlot;
-    Value* tempsSlot = 0;
-
-    if (hasTemporaries) {
-        MethodCompiler::TStackObject tempsPair = allocateStackObject(*jit.builder, sizeof(TObjectArray), directMethod->temporarySize);
-        tempsSlot = tempsPair.objectSlot;
-    }
 
     // Filling stack space with zeroes
     jit.builder->CreateMemSet(
@@ -1232,20 +1283,9 @@ void MethodCompiler::doSendInferredMessage(TJITContext& jit, type::InferContext&
         false                    // volatile operation
     );
 
-    if (hasTemporaries) {
-        jit.builder->CreateMemSet(
-            tempsSlot,                // destination address
-            jit.builder->getInt8(0),  // fill with zeroes
-            tempsSize,                // size of object slot
-            0,                        // no alignment
-            false                     // volatile operation
-        );
-    }
-
     // Initializing object fields
     // TODO Move the init sequence out of the block or check that it is correctly optimized in loops
     Value*    const newContextObject = jit.builder->CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
-    Value*    const newTempsObject   = hasTemporaries ? jit.builder->CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
     Function* const setObjectSize    = getBaseFunctions().setObjectSize;
     Function* const setObjectClass   = getBaseFunctions().setObjectClass;
 
@@ -1255,12 +1295,6 @@ void MethodCompiler::doSendInferredMessage(TJITContext& jit, type::InferContext&
 
     jit.builder->CreateCall2(setObjectSize, newContextObject, jit.builder->getInt32(contextFieldsCount));
     jit.builder->CreateCall2(setObjectClass, newContextObject, getJitGlobals().contextClass);
-
-    if (hasTemporaries) {
-        const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
-        jit.builder->CreateCall2(setObjectSize, newTempsObject, jit.builder->getInt32(tempsFieldsCount));
-        jit.builder->CreateCall2(setObjectClass, newTempsObject, getJitGlobals().arrayClass);
-    }
 
     Function* const setObjectField  = getBaseFunctions().setObjectField;
     Value* const methodRawPointer   = jit.builder->getInt32(reinterpret_cast<uint32_t>(directMethod));
@@ -1274,19 +1308,16 @@ void MethodCompiler::doSendInferredMessage(TJITContext& jit, type::InferContext&
 
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(0), directMethodObject);
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(1), messageArgumentsObject);
-    if (hasTemporaries)
-        jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), newTempsObject);
-    else
-        jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), getJitGlobals().nilObject);
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(3), contextObject);
+    // Note: temporaries will be allocated on the stack frame of the message handler
 
     Value* const newContext = jit.builder->CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
     Value* const result = jit.builder->CreateCall(directFunction, newContext);
 
-//     AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
-//     Function* const gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
-//     Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
-//     jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
+    AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
+    Function* const gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
+    Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
+    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
     Value* const targetContext  = jit.builder->CreateExtractValue(result, 1, "targetContext");
     Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);

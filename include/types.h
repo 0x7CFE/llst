@@ -287,6 +287,11 @@ typedef TArray<TSymbol> TSymbolArray;
 // will hold temporary objects during the call dispatching and the pointers
 // to the current executing instruction and the stack top.
 struct TContext : public TObject {
+    explicit TContext(TClass* klass) :
+        TObject(sizeof(TContext) / sizeof(TObject*) - 2, klass, false),
+        bytePointer(0),
+        stackTop(0) {}
+
     TMethod*      method;
     TObjectArray* arguments;
     TObjectArray* temporaries;

@@ -380,24 +380,40 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
 
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
-    TContext*       newContext = 0;
-    hptr<TContext>  previousContext  = m_softVM->newPointer(callingContext);
+
+    // Preparing the context object. Because we do not call the software
+    // implementation here, we do not need to allocate the stack object
+    // because it is not used by JIT runtime. We also may skip the proper
+    // initialization of various objects such as stackTop and bytePointer.
+    // Note: temporary object will be allocated by the function on it's frame.
+
+    TContext contextSlot(globals.contextClass);
+    contextSlot.arguments       = messageArguments;
+    contextSlot.previousContext = callingContext;
+    hptr<TContext> newContext   = m_softVM->newPointer(&contextSlot);
 
     {
         // First of all we need to find the actual method object
         if (!receiverClass) {
-            TObject* receiver = messageArguments[0];
+            TObject* const receiver = messageArguments[0];
             receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
         }
 
         // Searching for the actual method to be called
         hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
+        newContext->method = method;
 
         // Checking whether we found a method
         if (method == 0) {
-            // Oops. Method was not found. In this case we should send #doesNotUnderstand: message to the receiver
+            // Oops. Method was not found. In this case we should
+            // send #doesNotUnderstand: message to the receiver.
+
+            // TODO Refactor the code to eliminate memory allocation
+            //      This will allow to completely remove hptr's
             m_softVM->setupVarsForDoesNotUnderstand(method, messageArguments, message, receiverClass);
-            // Continuing the execution just as if #doesNotUnderstand: was the actual selector that we wanted to call
+
+            // Continuing the execution just as if #doesNotUnderstand:
+            // was the actual selector that we wanted to call
         }
 
         // Searching for the jit compiled function
@@ -436,22 +452,6 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
 
         // Updating call site statistics and scheduling method processing
         //updateHotSites(compiledMethodFunction, previousContext, message, receiverClass, callSiteIndex);
-
-        // Preparing the context objects. Because we do not call the software
-        // implementation here, we do not need to allocate the stack object
-        // because it is not used by JIT runtime. We also may skip the proper
-        // initialization of various objects such as stackTop and bytePointer.
-
-        // Creating context object and temporaries
-        // TODO Think about stack allocation
-        hptr<TObjectArray> newTemps = m_softVM->newObject<TObjectArray>(method->temporarySize);
-        newContext = m_softVM->newObject<TContext>();
-
-        // Initializing context variables
-        newContext->temporaries       = newTemps;
-        newContext->arguments         = messageArguments;
-        newContext->method            = method;
-        newContext->previousContext   = previousContext;
     }
 
     try {

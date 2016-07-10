@@ -224,6 +224,7 @@ public:
 
         llvm::Value* contextHolder;
         llvm::Value* selfHolder;
+        llvm::Value* temporaries;
 
         llvm::Value* getCurrentContext();
         llvm::Value* getSelf();
@@ -249,7 +250,8 @@ public:
             methodAllocatesMemory(true),
             compiler(compiler),
             contextHolder(0),
-            selfHolder(0)
+            selfHolder(0),
+            temporaries(0)
         {
             if (parse) {
                 parsedMethod = new st::ParsedMethod(method);
@@ -313,7 +315,7 @@ private:
     llvm::Value* allocateRoot(TJITContext& jit, llvm::Type* type);
     llvm::Value* protectPointer(TJITContext& jit, llvm::Value* value);
     llvm::Value* protectProducerNode(TJITContext& jit, st::ControlNode* node, llvm::Value* value);
-    bool shouldProtectProducer(st::ControlNode* node);
+    bool shouldProtectProducer(TJITContext& jit, st::ControlNode* node);
     bool methodAllocatesMemory(TJITContext& jit);
 
     void writePreamble(TJITContext& jit, bool isBlock = false);
