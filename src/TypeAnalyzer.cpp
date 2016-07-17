@@ -26,7 +26,7 @@ static void printBlock(const Type& blockType, std::stringstream& stream) {
         stream << blockType[Type::bstCaptureIndex].toString(); // capture context index
 }
 
-std::string Type::toString(bool subtypesOnly /*= false*/) const {
+std::string Type::toString(bool subtypesOnly /*= true*/) const {
     std::stringstream stream;
 
     switch (m_kind) {
@@ -62,7 +62,7 @@ std::string Type::toString(bool subtypesOnly /*= false*/) const {
             break;
 
         case tkArray:
-            if (subtypesOnly)
+            if (!subtypesOnly)
                 stream << getValue()->cast<TClass>()->name->toString();
         case tkComposite: {
             stream << (m_kind == tkComposite ? "(" : "[");

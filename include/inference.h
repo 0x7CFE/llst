@@ -39,7 +39,7 @@ public:
     // tkMonotype       (class name)        (SmallInt)
     // tkComposite      (class name, ...)   (SmallInt, *)
     // tkArray          class name [...]    Array[String, *, (*, *), (True, False)]
-    std::string toString(bool subtypesOnly = false) const;
+    std::string toString(bool subtypesOnly = true) const;
 
     Type(TKind kind = tkUndefined) : m_kind(kind), m_value(0) {}
     Type(TObject* literal, TKind kind = tkLiteral) { set(literal, kind); }
@@ -79,7 +79,7 @@ public:
     bool isBlock() const {
         return
             isMonotype() &&
-            m_value == globals.blockClass &&
+            (m_value == globals.blockClass) &&
             !m_subTypes.empty();
     }
 
