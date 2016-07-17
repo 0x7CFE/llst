@@ -287,8 +287,8 @@ typedef std::map<TNodeIndex, Type> TTypeMap;
 
 inline std::string getQualifiedMethodName(TMethod* method, const Type& arguments) {
     return
-        arguments.toString(true) + "::" +
-        method->getClass()->name->toString() + ">>" +
+        arguments.toString() + "::" +
+        method->klass->name->toString() + ">>" +
         method->name->toString();
 }
 

@@ -917,6 +917,7 @@ void createBlockTypes(
     st::ControlGraph& blockGraph,
     type::Type& blockType,
     type::Type& blockArguments,
+    type::Type& blockTemps,
     type::InferContext::TVariableMap& closureTypes)
 {
     blockType.set(globals.blockClass, type::Type::tkMonotype);
@@ -931,6 +932,11 @@ void createBlockTypes(
     const uint32_t argumentLocation = block->argumentLocation;
 
     const st::ControlGraph::TMetaInfo::TIndexList& readsTemporaries = blockGraph.getMeta().readsTemporaries;
+    const st::ControlGraph::TMetaInfo::TIndexList& writesTemporaries = blockGraph.getMeta().writesTemporaries;
+
+    type::Type readIndices(globals.arrayClass, type::Type::tkArray);
+    type::Type writeIndices(globals.arrayClass, type::Type::tkArray);
+
     for (std::size_t index = 0; index < readsTemporaries.size(); index++) {
         const uint32_t tempIndex = readsTemporaries[index];
         TObject* const argument = temporaries[tempIndex];
@@ -940,17 +946,37 @@ void createBlockTypes(
         if (readsTemporaries[index] < argumentLocation)
             closureTypes[tempIndex] = newType;
         else
-            blockArguments.pushSubType(newType);
+            blockTemps.pushSubType(newType);
+
+        // We're interested only in temporaries from lexical context, not block arguments
+        if (readsTemporaries[index] < argumentLocation)
+            readIndices.pushSubType(type::Type(TInteger(readsTemporaries[index])));
     }
 
+    for (std::size_t index = 0; index < writesTemporaries.size(); index++) {
+        // We're interested only in temporaries from lexical context, not block arguments
+        if (writesTemporaries[index] >= argumentLocation)
+            continue;
+
+        writeIndices.pushSubType(type::Type(TInteger(writesTemporaries[index])));
+    }
+
+    blockType.pushSubType(readIndices);  // [Type::bstReadsTemps]
+    blockType.pushSubType(writeIndices); // [Type::bstWritesTemps]
+    blockType.pushSubType(type::Type(TInteger(0))); // [Type::bstCaptureIndex]
 }
 
-std::string getBlockFunctionName(const type::Type& blockType, const type::Type& blockArguments)
+std::string getDynamicBlockFunctionName(const type::Type& blockType, const type::Type& blockArguments, const type::Type& blockTemps)
+{
+    return blockArguments.toString() + blockTemps.toString() + "::" + blockType.toString();
+}
+
+std::string getStaticBlockFunctionName(const type::Type& blockType, const type::Type& blockArguments)
 {
     return blockArguments.toString() + "::" + blockType.toString();
 }
 
-llvm::Function* MethodCompiler::compileBlock(TBlock* block)
+llvm::Function* MethodCompiler::compileDynamicBlock(TBlock* block)
 {
     const uint16_t blockOffset = block->blockBytePointer;
     st::ControlGraph* const methodGraph = m_typeSystem.getMethodGraph(block->method);
@@ -964,10 +990,11 @@ llvm::Function* MethodCompiler::compileBlock(TBlock* block)
 
     type::Type blockType;
     type::Type blockArguments(globals.arrayClass, type::Type::tkArray);
-    createBlockTypes(block, *blockGraph, blockType, blockArguments, closureTypes);
+    type::Type blockTemps(globals.arrayClass, type::Type::tkArray);
+    createBlockTypes(block, *blockGraph, blockType, blockArguments, blockTemps, closureTypes);
 
     // Check if function was already compiled
-    const std::string& blockFunctionName = getBlockFunctionName(blockType, blockArguments);
+    const std::string& blockFunctionName = getDynamicBlockFunctionName(blockType, blockArguments, blockTemps);
     if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
         return blockFunction;
 
@@ -978,10 +1005,10 @@ llvm::Function* MethodCompiler::compileBlock(TBlock* block)
     return compileBlock(blockFunctionName, parsedBlock, *blockInferContext);
 }
 
-llvm::Function* MethodCompiler::compileInvokedBlock(TJITContext& jit)
+llvm::Function* MethodCompiler::compileInferredBlock(TJITContext& jit)
 {
     type::Type& blockType = jit.inferContext[*jit.currentNode->getArgument()];
-    if (blockType.isBlock())
+    if (! blockType.isBlock())
         return 0;
 
     type::Type blockArguments(type::Type::tkArray);
@@ -992,13 +1019,12 @@ llvm::Function* MethodCompiler::compileInvokedBlock(TJITContext& jit)
     if (jit.currentNode->getArgumentsCount() > 2)
         blockArguments.pushSubType(jit.inferContext[*jit.currentNode->getArgument(2)]);
 
-    type::TContextStack stack(jit.inferContext); // Probably not needed, the context must already be cached
-    type::InferContext* const blockContext = m_typeSystem.inferBlock(blockType, blockArguments, &stack);
+    type::InferContext* const blockContext = m_typeSystem.inferBlock(blockType, blockArguments, 0);
 
     if (! blockContext)
         return 0;
 
-    const std::string& blockFunctionName = getBlockFunctionName(blockType, blockArguments);
+    const std::string& blockFunctionName = getStaticBlockFunctionName(blockType, blockArguments);
     if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
         return blockFunction;
 
@@ -1514,8 +1540,7 @@ void MethodCompiler::doSendMessage(TJITContext& jit)
         const uint32_t literalIndex = jit.currentNode->getInstruction().getArgument();
         TSymbol* const selector     = literals[literalIndex];
 
-        type::InferContext* const messageContext = m_typeSystem.inferMessage(selector, arguments, 0, false);
-        if (messageContext) {
+        if (type::InferContext* const messageContext = m_typeSystem.inferMessage(selector, arguments, 0, false)) {
             doSendInferredMessage(jit, *messageContext);
             return;
         }
@@ -1905,6 +1930,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             break;
 
         case primitive::blockInvoke: { // 8
+
             Value* const object = getArgument(jit); // jit.popValue();
             Value* const block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
 
@@ -1912,22 +1938,23 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
             Value* const blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
             Value* const blockTemps = jit.builder->CreateCall(m_baseFunctions.getTemps, blockAsContext);
-            Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
 
+//             Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
             Value* const argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
             Value* const argumentLocationField  = jit.builder->CreateLoad(argumentLocationPtr);
             Value* const argumentLocationObject = jit.builder->CreateIntToPtr(argumentLocationField, m_baseTypes.object->getPointerTo());
             Value* const argumentLocation       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, argumentLocationObject, "argLocation.");
 
-            BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
-            tempsChecked->moveAfter(jit.builder->GetInsertBlock());
+//             BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
+//             tempsChecked->moveAfter(jit.builder->GetInsertBlock());
 
+            // FIXME Check will lead to a crash  if containing method have no temporaries at all
             // TODO Remove the check if block is inferred
             //Checking the passed temps size TODO unroll stack
-            Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation, "blockAcceptsArgCount.");
-            Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount, "tempSizeOk.");
-            jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
-            jit.builder->SetInsertPoint(tempsChecked);
+//             Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation, "blockAcceptsArgCount.");
+//             Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount, "tempSizeOk.");
+//             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
+//             jit.builder->SetInsertPoint(tempsChecked);
 
             // Storing values in the block's wrapping context
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
@@ -1939,12 +1966,13 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, blockTemps, fieldIndex, argument);
             }
 
-            if (Function* const blockFunction = compileInvokedBlock(jit))
+            if (Function* const blockFunction = compileInferredBlock(jit)) {
                 // Direct call to the inferred block function
                 primitiveResult = jit.builder->CreateCall(blockFunction, block);
-            else
+            } else {
                 // Generic dispatch using runtime
                 primitiveResult = jit.builder->CreateCall2(m_runtimeAPI.invokeBlock, block, jit.getCurrentContext());
+            }
         } break;
 
         case primitive::throwError: { //19

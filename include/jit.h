@@ -338,7 +338,7 @@ private:
 
     void doPushBlock(TJITContext& jit);
     llvm::Function* compileBlock(const std::string& blockFunctionName, st::ParsedBlock* parsedBlock, type::InferContext& blockContext);
-    llvm::Function* compileInvokedBlock(TJITContext& jit);
+    llvm::Function* compileInferredBlock(TJITContext& jit);
 
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
@@ -385,7 +385,7 @@ public:
         llvm::Value** contextHolder = 0
     );
 
-    llvm::Function* compileBlock(TBlock* block);
+    llvm::Function* compileDynamicBlock(TBlock* block);
 
     // TStackObject is a pair of entities allocated on a thread stack space
     // objectSlot is a container for actual object's data

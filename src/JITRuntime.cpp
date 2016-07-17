@@ -586,11 +586,8 @@ void JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, TReturnVal
     Function* blockFunction = 0;
 
     if (! compiledBlockFunction) {
-        // Block functions are created when wrapping method gets compiled.
-        // If function was not found then the whole method needs compilation.
-
         // Compiling function and storing it to the table for further use
-        blockFunction = m_methodCompiler->compileBlock(block);
+        blockFunction = m_methodCompiler->compileDynamicBlock(block);
 
         if (!blockFunction) {
             // Something is really wrong!
