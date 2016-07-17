@@ -76,6 +76,13 @@ public:
     bool isArray() const { return m_kind == tkArray; }
     bool isPolytype() const { return m_kind == tkPolytype; }
 
+    bool isBlock() const {
+        return
+            isMonotype() &&
+            m_value == globals.blockClass &&
+            !m_subTypes.empty();
+    }
+
     const TSubTypes& getSubTypes() const { return m_subTypes; }
 
     Type& pushSubType(const Type& type) { m_subTypes.push_back(type); return m_subTypes.back(); }
