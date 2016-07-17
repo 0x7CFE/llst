@@ -198,6 +198,8 @@ public:
     };
 
     struct TJITContext {
+        bool isBlock;
+
         st::ParsedMethod*    parsedMethod;
         st::ControlGraph*    controlGraph;
         st::InstructionNode* currentNode;
@@ -237,6 +239,7 @@ public:
             type::InferContext& context,
             bool parse = true
         ) :
+            isBlock(false),
             currentNode(0),
             originMethod(method),
             inferContext(context),
@@ -272,14 +275,16 @@ public:
         TJITBlockContext(
             MethodCompiler*   compiler,
             st::ParsedMethod* method,
-            st::ParsedBlock*  block
-        )
-            : TJITContext(compiler, 0, *(type::InferContext*)(0), false), parsedBlock(block)
+            st::ParsedBlock*  block,
+            st::ControlGraph* blockGraph,
+            type::InferContext& context
+        ) :
+            TJITContext(compiler, 0, context, false),
+            parsedBlock(block)
         {
             parsedMethod = method;
             originMethod = parsedMethod->getOrigin();
-            controlGraph = new st::ControlGraph(method, block);
-            controlGraph->buildGraph();
+            controlGraph = blockGraph;
         }
 
         ~TJITBlockContext() {
@@ -332,7 +337,8 @@ private:
     void doPushConstant(TJITContext& jit);
 
     void doPushBlock(TJITContext& jit);
-    llvm::Function* compileBlock(TJITContext& jit, const std::string& blockFunctionName, st::ParsedBlock* parsedBlock);
+    llvm::Function* compileBlock(const std::string& blockFunctionName, st::ParsedBlock* parsedBlock, type::InferContext& blockContext);
+    llvm::Function* compileInvokedBlock(TJITContext& jit);
 
     void doAssignTemporary(TJITContext& jit);
     void doAssignInstance(TJITContext& jit);
