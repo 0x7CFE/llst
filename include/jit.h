@@ -417,7 +417,7 @@ extern "C" {
     TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
-    TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+    TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer, uint32_t stackTop);
     TReturnValue invokeBlock(TBlock* block, TContext* callingContext);
     void         emitBlockReturn(TObject* value, TContext* targetContext);
     const void*  getBlockReturnType();
@@ -456,12 +456,12 @@ private:
     void sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex, TReturnValue& result);
     void invokeBlock(TBlock* block, TContext* callingContext, TReturnValue& result);
 
-    TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+    TBlock*  createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer, uint32_t stackTop);
 
     friend TObject*     newOrdinaryObject(TClass* klass, uint32_t slotSize);
     friend TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize);
     friend TReturnValue sendMessage(TContext* callingContext, TSymbol* message, TObjectArray* arguments, TClass* receiverClass, uint32_t callSiteIndex);
-    friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer);
+    friend TBlock*      createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer, uint32_t stackTop);
     friend TReturnValue invokeBlock(TBlock* block, TContext* callingContext);
     friend void         emitBlockReturn(TObject* value, TContext* targetContext);
 
@@ -478,11 +478,15 @@ private:
     {
         TMethod* containerMethod;
         uint32_t blockOffset;
+        TClass*  closures[ARG_CACHE_SIZE * 2];
 
         TBlockFunction function;
     };
 
     static const unsigned int LOOKUP_CACHE_SIZE = 512;
+    static const unsigned int METHOD_CACHE_ASSOCIATIVITY = 4;
+    static const unsigned int BLOCK_CACHE_ASSOCIATIVITY = 4;
+
     TFunctionCacheEntry      m_functionLookupCache[LOOKUP_CACHE_SIZE];
     TBlockFunctionCacheEntry m_blockFunctionLookupCache[LOOKUP_CACHE_SIZE];
     uint32_t m_cacheHits;
@@ -495,10 +499,21 @@ private:
     uint32_t m_objectsAllocated;
 
     TMethodFunction lookupFunctionInCache(TMethod* method, TObjectArray* arguments);
-    TBlockFunction  lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset);
+    TBlockFunction  lookupBlockFunctionInCache(TBlock* block);
     void updateFunctionCache(TMethod* method, TMethodFunction function, TObjectArray* arguments);
-    void updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function);
+    void updateBlockFunctionCache(TBlock* block, TBlockFunction function);
     void flushBlockFunctionCache();
+
+    void fillMethodSlot(
+        TFunctionCacheEntry& entry,
+        TMethod* method,
+        TMethodFunction function,
+        TObjectArray* arguments);
+
+    void fillBlockSlot(
+        TBlockFunctionCacheEntry& slot,
+        TBlock* block,
+        TBlockFunction function);
 
     void initializePassManager();
 
