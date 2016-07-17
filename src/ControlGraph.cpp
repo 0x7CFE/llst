@@ -14,7 +14,6 @@ ControlGraph::TMetaInfo::TMetaInfo() :
     hasBackEdgeTau(false),
     usesSelf(false),
     usesSuper(false),
-    readsArguments(false),
     readsFields(false),
     writesFields(false),
     hasPrimitive(false)
@@ -190,7 +189,7 @@ void GraphConstructor::processNode(InstructionNode* node)
         case opcode::pushArgument:
             if (instruction.getArgument() == 0)
                 m_graph->getMeta().usesSelf = true;
-            m_graph->getMeta().readsArguments = true;
+            ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().readsArguments);
 
         case opcode::pushInstance:
             m_graph->getMeta().readsFields = true;

@@ -524,7 +524,6 @@ public:
         bool usesSelf;
         bool usesSuper;
 
-        bool readsArguments;
         bool readsFields;
         bool writesFields;
 
@@ -535,6 +534,7 @@ public:
         typedef std::vector<std::size_t> TIndexList;
         TIndexList readsTemporaries;
         TIndexList writesTemporaries;
+        TIndexList readsArguments;
 
         static void insertIndex(std::size_t index, TIndexList& list) {
             if (std::find(list.begin(), list.end(), index) == list.end())
