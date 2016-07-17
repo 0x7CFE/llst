@@ -350,6 +350,8 @@ declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiv
     %TContext*      ; targetContext
 }
 
+declare i32 @printf(i8* noalias nocapture, ...)
+
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

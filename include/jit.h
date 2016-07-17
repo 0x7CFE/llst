@@ -398,6 +398,9 @@ public:
 
     TStackObject allocateStackObject(llvm::IRBuilder<>& builder, uint32_t baseSize, uint32_t fieldsCount);
 
+    void insertTrace(TJITContext& jit, const char* message);
+    void insertTrace(TJITContext& jit, const char* message, llvm::Value* value);
+
     MethodCompiler(
         JITRuntime& runtime,
         llvm::Module* JITModule,

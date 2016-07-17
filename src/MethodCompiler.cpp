@@ -56,6 +56,28 @@ std::string to_string(const T& x) {
     return ss.str();
 }
 
+static Constant* createStringConstant(Module& M, char const* str, Twine const& name) {
+    LLVMContext& ctx = getGlobalContext();
+    Constant* strConstant = ConstantDataArray::getString(ctx, str);
+    GlobalVariable* GVStr =
+    new GlobalVariable(M, strConstant->getType(), true,
+                       GlobalValue::InternalLinkage, strConstant, name);
+    Constant* zero = Constant::getNullValue(IntegerType::getInt32Ty(ctx));
+    Constant* indices[] = {zero, zero};
+    Constant* strVal = ConstantExpr::getGetElementPtr(GVStr, indices, true);
+    return strVal;
+}
+
+void MethodCompiler::insertTrace(MethodCompiler::TJITContext& jit, const char* message) {
+    Value* const print = m_JITModule->getFunction("printf");
+    jit.builder->CreateCall(print, createStringConstant(*m_JITModule, message, "str."));
+}
+
+void MethodCompiler::insertTrace(MethodCompiler::TJITContext& jit, const char* message, llvm::Value* value) {
+    Value* const print = m_JITModule->getFunction("printf");
+    jit.builder->CreateCall2(print, createStringConstant(*m_JITModule, message, "str."), value);
+}
+
 MethodCompiler::MethodCompiler(
     JITRuntime& runtime,
     llvm::Module* JITModule,
