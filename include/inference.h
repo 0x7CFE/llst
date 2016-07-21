@@ -391,6 +391,8 @@ public:
 
     typedef TSymbol* TSelector;
 
+    InferContext* findBlockContext(std::size_t contextIndex) const;
+
     InferContext* inferMessage(
         TSelector selector,
         const Type& arguments,

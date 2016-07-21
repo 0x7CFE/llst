@@ -1485,3 +1485,15 @@ void type::TypeSystem::drawCallGraph() const {
     stream << "}\n";
     stream.close();
 }
+
+type::InferContext* type::TypeSystem::findBlockContext(std::size_t contextIndex) const
+{
+    TBlockCache::const_iterator iContext = m_blockCache.begin();
+    for (; iContext != m_blockCache.end(); ++iContext) {
+        InferContext* const candidate = iContext->second;
+        if (candidate->getIndex() == contextIndex)
+            return candidate;
+    }
+
+    return 0;
+}
