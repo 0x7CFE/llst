@@ -190,9 +190,13 @@ void GraphConstructor::processNode(InstructionNode* node)
             if (instruction.getArgument() == 0)
                 m_graph->getMeta().usesSelf = true;
             ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().readsArguments);
+            m_currentDomain->pushValue(node);
+            break;
 
         case opcode::pushInstance:
             m_graph->getMeta().readsFields = true;
+            m_currentDomain->pushValue(node);
+            break;
 
         case opcode::pushTemporary:
             ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().readsTemporaries);

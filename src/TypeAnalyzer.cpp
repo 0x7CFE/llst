@@ -202,6 +202,7 @@ void TypeAnalyzer::run(const Type* blockType /*= 0*/) {
 
     m_baseRun = true;
     m_literalBranch = true;
+    m_tauLinker.reset();
     m_tauLinker.run();
     bool singleReturn = basicRun();
 
@@ -564,6 +565,8 @@ void TypeAnalyzer::doPushTemporary(const InstructionNode& instruction) {
                 InferContext::TVariableMap& closureTypes = methodContext->getBlockClosures()[captureIndex];
 
                 m_context[instruction] = closureTypes[tempIndex];
+            } else {
+                std::cout << "Could not find method context for block " << m_blockType->toString() << std::endl;
             }
         }
     } else {

@@ -387,7 +387,7 @@ struct TContextStack {
 
 class TypeSystem {
 public:
-    TypeSystem(SmalltalkVM& vm) : m_vm(vm), m_lastContextIndex(0) {}
+    TypeSystem(SmalltalkVM& vm) : m_vm(vm), m_lastContextIndex(1) {}
 
     typedef TSymbol* TSelector;
 

@@ -70,6 +70,8 @@ struct TInteger {
     int32_t  operator -(int32_t right) const { return getValue() - right; }
     operator TObject*() const { return reinterpret_cast<TObject*>(m_value); }
 
+    void setRawValue(int32_t value) { m_value = value; }
+
 private:
     int32_t m_value;
 protected:

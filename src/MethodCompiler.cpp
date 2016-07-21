@@ -928,7 +928,7 @@ void createBlockTypes(
 
     blockArguments.set(globals.arrayClass, type::Type::tkArray);
 
-    TObjectArray& temporaries = * block->creatingContext->temporaries;
+    TObjectArray& temporaries = * block->temporaries;
     const uint32_t argumentLocation = block->argumentLocation;
 
     const st::ControlGraph::TMetaInfo::TIndexList& readsTemporaries = blockGraph.getMeta().readsTemporaries;
@@ -943,14 +943,13 @@ void createBlockTypes(
         TClass* const klass = isSmallInteger(argument) ? globals.smallIntClass : argument->getClass();
         const type::Type newType(klass);
 
-        if (readsTemporaries[index] < argumentLocation)
+        if (readsTemporaries[index] < argumentLocation) {
             closureTypes[tempIndex] = newType;
-        else
             blockTemps.pushSubType(newType);
-
-        // We're interested only in temporaries from lexical context, not block arguments
-        if (readsTemporaries[index] < argumentLocation)
-            readIndices.pushSubType(type::Type(TInteger(readsTemporaries[index])));
+            readIndices.pushSubType(type::Type(TInteger(tempIndex)));
+        } else {
+            blockArguments.pushSubType(newType);
+        }
     }
 
     for (std::size_t index = 0; index < writesTemporaries.size(); index++) {
@@ -1308,10 +1307,13 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     const type::Type& resultType = jit.inferContext[*jit.currentNode];
 
     if (leftType.isLiteral() && rightType.isLiteral()) {
-        ConstantInt* const rawResult = jit.builder->getInt32(TInteger(resultType.getValue()));
-        Value* const result = jit.builder->CreateCall(m_baseFunctions.newInteger, rawResult);
-        setNodeValue(jit, jit.currentNode, result);
-        return;
+        // TODO Extend to all literals
+        if (isSmallInteger(resultType.getValue())) {
+            ConstantInt* const rawResult = jit.builder->getInt32(TInteger(resultType.getValue()));
+            Value* const result = jit.builder->CreateCall(m_baseFunctions.newInteger, rawResult);
+            setNodeValue(jit, jit.currentNode, result);
+            return;
+        }
     }
 
     // Literal int or (SmallInt) monotype

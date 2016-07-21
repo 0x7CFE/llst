@@ -226,7 +226,7 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
 
     // NOTE This field is used by JIT VM to aid specialization lookup
     // See MethodCompiler::getClosureMask() and lookupBlockFunctionInCache()
-    newBlock->stackTop = stackTop;
+    newBlock->stackTop.setRawValue(stackTop);
 
     // Assigning creatingContext depending on the hierarchy
     // Nested blocks inherit the outer creating context
@@ -557,6 +557,7 @@ void JITRuntime::updateBlockFunctionCache(TBlock* block, TBlockFunction function
 
         // We have found a slot that may be used
         fillBlockSlot(slot, block, function);
+        return;
     }
 
     // It seem that all slots are occupied by the friendly specializations.
