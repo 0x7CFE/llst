@@ -1271,10 +1271,7 @@ InferContext* TypeSystem::inferMessage(
         receiver = self.getValue()->cast<TClass>();
     }
 
-    if (sendToSuper)
-        receiver = receiver->parentClass;
-
-    TMethod* const method = m_vm.lookupMethod(selector, receiver);
+    TMethod* const method = m_vm.lookupMethod(selector, sendToSuper ? receiver->parentClass : receiver);
 
     if (! method) { // TODO Redirect to #doesNotUnderstand: statically
         std::printf("Lookup failed for %s::?>>%s...\n",

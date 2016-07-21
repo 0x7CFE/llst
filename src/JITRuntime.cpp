@@ -666,8 +666,6 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
 
         if (! compiledMethodFunction) {
             type::Type argumentsType = type::createArgumentsType(messageArguments);
-            if (receiverClass)
-                argumentsType[0].set(receiverClass);
 
             // If function was not found in the cache looking it in the LLVM directly
             const std::string& functionName = type::getQualifiedMethodName(method, argumentsType);
