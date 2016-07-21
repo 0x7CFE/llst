@@ -1234,7 +1234,7 @@ InferContext* TypeSystem::inferMessage(
         const TContextMap::iterator iContext = contextMap.find(key);
         if (iContext != contextMap.end()) {
             InferContext* const cachedContext = iContext->second;
-            std::printf("*** Found cached context for key: %s, cache: %p\n", key.toString().c_str(), &contextMap);
+            std::printf("*** Found cached context for key: %s, selector: %s\n", key.toString().c_str(), selector->toString().c_str());
 
             if (cachedContext->getRecursionKind() == InferContext::rkUnknown) {
                 for (TContextStack* stack = parent; stack; stack = stack->parent) {
@@ -1255,7 +1255,7 @@ InferContext* TypeSystem::inferMessage(
             return cachedContext;
         }
 
-        std::printf("*** Not found cached context for key: %s, cache: %p\n", key.toString().c_str(), &contextMap);
+        std::printf("*** Not found cached context for key: %s, selector: %s\n", key.toString().c_str(), selector->toString().c_str());
     }
 
     TClass* receiver = 0;
@@ -1313,12 +1313,39 @@ InferContext* TypeSystem::inferMessage(
     return inferContext;
 }
 
-InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContextStack* parent) {
-    if (block.getKind() != Type::tkMonotype)
+InferContext* TypeSystem::inferDynamicBlock(
+    Type& block,
+    const Type& arguments,
+    const Type& temporaries,
+    TContextStack* parent)
+{
+    if (! block.isBlock())
         return 0;
 
-    // FIXME Prove that this is enough.
-    //       What about captured types/args?
+    Type key(Type::tkArray);
+    key.pushSubType(block);
+    key.pushSubType(arguments);
+    key.pushSubType(temporaries);
+
+    TBlockCache::iterator iBlock = m_blockCache.find(key);
+    if (iBlock != m_blockCache.end())
+        return iBlock->second;
+
+    TMethod* const method = block[Type::bstOrigin].getValue()->cast<TMethod>();
+    InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
+    m_blockCache[key] = inferContext;
+    std::printf("Cached dynamic block context %s -> %p (index %u), cache size %u\n",
+                key.toString().c_str(), inferContext, inferContext->getIndex(), m_blockCache.size());
+
+    doInferBlock(inferContext, block, arguments, parent);
+
+    return inferContext;
+}
+
+InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContextStack* parent) {
+    if (! block.isBlock())
+        return 0;
+
     Type key(Type::tkArray);
     key.pushSubType(block);
     key.pushSubType(arguments);
@@ -1328,13 +1355,20 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
         return iBlock->second;
 
     TMethod* const method = block[Type::bstOrigin].getValue()->cast<TMethod>();
-    const uint16_t offset = TInteger(block[Type::bstOffset].getValue());
-
-    InferContext* inferContext = new InferContext(method, m_lastContextIndex++, arguments);
+    InferContext* const inferContext = new InferContext(method, m_lastContextIndex++, arguments);
 
     m_blockCache[key] = inferContext;
     std::printf("Cached block context %s -> %p (index %u), cache size %u\n",
                 key.toString().c_str(), inferContext, inferContext->getIndex(), m_blockCache.size());
+
+    doInferBlock(inferContext, block, arguments, parent);
+    return inferContext;
+
+}
+
+void TypeSystem::doInferBlock(InferContext* inferContext, Type& block, const Type& arguments, TContextStack* parent) {
+    TMethod* const method = block[Type::bstOrigin].getValue()->cast<TMethod>();
+    const uint16_t offset = TInteger(block[Type::bstOffset].getValue());
 
     ControlGraph* const methodGraph = getMethodGraph(method);
     assert(methodGraph);
@@ -1366,8 +1400,6 @@ InferContext* TypeSystem::inferBlock(Type& block, const Type& arguments, TContex
 
     std::printf("%s::%s -> %s\n", arguments.toString().c_str(), block.toString().c_str(),
                 inferContext->getRawReturnType().toString().c_str());
-
-    return inferContext;
 }
 
 void type::TypeSystem::dumpAllContexts() const {

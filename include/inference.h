@@ -398,11 +398,19 @@ public:
         bool sendToSuper = false);
 
     InferContext* inferBlock(Type& block, const Type& arguments, TContextStack* parent);
+    InferContext* inferDynamicBlock(Type& block, const Type& arguments, const Type& temporaries, TContextStack* parent);
+
+    // TODO Solve concurrent modifications by returning:
+    //          - R/O holder to the shared graph
+    //          - R/W holder to the exclusive copy
     st::ControlGraph* getMethodGraph(TMethod* method);
     st::ControlGraph* getBlockGraph(st::ParsedBlock* parsedBlock);
 
     void dumpAllContexts() const;
     void drawCallGraph() const;
+
+private:
+    void doInferBlock(InferContext* inferContext, Type& block, const Type& arguments, TContextStack* parent);
 
 private:
     typedef std::pair<st::ParsedBytecode*, st::ControlGraph*> TGraphEntry;

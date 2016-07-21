@@ -674,6 +674,8 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
             Function* methodFunction = m_JITModule->getFunction(functionName);
 
             if (! methodFunction) {
+                outs() << "Compiling dynamic method " << functionName << "\n";
+
                 // Compiling function and storing it to the table for further use
                 methodFunction = m_methodCompiler->compileMethod(method, argumentsType);
 

@@ -997,8 +997,10 @@ llvm::Function* MethodCompiler::compileDynamicBlock(TBlock* block)
     if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
         return blockFunction;
 
+    printf("compiling dynamic block %s\n", blockFunctionName.c_str());
+
     type::TContextStack stack(methodContext);
-    type::InferContext* const blockInferContext = m_typeSystem.inferBlock(blockType, blockArguments, &stack);
+    type::InferContext* const blockInferContext = m_typeSystem.inferDynamicBlock(blockType, blockArguments, blockTemps, &stack);
     assert(blockInferContext);
 
     return compileBlock(blockFunctionName, parsedBlock, *blockInferContext);
@@ -1033,6 +1035,7 @@ llvm::Function* MethodCompiler::compileInferredBlock(TJITContext& jit)
     st::ControlGraph* const methodGraph = m_typeSystem.getMethodGraph(method);
     st::ParsedBlock*  const parsedBlock = methodGraph->getParsedMethod()->getParsedBlockByOffset(blockOffset);
 
+    printf("compiling inferred block %s\n", blockFunctionName.c_str());
     return compileBlock(blockFunctionName, parsedBlock, *blockContext);
 }
 
@@ -1041,8 +1044,6 @@ llvm::Function* MethodCompiler::compileBlock(const std::string& blockFunctionNam
     // Check if function was already compiled
     if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
         return blockFunction;
-
-    printf("compiling block %s\n", blockFunctionName.c_str());
 
     st::ControlGraph* const blockGraph = m_typeSystem.getBlockGraph(parsedBlock);
 
