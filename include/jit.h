@@ -292,6 +292,7 @@ public:
         }
     };
 
+    type::TypeSystem& getTypeSystem() { return m_typeSystem; }
 
 private:
     JITRuntime& m_runtime;

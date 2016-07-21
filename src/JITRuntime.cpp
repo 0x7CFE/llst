@@ -68,24 +68,22 @@ static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime
 
 void JITRuntime::printStat()
 {
-    float hitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    float blockHitRatio = 100.0 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
+    float messagehitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    float blockHitRatio   = 100.0 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
 
     std::printf(
         "JIT Runtime stat:\n"
-        "\tMessages dispatched: %12d\n"
-        "\tObjects  allocated:  %12d\n"
-        "\tBlocks   invoked:    %12d\n"
-        "\tBlockReturn emitted: %12d\n"
-        "\tBlock    cache hits: %12d  misses %10d ratio %6.2f %%\n"
-        "\tMessage  cache hits: %12d  misses %10d ratio %6.2f %%\n",
+        "\tDynamic messages:  %12d total, %12d hits, %10d misses, hit ratio %6.2f %%\n"
+        "\tDynamic blocks:    %12d total, %12d hits, %10d misses, hit ratio %6.2f %%\n"
+        "\tObjects allocated: %12d\n",
 
-        m_messagesDispatched,
-        m_objectsAllocated,
-        m_blocksInvoked, m_blockReturnsEmitted,
-        m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
-        m_cacheHits, m_cacheMisses, hitRatio
+        m_messagesDispatched, m_cacheHits, m_cacheMisses, messagehitRatio,
+        m_blocksInvoked, m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
+        m_objectsAllocated
     );
+
+    m_methodCompiler->getTypeSystem().dumpAllContexts();
+    m_methodCompiler->getTypeSystem().drawCallGraph();
 
     std::vector<THotMethod*> hotMethods;
 
