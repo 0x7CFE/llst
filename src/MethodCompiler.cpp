@@ -1303,9 +1303,9 @@ void MethodCompiler::setNodeValue(TJITContext& jit, st::ControlNode* node, llvm:
 
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
-    const type::Type& leftType   = jit.inferContext[*jit.currentNode->getArgument(0)];
-    const type::Type& rightType  = jit.inferContext[*jit.currentNode->getArgument(1)];
-    const type::Type& resultType = jit.inferContext[*jit.currentNode];
+    const type::Type& leftType   = jit.inferContext[*jit.currentNode->getArgument(0)].fold();
+    const type::Type& rightType  = jit.inferContext[*jit.currentNode->getArgument(1)].fold();
+    const type::Type& resultType = jit.inferContext[*jit.currentNode].fold();
 
     if (leftType.isLiteral() && rightType.isLiteral()) {
         // TODO Extend to all literals
