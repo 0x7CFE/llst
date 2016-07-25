@@ -977,15 +977,22 @@ void TypeAnalyzer::doPrimitive(const InstructionNode& instruction) {
         }
 
         case primitive::arrayAt:
-        case primitive::arrayAtPut:
-        case primitive::stringAt:
-        case primitive::stringAtPut:
         case primitive::bulkReplace:
             primitiveResult = Type(Type::tkPolytype);
             break;
 
+        // FIXME actually this is primitive for ByteArray>>basicAt:
+        case primitive::stringAt:
+            primitiveResult = Type(globals.smallIntClass, Type::tkMonotype);
+            break;
+
+        case primitive::arrayAtPut:
+        case primitive::stringAtPut:
+            primitiveResult = m_context[*instruction.getArgument(1)];
+            break;
+
         case primitive::cloneByteObject:
-            primitiveResult = m_context[*instruction.getArgument(0)];
+            primitiveResult = m_context[*instruction.getArgument(1)];
             break;
 
         case primitive::blockInvoke: {
