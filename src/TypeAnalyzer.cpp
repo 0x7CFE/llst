@@ -628,7 +628,11 @@ void TypeAnalyzer::doPushBlock(const InstructionNode& instruction) {
         blockType.pushSubType(origin);                                 // [Type::bstOrigin]
         blockType.pushSubType(Type(TInteger(offset)));                 // [Type::bstOffset]
         blockType.pushSubType(Type(TInteger(argIndex)));               // [Type::bstArgIndex]
-        blockType.pushSubType(Type(TInteger(m_context.getIndex())));   // [Type::bstContextIndex]
+
+        if (m_blockType)
+            blockType.pushSubType((*m_blockType)[Type::bstContextIndex]);
+        else
+            blockType.pushSubType(Type(TInteger(m_context.getIndex()))); // [Type::bstContextIndex]
 
         ControlGraph* const blockGraph = m_system.getBlockGraph(pushBlock->getParsedBlock());
         assert(blockGraph);
