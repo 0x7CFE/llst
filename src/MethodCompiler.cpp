@@ -992,6 +992,9 @@ llvm::Function* MethodCompiler::compileDynamicBlock(TBlock* block)
     type::Type blockTemps(globals.arrayClass, type::Type::tkArray);
     createBlockTypes(block, *blockGraph, blockType, blockArguments, blockTemps, closureTypes);
 
+    const uint32_t closureMask = getClosureMask(*blockGraph);
+    block->stackTop.setRawValue(closureMask);
+
     // Check if function was already compiled
     const std::string& blockFunctionName = getDynamicBlockFunctionName(blockType, blockArguments, blockTemps);
     if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
