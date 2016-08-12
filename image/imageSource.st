@@ -776,18 +776,115 @@ COMMENT                                                                         
 CLASS BranchTest Test
 
 METHOD BranchTest
-ifTrue |x|
+ifBlock |x|
+    [ true ] ifTrue:  [ x <- 123 ].
+    [ x ] assertEq: 123 withComment: '1'.
+
+    [ false ] ifFalse: [ x <- 151 ].
+    [ x ] assertEq: 151 withComment: '2'.
+
     [ true ] ifTrue:  [ x <- 123 ]
-             ifFalse: [ x <- 151 ]
-    [ x ] assertEq: 123
+             ifFalse: [ x <- 151 ].
+    [ x ] assertEq: 123 withComment: '3'.
+
+    [ false ] ifFalse: [ x <- 521 ]
+              ifTrue:  [ x <- 34 ].
+    [ x ] assertEq: 521 withComment: '4'.
 !
 
+METHOD BranchTest
+ifBlockBadCodegenIfTrue |x|
+    [ false ] ifTrue:  [ x <- 34 ]
+              ifFalse: [ x <- 521 ].
+    [ x ] assertEq: 521.
+!
 
 METHOD BranchTest
-ifFalse |x|
-    [ false ] ifTrue:  [ x <- 34 ]
-              ifFalse: [ x <- 521 ]
-    [ x ] assertEq: 521
+ifBlockBadCodegenIfFalse |x|
+    [ true ] ifFalse: [ x <- 151 ]
+             ifTrue:  [ x <- 123 ].
+    [ x ] assertEq: 123.
+!
+
+METHOD BranchTest
+ifLiteral |x|
+    true ifTrue:  [ x <- 123 ].
+    [ x ] assertEq: 123 withComment: '1'.
+
+    false ifFalse: [ x <- 151 ].
+    [ x ] assertEq: 151 withComment: '2'.
+
+    true ifTrue:  [ x <- 123 ]
+         ifFalse: [ x <- 151 ].
+    [ x ] assertEq: 123 withComment: '3'.
+
+    false ifTrue:  [ x <- 34 ]
+          ifFalse: [ x <- 521 ].
+    [ x ] assertEq: 521 withComment: '4'.
+
+    true ifFalse: [ x <- 151 ]
+         ifTrue:  [ x <- 123 ].
+    [ x ] assertEq: 123 withComment: '5'.
+
+    false ifFalse: [ x <- 521 ]
+          ifTrue:  [ x <- 34 ].
+    [ x ] assertEq: 521 withComment: '6'.
+!
+
+METHOD BranchTest
+ifRealBooleanMethods |arr x|
+    Context new performTest: (Boolean methods at: #ifTrue:)
+        withArguments: (Array with: true with: [ x <- 123 ]
+    ).
+    [ x ] assertEq: 123 withComment: '1'.
+
+    Context new performTest: (Boolean methods at: #ifFalse:)
+        withArguments: (Array with: false with: [ x <- 151 ]
+    ).
+    [ x ] assertEq: 151 withComment: '2'.
+
+    Context new performTest: (Boolean methods at: #ifTrue:ifFalse:)
+        withArguments: (Array with: true with: [ x <- 123 ] with: [ x <- 151 ]
+    ).
+    [ x ] assertEq: 123 withComment: '3'.
+
+    Context new performTest: (Boolean methods at: #ifTrue:ifFalse:)
+        withArguments: (Array with: false with: [ x <- 32 ] with: [ x <- 521 ]
+    ).
+    [ x ] assertEq: 521 withComment: '4'.
+
+    Context new performTest: (Boolean methods at: #ifFalse:ifTrue:)
+        withArguments: (Array with: true with: [ x <- 151 ] with: [ x <- 123 ]
+    ).
+    [ x ] assertEq: 123 withComment: '5'.
+
+    Context new performTest: (Boolean methods at: #ifFalse:ifTrue:)
+        withArguments: (Array with: false with: [ x <- 521 ] with: [ x <- 34 ]
+    ).
+    [ x ] assertEq: 521 withComment: '6'.
+!
+
+METHOD BranchTest
+ifRealTrueFalseMethods |arr x|
+    Context new performTest: (True methods at: #ifTrue:)
+        withArguments: (Array with: true with: [ x <- 123 ]
+    ).
+    [ x ] assertEq: 123 withComment: '1'.
+
+    Context new performTest: (True methods at: #ifFalse:)
+        withArguments: (Array with: true with: [ x <- 151 ]
+    ).
+    [ x ] assertEq: 123 withComment: '2'.
+
+    Context new performTest: (False methods at: #ifTrue:)
+        withArguments: (Array with: false with: [ x <- 151 ]
+    ).
+    [ x ] assertEq: 123 withComment: '3'.
+
+    Context new performTest: (False methods at: #ifFalse:)
+        withArguments: (Array with: false with: [ x <- 151 ]
+    ).
+    [ x ] assertEq: 151 withComment: '4'.
 !
 
 METHOD BranchTest
@@ -1008,7 +1105,7 @@ init
 
     arrOfChars <- Array new: 257.
     1 to: 257 do: [:idx|
-        arrOfChars at: idx put: (Char basicNew: idx-1)
+        arrOfChars at: idx put: (Char new: idx-1)
     ].
 !
 
@@ -2057,7 +2154,6 @@ run4: rounds | list indices tree |
 
 METHOD Undefined
 main    | command  data x |
-    Char initialize.
     Class fillChildren.
     System fixMethodClasses.
 
@@ -2072,45 +2168,46 @@ main    | command  data x |
 
 
 COMMENT -----------Boolean--------------
-METHOD Boolean
-and: aBlock
-	^ self
-		ifTrue: [ aBlock value ]
-		ifFalse: [ false ]
-!
-METHOD Boolean
-or: aBlock
-	^ self
-		ifTrue: [ true ]
-		ifFalse: [ aBlock value ]
-!
-METHOD Boolean
-not
-	^ self
-		ifTrue: [ false ]
-		ifFalse: [ true ]
-!
-METHOD Boolean
-ifFalse: falseBlock ifTrue: trueBlock
-	^ self ifTrue: [ trueBlock  value ] ifFalse: [ falseBlock value ]
+METHOD MetaBoolean
+new: arg
+    arg ifTrue: [ ^ true ].
+    ^ false
 !
 METHOD Boolean
 ifTrue: aBlock
-	^ self ifTrue: [ aBlock value ] ifFalse: [ nil ]
+    self ifTrue: [ ^ aBlock value ].
 !
 METHOD Boolean
 ifFalse: aBlock
-	^ self ifTrue: [ nil ] ifFalse: [ aBlock value ]
+    self ifFalse: [ ^ aBlock value ].
+!
+METHOD Boolean
+ifTrue: trueBlock ifFalse: falseBlock
+    self ifTrue: [ ^ trueBlock value ].
+    self ifFalse:[ ^ falseBlock value ].
+!
+METHOD Boolean
+ifFalse: falseBlock ifTrue: trueBlock
+    self ifTrue: [ ^ trueBlock value ].
+    self ifFalse:[ ^ falseBlock value ].
+!
+METHOD Boolean
+and: aBlock
+    ^ self and: [ ^ Boolean new: aBlock value ]
+!
+METHOD Boolean
+or: aBlock
+    ^ self or: [ ^ Boolean new: aBlock value ]
+!
+METHOD Boolean
+not
+    ^ self not
 !
 COMMENT -----------True--------------
 METHOD MetaTrue
 new
 	" there is only one true value "
 	^ true
-!
-METHOD True
-not
-	^ false
 !
 METHOD True
 asString
@@ -2121,26 +2218,30 @@ printString
   ^self asString
 !
 METHOD True
-ifTrue: trueBlock ifFalse: falseBlock
-	^ trueBlock value
+ifTrue: aBlock
+    ^ aBlock value
 !
 METHOD True
-or: aBlock
-	^ true
+ifFalse: aBlock
+    ^ nil
 !
 METHOD True
 and: aBlock
-	^ aBlock value
+    ^ Boolean new: aBlock value
+!
+METHOD True
+or: aBlock
+    ^ true
+!
+METHOD True
+not
+    ^ false
 !
 COMMENT -----------False--------------
 METHOD MetaFalse
 new
 	" there is only one false value "
   	^ false
-!
-METHOD False
-not
-	^ true
 !
 METHOD False
 asString
@@ -2151,17 +2252,27 @@ printString
   ^self asString
 !
 METHOD False
-ifTrue: trueBlock ifFalse: falseBlock
-	^ falseBlock value
+ifTrue: aBlock
+    ^ nil
 !
 METHOD False
-or: aBlock
-	^ aBlock value
+ifFalse: aBlock
+    ^ aBlock value
 !
 METHOD False
 and: aBlock
 	^ false
 !
+METHOD False
+or: aBlock
+    ^ Boolean new: aBlock value
+!
+METHOD False
+not
+    ^ true
+!
+
+COMMENT -----------Thread--------------
 METHOD MetaThread
 new: aBlock |instance|
     instance <- self new.
@@ -2484,15 +2595,6 @@ args: argNames inst: instNames temp: tempNames
 !
 COMMENT -----------Chars--------------
 METHOD MetaChar
-initialize
-	chars isNil ifTrue: [
-		chars <- Array new: 257.
-		1 to: 257 do: [:idx|
-			chars at: idx put: (Char basicNew: idx-1)
-		]
-	]
-!
-METHOD MetaChar
 basicNew: value
 	" create and initialize a new char "
 	^ self in: self new at: 1 put: value
@@ -2500,14 +2602,21 @@ basicNew: value
 METHOD MetaChar
 new: value
 	" return unique Char for ASCII value (or EOF) "
-	(value < 257) ifTrue: [ ^ chars at: value+1 ].
-
+	(value < 257) ifTrue: [
+		chars isNil ifTrue: [
+			chars <- Array new: 257.
+			1 to: 257 do: [:idx|
+				chars at: idx put: (Char basicNew: idx-1)
+			]
+		].
+		^ chars at: value+1
+	].
 	" otherwise build a custom Char "
 	^ self basicNew: value
 !
 METHOD MetaChar
 newline
-		" return newline character "
+	" return newline character "
 	^ self new: 10
 !
 METHOD MetaChar
