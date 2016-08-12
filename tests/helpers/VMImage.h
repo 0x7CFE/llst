@@ -11,11 +11,12 @@ class H_VMImage
     std::auto_ptr<IMemoryManager> m_memoryManager;
     std::auto_ptr<Image> m_smalltalkImage;
 public:
-    H_VMImage(const std::string& imageName) {
-        std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-        memoryManager->initializeHeap(1024*1024, 1024*1024);
-        std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
-        smalltalkImage->loadImage(TESTS_DIR "./data/" + imageName + ".image");
+    H_VMImage(const std::string& imageName) :
+        m_memoryManager(new BakerMemoryManager()),
+        m_smalltalkImage(new Image(m_memoryManager.get()))
+    {
+        m_memoryManager->initializeHeap(1024*1024, 1024*1024);
+        m_smalltalkImage->loadImage(TESTS_DIR "./data/" + imageName + ".image");
     }
     TObjectArray* newArray(std::size_t fields);
     TString* newString(std::size_t size);
