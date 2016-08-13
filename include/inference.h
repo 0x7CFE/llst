@@ -221,11 +221,33 @@ public:
 
             case tkLiteral:
                 if (m_value == other.m_value) { // 2 & 3
-                    return *this; // 2 & 2
+                    return *this; // 2 & 2 -> 2
                 } else {
-                    // TODO true & false -> (Boolean)
-                    TClass* const klass = isSmallInteger(m_value) ? globals.smallIntClass : m_value->getClass();
-                    return *this = (Type(klass) &= other);
+                    TClass* const leftClass = isSmallInteger(m_value) ? globals.smallIntClass : m_value->getClass();
+
+                    if (other.m_kind == tkMonotype) { // 2 & (SmallInt)
+                        TClass* const rightClass = static_cast<TClass*>(other.m_value);
+                        if (leftClass == rightClass) {
+                            // 2 & (SmallInt) -> (SmallInt)
+                            return *this = (Type(leftClass) &= other);
+                        } else {
+                            // String & (SmallInt) -> *
+                            return *this = Type(tkPolytype);
+                        }
+                    } else { // literal & literal
+                        TClass* const rightClass = isSmallInteger(other.m_value) ? globals.smallIntClass : other.m_value->getClass();
+                        if (leftClass == rightClass) {
+                            // 2 & 3 -> (SmallInt)
+                            return *this = Type(leftClass);
+                        }
+                        TClass* const booleanClass = globals.trueObject->getClass()->parentClass;
+                        if (leftClass->parentClass == rightClass->parentClass && leftClass->parentClass == booleanClass) {
+                            // true & false -> Boolean
+                            return *this = Type(booleanClass);
+                        }
+                    }
+
+                    return *this = (Type(leftClass) &= other);
                 }
 
             case tkMonotype: {
