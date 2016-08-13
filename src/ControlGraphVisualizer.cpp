@@ -1,6 +1,7 @@
 
 #include <visualization.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <cstdlib>
 #include <iomanip>
@@ -32,6 +33,25 @@ std::string gnu_getcwd() {
     }
 }
 
+void gnu_mkdir(const std::string& path) {
+    int status = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    if (status != 0) {
+        std::stringstream ss;
+        ss << "Cannot create '" << path << "'";
+        throw std::ios_base::failure( ss.str() );
+    }
+}
+
+bool gnu_dir_exists(const std::string& path) {
+    struct stat info;
+    int status = stat(path.c_str(), &info);
+    if (status != 0)
+        return false;
+    if (info.st_mode & S_IFDIR)
+        return true;
+    return false;
+}
+
 std::string escape_path(const std::string& path) {
     if (path.empty())
         return "<empty name>";
@@ -55,6 +75,9 @@ std::string escape_path(const std::string& path) {
 ControlGraphVisualizer::ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName, const std::string& directory /*= "."*/)
     : st::PlainNodeVisitor(graph)
 {
+    if (!gnu_dir_exists(directory)) {
+        gnu_mkdir(directory);
+    }
     std::string fullpath = directory + "/" + escape_path(fileName) + ".dot";
     m_stream.open(fullpath.c_str(), std::ios::out | std::ios::trunc);
     if (m_stream.fail()) {
