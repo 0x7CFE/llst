@@ -387,7 +387,34 @@ struct TContextStack {
 
 class TypeSystem {
 public:
-    TypeSystem(SmalltalkVM& vm) : m_vm(vm), m_lastContextIndex(1) {}
+    TypeSystem(SmalltalkVM& vm) :
+        m_vm(vm),
+        m_graphCache(),
+        m_contextCache(),
+        m_blockCache(),
+        m_blockGraphCache(),
+        m_lastContextIndex(1)
+    {}
+
+    ~TypeSystem() {
+        for(TBlockGraphCache::const_iterator it = m_blockGraphCache.begin(); it != m_blockGraphCache.end(); ++it) {
+            delete it->second;
+        }
+        for(TBlockCache::const_iterator it = m_blockCache.begin(); it != m_blockCache.end(); ++it) {
+            delete it->second;
+        }
+        for(TContextCache::const_iterator it = m_contextCache.begin(); it != m_contextCache.end(); ++it) {
+            const TContextMap& contextMap = it->second;
+            for(TContextMap::const_iterator jt = contextMap.begin(); jt != contextMap.end(); ++jt) {
+                delete jt->second;
+            }
+        }
+        for(TGraphCache::const_iterator it = m_graphCache.begin(); it != m_graphCache.end(); ++it) {
+            const TGraphEntry& entry = it->second;
+            delete entry.first;
+            delete entry.second;
+        }
+    }
 
     typedef TSymbol* TSelector;
 
