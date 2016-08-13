@@ -89,7 +89,9 @@ add_library(stapi
     src/ParsedBlock.cpp
 
     src/ControlGraph.cpp
+    src/TauLinker.cpp
     src/ControlGraphVisualizer.cpp
+    src/TypeAnalyzer.cpp
 )
 
 set(MM_CPP_FILES

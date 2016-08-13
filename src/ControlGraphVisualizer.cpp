@@ -1,6 +1,7 @@
 
 #include <visualization.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <errno.h>
 #include <cstdlib>
 #include <iomanip>
@@ -32,6 +33,25 @@ std::string gnu_getcwd() {
     }
 }
 
+void gnu_mkdir(const std::string& path) {
+    int status = mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    if (status != 0) {
+        std::stringstream ss;
+        ss << "Cannot create '" << path << "'";
+        throw std::ios_base::failure( ss.str() );
+    }
+}
+
+bool gnu_dir_exists(const std::string& path) {
+    struct stat info;
+    int status = stat(path.c_str(), &info);
+    if (status != 0)
+        return false;
+    if (info.st_mode & S_IFDIR)
+        return true;
+    return false;
+}
+
 std::string escape_path(const std::string& path) {
     if (path.empty())
         return "<empty name>";
@@ -55,6 +75,9 @@ std::string escape_path(const std::string& path) {
 ControlGraphVisualizer::ControlGraphVisualizer(st::ControlGraph* graph, const std::string& fileName, const std::string& directory /*= "."*/)
     : st::PlainNodeVisitor(graph)
 {
+    if (!gnu_dir_exists(directory)) {
+        gnu_mkdir(directory);
+    }
     std::string fullpath = directory + "/" + escape_path(fileName) + ".dot";
     m_stream.open(fullpath.c_str(), std::ios::out | std::ios::trunc);
     if (m_stream.fail()) {
@@ -74,17 +97,13 @@ bool ControlGraphVisualizer::visitDomain(st::ControlDomain& /*domain*/) {
 }
 
 std::string edgeStyle(st::ControlNode* from, st::ControlNode* to) {
-    const st::InstructionNode* const fromInstruction = from->cast<st::InstructionNode>();
-	const st::InstructionNode* const toInstruction   = to->cast<st::InstructionNode>();
+    const st::InstructionNode* const toInstruction   = to->cast<st::InstructionNode>();
 
     if (from->getNodeType() == st::ControlNode::ntPhi && to->getNodeType() == st::ControlNode::ntPhi)
         return "[style=invis color=red constraint=false]";
 
-    if (fromInstruction && fromInstruction->getInstruction().isBranch())
-        return "[color=\"grey\" style=\"dashed\"]";
-
     if (toInstruction && toInstruction->getArgumentsCount() == 0)
-        return "[color=\"black\" style=\"dashed\" ]";
+        return "[weight=100 color=\"black\" style=\"dashed\" ]";
 
     return "";
 }
@@ -96,31 +115,45 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
     // Processing incoming edges
     st::TNodeSet::iterator iEdge = inEdges.begin();
     for (; iEdge != inEdges.end(); ++iEdge) {
-        if (isNodeProcessed(*iEdge))
+        if (isNodeProcessed(*iEdge) || (*iEdge)->getNodeType() == st::ControlNode::ntPhi)
             continue;
+
+        if (const st::InstructionNode* const instruction = (*iEdge)->cast<st::InstructionNode>()) {
+            // Branch edges are handled separately
+            if (instruction->getInstruction().isBranch())
+                continue;
+        }
 
         m_stream << "\t\t" << (*iEdge)->getIndex() << " -> " << node.getIndex() << edgeStyle(*iEdge, &node) << ";\n";
     }
 
-    // Processing outgoing edges
-    iEdge = outEdges.begin();
-    for (; iEdge != outEdges.end(); ++iEdge) {
-        if (isNodeProcessed(*iEdge))
-            continue;
-
-        m_stream << "\t\t" << node.getIndex() << " -> " << (*iEdge)->getIndex() << edgeStyle(&node, *iEdge) << ";\n";
-    }
+    bool outEdgesProcessed = false;
 
     // Processing argument edges
     if (const st::InstructionNode* const instruction = node.cast<st::InstructionNode>()) {
         const std::size_t argsCount = instruction->getArgumentsCount();
         for (std::size_t index = 0; index < argsCount; index++) {
-            m_stream << "\t\t" << node.getIndex() << " -> " << instruction->getArgument(index)->getIndex() << " [";
+            m_stream << "\t\t" << instruction->getArgument(index)->getIndex() << " -> " << node.getIndex() << " [";
 
             if (argsCount > 1)
                 m_stream << "label=" << index;
 
-            m_stream << " labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"dashed\" constraint=false];\n";
+            m_stream << "dir=back weight=8 labelfloat=true color=\"blue\" fontcolor=\"blue\" style=\"dashed\" constraint=true];\n";
+        }
+
+        if (const st::BranchNode* const branch = node.cast<st::BranchNode>()) {
+            m_stream
+                << "\t\t" << node.getIndex() << " -> " << branch->getTargetNode()->getIndex() << " ["
+                << (branch->getSkipNode() ? " label=target " : "")
+                << "weight=20 labelfloat=true color=\"grey\" fontcolor=\"grey\" style=\"dashed\"];\n";
+
+            if (branch->getSkipNode()) {
+                m_stream
+                    << "\t\t" << node.getIndex() << " -> " << branch->getSkipNode()->getIndex() << " ["
+                    << "weight=20 label=skip labelfloat=true color=\"grey\" fontcolor=\"grey\" style=\"dashed\"];\n";
+            }
+
+            outEdgesProcessed = true;
         }
     } else if (const st::PhiNode* const phi = node.cast<st::PhiNode>()) {
 
@@ -136,6 +169,61 @@ bool ControlGraphVisualizer::visitNode(st::ControlNode& node) {
 
             m_stream << "\t\t" << incoming.domain->getTerminator()->getIndex() << " -> " << phi->getIndex() << " ["
                 << "style=\"invis\" constraint=true ];\n";
+        }
+    } else if (const st::TauNode* const tau = node.cast<st::TauNode>()) {
+
+        for (st::TauNode::TIncomingMap::const_iterator iNode = tau->getIncomingMap().begin();
+             iNode != tau->getIncomingMap().end();
+             ++iNode)
+        {
+            if (tau->getKind() == st::TauNode::tkProvider) {
+                m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
+                    << "weight=15 dir=back labelfloat=true color=\"red\" fontcolor=\"red\" style=\"dashed\" constraint=true ];\n";
+//             } else if (tau->getKind() == st::TauNode::tkClosure) {
+//                 m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
+//                     << "weight=15 dir=back labelfloat=true color=\"orange\" fontcolor=\"orange\" style=\"dashed\" constraint=true ];\n";
+            } else {
+                const bool byBackEdge = iNode->second;
+                m_stream << "\t\t" << iNode->first->getIndex() << " -> " << tau->getIndex() << " ["
+                    << "weight=5 dir=back labelfloat=true color=\""
+                    << (byBackEdge ? "blue" : "grey")
+                    <<  "\" fontcolor=\"green\" style=\"dotted\" constraint=true ];\n";
+            }
+        }
+
+        for (st::TNodeSet::iterator iNode = tau->getConsumers().begin(); iNode != tau->getConsumers().end(); ++iNode) {
+            if ((*iNode)->getNodeType() == st::ControlNode::ntTau)
+                continue;
+
+            if (tau->getKind() == st::TauNode::tkClosure) {
+                if (static_cast<const st::ClosureTauNode*>(tau)->getOrigin() == *iNode) {
+                    m_stream << "\t\t";
+
+                    if (tau->getIncomingMap().empty())
+                        m_stream  << (*iNode)->getIndex() << " -> " << tau->getIndex();
+                    else
+                        m_stream  << tau->getIndex() << " -> " << (*iNode)->getIndex();
+
+                    m_stream << " [ weight=25 dir=back labelfloat=true color=\"orange\" fontcolor=\"orange\" style=\"dashed\" constraint=true ];\n";
+
+                    continue;
+                }
+            }
+
+            m_stream
+                << "\t\t" << tau->getIndex() << " -> " << (*iNode)->getIndex() << " ["
+                << "weight=15 dir=back labelfloat=true color=\"green\" fontcolor=\"green\" style=\"dashed\" constraint=true ];\n";
+        }
+    }
+
+    // Processing outgoing edges in generic way
+    if (!outEdgesProcessed) {
+        iEdge = outEdges.begin();
+        for (; iEdge != outEdges.end(); ++iEdge) {
+            if (isNodeProcessed(*iEdge))
+                continue;
+
+            m_stream << "\t\t" << node.getIndex() << " -> " << (*iEdge)->getIndex() << edgeStyle(&node, *iEdge) << ";\n";
         }
     }
 
@@ -156,13 +244,24 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
     switch (node->getNodeType()) {
         case st::ControlNode::ntPhi:
             //label = "Phi ";
-            color = "grey";
+            color = "blue";
             shape = "oval";
             break;
 
         case st::ControlNode::ntTau:
             label = "Tau ";
-            color = "green";
+
+            switch (node->cast<st::TauNode>()->getKind()) {
+                case st::TauNode::tkProvider: color = "red"; break;
+                case st::TauNode::tkClosure: color = "orange"; break;
+
+                case st::TauNode::tkAggregator:
+                default:
+                    color = "green"; break;
+                    break;
+            }
+
+            shape = "oval";
             break;
 
         case st::ControlNode::ntInstruction: {
@@ -202,7 +301,7 @@ void ControlGraphVisualizer::markNode(st::ControlNode* node) {
             ;
     }
 
-    if (node->getNodeType() == st::ControlNode::ntPhi)
+    if (node->getNodeType() == st::ControlNode::ntPhi || node->getNodeType() == st::ControlNode::ntTau)
         m_stream << "\t\t" << node->getIndex() << " [label=\"" << node->getIndex() << "\" color=\"" << color << "\"];\n";
     else
         m_stream << "\t\t" << node->getIndex() << " [shape=\"" << shape << "\" label=\"" << (node->getDomain() ? node->getDomain()->getBasicBlock()->getOffset() : 666) << "." << node->getIndex() << " : " << label << "\" color=\"" << color << "\"];\n";

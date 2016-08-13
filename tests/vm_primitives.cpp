@@ -1,8 +1,29 @@
 #include <gtest/gtest.h>
 #include "helpers/VMImage.h"
-#include "patterns/InitVMImage.h"
 #include <primitives.h>
 #include <opcodes.h>
+
+class P_InitVM_Image : public ::testing::TestWithParam<std::string /*image name*/>
+{
+protected:
+    H_VMImage* m_image;
+public:
+    virtual ~P_InitVM_Image() {}
+
+    virtual void SetUp()
+    {
+        bool is_parameterized_test = ::testing::UnitTest::GetInstance()->current_test_info()->value_param();
+        if (!is_parameterized_test) {
+            // Use TEST_P instead of TEST_F !
+            abort();
+        }
+        ParamType image_name = GetParam();
+        m_image = new H_VMImage(image_name);
+    }
+    virtual void TearDown() {
+        delete m_image;
+    }
+};
 
 INSTANTIATE_TEST_CASE_P(_, P_InitVM_Image, ::testing::Values(std::string("VMPrimitives")) );
 

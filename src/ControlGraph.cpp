@@ -5,6 +5,21 @@ using namespace st;
 
 static const bool traces_enabled = false;
 
+ControlGraph::TMetaInfo::TMetaInfo() :
+    isBlock(false),
+    hasBlockReturn(false),
+    hasLiteralBlocks(false),
+    hasMutatingBlocks(false),
+    hasLoops(false),
+    hasBackEdgeTau(false),
+    usesSelf(false),
+    usesSuper(false),
+    readsFields(false),
+    writesFields(false),
+    hasPrimitive(false)
+{
+}
+
 bool NodeIndexCompare::operator() (const ControlNode* a, const ControlNode* b) const
 {
     return a->getIndex() < b->getIndex();
@@ -33,13 +48,66 @@ template<> PushBlockNode* ControlNode::cast<PushBlockNode>() {
     return static_cast<PushBlockNode*>(this);
 }
 
+template<> const PushBlockNode* ControlNode::cast<PushBlockNode>() const {
+    return const_cast<ControlNode*>(this)->cast<PushBlockNode>();
+}
+
 template<> PushBlockNode* ControlGraph::newNode<PushBlockNode>() {
-    PushBlockNode* node = new PushBlockNode(m_lastNodeIndex++);
+    PushBlockNode* const node = new PushBlockNode(m_lastNodeIndex++);
     m_nodes.push_back(node);
     return static_cast<PushBlockNode*>(node);
 }
 
-TNodeSet PhiNode::getRealValues() {
+template<> ClosureTauNode* ControlGraph::newNode<ClosureTauNode>() {
+    ClosureTauNode* const node = new ClosureTauNode(m_lastNodeIndex++);
+    m_nodes.push_back(node);
+    return static_cast<ClosureTauNode*>(node);
+}
+
+template<> ClosureTauNode* ControlNode::cast<ClosureTauNode>() {
+    if (this->getNodeType() != ntTau)
+        return 0;
+
+    TauNode* const node = static_cast<TauNode*>(this);
+    if (node->getKind() != TauNode::tkClosure)
+        return 0;
+
+    return static_cast<ClosureTauNode*>(this);
+}
+
+template<> const ClosureTauNode* ControlNode::cast<ClosureTauNode>() const {
+    return const_cast<ControlNode*>(this)->cast<ClosureTauNode>();
+}
+
+template<> BranchNode* ControlNode::cast<BranchNode>() {
+    if (this->getNodeType() != ntInstruction)
+        return 0;
+
+    InstructionNode* const node = static_cast<InstructionNode*>(this);
+    if (node->getInstruction().getOpcode() != opcode::doSpecial)
+        return 0;
+
+    switch (node->getInstruction().getArgument()) {
+        case special::branch:
+        case special::branchIfTrue:
+        case special::branchIfFalse:
+            return static_cast<BranchNode*>(this);
+    }
+
+    return 0;
+}
+
+template<> const BranchNode* ControlNode::cast<BranchNode>() const {
+    return const_cast<ControlNode*>(this)->cast<BranchNode>();
+}
+
+template<> BranchNode* ControlGraph::newNode<BranchNode>() {
+    BranchNode* const node = new BranchNode(m_lastNodeIndex++);
+    m_nodes.push_back(node);
+    return static_cast<BranchNode*>(node);
+}
+
+TNodeSet PhiNode::getRealValues() const {
     TNodeSet values;
 
     for (std::size_t i = 0; i < m_incomingList.size(); i++) {
@@ -101,10 +169,13 @@ private:
 
 InstructionNode* GraphConstructor::createNode(const TSmalltalkInstruction& instruction)
 {
+    if (instruction.isBranch())
+        return m_graph->newNode<BranchNode>();
+
     if (instruction.getOpcode() == opcode::pushBlock)
         return m_graph->newNode<PushBlockNode>();
-    else
-        return m_graph->newNode<InstructionNode>();
+
+    return m_graph->newNode<InstructionNode>();
 }
 
 void GraphConstructor::processNode(InstructionNode* node)
@@ -115,15 +186,34 @@ void GraphConstructor::processNode(InstructionNode* node)
         m_currentDomain->setEntryPoint(node);
 
     switch (instruction.getOpcode()) {
+        case opcode::pushArgument:
+            if (instruction.getArgument() == 0)
+                m_graph->getMeta().usesSelf = true;
+            ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().readsArguments);
+            m_currentDomain->pushValue(node);
+            break;
+
+        case opcode::pushInstance:
+            m_graph->getMeta().readsFields = true;
+            m_currentDomain->pushValue(node);
+            break;
+
+        case opcode::pushTemporary:
+            ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().readsTemporaries);
         case opcode::pushConstant:
         case opcode::pushLiteral:
-        case opcode::pushArgument:
-        case opcode::pushTemporary:   // TODO Link with tau node
-        case opcode::pushInstance:
             m_currentDomain->pushValue(node);
             break;
 
         case opcode::pushBlock: {
+            // FIXME m_graph->getMeta().hasLiteralBlocks = true;
+            //
+            // NOTE  Technically, we may set the meta here,
+            //       but we may get false-positive value
+            //       due to a known bug in the imageBuilder
+            //       which leaves dead PushBlock instructions
+            //       when inlining key selectors.
+
             const uint16_t blockEndOffset    = node->getInstruction().getExtra();
             ParsedMethod* const parsedMethod = m_graph->getParsedMethod();
             ParsedBlock*  const parsedBlock  = parsedMethod->getParsedBlockByEndOffset(blockEndOffset);
@@ -132,8 +222,13 @@ void GraphConstructor::processNode(InstructionNode* node)
             m_currentDomain->pushValue(node);
         } break;
 
-        case opcode::assignTemporary: // TODO Link with tau node
+        case opcode::assignTemporary:
+            ControlGraph::TMetaInfo::insertIndex(instruction.getArgument(), m_graph->getMeta().writesTemporaries);
+            m_currentDomain->requestArgument(0, node, true);
+            break;
+
         case opcode::assignInstance:
+            m_graph->getMeta().writesFields = true;
             m_currentDomain->requestArgument(0, node, true);
             break;
 
@@ -160,6 +255,7 @@ void GraphConstructor::processNode(InstructionNode* node)
             break;
 
         case opcode::doPrimitive:
+            m_graph->getMeta().hasPrimitive = true;
             processPrimitives(node);
             m_currentDomain->pushValue(node);
             break;
@@ -174,8 +270,9 @@ void GraphConstructor::processSpecials(InstructionNode* node)
     const TSmalltalkInstruction& instruction = node->getInstruction();
 
     switch (instruction.getArgument()) {
-        case special::stackReturn:
         case special::blockReturn:
+            m_graph->getMeta().hasBlockReturn = true;
+        case special::stackReturn:
             m_currentDomain->requestArgument(0, node);
 
         case special::selfReturn:
@@ -184,6 +281,7 @@ void GraphConstructor::processSpecials(InstructionNode* node)
             break;
 
         case special::sendToSuper:
+            m_graph->getMeta().usesSuper = true;
             m_currentDomain->requestArgument(0, node);
             m_currentDomain->pushValue(node);
             break;
@@ -320,22 +418,30 @@ void GraphLinker::processBranching()
     const BasicBlock::TBasicBlockSet& referers = m_currentDomain->getBasicBlock()->getReferers();
     BasicBlock::TBasicBlockSet::iterator iReferer = referers.begin();
     for (; iReferer != referers.end(); ++iReferer) {
-        ControlDomain* const refererDomain = m_graph->getDomainFor(*iReferer);
-        InstructionNode* const  terminator = refererDomain->getTerminator();
-        assert(terminator && terminator->getInstruction().isBranch());
+        ControlDomain* const refererDomain = getGraph().getDomainFor(*iReferer);
+        BranchNode* const branch = refererDomain->getTerminator()->cast<BranchNode>();
+        assert(branch);
+
+        if (entryPoint->getDomain()->getBasicBlock()->getOffset() == branch->getInstruction().getExtra())
+            branch->setTargetNode(entryPoint);
+        else
+            branch->setSkipNode(entryPoint);
 
         if (traces_enabled)
-            std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", terminator->getIndex(), entryPoint->getIndex());
+            std::printf("GraphLinker::processNode : linking nodes of referring graphs %.2u and %.2u\n", branch->getIndex(), entryPoint->getIndex());
 
-        terminator->addEdge(entryPoint);
+        branch->addEdge(entryPoint);
     }
 }
 
 void GraphLinker::processArgumentRequests()
 {
     const ControlDomain::TRequestList& requestList = m_currentDomain->getRequestedArguments();
-    for (std::size_t index = 0; index < requestList.size(); index++)
-        processRequest(m_currentDomain, index, requestList[index]);
+    for (std::size_t index = 0, argIndex = 0; index < requestList.size(); index++) {
+        processRequest(m_currentDomain, argIndex, requestList[index]);
+        if (!requestList[index].keep)
+            argIndex++;
+    }
 }
 
 void GraphLinker::processRequest(ControlDomain* domain, std::size_t argumentIndex, const ControlDomain::TArgumentRequest& request)
@@ -368,7 +474,7 @@ void GraphLinker::mergePhi(PhiNode* source, PhiNode* target)
     }
 
     // Deleting source node because it is no longer used
-    m_graph->eraseNode(source);
+    getGraph().eraseNode(source);
 }
 
 ControlNode* GraphLinker::optimizePhi(PhiNode* phi)
@@ -399,11 +505,12 @@ ControlNode* GraphLinker::optimizePhi(PhiNode* phi)
 
     // This is the real value that should be returned
     ControlNode* const value = *incomingValues.begin();
+    assert(value);
 
     // Unlink and erase phi
     value->removeConsumer(phi);
     value->removeEdge(phi);
-    m_graph->eraseNode(phi);
+    getGraph().eraseNode(phi);
 
     return value;
 }
@@ -418,14 +525,14 @@ ControlNode* GraphLinker::getRequestedNode(ControlDomain* domain, std::size_t ar
     ControlNode* result = 0;
 
     if (!singleReferer) {
-        PhiNode* const phi = m_graph->newNode<PhiNode>();
+        PhiNode* const phi = getGraph().newNode<PhiNode>();
         phi->setDomain(domain);
         result = phi;
     }
 
     BasicBlock::TBasicBlockSet::iterator iBlock = refererBlocks.begin();
     for (; iBlock != refererBlocks.end(); ++iBlock) {
-        ControlDomain* const refererDomain    = m_graph->getDomainFor(* iBlock);
+        ControlDomain* const refererDomain    = getGraph().getDomainFor(* iBlock);
         const TNodeList&     refererStack     = refererDomain->getLocalStack();
         const std::size_t    refererStackSize = refererStack.size();
 
@@ -474,48 +581,26 @@ class GraphOptimizer : public PlainNodeVisitor {
 public:
     GraphOptimizer(ControlGraph* graph) : PlainNodeVisitor(graph) {}
 
+    bool graphAltered() const { return !m_nodesToRemove.empty(); }
+
+private:
     virtual bool visitNode(ControlNode& node) {
-        // If node pushes value on the stack but this value is not consumed
-        // by another node, or the only consumer is a popTop instruction
-        // then we may remove such node (or a node pair)
-
-        if (InstructionNode* const instruction = node.cast<InstructionNode>()) {
-            const TSmalltalkInstruction& nodeInstruction = instruction->getInstruction();
-            if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider())
-                return true;
-
-            const TNodeSet& consumers = instruction->getConsumers();
-            if (consumers.empty()) {
-                if (traces_enabled)
-                    std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction->getIndex());
-
-                m_nodesToRemove.push_back(instruction);
-            } else if (consumers.size() == 1) {
-                if (InstructionNode* const consumer = (*consumers.begin())->cast<InstructionNode>()) {
-                    const TSmalltalkInstruction& consumerInstruction = consumer->getInstruction();
-                    if (consumerInstruction == TSmalltalkInstruction(opcode::doSpecial, special::popTop)) {
-                        if (traces_enabled)
-                            std::printf("GraphOptimizer::visitNode : node %u is consumed only by popTop %u and may be removed\n",
-                                instruction->getIndex(),
-                                consumer->getIndex()
-                            );
-
-                        m_nodesToRemove.push_back(consumer);
-                        m_nodesToRemove.push_back(instruction);
-                    }
-                }
-            }
-        }
+//         if (BranchNode* const branch = node.cast<BranchNode>())
+//             checkBranch(*branch);
+//         else
+        if (InstructionNode* const instruction = node.cast<InstructionNode>())
+            checkInstruction(*instruction);
 
         return true;
     }
 
     virtual void nodesVisited() {
         // Removing nodes that were optimized out
-        TNodeList::iterator iNode = m_nodesToRemove.begin();
+        TNodeSet::const_iterator iNode = m_nodesToRemove.begin();
         for (; iNode != m_nodesToRemove.end(); ++iNode) {
             assert((*iNode)->getNodeType() == ControlNode::ntInstruction
                 || (*iNode)->getNodeType() == ControlNode::ntPhi);
+
             if (InstructionNode* const instruction = (*iNode)->cast<InstructionNode>())
                 removeInstruction(instruction);
             else if (PhiNode* const phi = (*iNode)->cast<PhiNode>())
@@ -524,6 +609,70 @@ public:
     }
 
 private:
+    void checkBranch(const BranchNode& branch) {
+        // If branch is targets to an unconditional branch, latter may be removed
+
+        if (BranchNode* const target_branch = branch.getTargetNode()->cast<BranchNode>()) {
+            if (! target_branch->getSkipNode()) {
+                if (traces_enabled)
+                    std::printf("GraphOptimizer::visitNode : node %u is branch to unconditional branch %u and latter may be removed\n",
+                                branch.getIndex(), target_branch->getIndex());
+
+                m_nodesToRemove.insert(target_branch);
+                return;
+            }
+        }
+
+        if (!branch.getSkipNode())
+            return;
+
+        if (BranchNode* const target_branch = branch.getSkipNode()->cast<BranchNode>()) {
+            if (! target_branch->getSkipNode()) {
+                if (traces_enabled)
+                    std::printf("GraphOptimizer::visitNode : node %u is branch to unconditional branch %u and latter may be removed\n",
+                                branch.getIndex(), target_branch->getIndex());
+
+                m_nodesToRemove.insert(target_branch);
+                return;
+            }
+        }
+    }
+
+    void checkInstruction(InstructionNode& instruction) {
+        // If node pushes value on the stack but this value is not consumed
+        // by another node, or the only consumer is a popTop instruction
+        // then we may remove such node (or a node pair)
+
+        const TSmalltalkInstruction& nodeInstruction = instruction.getInstruction();
+        if (!nodeInstruction.isTrivial() || !nodeInstruction.isValueProvider()) {
+            if (! instruction.cast<PushBlockNode>())
+                return;
+        }
+
+        const TNodeSet& consumers = instruction.getConsumers();
+        if (consumers.empty()) {
+            if (traces_enabled)
+                std::printf("GraphOptimizer::visitNode : node %u is not consumed and may be removed\n", instruction.getIndex());
+
+            m_nodesToRemove.insert(&instruction);
+        } else if (consumers.size() == 1) {
+            if (InstructionNode* const consumer = (*consumers.begin())->cast<InstructionNode>()) {
+                const TSmalltalkInstruction& consumerInstruction = consumer->getInstruction();
+                if (consumerInstruction == TSmalltalkInstruction(opcode::doSpecial, special::popTop)) {
+                    if (traces_enabled)
+                        std::printf("GraphOptimizer::visitNode : node %u is consumed only by popTop %u and may be removed\n",
+                            instruction.getIndex(),
+                            consumer->getIndex()
+                        );
+
+                    // TODO Remove phi incoming and probably remove phi node along with it's consumer
+                    m_nodesToRemove.insert(consumer);
+                    m_nodesToRemove.insert(&instruction);
+                }
+            }
+        }
+    }
+
     void removePhi(PhiNode* phi) {
         assert(phi->getInEdges().size() == 1);
 
@@ -562,8 +711,10 @@ private:
         if (domain->getEntryPoint() == node)
             domain->setEntryPoint(nextNode->cast<InstructionNode>());
 
+        // TODO Phi node
+
         // Fixing incoming edges by remapping them to the next node
-        TNodeSet::iterator iNode = node->getInEdges().begin();
+        TNodeSet::const_iterator iNode = node->getInEdges().begin();
         while (iNode != node->getInEdges().end()) {
             ControlNode* const sourceNode = *iNode++;
 
@@ -573,6 +724,19 @@ private:
                     node->getIndex(),
                     nextNode->getIndex()
                 );
+
+            if (BranchNode* const branch = sourceNode->cast<BranchNode>()) {
+                if (traces_enabled)
+                    std::printf("Patching branch info %.2u -> %.2u\n",
+                        sourceNode->getIndex(),
+                        nextNode->getIndex()
+                    );
+
+                if (branch->getTargetNode() == node)
+                    branch->setTargetNode(nextNode);
+                else
+                    branch->setSkipNode(nextNode);
+            }
 
             sourceNode->removeEdge(node);
             sourceNode->addEdge(nextNode);
@@ -599,7 +763,7 @@ private:
     }
 
 private:
-    TNodeList m_nodesToRemove;
+    TNodeSet m_nodesToRemove;
 };
 
 void ControlGraph::buildGraph()
@@ -608,8 +772,10 @@ void ControlGraph::buildGraph()
         std::printf("Phase 1. Constructing control graph\n");
 
     // Iterating through basic blocks of parsed method and constructing node domains
-    GraphConstructor constructor(this);
-    constructor.run();
+    {
+        GraphConstructor constructor(this);
+        constructor.run();
+    }
 
     if (traces_enabled)
         std::printf("Phase 2. Linking control graph\n");
@@ -618,13 +784,54 @@ void ControlGraph::buildGraph()
     // They're linked using phi nodes or a direct link if possible.
     // Also branching edges are added so graph remains linked even if
     // no stack relations exist.
-    GraphLinker linker(this);
-    linker.run();
+    {
+        GraphLinker linker(this);
+        linker.run();
+    }
 
     if (traces_enabled)
         std::printf("Phase 3. Optimizing control graph\n");
 
     // Optimizing graph by removing stalled nodes and merging linear branch sequences
-    GraphOptimizer optimizer(this);
-    optimizer.run();
+    {
+        GraphOptimizer optimizer(this);
+        optimizer.run();
+    }
+
+    if (traces_enabled)
+        std::printf("Phase 4. Linking PushTemporary and AssignTemporary nodes\n");
+}
+
+void ControlGraph::eraseTauNodes() {
+    if (isEmpty())
+        return;
+
+    for (ControlGraph::reverse_iterator iNode = nodes_rbegin(); iNode != nodes_rend(); ) {
+        if (TauNode* const tau = (*iNode)->cast<TauNode>()) {
+            if (traces_enabled)
+                std::printf("Erasing tau %.2u\n", tau->getIndex());
+
+            const TauNode::TIncomingMap& incomings = tau->getIncomingMap();
+            TauNode::TIncomingMap::const_iterator iIncoming = incomings.begin();
+            for (; iIncoming != incomings.end(); ++iIncoming) {
+                if (InstructionNode* const instruction = iIncoming->first->cast<InstructionNode>())
+                    instruction->setTauNode(0);
+
+                iIncoming->first->removeConsumer(tau);
+            }
+
+            const TNodeSet& consumers = tau->getConsumers();
+            for (TNodeSet::const_iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
+                if (InstructionNode* const instruction = (*iConsumer)->cast<InstructionNode>()) {
+                    assert(instruction->getTauNode() == tau);
+                    instruction->setTauNode(0);
+                }
+            }
+
+            ++iNode;
+            eraseNode(tau);
+        } else {
+            ++iNode;
+        }
+    }
 }

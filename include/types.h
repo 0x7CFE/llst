@@ -70,6 +70,8 @@ struct TInteger {
     int32_t  operator -(int32_t right) const { return getValue() - right; }
     operator TObject*() const { return reinterpret_cast<TObject*>(m_value); }
 
+    void setRawValue(int32_t value) { m_value = value; }
+
 private:
     int32_t m_value;
 protected:
@@ -235,6 +237,7 @@ struct TSymbol : public TByteObject {
 // Strings are binary objects that hold raw character bytes.
 struct TString : public TByteObject {
     static const char* InstanceClassName() { return "String"; }
+    std::string toString() const { return std::string(reinterpret_cast<const char*>(bytes), getSize()); }
 };
 
 // Chars are intermediate representation of single printable character
@@ -286,6 +289,11 @@ typedef TArray<TSymbol> TSymbolArray;
 // will hold temporary objects during the call dispatching and the pointers
 // to the current executing instruction and the stack top.
 struct TContext : public TObject {
+    explicit TContext(TClass* klass) :
+        TObject(sizeof(TContext) / sizeof(TObject*) - 2, klass, false),
+        bytePointer(0),
+        stackTop(0) {}
+
     TMethod*      method;
     TObjectArray* arguments;
     TObjectArray* temporaries;

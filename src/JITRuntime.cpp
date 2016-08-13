@@ -68,24 +68,22 @@ static bool compareByHitCount(const JITRuntime::THotMethod* m1, const JITRuntime
 
 void JITRuntime::printStat()
 {
-    float hitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
-    float blockHitRatio = 100.0 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
+    float messagehitRatio = 100.0 * m_cacheHits / (m_cacheHits + m_cacheMisses);
+    float blockHitRatio   = 100.0 * m_blockCacheHits / (m_blockCacheHits + m_blockCacheMisses);
 
     std::printf(
         "JIT Runtime stat:\n"
-        "\tMessages dispatched: %12d\n"
-        "\tObjects  allocated:  %12d\n"
-        "\tBlocks   invoked:    %12d\n"
-        "\tBlockReturn emitted: %12d\n"
-        "\tBlock    cache hits: %12d  misses %10d ratio %6.2f %%\n"
-        "\tMessage  cache hits: %12d  misses %10d ratio %6.2f %%\n",
+        "\tDynamic messages:  %12d total, %12d hits, %10d misses, hit ratio %6.2f %%\n"
+        "\tDynamic blocks:    %12d total, %12d hits, %10d misses, hit ratio %6.2f %%\n"
+        "\tObjects allocated: %12d\n",
 
-        m_messagesDispatched,
-        m_objectsAllocated,
-        m_blocksInvoked, m_blockReturnsEmitted,
-        m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
-        m_cacheHits, m_cacheMisses, hitRatio
+        m_messagesDispatched, m_cacheHits, m_cacheMisses, messagehitRatio,
+        m_blocksInvoked, m_blockCacheHits, m_blockCacheMisses, blockHitRatio,
+        m_objectsAllocated
     );
+
+    m_methodCompiler->getTypeSystem().dumpAllContexts();
+    m_methodCompiler->getTypeSystem().drawCallGraph();
 
     std::vector<THotMethod*> hotMethods;
 
@@ -211,7 +209,7 @@ void JITRuntime::flushBlockFunctionCache()
     std::memset(&m_blockFunctionLookupCache, 0, sizeof(m_blockFunctionLookupCache));
 }
 
-TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
+TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer, uint32_t stackTop)
 {
     hptr<TContext> previousContext = m_softVM->newPointer(callingContext);
 
@@ -224,6 +222,10 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     newBlock->arguments        = previousContext->arguments;
     newBlock->temporaries      = previousContext->temporaries;
 
+    // NOTE This field is used by JIT VM to aid specialization lookup
+    // See MethodCompiler::getClosureMask() and lookupBlockFunctionInCache()
+    newBlock->stackTop.setRawValue(stackTop);
+
     // Assigning creatingContext depending on the hierarchy
     // Nested blocks inherit the outer creating context
     if (previousContext->getClass() == globals.blockClass)
@@ -234,53 +236,337 @@ TBlock* JITRuntime::createBlock(TContext* callingContext, uint8_t argLocation, u
     return newBlock;
 }
 
-JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method)
+JITRuntime::TMethodFunction JITRuntime::lookupFunctionInCache(TMethod* method, TObjectArray* arguments)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
-    TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
-
-    if (entry.method == method) {
-        m_cacheHits++;
-        return entry.function;
-    } else {
+    if (!arguments || arguments->getSize() > ARG_CACHE_SIZE) {
+        // Current method has too many arguments that do not fit into the cache.
+        // It will never be cached, hence no need to search.
         m_cacheMisses++;
         return 0;
     }
+
+    const uint32_t hash = (reinterpret_cast<uint32_t>(method) << 2) + arguments->getSize();
+
+    // All method specializations share the same hash. If cache would be 1-way associative
+    // then constant cache rotation will occur as several specializations will compete
+    // against the single cache slot. It order to prevent this we use the n-way cache.
+
+    // Outer loop iterates over the associated slots
+    for (std::size_t slotIndex = 0; slotIndex < METHOD_CACHE_ASSOCIATIVITY; slotIndex++) {
+        TFunctionCacheEntry& slot = m_functionLookupCache[(hash + slotIndex) % LOOKUP_CACHE_SIZE];
+
+        if (slot.method != method)
+            continue;
+
+        bool match = true;
+
+        // Checking that current entry matches the actual argument types
+        for (std::size_t argIndex = 0; argIndex < arguments->getSize(); argIndex++) {
+            TClass*  const cachedClass  = slot.arguments[argIndex];
+            TObject* const field        = arguments->getField(argIndex);
+            TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+            if (currentClass != cachedClass) {
+                // Current entry is from another specialization
+                match = false;
+                break;
+            }
+        }
+
+        if (match) {
+            // Gotcha! We've just found an entry in the cache
+            // that has the same method and all passed arguments
+            // exactly match the stored types in the cache entry.
+
+            // We've found the specialization that may be used.
+            m_cacheHits++;
+            return slot.function;
+        }
+    }
+
+    // If all associated slots are visited,
+    // but no matching entry is found then
+    // it is definitely a cache miss.
+
+    // Sad but true
+    m_cacheMisses++;
+    return 0;
 }
 
-JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TMethod* containerMethod, uint32_t blockOffset)
+void JITRuntime::fillMethodSlot(
+    JITRuntime::TFunctionCacheEntry& slot,
+    TMethod* method,
+    JITRuntime::TMethodFunction function,
+    TObjectArray* arguments)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
-    TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
+    slot.method   = method;
+    slot.function = function;
 
-    if (entry.containerMethod == containerMethod && entry.blockOffset == blockOffset) {
-        m_blockCacheHits++;
-        return entry.function;
-    } else {
-        m_blockCacheMisses++;
+    const std::size_t argSize = arguments->getSize();
+    for (std::size_t i = 0; i < argSize; i++) {
+        TObject* const field        = arguments->getField(i);
+        TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+        slot.arguments[i] = currentClass;
+    }
+
+    // Class list should be zero terminated or filled completely
+    if (argSize < JITRuntime::ARG_CACHE_SIZE)
+        slot.arguments[argSize + 1] = 0;
+}
+
+void JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function, TObjectArray* arguments)
+{
+    // Check if we may cache the method at all.
+    // Some methods may have too many arguments
+    // that will not fit into the cache.
+    if (!arguments || arguments->getSize() > ARG_CACHE_SIZE)
+        return;
+
+    const uint32_t hash = (reinterpret_cast<uint32_t>(method) << 2) + arguments->getSize();
+
+    // All method specializations share the same hash. If we use 1-way associative cache
+    // then constant entry rotation will occur, as several specializations will compete
+    // for the single cache slot. It order to prevent this we use the n-way associative cache.
+
+    // Outer loop iterates over the associated slots
+    for (std::size_t slotIndex = 0; slotIndex < METHOD_CACHE_ASSOCIATIVITY; slotIndex++) {
+        TFunctionCacheEntry& slot = m_functionLookupCache[(hash + slotIndex) % LOOKUP_CACHE_SIZE];
+
+        // We need to find a suitable slot preserving other friendly specializations if possible.
+        // If we'll find a slot occupied by a friendly specialization, then we'll try again.
+        if (slot.method == method)
+            continue;
+
+        // We have found a slot that may be used
+        fillMethodSlot(slot, method, function, arguments);
+        return;
+    }
+
+    // It seem that all slots are occupied by the friendly specializations.
+    // We need to chose the slot within bounds and overwrite it by our data.
+
+    // Bit shift is required to eliminate pointer alignment or it would not work.
+    const uint32_t slotIndex = (reinterpret_cast<uint32_t>(function) >> 4) % METHOD_CACHE_ASSOCIATIVITY;
+
+    TFunctionCacheEntry& slot = m_functionLookupCache[(hash + slotIndex) % LOOKUP_CACHE_SIZE];
+    fillMethodSlot(slot, method, function, arguments);
+}
+
+JITRuntime::TBlockFunction JITRuntime::lookupBlockFunctionInCache(TBlock* block)
+{
+    // If closure mask is not defined then we could not perform fast lookup.
+    // This happens either when block came from the SoftVM or because block
+    // accesses too many temporaries and/or arguments.
+    if (! (block->stackTop.rawValue() & 1))
         return 0;
+
+    const uint32_t blockOffset     = block->blockBytePointer;
+    TMethod* const containerMethod = block->method;
+
+    // Closure mask is a bit mask representing indices of the temporaries (T)
+    // and arguments (A) that are accessed from within a block.
+    // Currently only 17 bits are defined:  xxxxxxxxxxxxxxx|AAAAAAAA|TTTTTTTT|1
+
+    // The least significant bit is set to 1 to indicate that it is not an object pointer.
+    // It is not used in lookup logic, so we shift it out to make life easier:
+    const uint32_t closureMask = static_cast<uint32_t>(block->stackTop.rawValue()) >> 1;
+
+    // All block specializations share the same hash. If cache would be 1-way associative
+    // then constant cache rotation will occur as several specializations will compete
+    // against the single cache slot. It order to prevent this we use the n-way cache.
+
+    const uint32_t hash = (reinterpret_cast<uint32_t>(containerMethod) << 16) ^ (blockOffset << 8) ^ closureMask;
+
+    // Outer loop iterates over the associated slots
+    for (std::size_t slotIndex = 0; slotIndex < METHOD_CACHE_ASSOCIATIVITY; slotIndex++) {
+        TBlockFunctionCacheEntry& slot = m_blockFunctionLookupCache[(hash + slotIndex) % LOOKUP_CACHE_SIZE];
+
+        // Quick check that discards most of the entries
+        if (slot.containerMethod != containerMethod || slot.blockOffset != blockOffset /*|| slot.closureMask != closureMask*/)
+            continue; // check the next slot
+
+        if (! closureMask) {
+            // If no closure mask is defined then
+            // it is already a matching entry
+
+            m_blockCacheHits++;
+            return slot.function;
+        }
+
+        bool match = true;
+
+        // If closure mask is defined, it means that block accesses temporaries and/or arguments
+        // In order to check whether current cached value match we check only the entries that
+        // correspond to a set bit. Others must be ignored because their value is undefined.
+
+        // Masking out non-interesting bits, only temporaries will remain
+        if (uint32_t tempBits = closureMask & 0xFF) {
+            TObjectArray& temporaries = *block->temporaries;
+
+            // Shift bits one by one and check for bits.
+            // Break if no more non-zero bits remain.
+
+            for (std::size_t index = 0; tempBits; index++, tempBits >>= 1) {
+                // Check whether temporary corresponding to the current index is used by the block
+                const bool tempIsUsed = tempBits & 1;
+
+                if (! tempIsUsed)
+                    continue; // check the next temp
+
+                TClass*  const cachedClass  = slot.closures[index];
+                TObject* const field        = temporaries[index];
+                TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+                if (currentClass != cachedClass) {
+                    match = false;
+                    break;
+                }
+            }
+        }
+
+        // Quick check for early return
+        if (! match)
+            continue; // check the next slot
+
+        // Shifting and masking out non-interesting bits, only arguments will remain
+        if (uint32_t argBits = (closureMask >> 8) & 0xFF) {
+            TObjectArray& arguments = *block->arguments;
+
+            for (std::size_t index = 0; argBits; index++, argBits >>= 1) {
+                // Check whether temporary corresponding to the current index is used by the block
+                const bool argIsUsed = argBits & 1;
+
+                if (! argIsUsed)
+                    continue; // check the next arg
+
+                TClass*  const cachedClass  = slot.closures[index + 8];
+                TObject* const field        = arguments[index];
+                TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+                if (currentClass != cachedClass) {
+                    match = false;
+                    break;
+                }
+            }
+        }
+
+        if (match) {
+            // Gotcha! We've just found an entry in the cache
+            // that matched all passed arguments and temporaries.
+
+            // We've found the specialization that may be used.
+            m_blockCacheHits++;
+            return slot.function;
+        }
+    }
+
+    // If all associated slots are visited,
+    // but no matching entry is found then
+    // it is definitely a cache miss.
+
+    // Sad but true
+    m_blockCacheMisses++;
+    return 0;
+}
+
+void JITRuntime::fillBlockSlot(
+    JITRuntime::TBlockFunctionCacheEntry& slot,
+    TBlock* block,
+    JITRuntime::TBlockFunction function)
+{
+    const uint32_t blockOffset     = block->blockBytePointer;
+    TMethod* const containerMethod = block->method;
+
+    slot.containerMethod = containerMethod;
+    slot.blockOffset = blockOffset;
+    slot.function = function;
+
+    const uint32_t closureMask = static_cast<uint32_t>(block->stackTop.rawValue()) >> 1;
+    if (! closureMask)
+        return;
+
+    if (uint32_t tempBits = closureMask & 0xFF) {
+        TObjectArray& temporaries = *block->temporaries;
+
+        for (std::size_t index = 0; tempBits; index++, tempBits >>= 1) {
+            const bool tempIsUsed = tempBits & 1;
+
+            if (! tempIsUsed)
+                continue;
+
+            TObject* const field        = temporaries[index];
+            TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+            slot.closures[index] = currentClass;
+        }
+    }
+
+    if (uint32_t argBits = (closureMask >> 8) & 0xFF) {
+        TObjectArray& arguments = *block->arguments;
+
+        for (std::size_t index = 0; argBits; index++, argBits >>= 1) {
+            const bool argIsUsed = argBits & 1;
+
+            if (! argIsUsed)
+                continue;
+
+            TObject* const field        = arguments[index];
+            TClass*  const currentClass = isSmallInteger(field) ? globals.smallIntClass : field->getClass();
+
+            slot.closures[index + 8] = currentClass;
+        }
     }
 }
 
-void JITRuntime::updateFunctionCache(TMethod* method, TMethodFunction function)
+void JITRuntime::updateBlockFunctionCache(TBlock* block, TBlockFunction function)
 {
-    uint32_t hash = reinterpret_cast<uint32_t>(method) ^ reinterpret_cast<uint32_t>(method->name); // ^ 0xDEADBEEF;
-    TFunctionCacheEntry& entry = m_functionLookupCache[hash % LOOKUP_CACHE_SIZE];
+    // If closure mask is not defined then we could not cache the block.
+    // This happens either when block came from the SoftVM or because block
+    // accesses too many temporaries and/or arguments.
+    if (! (block->stackTop.rawValue() & 1))
+        return;
 
-    entry.method   = method;
-    entry.function = function;
+    const uint32_t blockOffset     = block->blockBytePointer;
+    TMethod* const containerMethod = block->method;
+
+    // Closure mask is a bit mask representing indices of the temporaries (T)
+    // and arguments (A) that are accessed from within a block.
+    // Currently only 17 bits are defined:  xxxxxxxxxxxxxxx|AAAAAAAA|TTTTTTTT|1
+
+    // The least significant bit is set to 1 to indicate that it is not an object pointer.
+    // It is not used in lookup logic, so we shift it out to make life easier:
+    const uint32_t closureMask = static_cast<uint32_t>(block->stackTop.rawValue()) >> 1;
+
+    // All block specializations share the same hash. If cache would be 1-way associative
+    // then constant cache rotation will occur as several specializations will compete
+    // against the single cache slot. It order to prevent this we use the n-way cache.
+
+    const uint32_t hash = (reinterpret_cast<uint32_t>(containerMethod) << 16) ^ (blockOffset << 8) ^ closureMask;
+
+    // Outer loop iterates over the associated slots
+    for (std::size_t slotIndex = 0; slotIndex < BLOCK_CACHE_ASSOCIATIVITY; slotIndex++) {
+        TBlockFunctionCacheEntry& slot = m_blockFunctionLookupCache[(hash + slotIndex) % LOOKUP_CACHE_SIZE];
+
+        // We need to find a suitable slot preserving other friendly specializations if possible.
+        // If we'll find a slot occupied by a friendly specialization, then we'll try again.
+        if (slot.containerMethod == containerMethod && slot.blockOffset == blockOffset)
+            continue; // check the next slot
+
+        // We have found a slot that may be used
+        fillBlockSlot(slot, block, function);
+        return;
+    }
+
+    // It seem that all slots are occupied by the friendly specializations.
+    // We need to chose the slot within bounds and overwrite it by our data.
+
+    // Bit shift is required to eliminate pointer alignment or it would not work.
+    const uint32_t slotIndex = (reinterpret_cast<uint32_t>(function) >> 4) % METHOD_CACHE_ASSOCIATIVITY;
+
+    TBlockFunctionCacheEntry& slot = m_blockFunctionLookupCache[(hash + slotIndex) % LOOKUP_CACHE_SIZE];
+    fillBlockSlot(slot, block, function);
 }
-
-void JITRuntime::updateBlockFunctionCache(TMethod* containerMethod, uint32_t blockOffset, TBlockFunction function)
-{
-    uint32_t hash = reinterpret_cast<uint32_t>(containerMethod) ^ blockOffset;
-    TBlockFunctionCacheEntry& entry = m_blockFunctionLookupCache[hash % LOOKUP_CACHE_SIZE];
-
-    entry.containerMethod = containerMethod;
-    entry.blockOffset = blockOffset;
-    entry.function = function;
-}
-
 
 void JITRuntime::optimizeFunction(Function* function, bool runModulePass)
 {
@@ -295,40 +581,27 @@ void JITRuntime::invokeBlock(TBlock* block, TContext* callingContext, TReturnVal
 {
     m_blocksInvoked++;
 
-    // Guessing the block function name
-    const uint16_t blockOffset = block->blockBytePointer;
-
-    TBlockFunction compiledBlockFunction = once ? 0 : lookupBlockFunctionInCache(block->method, blockOffset);
+    TBlockFunction compiledBlockFunction = once ? 0 : lookupBlockFunctionInCache(block);
     Function* blockFunction = 0;
 
     if (! compiledBlockFunction) {
-        std::ostringstream ss;
-        ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << blockOffset;
-        std::string blockFunctionName = ss.str();
+        // Compiling function and storing it to the table for further use
+        blockFunction = m_methodCompiler->compileDynamicBlock(block);
 
-        blockFunction = m_JITModule->getFunction(blockFunctionName);
         if (!blockFunction) {
-            // Block functions are created when wrapping method gets compiled.
-            // If function was not found then the whole method needs compilation.
-
-            // Compiling function and storing it to the table for further use
-            blockFunction = m_methodCompiler->compileBlock(block);
-
-            if (!blockFunction) {
-                // Something is really wrong!
-                outs() << "JIT: Fatal error in invokeBlock for " << blockFunctionName << "\n";
-                std::exit(1);
-            }
+            // Something is really wrong!
+            outs() << "JIT: Fatal error in invokeBlock\n";
+            std::exit(1);
+        }
 
 //              outs() << *blockFunction << "\n";
 
             verifyModule(*m_JITModule, AbortProcessAction);
 
-            optimizeFunction(blockFunction, true);
-        }
+        optimizeFunction(blockFunction, true); // FIXME
 
         compiledBlockFunction = reinterpret_cast<TBlockFunction>(m_executionEngine->getPointerToFunction(blockFunction));
-        updateBlockFunctionCache(block->method, blockOffset, compiledBlockFunction);
+        updateBlockFunctionCache(block, compiledBlockFunction);
     }
 
     block->previousContext = callingContext->previousContext;
@@ -350,37 +623,57 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
 
     hptr<TObjectArray> messageArguments = m_softVM->newPointer(arguments);
     TMethodFunction compiledMethodFunction = 0;
-    TContext*       newContext = 0;
-    hptr<TContext>  previousContext  = m_softVM->newPointer(callingContext);
+
+    // Preparing the context object. Because we do not call the software
+    // implementation here, we do not need to allocate the stack object
+    // because it is not used by JIT runtime. We also may skip the proper
+    // initialization of various objects such as stackTop and bytePointer.
+    // Note: temporary object will be allocated by the function on it's frame.
+
+    TContext contextSlot(globals.contextClass);
+    contextSlot.arguments       = messageArguments;
+    contextSlot.previousContext = callingContext;
+    hptr<TContext> newContext   = m_softVM->newPointer(&contextSlot);
 
     {
         // First of all we need to find the actual method object
         if (!receiverClass) {
-            TObject* receiver = messageArguments[0];
+            TObject* const receiver = messageArguments[0];
             receiverClass = isSmallInteger(receiver) ? globals.smallIntClass : receiver->getClass();
         }
 
         // Searching for the actual method to be called
         hptr<TMethod> method = m_softVM->newPointer(m_softVM->lookupMethod(message, receiverClass));
+        newContext->method = method;
 
         // Checking whether we found a method
         if (method == 0) {
-            // Oops. Method was not found. In this case we should send #doesNotUnderstand: message to the receiver
+            // Oops. Method was not found. In this case we should
+            // send #doesNotUnderstand: message to the receiver.
+
+            // TODO Refactor the code to eliminate memory allocation
+            //      This will allow to completely remove hptr's
             m_softVM->setupVarsForDoesNotUnderstand(method, messageArguments, message, receiverClass);
-            // Continuing the execution just as if #doesNotUnderstand: was the actual selector that we wanted to call
+
+            // Continuing the execution just as if #doesNotUnderstand:
+            // was the actual selector that we wanted to call
         }
 
         // Searching for the jit compiled function
-        compiledMethodFunction = lookupFunctionInCache(method);
+        compiledMethodFunction = lookupFunctionInCache(method, messageArguments);
 
         if (! compiledMethodFunction) {
+            type::Type argumentsType = type::createArgumentsType(messageArguments);
+
             // If function was not found in the cache looking it in the LLVM directly
-            std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
+            const std::string& functionName = type::getQualifiedMethodName(method, argumentsType);
             Function* methodFunction = m_JITModule->getFunction(functionName);
 
             if (! methodFunction) {
+                outs() << "Compiling dynamic method " << functionName << "\n";
+
                 // Compiling function and storing it to the table for further use
-                methodFunction = m_methodCompiler->compileMethod(method);
+                methodFunction = m_methodCompiler->compileMethod(method, argumentsType);
 
 //                  outs() << *methodFunction << "\n";
 
@@ -391,7 +684,7 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
 
             // Calling the method and returning the result
             compiledMethodFunction = reinterpret_cast<TMethodFunction>(m_executionEngine->getPointerToFunction(methodFunction));
-            updateFunctionCache(method, compiledMethodFunction);
+            updateFunctionCache(method, compiledMethodFunction, messageArguments);
 
 //             outs() << *methodFunction << "\n";
 
@@ -401,22 +694,7 @@ void JITRuntime::sendMessage(TContext* callingContext, TSymbol* message, TObject
         }
 
         // Updating call site statistics and scheduling method processing
-        updateHotSites(compiledMethodFunction, previousContext, message, receiverClass, callSiteIndex);
-
-        // Preparing the context objects. Because we do not call the software
-        // implementation here, we do not need to allocate the stack object
-        // because it is not used by JIT runtime. We also may skip the proper
-        // initialization of various objects such as stackTop and bytePointer.
-
-        // Creating context object and temporaries
-        hptr<TObjectArray> newTemps = m_softVM->newObject<TObjectArray>(method->temporarySize);
-        newContext = m_softVM->newObject<TContext>();
-
-        // Initializing context variables
-        newContext->temporaries       = newTemps;
-        newContext->arguments         = messageArguments;
-        newContext->method            = method;
-        newContext->previousContext   = previousContext;
+        //updateHotSites(compiledMethodFunction, previousContext, message, receiverClass, callSiteIndex);
     }
 
     try {
@@ -439,7 +717,7 @@ void JITRuntime::updateHotSites(TMethodFunction methodFunction, TContext* callin
     if (!callSiteIndex)
         return;
 
-    TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method);
+    TMethodFunction callerMethodFunction = lookupFunctionInCache(callingContext->method, 0);
     // TODO reload cache if callerMethodFunction was popped out
 
     if (!callerMethodFunction)
@@ -494,7 +772,7 @@ void JITRuntime::patchHotMethods()
         // Compiling function from scratch
         outs() << "Recompiling method for patching: " << methodFunction->getName().str() << "\n";
         Value* contextHolder = 0;
-        m_methodCompiler->compileMethod(method, methodFunction, &contextHolder);
+        m_methodCompiler->compileMethod(method, type::Type(), methodFunction, &contextHolder);
 
         outs() << "Patching " << hotMethod->methodFunction->getName().str() << " ...";
 
@@ -1099,9 +1377,9 @@ TByteObject* newBinaryObject(TClass* klass, uint32_t dataSize)
     return JITRuntime::Instance()->getVM()->newBinaryObject(klass, dataSize);
 }
 
-TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer)
+TBlock* createBlock(TContext* callingContext, uint8_t argLocation, uint16_t bytePointer, uint32_t stackTop)
 {
-    return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer);
+    return JITRuntime::Instance()->createBlock(callingContext, argLocation, bytePointer, stackTop);
 }
 
 void emitBlockReturn(TObject* value, TContext* targetContext)

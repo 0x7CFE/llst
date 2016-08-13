@@ -2,13 +2,16 @@
 #define LLST_PATTERN_INIT_VM_IMAGE_INCLUDED
 
 #include <gtest/gtest.h>
-#include "../helpers/VMImage.h"
+#include <vm.h>
 
 class P_InitVM_Image : public ::testing::TestWithParam<std::string /*image name*/>
 {
 protected:
-    H_VMImage* m_image;
+    std::auto_ptr<IMemoryManager> m_memoryManager;
 public:
+    std::auto_ptr<Image> m_image;
+    std::auto_ptr<SmalltalkVM> m_vm;
+    P_InitVM_Image() : m_memoryManager(), m_image(), m_vm() {}
     virtual ~P_InitVM_Image() {}
 
     virtual void SetUp()
@@ -19,10 +22,21 @@ public:
             abort();
         }
         ParamType image_name = GetParam();
-        m_image = new H_VMImage(image_name);
+
+        #if defined(LLVM)
+            m_memoryManager.reset(new LLVMMemoryManager());
+        #else
+            m_memoryManager.reset(new BakerMemoryManager()),
+        #endif
+        m_memoryManager->initializeHeap(1024*1024, 1024*1024);
+        m_image.reset(new Image(m_memoryManager.get()));
+        m_image->loadImage(TESTS_DIR "./data/" + image_name + ".image");
+        m_vm.reset(new SmalltalkVM(m_image.get(), m_memoryManager.get()));
     }
     virtual void TearDown() {
-        delete m_image;
+        m_vm.reset();
+        m_image.reset();
+        m_memoryManager.reset();
     }
 };
 

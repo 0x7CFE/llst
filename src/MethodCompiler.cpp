@@ -43,6 +43,7 @@
 #include <sstream>
 #include <opcodes.h>
 #include <analysis.h>
+#include <inference.h>
 #include <visualization.h>
 
 using namespace llvm;
@@ -53,6 +54,46 @@ std::string to_string(const T& x) {
     std::ostringstream ss;
     ss << x;
     return ss.str();
+}
+
+static Constant* createStringConstant(Module& M, char const* str, Twine const& name) {
+    LLVMContext& ctx = getGlobalContext();
+    Constant* strConstant = ConstantDataArray::getString(ctx, str);
+    GlobalVariable* GVStr =
+    new GlobalVariable(M, strConstant->getType(), true,
+                       GlobalValue::InternalLinkage, strConstant, name);
+    Constant* zero = Constant::getNullValue(IntegerType::getInt32Ty(ctx));
+    Constant* indices[] = {zero, zero};
+    Constant* strVal = ConstantExpr::getGetElementPtr(GVStr, indices, true);
+    return strVal;
+}
+
+void MethodCompiler::insertTrace(MethodCompiler::TJITContext& jit, const char* message) {
+    Value* const print = m_JITModule->getFunction("printf");
+    jit.builder->CreateCall(print, createStringConstant(*m_JITModule, message, "str."));
+}
+
+void MethodCompiler::insertTrace(MethodCompiler::TJITContext& jit, const char* message, llvm::Value* value) {
+    Value* const print = m_JITModule->getFunction("printf");
+    jit.builder->CreateCall2(print, createStringConstant(*m_JITModule, message, "str."), value);
+}
+
+MethodCompiler::MethodCompiler(
+    JITRuntime& runtime,
+    llvm::Module* JITModule,
+    TRuntimeAPI   runtimeApi,
+    TExceptionAPI exceptionApi
+) :
+    m_runtime(runtime),
+    m_JITModule(JITModule),
+    m_runtimeAPI(runtimeApi),
+    m_exceptionAPI(exceptionApi),
+    m_typeSystem(*runtime.getVM()),
+    m_callSiteIndex(1)
+{
+    m_baseTypes.initializeFromModule(JITModule);
+    m_globals.initializeFromModule(JITModule);
+    m_baseFunctions.initializeFromModule(JITModule);
 }
 
 Value* MethodCompiler::TJITContext::getLiteral(uint32_t index)
@@ -78,7 +119,7 @@ Value* MethodCompiler::TJITContext::getMethodClass()
     return klass;
 }
 
-Function* MethodCompiler::createFunction(TMethod* method)
+Function* MethodCompiler::createFunction(TMethod* method, const std::string& functionName)
 {
     Type* const methodParams[] = { m_baseTypes.context->getPointerTo() };
     FunctionType* const functionType = FunctionType::get(
@@ -87,7 +128,6 @@ Function* MethodCompiler::createFunction(TMethod* method)
         false                    // we're not dealing with vararg
     );
 
-    std::string functionName = method->klass->name->toString() + ">>" + method->name->toString();
     Function* const function = cast<Function>( m_JITModule->getOrInsertFunction(functionName, functionType));
     function->setCallingConv(CallingConv::C); //Anyway C-calling conversion is default
     function->setGC("shadow-stack");
@@ -133,7 +173,7 @@ Value* MethodCompiler::protectPointer(TJITContext& jit, Value* value)
 
 Value* MethodCompiler::protectProducerNode(TJITContext& jit, st::ControlNode* node, Value* value)
 {
-    if (shouldProtectProducer(jit.currentNode))
+    if (shouldProtectProducer(jit, node))
         return protectPointer(jit, value);
     else
         return value; // return value as is
@@ -176,17 +216,20 @@ public:
 
 private:
     Detector& m_detector;
-    virtual TVisitResult visitNode(st::ControlNode* node) { return m_detector.checkNode(node); }
+
+    virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode*) {
+        return m_detector.checkNode(&node);
+    }
 };
 
 bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
 {
-    class GCDetector : public st::ForwardWalker {
+    class GCDetector : public st::GraphWalker {
     public:
         GCDetector() : m_detected(false) {}
 
-        virtual TVisitResult visitNode(st::ControlNode* node) {
-            if (st::InstructionNode* const candidate = node->cast<st::InstructionNode>()) {
+        virtual TVisitResult visitNode(st::ControlNode& node, const TPathNode*) {
+            if (st::InstructionNode* const candidate = node.cast<st::InstructionNode>()) {
                 if (candidate->getInstruction().mayCauseGC()) {
                     m_detected = true;
                     return st::GraphWalker::vrStopWalk;
@@ -203,13 +246,17 @@ bool MethodCompiler::methodAllocatesMemory(TJITContext& jit)
     };
 
     GCDetector detector;
-    detector.run((*jit.controlGraph->begin())->getEntryPoint());
+    detector.run((*jit.controlGraph->begin())->getEntryPoint(), GCDetector::wdForward, GCDetector::wtDepthFirst, true);
 
     return detector.isDetected();
 }
 
-bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
+bool MethodCompiler::shouldProtectProducer(TJITContext& jit, st::ControlNode* producer)
 {
+    const type::Type& type = jit.inferContext[*producer];
+    if (type.isLiteral() || type.getValue() == globals.smallIntClass)
+        return false;
+
     // We should protect the value by holder if consumer of this value is far away.
     // By far away we mean that it crosses the barrier of potential garbage collection.
     // For example if value is consumed right next to the point it was produced, then
@@ -265,7 +312,7 @@ bool MethodCompiler::shouldProtectProducer(st::ControlNode* producer)
 
     for (st::TNodeSet::iterator iConsumer = consumers.begin(); iConsumer != consumers.end(); ++iConsumer) {
         st::ControlNode* const consumer = *iConsumer;
-        walker.run(consumer, st::GraphWalker::wdBackward);
+        walker.run(consumer, st::GraphWalker::wdBackward, st::GraphWalker::wtDepthFirst, true);
 
         if (detector.isDetected()) {
             return true;
@@ -290,11 +337,9 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 
         context = jit.builder->CreateBitCast(blockContext, m_baseTypes.context->getPointerTo());
     }
-    context->setName("contextParameter");
 
-    // Protecting the context holder
+    // FIXME Temporary until block context is stack allocated
     jit.contextHolder = jit.methodAllocatesMemory ? protectPointer(jit, context) : context;
-    jit.contextHolder->setName("pContext");
 
     // Storing self pointer
     Value* const pargs     = jit.builder->CreateStructGEP(context, 2);
@@ -304,12 +349,51 @@ void MethodCompiler::writePreamble(TJITContext& jit, bool isBlock)
 
     jit.selfHolder = jit.methodAllocatesMemory ? protectPointer(jit, self) : self;
     jit.selfHolder->setName("pSelf");
+
+    // Allocating context object and temporaries on the methodFunction's stack.
+    // This operation does not affect garbage collector, so no pointer protection
+    // is required. Moreover, this is operation is much faster than heap allocation.
+    const std::size_t tempsCount = jit.originMethod->temporarySize;
+
+    if (tempsCount) {
+        if (isBlock) {
+            // TODO Protect pointer
+            Value* const ptemps      = jit.builder->CreateStructGEP(context, 3);
+            Value* const temporaries = jit.builder->CreateLoad(ptemps);
+            jit.temporaries = jit.builder->CreateBitCast(temporaries, m_baseTypes.object->getPointerTo());
+        } else {
+            const uint32_t tempsSize = sizeof(TObjectArray) + sizeof(TObject*) * tempsCount;
+
+            MethodCompiler::TStackObject tempsPair = allocateStackObject(*jit.builder, sizeof(TObjectArray), tempsCount);
+
+            jit.builder->CreateMemSet(
+                tempsPair.objectSlot,     // destination address
+                jit.builder->getInt8(0),  // fill with zeroes
+                tempsSize,                // size of object slot
+                0,                        // no alignment
+                false                     // volatile operation
+            );
+
+            Value* const newTempsObject = jit.builder->CreateBitCast(tempsPair.objectSlot, m_baseTypes.object->getPointerTo(), "temps.");
+
+            const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
+            jit.builder->CreateCall2(getBaseFunctions().setObjectSize, newTempsObject, jit.builder->getInt32(tempsFieldsCount));
+            jit.builder->CreateCall2(getBaseFunctions().setObjectClass, newTempsObject, getJitGlobals().arrayClass);
+
+            Value* const contextObject = jit.builder->CreateBitCast(context, m_baseTypes.object->getPointerTo());
+            jit.builder->CreateCall3(getBaseFunctions().setObjectField, contextObject, jit.builder->getInt32(2), newTempsObject);
+
+            jit.temporaries = newTempsObject;
+        }
+    }
+
 }
 
 Value* MethodCompiler::TJITContext::getCurrentContext()
 {
+    // FIXME Temporary until block context is stack allocated
     if (methodAllocatesMemory)
-        return builder->CreateLoad(contextHolder, "context.");
+        return builder->CreateLoad(contextHolder, "self.");
     else
         return contextHolder;
 }
@@ -392,12 +476,24 @@ TObjectAndSize MethodCompiler::createArray(TJITContext& jit, uint32_t elementsCo
     return std::make_pair(arrayObject, arraySize);
 }
 
-Function* MethodCompiler::compileMethod(TMethod* method, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
+Function* MethodCompiler::compileMethod(TMethod* method, const type::Type& arguments, llvm::Function* methodFunction /*= 0*/, llvm::Value** contextHolder /*= 0*/)
 {
-    TJITContext  jit(this, method);
+    type::InferContext* const inferContext = m_typeSystem.inferMessage(method->name, arguments, 0);
+    assert(inferContext);
+    assert(inferContext->getMethod() == method);
+
+    const std::string& methodName = type::getQualifiedMethodName(method, arguments);
+    printf("compiling method %s\n", methodName.c_str());
+
+    TJITContext jit(this, method, *inferContext);
+
+    {
+        ControlGraphVisualizer vis(jit.controlGraph, methodName, "dots/");
+        vis.run();
+    }
 
     // Creating the function named as "Class>>method" or using provided one
-    jit.function = methodFunction ? methodFunction : createFunction(method);
+    jit.function = methodFunction ? methodFunction : createFunction(method, methodName);
 
     // Creating the preamble basic block and inserting it into the function
     // It will contain basic initialization code (args, temps and so on)
@@ -669,11 +765,24 @@ void MethodCompiler::doPushArgument(TJITContext& jit)
 void MethodCompiler::doPushTemporary(TJITContext& jit)
 {
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
-    Value* const temporary = jit.builder->CreateCall2(
+
+    Value* temporary = 0;
+
+    if (jit.isBlock) {
+        temporary = jit.builder->CreateCall2(
             m_baseFunctions.getTemporary,
             jit.getCurrentContext(),
             jit.builder->getInt32(index)
-    );
+        );
+    } else {
+        temporary = jit.builder->CreateCall2(
+            m_baseFunctions.getObjectField,
+            jit.temporaries,
+            jit.builder->getInt32(index)
+        );
+    }
+
+    assert(temporary);
     temporary->setName(std::string("temp") + to_string(index) + ".");
 
     Value* const holder = protectProducerNode(jit, jit.currentNode, temporary);
@@ -740,25 +849,59 @@ void MethodCompiler::doPushConstant(TJITContext& jit)
     setNodeValue(jit, jit.currentNode, constantValue);
 }
 
+uint32_t getClosureMask(st::ControlGraph& blockGraph)
+{
+    // Closure mask is a bit mask representing indices of the temporaries (T)
+    // and arguments (A) that are accessed from within a block.
+    // Currently only 17 bits are defined:  xxxxxxxxxxxxxxx|AAAAAAAA|TTTTTTTT|1
+    // The least significant bit is set to 1 to indicate that it is not an object pointer.
+
+    std::bitset<32> closureMask;
+
+    closureMask[0] = 1;
+
+    const st::ControlGraph::TMetaInfo::TIndexList& readsTemporaries = blockGraph.getMeta().readsTemporaries;
+    for (std::size_t index = 0; index < readsTemporaries.size(); index++) {
+        const uint32_t tempIndex = readsTemporaries[index];
+
+        if (tempIndex < 8)
+            closureMask[tempIndex + 1] = 1;
+        else
+            return 0; // method could not be cashed
+    }
+
+    const st::ControlGraph::TMetaInfo::TIndexList& readsArguments = blockGraph.getMeta().readsArguments;
+    for (std::size_t index = 0; index < readsArguments.size(); index++) {
+        const uint32_t argIndex = readsArguments[index];
+
+        if (argIndex < 8)
+            closureMask[argIndex + 8 + 1] = 1;
+        else
+            return 0; // method could not be cashed
+    }
+
+    return closureMask.to_ulong();
+}
+
 void MethodCompiler::doPushBlock(TJITContext& jit)
 {
+    // TODO Check that this block is actually used/invoked and not escapes.
+
     st::PushBlockNode* const pushBlockNode = jit.currentNode->cast<st::PushBlockNode>();
     st::ParsedBlock*   const parsedBlock   = pushBlockNode->getParsedBlock();
 
     const uint16_t blockOffset = parsedBlock->getStartOffset();
-    std::ostringstream ss;
-    ss << jit.originMethod->klass->name->toString() + ">>" + jit.originMethod->name->toString() << "@" << blockOffset;
-    std::string blockFunctionName = ss.str();
+    st::ControlGraph* const blockGraph = m_typeSystem.getBlockGraph(parsedBlock);
 
-    // If block function is not already created, create it
-    if (! m_JITModule->getFunction(blockFunctionName))
-        compileBlock(jit, blockFunctionName, parsedBlock);
+    const uint32_t argumentLocation = jit.currentNode->getInstruction().getArgument();
+    const uint32_t closureMask = getClosureMask(*blockGraph);
 
     // Create block object and fill it with context information
     Value* const args[] = {
-        jit.getCurrentContext(),                   // creatingContext
-        jit.builder->getInt8(jit.currentNode->getInstruction().getArgument()), // arg offset
-        jit.builder->getInt16(blockOffset)
+        jit.getCurrentContext(),                // creatingContext
+        jit.builder->getInt8(argumentLocation), // arg offset
+        jit.builder->getInt16(blockOffset),     // block byte pointer
+        jit.builder->getInt32(closureMask)      // closure mask as stack top
     };
 
     Value* blockObject = jit.builder->CreateCall(m_runtimeAPI.createBlock, args);
@@ -769,25 +912,150 @@ void MethodCompiler::doPushBlock(TJITContext& jit)
     setNodeValue(jit, jit.currentNode, blockHolder);
 }
 
-llvm::Function* MethodCompiler::compileBlock(TBlock* block)
+void createBlockTypes(
+    TBlock* block,
+    st::ControlGraph& blockGraph,
+    type::Type& blockType,
+    type::Type& blockArguments,
+    type::Type& blockTemps,
+    type::InferContext::TVariableMap& closureTypes)
 {
-    TJITContext methodContext(this, block->method);
-    const uint16_t blockOffset = block->blockBytePointer;
+    blockType.set(globals.blockClass, type::Type::tkMonotype);
+    blockType.pushSubType(block->method);                                 // [Type::bstOrigin]
+    blockType.pushSubType(type::Type(TInteger(block->blockBytePointer))); // [Type::bstOffset]
+    blockType.pushSubType(type::Type(TInteger(block->argumentLocation))); // [Type::bstArgIndex]
+    blockType.pushSubType(type::Type(TInteger(0)));                       // [Type::bstContextIndex]
 
-    std::ostringstream ss;
-    ss << block->method->klass->name->toString() << ">>" << block->method->name->toString() << "@" << blockOffset;
-    const std::string blockFunctionName = ss.str();
+    blockArguments.set(globals.arrayClass, type::Type::tkArray);
 
-    st::ParsedBlock* const parsedBlock = methodContext.parsedMethod->getParsedBlockByOffset(blockOffset);
-    assert(parsedBlock);
+    TObjectArray& temporaries = * block->temporaries;
+    const uint32_t argumentLocation = block->argumentLocation;
 
-    return compileBlock(methodContext, blockFunctionName, parsedBlock);
+    const st::ControlGraph::TMetaInfo::TIndexList& readsTemporaries = blockGraph.getMeta().readsTemporaries;
+    const st::ControlGraph::TMetaInfo::TIndexList& writesTemporaries = blockGraph.getMeta().writesTemporaries;
+
+    type::Type readIndices(globals.arrayClass, type::Type::tkArray);
+    type::Type writeIndices(globals.arrayClass, type::Type::tkArray);
+
+    for (std::size_t index = 0; index < readsTemporaries.size(); index++) {
+        const uint32_t tempIndex = readsTemporaries[index];
+        TObject* const argument = temporaries[tempIndex];
+        TClass* const klass = isSmallInteger(argument) ? globals.smallIntClass : argument->getClass();
+        const type::Type newType(klass);
+
+        if (readsTemporaries[index] < argumentLocation) {
+            closureTypes[tempIndex] = newType;
+            blockTemps.pushSubType(newType);
+            readIndices.pushSubType(type::Type(TInteger(tempIndex)));
+        } else {
+            blockArguments.pushSubType(newType);
+        }
+    }
+
+    for (std::size_t index = 0; index < writesTemporaries.size(); index++) {
+        // We're interested only in temporaries from lexical context, not block arguments
+        if (writesTemporaries[index] >= argumentLocation)
+            continue;
+
+        writeIndices.pushSubType(type::Type(TInteger(writesTemporaries[index])));
+    }
+
+    blockType.pushSubType(readIndices);  // [Type::bstReadsTemps]
+    blockType.pushSubType(writeIndices); // [Type::bstWritesTemps]
+    blockType.pushSubType(type::Type(TInteger(0))); // [Type::bstCaptureIndex]
 }
 
-llvm::Function* MethodCompiler::compileBlock(TJITContext& jit, const std::string& blockFunctionName, st::ParsedBlock* parsedBlock)
+std::string getDynamicBlockFunctionName(const type::Type& blockType, const type::Type& blockArguments, const type::Type& blockTemps)
 {
-    const uint16_t blockOffset = parsedBlock->getStartOffset();
-    TJITBlockContext blockContext(this, jit.parsedMethod, parsedBlock);
+    return blockArguments.toString() + blockTemps.toString() + "::" + blockType.toString();
+}
+
+std::string getStaticBlockFunctionName(const type::Type& blockType, const type::Type& blockArguments)
+{
+    return blockArguments.toString() + "::" + blockType.toString();
+}
+
+llvm::Function* MethodCompiler::compileDynamicBlock(TBlock* block)
+{
+    const uint16_t blockOffset = block->blockBytePointer;
+    st::ControlGraph* const methodGraph = m_typeSystem.getMethodGraph(block->method);
+    st::ParsedBlock*  const parsedBlock = methodGraph->getParsedMethod()->getParsedBlockByOffset(blockOffset);
+    st::ControlGraph* const blockGraph = m_typeSystem.getBlockGraph(parsedBlock);
+
+    const type::Type& methodArguments = type::createArgumentsType(block->arguments);
+
+    type::InferContext methodContext(block->method, 0, methodArguments);
+    type::InferContext::TVariableMap& closureTypes = methodContext.getBlockClosures()[0];
+
+    type::Type blockType;
+    type::Type blockArguments(globals.arrayClass, type::Type::tkArray);
+    type::Type blockTemps(globals.arrayClass, type::Type::tkArray);
+    createBlockTypes(block, *blockGraph, blockType, blockArguments, blockTemps, closureTypes);
+
+    const uint32_t closureMask = getClosureMask(*blockGraph);
+    block->stackTop.setRawValue(closureMask);
+
+    // Check if function was already compiled
+    const std::string& blockFunctionName = getDynamicBlockFunctionName(blockType, blockArguments, blockTemps);
+    if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
+        return blockFunction;
+
+    printf("compiling dynamic block %s\n", blockFunctionName.c_str());
+
+    type::TContextStack stack(methodContext);
+    type::InferContext* const blockInferContext = m_typeSystem.inferDynamicBlock(blockType, blockArguments, blockTemps, &stack);
+    assert(blockInferContext);
+
+    return compileBlock(blockFunctionName, parsedBlock, *blockInferContext);
+}
+
+llvm::Function* MethodCompiler::compileInferredBlock(TJITContext& jit)
+{
+    type::Type& blockType = jit.inferContext[*jit.currentNode->getArgument()];
+    if (! blockType.isBlock())
+        return 0;
+
+    type::Type blockArguments(type::Type::tkArray);
+
+    if (jit.currentNode->getArgumentsCount() > 1)
+        blockArguments.pushSubType(jit.inferContext[*jit.currentNode->getArgument(1)]);
+
+    if (jit.currentNode->getArgumentsCount() > 2)
+        blockArguments.pushSubType(jit.inferContext[*jit.currentNode->getArgument(2)]);
+
+    type::InferContext* const blockContext = m_typeSystem.inferBlock(blockType, blockArguments, 0);
+
+    if (! blockContext)
+        return 0;
+
+    const std::string& blockFunctionName = getStaticBlockFunctionName(blockType, blockArguments);
+    if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
+        return blockFunction;
+
+    TMethod* const method = blockType[type::Type::bstOrigin].getValue()->cast<TMethod>();
+    const uint16_t blockOffset = TInteger(blockType[type::Type::bstOffset].getValue());
+
+    st::ControlGraph* const methodGraph = m_typeSystem.getMethodGraph(method);
+    st::ParsedBlock*  const parsedBlock = methodGraph->getParsedMethod()->getParsedBlockByOffset(blockOffset);
+
+    printf("compiling inferred block %s\n", blockFunctionName.c_str());
+    return compileBlock(blockFunctionName, parsedBlock, *blockContext);
+}
+
+llvm::Function* MethodCompiler::compileBlock(const std::string& blockFunctionName, st::ParsedBlock* parsedBlock, type::InferContext& blockcontext)
+{
+    // Check if function was already compiled
+    if (Function* const blockFunction = m_JITModule->getFunction(blockFunctionName))
+        return blockFunction;
+
+    st::ControlGraph* const blockGraph = m_typeSystem.getBlockGraph(parsedBlock);
+
+    TJITBlockContext blockContext(this, parsedBlock->getContainer(), parsedBlock, blockGraph, blockcontext);
+
+    {
+        ControlGraphVisualizer vis(blockContext.controlGraph, blockFunctionName, "dots/");
+        vis.run();
+    }
 
     std::vector<Type*> blockParams;
     blockParams.push_back(m_baseTypes.block->getPointerTo()); // block object with context information
@@ -798,59 +1066,58 @@ llvm::Function* MethodCompiler::compileBlock(TJITContext& jit, const std::string
         false                        // we're not dealing with vararg
     );
 
-    blockContext.function = m_JITModule->getFunction(blockFunctionName);
-    if (! blockContext.function) { // Checking if not already created
-        blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
+    blockContext.function = cast<Function>(m_JITModule->getOrInsertFunction(blockFunctionName, blockFunctionType));
 
-        blockContext.function->setGC("shadow-stack");
-        m_blockFunctions[blockFunctionName] = blockContext.function;
+    blockContext.function->setGC("shadow-stack");
+    m_blockFunctions[blockFunctionName] = blockContext.function;
 
-        // Creating the basic block and inserting it into the function
-        blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
-        blockContext.builder = new IRBuilder<>(blockContext.preamble);
-        writePreamble(blockContext, /*isBlock*/ true);
+    // Creating the basic block and inserting it into the function
+    blockContext.preamble = BasicBlock::Create(m_JITModule->getContext(), "blockPreamble", blockContext.function);
+    blockContext.builder = new IRBuilder<>(blockContext.preamble);
+    writePreamble(blockContext, /*isBlock*/ true);
 
-        writeUnwindBlockReturn(blockContext);
+    writeUnwindBlockReturn(blockContext);
 
-        scanForBranches(blockContext, blockContext.parsedBlock);
+    scanForBranches(blockContext, blockContext.parsedBlock);
 
-        std::stringstream ss;
-        ss.str("");
-        ss << "offset" << blockOffset;
+    const uint16_t blockOffset = parsedBlock->getStartOffset();
 
-        BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
-        assert(blockBody);
-        blockBody->setName(ss.str());
+    std::stringstream ss;
+    ss.str("");
+    ss << "offset" << blockOffset;
 
-        blockContext.builder->SetInsertPoint(blockContext.preamble);
-        blockContext.builder->CreateBr(blockBody);
+    BasicBlock* const blockBody = parsedBlock->getBasicBlockByOffset(blockOffset)->getValue(); // m_targetToBlockMap[blockOffset];
+    assert(blockBody);
+    blockBody->setName(ss.str());
 
-        blockContext.builder->SetInsertPoint(blockBody);
+    blockContext.builder->SetInsertPoint(blockContext.preamble);
+    blockContext.builder->CreateBr(blockBody);
 
-        writeFunctionBody(blockContext);
+    blockContext.builder->SetInsertPoint(blockBody);
 
-        // Erasing unwind phi if it is not needed
-        // Block will be removed by DCE
-        // TODO Better to detect it before unwind block is written
-        if (! blockContext.unwindBlockReturn->hasNUsesOrMore(1)) {
-            if (blockContext.unwindPhi->getNumIncomingValues()) {
-                outs() << *blockContext.function << "\n";
-                outs() << "Fatal error: phi is used but the block isn't!\n";
-                abort();
-            }
+    writeFunctionBody(blockContext);
 
-            blockContext.unwindPhi->replaceAllUsesWith(UndefValue::get(m_baseTypes.returnValueType));
-            blockContext.unwindPhi->eraseFromParent();
-            blockContext.unwindPhi = 0;
+    // Erasing unwind phi if it is not needed
+    // Block will be removed by DCE
+    // TODO Better to detect it before unwind block is written
+    if (! blockContext.unwindBlockReturn->hasNUsesOrMore(1)) {
+        if (blockContext.unwindPhi->getNumIncomingValues()) {
+            outs() << *blockContext.function << "\n";
+            outs() << "Fatal error: phi is used but the block isn't!\n";
+            abort();
         }
 
-        //         outs() << *blockContext.function << "\n";
-
-        verifyFunction(*blockContext.function);
-
-        // Running optimization passes on a block function
-        JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
+        blockContext.unwindPhi->replaceAllUsesWith(UndefValue::get(m_baseTypes.returnValueType));
+        blockContext.unwindPhi->eraseFromParent();
+        blockContext.unwindPhi = 0;
     }
+
+    outs() << *blockContext.function << "\n";
+
+    verifyFunction(*blockContext.function);
+
+    // Running optimization passes on a block function
+    //JITRuntime::Instance()->optimizeFunction(blockContext.function, false);
 
     return blockContext.function;
 }
@@ -860,12 +1127,21 @@ void MethodCompiler::doAssignTemporary(TJITContext& jit)
     const uint8_t index = jit.currentNode->getInstruction().getArgument();
     Value* const  value = getArgument(jit);
 
-    jit.builder->CreateCall3(
+    if (jit.isBlock) {
+        jit.builder->CreateCall3(
             m_baseFunctions.setTemporary,
             jit.getCurrentContext(),
             jit.builder->getInt32(index),
             value
-    );
+        );
+    } else {
+        jit.builder->CreateCall3(
+            m_baseFunctions.setObjectField,
+            jit.temporaries,
+            jit.builder->getInt32(index),
+            value
+        );
+    }
 }
 
 void MethodCompiler::doAssignInstance(TJITContext& jit)
@@ -900,8 +1176,8 @@ void MethodCompiler::doMarkArguments(TJITContext& jit)
     Value* const argumentsArray = jit.builder->CreateBitCast(argumentsObject, m_baseTypes.objectArray->getPointerTo());
 
     Value* const argumentsPointer = jit.builder->CreateBitCast(argumentsObject, jit.builder->getInt8PtrTy());
-    Function* gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_start);
-    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->getInt64(sizeInBytes), argumentsPointer);
+    Function* lifetimeStartIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_start);
+    jit.builder->CreateCall2(lifetimeStartIntrinsic, jit.builder->getInt64(sizeInBytes), argumentsPointer);
 
     setNodeValue(jit, jit.currentNode, argumentsArray);
 }
@@ -1030,29 +1306,55 @@ void MethodCompiler::setNodeValue(TJITContext& jit, st::ControlNode* node, llvm:
 
 void MethodCompiler::doSendBinary(TJITContext& jit)
 {
+    const type::Type& leftType   = jit.inferContext[*jit.currentNode->getArgument(0)].fold();
+    const type::Type& rightType  = jit.inferContext[*jit.currentNode->getArgument(1)].fold();
+    const type::Type& resultType = jit.inferContext[*jit.currentNode].fold();
+
+    if (leftType.isLiteral() && rightType.isLiteral()) {
+        // TODO Extend to all literals
+        if (isSmallInteger(resultType.getValue())) {
+            ConstantInt* const rawResult = jit.builder->getInt32(TInteger(resultType.getValue()));
+            Value* const result = jit.builder->CreateCall(m_baseFunctions.newInteger, rawResult);
+            setNodeValue(jit, jit.currentNode, result);
+            return;
+        }
+    }
+
+    // Literal int or (SmallInt) monotype
+    const bool leftTypeIsInt  = isSmallInteger(leftType.getValue())  || leftType.getValue()  == globals.smallIntClass;
+    const bool rightTypeIsInt = isSmallInteger(rightType.getValue()) || rightType.getValue() == globals.smallIntClass;
+    const bool encodeDirectIntegers = leftTypeIsInt && rightTypeIsInt;
+
     // 0, 1 or 2 for '<', '<=' or '+' respectively
     binaryBuiltIns::Operator opcode = static_cast<binaryBuiltIns::Operator>(jit.currentNode->getInstruction().getArgument());
 
-    Value* const rightValue = getArgument(jit, 1); // jit.popValue();
     Value* const leftValue  = getArgument(jit, 0); // jit.popValue();
+    Value* const rightValue = getArgument(jit, 1); // jit.popValue();
 
-    // Checking if values are both small integers
-    Value* const rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
-    Value* const leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftValue);
-    Value* const isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
+    BasicBlock* integersBlock   = 0;
+    BasicBlock* sendBinaryBlock = 0;
+    BasicBlock* resultBlock     = 0;
 
-    BasicBlock* const integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
-    BasicBlock* const sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
-    BasicBlock* const resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
+    if (! encodeDirectIntegers) {
+        // Checking if values are both small integers
+        Value* const leftIsInt   = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, leftValue);
+        Value* const rightIsInt  = jit.builder->CreateCall(m_baseFunctions.isSmallInteger, rightValue);
+        Value* const isSmallInts = jit.builder->CreateAnd(rightIsInt, leftIsInt);
 
-    // Depending on the contents we may either do the integer operations
-    // directly or create a send message call using operand objects
-    jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
+        integersBlock   = BasicBlock::Create(m_JITModule->getContext(), "asIntegers.", jit.function);
+        sendBinaryBlock = BasicBlock::Create(m_JITModule->getContext(), "asObjects.",  jit.function);
+        resultBlock     = BasicBlock::Create(m_JITModule->getContext(), "result.",     jit.function);
+
+        // Depending on the contents we may either do the integer operations
+        // directly or create a send message call using operand objects
+        jit.builder->CreateCondBr(isSmallInts, integersBlock, sendBinaryBlock);
+
+        jit.builder->SetInsertPoint(integersBlock);
+    }
 
     // Now the integers part
-    jit.builder->SetInsertPoint(integersBlock);
-    Value* const rightInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
     Value* const leftInt  = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, leftValue);
+    Value* const rightInt = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, rightValue);
 
     Value* intResult       = 0; // this will be an immediate operation result
     Value* intResultObject = 0; // this will be actual object to return
@@ -1080,6 +1382,11 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
         intResultObject->setName("bool.");
     }
 
+    if (encodeDirectIntegers) {
+        setNodeValue(jit, jit.currentNode, intResultObject);
+        return;
+    }
+
     // Jumping out the integersBlock to the value aggregator
     jit.builder->CreateBr(resultBlock);
 
@@ -1087,6 +1394,7 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     jit.builder->SetInsertPoint(sendBinaryBlock);
     // We need to create an arguments array and fill it with argument objects
     // Then send the message just like ordinary one
+    // TODO direct call in case of inferred context
 
     // Now creating the argument array
     TObjectAndSize array = createArray(jit, 2);
@@ -1143,87 +1451,33 @@ void MethodCompiler::doSendBinary(TJITContext& jit)
     setNodeValue(jit, jit.currentNode, resultHolder);
 }
 
-
-bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNode* receiverNode, TClass* receiverClass /*= 0*/)
+void MethodCompiler::doSendInferredMessage(TJITContext& jit, type::InferContext& context)
 {
-    // Optimized version of doSendMessage which takes into account that
-    // pending message should be sent to the literal receiver
-    // (either constant or a member of method literals). Literal receivers
-    // are encoded at the time of method compilation, so thier value and
-    // their class will not change over time. Moreover, actual values
-    // are known at compile time and may be used to lookup the actual
-    // method that should be invoked.
+    // Inferred messages are easy to dispatch because we know
+    // virtually everything about their execution context.
+    // Therefore we may encode direct method call and optimize
+    // all stuff like as GC roots or checks that is redundant.
 
-    // Locating message selector
-    TSymbolArray& literals   = *jit.originMethod->literals;
-    TSymbol* const messageSelector = literals[jit.currentNode->getInstruction().getArgument()];
+    TMethod* const directMethod = context.getMethod();
 
-    // Determining receiver class
-    if (!receiverClass) {
-        TObject* literalReceiver = 0;
-
-        const st::TSmalltalkInstruction::TOpcode opcode = receiverNode->getInstruction().getOpcode();
-        if (opcode == opcode::pushLiteral) {
-            literalReceiver = literals[receiverNode->getInstruction().getArgument()];
-        } else if (opcode == opcode::pushConstant) {
-            const uint8_t constant = receiverNode->getInstruction().getArgument();
-            switch(constant) {
-                case 0: case 1: case 2: case 3: case 4:
-                case 5: case 6: case 7: case 8: case 9:
-                    literalReceiver = TInteger(constant);
-                    break;
-
-                case pushConstants::nil:         literalReceiver = globals.nilObject;   break;
-                case pushConstants::trueObject:  literalReceiver = globals.trueObject;  break;
-                case pushConstants::falseObject: literalReceiver = globals.falseObject; break;
-            }
-        }
-
-        assert(literalReceiver);
-        receiverClass = isSmallInteger(literalReceiver) ? globals.smallIntClass : literalReceiver->getClass();
-    }
-
-    assert(receiverClass);
-
-    // Locating a method suitable for a direct call
-    TMethod* const directMethod = m_runtime.getVM()->lookupMethod(messageSelector, receiverClass);
-
-    if (! directMethod) {
-        outs() << "Error! Could not lookup method for class "  << receiverClass->name->toString() << ", selector " << messageSelector->toString() << "\n";
-        return false;
-    }
-
-    std::string directFunctionName = directMethod->klass->name->toString() + ">>" + messageSelector->toString();
+    const std::string& directFunctionName = context.getQualifiedName();
     Function* directFunction = m_JITModule->getFunction(directFunctionName);
 
     if (!directFunction) {
         // Compiling function and storing it to the table for further use
-        directFunction = compileMethod(directMethod);
+        directFunction = compileMethod(directMethod, context.getArguments());
 
-//         outs() << *directFunction << "\n";
-
-        verifyFunction(*directFunction , llvm::AbortProcessAction);
-
-        m_runtime.optimizeFunction(directFunction, false);
+        outs() << *directFunction << "\n";
     }
 
-    // Allocating context object and temporaries on the methodFunction's stack.
-    // This operation does not affect garbage collector, so no pointer protection
-    // is required. Moreover, this is operation is much faster than heap allocation.
-    const bool hasTemporaries  = directMethod->temporarySize > 0;
+    // Allocating context object on the methodFunction's stack. This operation
+    // does not affect garbage collector, so no pointer protection is required.
+    // Moreover, this is operation is much faster than heap allocation.
     const uint32_t contextSize = sizeof(TContext);
-    const uint32_t tempsSize   = hasTemporaries ? sizeof(TObjectArray) + sizeof(TObject*) * directMethod->temporarySize : 0;
 
-    // Allocating stack space for objects and registering GC protection holder
-
-    MethodCompiler::TStackObject contextPair = allocateStackObject(*jit.builder, sizeof(TContext), 0);
+    // Allocating stack space for context and registering GC protection holder
+    TStackObject contextPair = allocateStackObject(*jit.builder, sizeof(TContext), 0);
     Value* const contextSlot = contextPair.objectSlot;
-    Value* tempsSlot = 0;
-
-    if (hasTemporaries) {
-        MethodCompiler::TStackObject tempsPair = allocateStackObject(*jit.builder, sizeof(TObjectArray), directMethod->temporarySize);
-        tempsSlot = tempsPair.objectSlot;
-    }
 
     // Filling stack space with zeroes
     jit.builder->CreateMemSet(
@@ -1234,21 +1488,11 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
         false                    // volatile operation
     );
 
-    if (hasTemporaries)
-        jit.builder->CreateMemSet(
-            tempsSlot,                // destination address
-            jit.builder->getInt8(0),  // fill with zeroes
-            tempsSize,                // size of object slot
-            0,                        // no alignment
-            false                     // volatile operation
-        );
-
     // Initializing object fields
     // TODO Move the init sequence out of the block or check that it is correctly optimized in loops
-    Value* const newContextObject  = jit.builder->CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
-    Value* const newTempsObject    = hasTemporaries ? jit.builder->CreateBitCast(tempsSlot, m_baseTypes.object->getPointerTo(), "newTemps.") : 0;
-    Function* const setObjectSize  = getBaseFunctions().setObjectSize;
-    Function* const setObjectClass = getBaseFunctions().setObjectClass;
+    Value*    const newContextObject = jit.builder->CreateBitCast(contextSlot, m_baseTypes.object->getPointerTo(), "newContext.");
+    Function* const setObjectSize    = getBaseFunctions().setObjectSize;
+    Function* const setObjectClass   = getBaseFunctions().setObjectClass;
 
     // Object size stored in the TSize field of any ordinary object contains
     // number of pointers except for the first two fields
@@ -1256,12 +1500,6 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
 
     jit.builder->CreateCall2(setObjectSize, newContextObject, jit.builder->getInt32(contextFieldsCount));
     jit.builder->CreateCall2(setObjectClass, newContextObject, getJitGlobals().contextClass);
-
-    if (hasTemporaries) {
-        const uint32_t tempsFieldsCount = tempsSize / sizeof(TObject*) - 2;
-        jit.builder->CreateCall2(setObjectSize, newTempsObject, jit.builder->getInt32(tempsFieldsCount));
-        jit.builder->CreateCall2(setObjectClass, newTempsObject, getJitGlobals().arrayClass);
-    }
 
     Function* const setObjectField  = getBaseFunctions().setObjectField;
     Value* const methodRawPointer   = jit.builder->getInt32(reinterpret_cast<uint32_t>(directMethod));
@@ -1275,34 +1513,16 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
 
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(0), directMethodObject);
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(1), messageArgumentsObject);
-    if (hasTemporaries)
-        jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), newTempsObject);
-    else
-        jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(2), getJitGlobals().nilObject);
+    // Note: temporaries (2) will be allocated on the stack frame of the message handler
     jit.builder->CreateCall3(setObjectField, newContextObject, jit.builder->getInt32(3), contextObject);
 
     Value* const newContext = jit.builder->CreateBitCast(newContextObject, m_baseTypes.context->getPointerTo());
-    Value* result = 0;
-
-    if (jit.methodHasBlockReturn) {
-        // Creating basic block that will be branched to on normal invoke
-        BasicBlock* const nextBlock = BasicBlock::Create(m_JITModule->getContext(), "next.", jit.function);
-        jit.currentNode->getDomain()->getBasicBlock()->setEndValue(nextBlock);
-
-        // Performing a function invoke
-        result = jit.builder->CreateInvoke(directFunction, nextBlock, jit.exceptionLandingPad, newContext);
-
-        // Switching builder to a new block
-        jit.builder->SetInsertPoint(nextBlock);
-    } else {
-        // Just calling the function. No block switching is required
-        result = jit.builder->CreateCall(directFunction, newContext);
-    }
+    Value* const result = jit.builder->CreateCall(directFunction, newContext);
 
     AllocaInst* const allocaInst = dyn_cast<AllocaInst>(jit.currentNode->getArgument()->getValue()->stripPointerCasts());
-    Function* const gcrootIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
+    Function* const lifetimeEndIntrinsic = getDeclaration(m_JITModule, Intrinsic::lifetime_end);
     Value* const argumentsPointer = jit.builder->CreateBitCast(arguments, jit.builder->getInt8PtrTy());
-    jit.builder->CreateCall2(gcrootIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
+    jit.builder->CreateCall2(lifetimeEndIntrinsic, jit.builder->CreateZExt(allocaInst->getArraySize(), jit.builder->getInt64Ty()), argumentsPointer);
 
     Value* const targetContext  = jit.builder->CreateExtractValue(result, 1, "targetContext");
     Value* const isBlockReturn  = jit.builder->CreateIsNotNull(targetContext);
@@ -1315,43 +1535,28 @@ bool MethodCompiler::doSendMessageToLiteral(TJITContext& jit, st::InstructionNod
     Value* const resultObject = jit.builder->CreateExtractValue(result, 0, "resultObject");
     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, resultObject);
     setNodeValue(jit, jit.currentNode, resultHolder);
-
-//     Value* const resultHolder = protectProducerNode(jit, jit.currentNode, result);
-//     setNodeValue(jit, jit.currentNode, resultHolder);
-
-    return true;
 }
 
 void MethodCompiler::doSendMessage(TJITContext& jit)
 {
+    const type::Type& arguments = jit.inferContext[*jit.currentNode->getArgument()];
 
-    st::InstructionNode* const markArgumentsNode = jit.currentNode->getArgument()->cast<st::InstructionNode>();
-    assert(markArgumentsNode);
+    if (arguments.isArray() && !arguments.getSubTypes().empty()) {
+        TSymbolArray&  literals     = *jit.originMethod->literals;
+        const uint32_t literalIndex = jit.currentNode->getInstruction().getArgument();
+        TSymbol* const selector     = literals[literalIndex];
 
-    st::InstructionNode* const receiverNode = markArgumentsNode->getArgument()->cast<st::InstructionNode>();
-    assert(receiverNode);
-
-    const st::TSmalltalkInstruction instruction = receiverNode->getInstruction();
-
-    // In case of a literal receiver we may encode direct method call
-    if (instruction.getOpcode() == opcode::pushLiteral ||
-        instruction.getOpcode() == opcode::pushConstant)
-    {
-        if (doSendMessageToLiteral(jit, receiverNode))
+        if (type::InferContext* const messageContext = m_typeSystem.inferMessage(selector, arguments, 0, false)) {
+            doSendInferredMessage(jit, *messageContext);
             return;
-    }
-
-    // We may optimize send to self if clas does not have children
-    // TODO More optimization possible: send to super, if chiildren do not override selector
-    if (instruction.getOpcode() == opcode::pushArgument && instruction.getArgument() == 0)
-    {
-        TClass* const receiverClass = jit.originMethod->klass;
-        if (receiverClass->package == globals.nilObject) {
-            if (doSendMessageToLiteral(jit, receiverNode, receiverClass))
-                return;
         }
     }
 
+    doSendGenericMessage(jit);
+}
+
+void MethodCompiler::doSendGenericMessage(TJITContext& jit)
+{
     Value* const arguments = getArgument(jit); // jit.popValue();
 
     // First of all we need to get the actual message selector
@@ -1731,6 +1936,7 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
             break;
 
         case primitive::blockInvoke: { // 8
+
             Value* const object = getArgument(jit); // jit.popValue();
             Value* const block  = jit.builder->CreateBitCast(object, m_baseTypes.block->getPointerTo());
 
@@ -1738,21 +1944,23 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
 
             Value* const blockAsContext = jit.builder->CreateBitCast(block, m_baseTypes.context->getPointerTo());
             Value* const blockTemps = jit.builder->CreateCall(m_baseFunctions.getTemps, blockAsContext);
-            Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
 
+//             Value* const tempsSize = jit.builder->CreateCall(m_baseFunctions.getObjectSize, blockTemps, "tempsSize.");
             Value* const argumentLocationPtr    = jit.builder->CreateStructGEP(block, 1);
             Value* const argumentLocationField  = jit.builder->CreateLoad(argumentLocationPtr);
             Value* const argumentLocationObject = jit.builder->CreateIntToPtr(argumentLocationField, m_baseTypes.object->getPointerTo());
             Value* const argumentLocation       = jit.builder->CreateCall(m_baseFunctions.getIntegerValue, argumentLocationObject, "argLocation.");
 
-            BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
-            tempsChecked->moveAfter(jit.builder->GetInsertBlock());
+//             BasicBlock* const tempsChecked = BasicBlock::Create(m_JITModule->getContext(), "tempsChecked.", jit.function);
+//             tempsChecked->moveAfter(jit.builder->GetInsertBlock());
 
+            // FIXME Check will lead to a crash  if containing method have no temporaries at all
+            // TODO Remove the check if block is inferred
             //Checking the passed temps size TODO unroll stack
-            Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation, "blockAcceptsArgCount.");
-            Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount, "tempSizeOk.");
-            jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
-            jit.builder->SetInsertPoint(tempsChecked);
+//             Value* const blockAcceptsArgCount = jit.builder->CreateSub(tempsSize, argumentLocation, "blockAcceptsArgCount.");
+//             Value* const tempSizeOk = jit.builder->CreateICmpSLE(jit.builder->getInt32(argCount), blockAcceptsArgCount, "tempSizeOk.");
+//             jit.builder->CreateCondBr(tempSizeOk, tempsChecked, primitiveFailedBB);
+//             jit.builder->SetInsertPoint(tempsChecked);
 
             // Storing values in the block's wrapping context
             for (uint32_t index = argCount - 1, count = argCount; count > 0; index--, count--)
@@ -1764,10 +1972,13 @@ void MethodCompiler::compilePrimitive(TJITContext& jit,
                 jit.builder->CreateCall3(m_baseFunctions.setObjectField, blockTemps, fieldIndex, argument);
             }
 
-            Value* const args[] = { block, jit.getCurrentContext() };
-            Value* const result = jit.builder->CreateCall(m_runtimeAPI.invokeBlock, args);
-
-            primitiveResult = result;
+            if (Function* const blockFunction = compileInferredBlock(jit)) {
+                // Direct call to the inferred block function
+                primitiveResult = jit.builder->CreateCall(blockFunction, block);
+            } else {
+                // Generic dispatch using runtime
+                primitiveResult = jit.builder->CreateCall2(m_runtimeAPI.invokeBlock, block, jit.getCurrentContext());
+            }
         } break;
 
         case primitive::throwError: { //19

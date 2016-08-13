@@ -153,7 +153,7 @@
 ;;;;;;;;;;;;;;;;;;;; functions ;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-define i1 @isSmallInteger(%TObject* %value) alwaysinline {
+define i1 @isSmallInteger(%TObject* %value) alwaysinline nounwind {
     ; return reinterpret_cast<int32_t>(value) & 1;
 
     %int = ptrtoint %TObject* %value to i32
@@ -161,7 +161,7 @@ define i1 @isSmallInteger(%TObject* %value) alwaysinline {
     ret i1 %result
 }
 
-define i32 @getIntegerValue(%TObject* %value) alwaysinline {
+define i32 @getIntegerValue(%TObject* %value) alwaysinline nounwind {
     ; return (int32_t) (value >> 1)
 
     %int = ptrtoint %TObject* %value to i32
@@ -169,7 +169,7 @@ define i32 @getIntegerValue(%TObject* %value) alwaysinline {
     ret i32 %result
 }
 
-define %TObject* @newInteger(i32 %value) alwaysinline {
+define %TObject* @newInteger(i32 %value) alwaysinline nounwind {
     ; return reinterpret_cast<TObject>( (value << 1) | 1 );
 
     %shled = shl i32 %value, 1
@@ -178,7 +178,7 @@ define %TObject* @newInteger(i32 %value) alwaysinline {
     ret %TObject* %result
 }
 
-define i32 @getSlotSize(i32 %fieldsCount) alwaysinline {
+define i32 @getSlotSize(i32 %fieldsCount) alwaysinline nounwind  {
     ;sizeof(TObject) + fieldsCount * sizeof(TObject*)
 
     %fieldsSize = mul i32 4, %fieldsCount
@@ -188,21 +188,21 @@ define i32 @getSlotSize(i32 %fieldsCount) alwaysinline {
 }
 
 
-define i32 @getObjectSize(%TObject* %this) alwaysinline {
+define i32 @getObjectSize(%TObject* %this) alwaysinline nounwind  {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %result = lshr i32 %data, 2
     ret i32 %result
 }
 
-define %TObject* @setObjectSize(%TObject* %this, i32 %size) alwaysinline {
+define %TObject* @setObjectSize(%TObject* %this, i32 %size) alwaysinline nounwind {
     %addr = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %ssize = shl i32 %size, 2
     store i32 %ssize, i32* %addr
     ret %TObject* %this
 }
 
-define i1 @isObjectRelocated(%TObject* %this) alwaysinline {
+define i1 @isObjectRelocated(%TObject* %this) alwaysinline nounwind {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %field = and i32 %data, 1
@@ -210,7 +210,7 @@ define i1 @isObjectRelocated(%TObject* %this) alwaysinline {
     ret i1 %result
 }
 
-define i1 @isObjectBinary(%TObject* %this) alwaysinline {
+define i1 @isObjectBinary(%TObject* %this) alwaysinline nounwind {
     %1 = getelementptr %TObject* %this, i32 0, i32 0, i32 0
     %data = load i32* %1
     %field = and i32 %data, 2
@@ -218,14 +218,14 @@ define i1 @isObjectBinary(%TObject* %this) alwaysinline {
     ret i1 %result
 }
 
-define %TClass** @getObjectClassPtr(%TObject* %this) alwaysinline {
+define %TClass** @getObjectClassPtr(%TObject* %this) alwaysinline nounwind {
     %pclass = getelementptr inbounds %TObject* %this, i32 0, i32 1
     ret %TClass** %pclass
 }
 
 @SmallInt = external global %TClass
 
-define %TClass* @getObjectClass(%TObject* %this) alwaysinline {
+define %TClass* @getObjectClass(%TObject* %this) alwaysinline nounwind {
     ; TODO SmallInt case
     %test = call i1 @isSmallInteger(%TObject* %this)
     br i1 %test, label %is_smallint, label %is_object
@@ -237,36 +237,36 @@ is_object:
     ret %TClass* %class
 }
 
-define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) alwaysinline {
+define %TObject* @setObjectClass(%TObject* %this, %TClass* %class) alwaysinline nounwind {
     %addr = call %TClass** @getObjectClassPtr(%TObject* %this)
     store %TClass* %class, %TClass** %addr
     ret %TObject* %this
 }
 
-define %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index) alwaysinline {
+define %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index) alwaysinline nounwind {
     %fields    = getelementptr inbounds %TObject* %object, i32 0, i32 2
     %fieldPtr  = getelementptr inbounds [0 x %TObject*]* %fields, i32 0, i32 %index
     ret %TObject** %fieldPtr
 }
 
-define %TObject** @getObjectFields(%TObject* %this) alwaysinline {
+define %TObject** @getObjectFields(%TObject* %this) alwaysinline nounwind {
     %fieldsPtr = call %TObject** @getObjectFieldPtr(%TObject* %this, i32 0)
     ret %TObject** %fieldsPtr
 }
 
-define %TObject* @getObjectField(%TObject* %object, i32 %index) alwaysinline {
+define %TObject* @getObjectField(%TObject* %object, i32 %index) alwaysinline nounwind {
     %fieldPtr  = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
     %result    = load %TObject** %fieldPtr
     ret %TObject* %result
 }
 
-define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) alwaysinline {
+define %TObject** @setObjectField(%TObject* %object, i32 %index, %TObject* %value) alwaysinline nounwind {
     %fieldPtr = call %TObject** @getObjectFieldPtr(%TObject* %object, i32 %index)
     store %TObject* %value, %TObject** %fieldPtr
     ret %TObject** %fieldPtr
 }
 
-define %TObject* @getArgFromContext(%TContext* %context, i32 %index) alwaysinline {
+define %TObject* @getArgFromContext(%TContext* %context, i32 %index) alwaysinline nounwind {
     %argsPtr = getelementptr inbounds %TContext* %context, i32 0, i32 2
     %args    = load %TObjectArray** %argsPtr
     %argsObj = bitcast %TObjectArray* %args to %TObject*
@@ -274,7 +274,7 @@ define %TObject* @getArgFromContext(%TContext* %context, i32 %index) alwaysinlin
     ret %TObject* %arg
 }
 
-define %TObject* @getLiteralFromContext(%TContext* %context, i32 %index) alwaysinline {
+define %TObject* @getLiteralFromContext(%TContext* %context, i32 %index) alwaysinline nounwind {
     %methodPtr   = getelementptr inbounds %TContext* %context, i32 0, i32 1
     %method      = load %TMethod** %methodPtr
     %literalsPtr = getelementptr inbounds %TMethod* %method, i32 0, i32 3
@@ -284,32 +284,32 @@ define %TObject* @getLiteralFromContext(%TContext* %context, i32 %index) alwaysi
     ret %TObject* %literal
 }
 
-define %TObject* @getTempsFromContext(%TContext* %context) alwaysinline {
+define %TObject* @getTempsFromContext(%TContext* %context) alwaysinline nounwind {
     %tempsPtr = getelementptr inbounds %TContext* %context, i32 0, i32 3
     %temps    = load %TObjectArray** %tempsPtr
     %tempsObj = bitcast %TObjectArray* %temps to %TObject*
     ret %TObject* %tempsObj
 }
 
-define %TObject* @getTemporaryFromContext(%TContext* %context, i32 %index) alwaysinline {
+define %TObject* @getTemporaryFromContext(%TContext* %context, i32 %index) alwaysinline nounwind {
     %temps = call %TObject* @getTempsFromContext(%TContext* %context)
     %temporary = call %TObject* @getObjectField(%TObject* %temps, i32 %index)
     ret %TObject* %temporary
 }
 
-define void @setTemporaryInContext(%TContext* %context, i32 %index, %TObject* %value) alwaysinline {
+define void @setTemporaryInContext(%TContext* %context, i32 %index, %TObject* %value) alwaysinline nounwind {
     %temps = call %TObject* @getTempsFromContext(%TContext* %context)
     call %TObject** @setObjectField(%TObject* %temps, i32 %index, %TObject* %value)
     ret void
 }
 
-define %TObject* @getInstanceFromContext(%TContext* %context, i32 %index) alwaysinline {
+define %TObject* @getInstanceFromContext(%TContext* %context, i32 %index) alwaysinline nounwind {
     %self = call %TObject* @getArgFromContext(%TContext* %context, i32 0)
     %instance = call %TObject* @getObjectField(%TObject* %self, i32 %index)
     ret %TObject* %instance
 }
 
-define void @setInstanceInContext(%TContext* %context, i32 %index, %TObject* %value) alwaysinline {
+define void @setInstanceInContext(%TContext* %context, i32 %index, %TObject* %value) alwaysinline nounwind {
     %self = call %TObject* @getArgFromContext(%TContext* %context, i32 0)
     %instancePtr = call %TObject** @getObjectFieldPtr(%TObject* %self, i32 %index)
     call void @checkRoot(%TObject* %value, %TObject** %instancePtr)
@@ -317,7 +317,7 @@ define void @setInstanceInContext(%TContext* %context, i32 %index, %TObject* %va
     ret void
 }
 
-define void @dummy() gc "shadow-stack" {
+define void @dummy() nounwind gc "shadow-stack" {
     ; enabling shadow stack init on this module
     ret void
 }
@@ -336,7 +336,7 @@ declare %TByteObject* @newBinaryObject(%TClass*, i32)
 ;declare %TObject* @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
 declare { %TObject*, %TContext* } @sendMessage(%TContext* %callingContext, %TSymbol* %selector, %TObjectArray* %arguments, %TClass* %receiverClass, i32 %callSiteOffset)
 
-declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer)
+declare %TBlock*  @createBlock(%TContext* %callingContext, i8 %argLocation, i16 %bytePointer, i32 %stackTop)
 declare { %TObject*, %TContext* } @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 ;declare %TObject* @invokeBlock(%TBlock* %block, %TContext* %callingContext)
 
@@ -349,6 +349,8 @@ declare %TObject* @callPrimitive(i8 %opcode, %TObjectArray* %args, i1* %primitiv
     %TObject*,      ; value
     %TContext*      ; targetContext
 }
+
+declare i32 @printf(i8* noalias nocapture, ...)
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;;;;;;;;;;;;;;;;; exception API ;;;;;;;;;;;;;;;;;;;;;;;
