@@ -2,6 +2,7 @@
 #include <interpreter/exceptions.hpp>
 
 #include <cassert>
+#include <stdexcept>
 
 namespace Interpreter
 {

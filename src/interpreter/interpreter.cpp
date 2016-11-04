@@ -5,6 +5,7 @@
 #include <instructions.h>
 
 #include <iostream>
+#include <stdexcept>
 
 namespace Interpreter
 {

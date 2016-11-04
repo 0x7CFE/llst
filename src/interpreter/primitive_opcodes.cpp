@@ -7,6 +7,7 @@
 
 #include <cstring>
 #include <cerrno>
+#include <stdexcept>
 
 namespace Interpreter
 {

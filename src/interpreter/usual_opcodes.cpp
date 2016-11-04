@@ -2,6 +2,8 @@
 #include <interpreter/primitive_opcodes.hpp>
 #include <interpreter/runtime.hpp>
 
+#include <stdexcept>
+
 namespace Interpreter
 {
 
