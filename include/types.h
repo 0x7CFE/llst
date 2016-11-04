@@ -156,7 +156,9 @@ public:
 
     // TODO boundary checks
     TObject** getFields() { return fields; }
+    TObject* const * getFields() const { return fields; }
     TObject*  getField(uint32_t index) { return fields[index]; }
+    const TObject* getField(uint32_t index) const { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
 
@@ -262,6 +264,7 @@ struct TArray : public TObject {
     static const char* InstanceClassName() { return "Array"; }
 
     Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
+    const Element* getField(uint32_t index) const { return static_cast<const Element*>(fields[index]); }
     template <typename Type> Type* getField(uint32_t index) { return static_cast<Type*>(fields[index]); }
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
