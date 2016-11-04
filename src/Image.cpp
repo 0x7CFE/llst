@@ -184,6 +184,7 @@ bool Image::loadImage(const std::string& fileName)
         globals.binaryMessages[i] = readObject();
 
     globals.badMethodSymbol = readObject<TSymbol>();
+    globals.processClass = getGlobal<TClass>("Process");
 
     std::fprintf(stdout, "Image read complete. Loaded %d objects\n", m_indirects.size());
     m_indirects.clear();

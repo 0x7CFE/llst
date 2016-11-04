@@ -496,6 +496,7 @@ struct TGlobals {
     TClass*  arrayClass;
     TClass*  blockClass;
     TClass*  contextClass;
+    TClass*  processClass;
     TClass*  stringClass;
     TDictionary* globalsObject;
     TMethod* initialMethod;
