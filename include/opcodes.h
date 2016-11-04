@@ -111,6 +111,7 @@ enum {
     integerNew        = 32,
     flushCache        = 34,
     bulkReplace       = 38,
+    getTimeOfDay      = 230,
     LLVMsendMessage   = 252,
     getSystemTicks    = 253
 };

@@ -153,6 +153,16 @@ TObject* callPrimitive(uint8_t opcode, TObjectArray* arguments, bool& primitiveF
         } break;
 
         // FIXME opcodes 253-255 are not standard
+        case primitive::getTimeOfDay: { //230
+            timeval result;
+            gettimeofday(&result, NULL);
+
+            TObject* timeVal = args[0];
+            timeVal->putField(0, TInteger(result.tv_sec));
+            timeVal->putField(1, TInteger(result.tv_usec));
+            return globals.nilObject;
+        } break;
+
         case primitive::getSystemTicks: { //253
             timeval tv;
             gettimeofday(&tv, NULL);

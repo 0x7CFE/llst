@@ -1025,6 +1025,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::smallIntBitAnd:     // 37
         case primitive::smallIntBitShift:   // 39
 
+        case primitive::getTimeOfDay:       //230
         case primitive::getSystemTicks:     //253
 
         default: {

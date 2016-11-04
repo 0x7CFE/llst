@@ -1441,16 +1441,69 @@ printHierarchy: aClass | class |
     [ class isNil ] whileFalse: [ class printNl. class <- class parent ]
 !
 
-CLASS Timer Object initValue
-METHOD MetaTimer
-get
-    <253>
+CLASS TimeVal Object seconds microseconds
+
+METHOD MetaTimeVal
+new | instance |
+    instance <- super new.
+    self in: instance at: 1 put: 0.
+    self in: instance at: 2 put: 0.
+    ^instance
 !
+
+METHOD MetaTimeVal
+initWithNow: arg
+    (arg isMemberOf: TimeVal) ifFalse: [ self error: 'Incorrect argument' ].
+    <230 arg>.
+    self primitiveFailed
+!
+
+METHOD MetaTimeVal
+now | instance |
+    instance <- self new.
+    self initWithNow: instance.
+    ^instance
+!
+
+METHOD TimeVal
+seconds
+    ^seconds
+!
+
+METHOD TimeVal
+seconds: value
+    seconds <- value
+!
+
+METHOD TimeVal
+microseconds
+    ^microseconds
+!
+
+METHOD TimeVal
+microseconds: value
+    microseconds <- value
+!
+
+METHOD TimeVal
+- arg |result|
+    (arg isMemberOf: TimeVal) ifFalse: [ self error: 'Incorrect argument' ].
+    result <- TimeVal new.
+    result seconds: (self seconds - arg seconds).
+    result microseconds: (self microseconds - arg microseconds).
+    (result microseconds < 0) ifTrue: [
+        result seconds: (result seconds - 1).
+        result microseconds: (result microseconds + 1000000).
+    ].
+    ^result
+!
+
+CLASS Timer Object initTimeVal
 
 METHOD MetaTimer
 new | instance |
     instance <- super new.
-    self in: instance at: 1 put: self get.
+    self in: instance at: 1 put: TimeVal now.
     ^instance
 !
 
@@ -1458,24 +1511,13 @@ METHOD MetaTimer
 millisecondsToRun: aBlock | timer |
     timer <- Timer new.
     aBlock value.
-    ^timer value.
+    ^timer elapsedMilliseconds.
 !
 
 METHOD Timer
-millisecondsToRun: aBlock | time |
-    time <- self value.
-    aBlock value.
-    ^self value - time.
-!
-
-METHOD Timer
-initValue
-    ^initValue
-!
-
-METHOD Timer
-value
-    ^ self class get - initValue
+elapsedMilliseconds |diff|
+    diff <- TimeVal now - initTimeVal.
+    ^ (diff seconds * 1000) + (diff microseconds / 1000)
 !
 
 METHOD Undefined
