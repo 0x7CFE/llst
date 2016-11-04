@@ -59,22 +59,23 @@ inline bool isSmallInteger(const TObject* value) { return reinterpret_cast<int32
 // This is a special interpretation of Smalltalk's SmallInteger
 // The struct is binary compatible with the TObject*
 struct TInteger {
-    TInteger(int32_t value) : m_value( reinterpret_cast<int32_t>(newInteger(value)) ) { }
+public:
+    TInteger(int32_t value) : m_value( (value << 1) | 1 ) { }
     TInteger(const TObject* value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
 
-    int32_t getValue() const { return getIntegerValue(reinterpret_cast<TObject*>(m_value)); }
+    int32_t getValue() const { return m_value >> 1; }
     int32_t rawValue() const { return m_value; }
 
     operator int32_t() const { return getValue(); }
-    int32_t  operator +(int32_t right) const { return getValue() + right; }
-    int32_t  operator -(int32_t right) const { return getValue() - right; }
     operator TObject*() const { return reinterpret_cast<TObject*>(m_value); }
 
+    int32_t operator +(int32_t right) const { return getValue() + right; }
+    int32_t operator -(int32_t right) const { return getValue() - right; }
+
+    TInteger& operator -=(const TInteger& right) { *this = *this - right; return *this; }
+    TInteger& operator +=(const TInteger& right) { *this = *this + right; return *this; }
 private:
     int32_t m_value;
-protected:
-    static int32_t  getIntegerValue(const TObject* value) { return reinterpret_cast<int32_t>(value) >> 1; }
-    static TObject* newInteger(int32_t value) { return reinterpret_cast<TObject*>((value << 1) | 1); }
 };
 
 // Helper struct used to hold object size and special
