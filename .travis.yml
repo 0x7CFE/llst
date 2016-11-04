@@ -17,6 +17,7 @@ addons:
   apt:
     packages:
     - g++-multilib
+    - libgtest-dev
     - linux-libc-dev:i386
     - libreadline-dev:i386
     - llvm-3.4-dev:i386
