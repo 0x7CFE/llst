@@ -112,8 +112,10 @@ enum {
     flushCache        = 34,
     bulkReplace       = 38,
     getTimeOfDay      = 230,
+    readLine          = 251,
     LLVMsendMessage   = 252,
-    getSystemTicks    = 253
+    getSystemTicks    = 253,
+    collectGarbage    = 254
 };
 
 enum SmallIntOpcode {
@@ -130,6 +132,11 @@ enum SmallIntOpcode {
 };
 
 enum {
+    objectAt            = 24,
+    objectAtPut         = 5,
+    binaryObjectAt      = 21,
+    binaryObjectAtPut   = 22,
+
     stringAt        = 21,
     stringAtPut     = 22,
     arrayAt         = 24,
