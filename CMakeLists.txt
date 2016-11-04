@@ -140,6 +140,9 @@ if (USE_LLVM)
 endif()
 target_link_libraries(llst standard_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 
+add_executable(llst_test src/test_main.cpp)
+target_link_libraries(llst_test interpreter memory_managers standard_set ${READLINE_LIBS_TO_LINK})
+
 set(changelog_compressed "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
 gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" ${changelog_compressed})
 
