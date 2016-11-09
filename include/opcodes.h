@@ -161,7 +161,11 @@ enum IntegerOpcode {
     integerMul,
     integerSub,
     integerLess,
-    integerEqual
+    integerEqual,
+    integerNew = 32,
+    integerAsSmallInt = 33,
+    integerTruncToSmallInt = 40,
+    integerAsString = 41
 };
 }
 

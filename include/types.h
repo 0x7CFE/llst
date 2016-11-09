@@ -380,4 +380,25 @@ struct TProcess : public TObject {
     static const char* InstanceClassName() { return "Process"; }
 };
 
+// Arbitrary-precision arithmetic
+// FIXME: rename TInteger -> TSmallInt, TLongInteger -> TInteger
+struct TLongInteger : public TByteObject {
+    // the first byte holds the sign
+    // -1 if negative, 0 if zero, 1 if positive
+    int getSign() const { return bytes[0]; }
+    void setSign(int sign) { bytes[0] = sign; }
+
+    // all but the first byte
+    uint8_t* getBuffer() { return bytes+1; }
+    uint32_t getBufferSize() const { return getSize() - 1; }
+
+    static const char* InstanceClassName() { return "Integer"; }
+
+    static const size_t order = -1; // 1 = host byte order, -1 = network byte order
+    static const size_t size = sizeof(uint8_t); // the size of element
+    static const size_t endian = 0; // should be [-1, 1]. autodetect if 0
+    static const size_t nails = 0; // should always be zero. nails not supported
+};
+
+
 #endif

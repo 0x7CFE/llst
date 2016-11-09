@@ -11,10 +11,13 @@ find_package(READLINE)
 find_package(LLVM ${LLVM_PACKAGE_VERSION} EXACT)
 find_package(POD2MAN)
 find_package(GZIP REQUIRED)
+find_package(GMP REQUIRED)
 
 option(USE_READLINE "Should we use the GNU readline and history libraries?" ON)
 option(USE_LLVM "Should we use LLVM to build JIT?" OFF)
 option(USE_POD2MAN "Should we use pod2man to build the documentation (we will create empty docs otherwise)?" ON)
+
+include_directories(SYSTEM ${GMP_INCLUDE_DIRS})
 
 if (USE_LLVM)
     if (LLVM_FOUND)
@@ -141,7 +144,7 @@ endif()
 target_link_libraries(llst standard_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
 
 add_executable(llst_test src/test_main.cpp)
-target_link_libraries(llst_test interpreter memory_managers standard_set ${READLINE_LIBS_TO_LINK})
+target_link_libraries(llst_test interpreter memory_managers standard_set ${GMP_LIBRARIES} ${READLINE_LIBS_TO_LINK})
 
 set(changelog_compressed "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
 gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" ${changelog_compressed})

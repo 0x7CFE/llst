@@ -49,6 +49,7 @@ public:
     const TClass* blockClass() const;
     const TClass* arrayClass() const;
     const TClass* stringClass() const;
+    const TClass* integerClass() const;
     const TClass* contextClass() const;
     const TClass* processClass() const;
     const TSymbol* badMethodSymbol() const;

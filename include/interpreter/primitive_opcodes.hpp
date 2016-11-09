@@ -3,6 +3,8 @@
 #include <interpreter/opcodes.hpp>
 #include <types.h>
 
+#include <gmpxx.h>
+
 namespace Interpreter
 {
 
@@ -179,6 +181,73 @@ class PrimitiveSmallIntBitShift : public PrimitiveSmallInt {
 public:
     virtual const TObject* impl(Runtime& runtime, const int32_t lhs, const int32_t rhs);
 };
+
+/* ========================================= */
+
+// for Integer primitives
+
+class PrimitiveInteger : public Primitive2 {
+public:
+    virtual const TObject* call(Runtime& runtime, const TObject* lhsObject, const TObject* rhsObject);
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) = 0;
+};
+
+class PrimitiveIntegerDiv : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerMod : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerAdd : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerMul : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerSub : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerLess : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerEqual : public PrimitiveInteger {
+public:
+    virtual const TObject* impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs);
+};
+
+class PrimitiveIntegerNew : public Primitive1 {
+public:
+    virtual const TObject* call(Runtime& runtime, const TObject* arg);
+};
+
+class PrimitiveIntegerAsSmallInt : public Primitive1 {
+public:
+    virtual const TObject* call(Runtime& runtime, const TObject* arg);
+};
+
+class PrimitiveIntegerTruncateToSmallInt : public Primitive1 {
+public:
+    virtual const TObject* call(Runtime& runtime, const TObject* arg);
+};
+
+class PrimitiveIntegerAsString : public Primitive1 {
+public:
+    virtual const TObject* call(Runtime& runtime, const TObject* arg);
+};
+
+/* ========================================= */
 
 class PrimitiveStartNewProcess : public Primitive2 {
 public:

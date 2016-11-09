@@ -8,9 +8,52 @@
 #include <cstring>
 #include <cerrno>
 #include <stdexcept>
+#include <climits>
 
 namespace Interpreter
 {
+
+const TObject* to_binary(Runtime& runtime, const ::mpz_class& value) {
+    // precalculate binary_buffer size
+    const size_t numb = CHAR_BIT * TLongInteger::size - TLongInteger::nails;
+    const size_t count = (mpz_sizeinbase(value.get_mpz_t(), 2) + numb-1) / numb;
+    size_t binary_size = count * TLongInteger::size;
+
+    TLongInteger* integer = runtime.createObject<TLongInteger>(binary_size);
+    integer->setSign( mpz_sgn(value.get_mpz_t()) );
+    mpz_export(integer->getBuffer(),
+               &binary_size,
+               TLongInteger::order,
+               TLongInteger::size,
+               TLongInteger::endian,
+               TLongInteger::nails,
+                value.get_mpz_t());
+    return integer;
+}
+
+const ::mpz_class from_binary(Runtime& runtime, const TObject* valueObject) {
+    const TClass* klass = runtime.getClass(valueObject);
+
+    if (klass == runtime.smallIntClass()) {
+        return ::mpz_class( TInteger(valueObject).getValue());
+    }
+    if (klass == runtime.integerClass()) {
+        TLongInteger* value = static_cast<TLongInteger*>(const_cast<TObject*>(valueObject));
+        mpz_class result;
+        mpz_import(result.get_mpz_t(),
+                value->getBufferSize(),
+                TLongInteger::order,
+                TLongInteger::size,
+                TLongInteger::endian,
+                TLongInteger::nails,
+                value->getBuffer());
+        if (value->getSign() < 0)
+            mpz_neg(result.get_mpz_t(), result.get_mpz_t());
+
+        return result;
+    }
+    throw std::runtime_error("Integer from_binary accepts only TInteger or SmallInt");
+}
 
 void PrimitiveBase::checkThrowArgMustBeSmallInt(const TObject* arg) const {
     if ( !isSmallInteger(arg) ) {
@@ -292,6 +335,80 @@ const TObject* PrimitiveSmallIntBitShift::impl(Runtime& /*runtime*/, const int32
         }
     }
 }
+
+const TObject* PrimitiveInteger::call(Runtime& runtime, const TObject* lhsObject, const TObject* rhsObject) {
+    //this->checkThrowArgMustBeSmallInt(lhsObject);
+    //this->checkThrowArgMustBeSmallInt(rhsObject);
+    const ::mpz_class& lhs = from_binary(runtime, lhsObject);
+    const ::mpz_class& rhs = from_binary(runtime, rhsObject);
+    return this->impl(runtime, lhs, rhs);
+}
+
+const TObject* PrimitiveIntegerDiv::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return to_binary(runtime, lhs / rhs);
+}
+
+const TObject* PrimitiveIntegerMod::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return to_binary(runtime, lhs % rhs);
+}
+
+const TObject* PrimitiveIntegerAdd::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return to_binary(runtime, lhs + rhs);
+}
+
+const TObject* PrimitiveIntegerMul::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return to_binary(runtime, lhs * rhs);
+}
+
+const TObject* PrimitiveIntegerSub::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return to_binary(runtime, lhs - rhs);
+}
+
+const TObject* PrimitiveIntegerLess::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return (mpz_cmp(lhs.get_mpz_t(), rhs.get_mpz_t()) < 0) ? runtime.trueObject() : runtime.falseObject();
+}
+
+const TObject* PrimitiveIntegerEqual::impl(Runtime& runtime, const ::mpz_class& lhs, const ::mpz_class& rhs) {
+    return (mpz_cmp(lhs.get_mpz_t(), rhs.get_mpz_t()) == 0) ? runtime.trueObject() : runtime.falseObject();
+}
+
+const TObject* PrimitiveIntegerNew::call(Runtime& runtime, const TObject* arg) {
+    ::mpz_class result;
+    if (runtime.getClass(arg) == runtime.stringClass()) {
+        const TString* input = static_cast<const TString*>(arg);
+        const std::string strInput(reinterpret_cast<const char*>(input->getBytes()), input->getSize());
+        result = strInput;
+    } else {
+        result = from_binary(runtime, arg);
+    }
+
+    return to_binary(runtime, result);
+}
+
+const TObject* PrimitiveIntegerAsSmallInt::call(Runtime& runtime, const TObject* arg) {
+    const ::mpz_class& self = from_binary(runtime, arg);
+    if (self.fits_sint_p()) {
+        return TInteger(self.get_si());
+    } else {
+        throw std::runtime_error("PrimitiveIntegerAsSmallInt: the value does not fit SmallInt");
+    }
+}
+
+const TObject* PrimitiveIntegerTruncateToSmallInt::call(Runtime& runtime, const TObject* arg) {
+    const ::mpz_class& self = from_binary(runtime, arg);
+    return TInteger(self.get_si());
+}
+
+const TObject* PrimitiveIntegerAsString::call(Runtime& runtime, const TObject* arg) {
+    const ::mpz_class& self = from_binary(runtime, arg);
+    const std::string& str = self.get_str();
+    TString* const stringObject = runtime.createObject<TString>(str.size());
+
+    std::memcpy(stringObject->getBytes(), str.data(), str.size());
+    return stringObject;
+}
+
+/* ============== */
 
 const TObject* PrimitiveStartNewProcess::call(Runtime& runtime, const TObject* processObject, const TObject* ticksObject) {
     this->checkThrowArgMustBeSmallInt(ticksObject);

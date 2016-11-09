@@ -98,6 +98,11 @@ template<> TString* Runtime::createObject<TString>(std::size_t dataSize)
     return static_cast<TString*>( newBinaryObject(stringClass(), dataSize) );
 }
 
+template<> TLongInteger* Runtime::createObject<TLongInteger>(std::size_t bufferSize)
+{
+    return static_cast<TLongInteger*>( newBinaryObject(integerClass(), 1 + bufferSize) );
+}
+
 const Interpreter& Runtime::interpreter() const {
     return m_interpreter;
 }
@@ -237,6 +242,9 @@ const TClass* Runtime::arrayClass() const {
 }
 const TClass* Runtime::stringClass() const {
     return globals.stringClass;
+}
+const TClass* Runtime::integerClass() const {
+    return globals.integerClass;
 }
 const TClass* Runtime::contextClass() const {
     return globals.contextClass;

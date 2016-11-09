@@ -3901,8 +3901,6 @@ bitShift: arg
 COMMENT ---------- Integer ------------
 METHOD MetaInteger
 new: low
-	<32 low>
-	low <- low asSmallInt.
 	<32 low>.
 	self primitiveFailed
 !

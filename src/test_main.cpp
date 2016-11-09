@@ -63,6 +63,18 @@ int main() {
     interpreter.installPrimitive(primitive::smallIntBitAnd, new Interpreter::PrimitiveSmallIntBitAnd);
     interpreter.installPrimitive(primitive::smallIntBitShift, new Interpreter::PrimitiveSmallIntBitShift);
 
+    interpreter.installPrimitive(primitive::integerDiv, new Interpreter::PrimitiveIntegerDiv);
+    interpreter.installPrimitive(primitive::integerMod, new Interpreter::PrimitiveIntegerMod);
+    interpreter.installPrimitive(primitive::integerAdd, new Interpreter::PrimitiveIntegerAdd);
+    interpreter.installPrimitive(primitive::integerMul, new Interpreter::PrimitiveIntegerMul);
+    interpreter.installPrimitive(primitive::integerSub, new Interpreter::PrimitiveIntegerSub);
+    interpreter.installPrimitive(primitive::integerLess, new Interpreter::PrimitiveIntegerLess);
+    interpreter.installPrimitive(primitive::integerEqual, new Interpreter::PrimitiveIntegerEqual);
+    interpreter.installPrimitive(primitive::integerNew, new Interpreter::PrimitiveIntegerNew);
+    interpreter.installPrimitive(primitive::integerAsSmallInt, new Interpreter::PrimitiveIntegerAsSmallInt);
+    interpreter.installPrimitive(primitive::integerTruncToSmallInt, new Interpreter::PrimitiveIntegerTruncateToSmallInt);
+    interpreter.installPrimitive(primitive::integerAsString, new Interpreter::PrimitiveIntegerAsString);
+
     interpreter.installPrimitive(primitive::readLine, new Interpreter::PrimitiveReadline);
     interpreter.installPrimitive(primitive::getTimeOfDay, new Interpreter::PrimitiveGetTimeOfDay);
     interpreter.installPrimitive(primitive::getSystemTicks, new Interpreter::PrimitiveGetSystemTicks);
