@@ -36,7 +36,7 @@ public:
         m_runtime(*this, interpreter.m_runtime)
     {}
     Runtime& runtime();
-    void execute(st::TSmalltalkInstruction instruction);
+    void execute(const st::TSmalltalkInstruction& instruction);
     TExecuteResult execute(TProcess* process, uint32_t ticks);
     void installUsual(int opcode, UsualOpcode* f);
     void installSpecial(int opcode, SpecialOpcode* f);

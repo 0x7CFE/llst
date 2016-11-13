@@ -2100,8 +2100,18 @@ run4: rounds | list indices tree |
 METHOD Undefined
 main    | command  data x |
     Char initialize.
-    Class fillChildren.
-    System fixMethodClasses.
+
+    "Integer new: 200; factorial."
+    
+    "(468468468468*2367123) printNl.
+    468468468 class printNl.
+    (468468468+468468468+468468468+468468468) class printNl."
+    "Timer millisecondsToRun: [ (Integer new: 150) factorial printNl. ] ; printNl."
+    "10 times: [ :x| nil benchmark: 10000 ]."
+    nil benchmark: 10000.
+
+    "Class fillChildren.
+    System fixMethodClasses."
 
     "Jit do: [ nil runAllTests ].
     Jit do: [ System rebuildImage ]."
@@ -3715,7 +3725,13 @@ negated
 METHOD Number
 factorial
 	self <= 1 ifTrue: [ ^ 1 ]
-	ifFalse: [ ^ (self - 1) factorial * self ]
+	ifFalse: [ ^ self * (self - 1) factorial ]
+!
+METHOD Number
+fib
+    ^ self < 2
+        ifTrue: [ 1 ]
+        ifFalse: [ (self - 2) fib + (self - 1) fib ]
 !
 METHOD Number
 asDigit

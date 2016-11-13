@@ -20,8 +20,6 @@ public:
 };
 
 
-
-
 class PushInstanceVariable : public UsualOpcodeOnlyArg {
 public:
     virtual void execute(Runtime& runtime, const uint8_t index);

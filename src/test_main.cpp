@@ -5,7 +5,7 @@
 
 int main() {
     std::auto_ptr<IMemoryManager> memoryManager(new BakerMemoryManager());
-    memoryManager->initializeHeap(1048576 * 1000, 1048576 * 1000);
+    memoryManager->initializeHeap(1048576 * 1, 1048576 * 100);
     memoryManager->setLogger(std::tr1::shared_ptr<IGCLogger>(new EmptyGCLogger));
     std::auto_ptr<Image> smalltalkImage(new Image(memoryManager.get()));
     smalltalkImage->loadImage("../image/LittleSmalltalk.image");

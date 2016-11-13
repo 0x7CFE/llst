@@ -11,25 +11,25 @@ namespace Interpreter
 {
 
 void Interpreter::installUsual(int opcode, UsualOpcode* f) {
-    m_usuals.insert(std::make_pair(opcode, f));
+    m_usuals[opcode] = f;
 }
 void Interpreter::installSpecial(int opcode, SpecialOpcode* f) {
-    m_specials.insert(std::make_pair(opcode, f));
+    m_specials[opcode] = f;
 }
 void Interpreter::installPrimitive(int opcode, PrimitiveOpcode* f) {
-    m_primitives.insert(std::make_pair(opcode, f));
+    m_primitives[opcode] = f;
 }
 Runtime& Interpreter::runtime() {
     return m_runtime;
 }
 
-void Interpreter::execute(st::TSmalltalkInstruction instruction)
+void Interpreter::execute(const st::TSmalltalkInstruction& instruction)
 {
     switch (instruction.getOpcode()) {
         case opcode::doSpecial: {
-            std::map<int, SpecialOpcode*>::const_iterator it = m_specials.find(instruction.getArgument());
-            if (it != m_specials.end()) {
-                it->second->execute(m_runtime, instruction.getExtra());
+            SpecialOpcode* f = m_specials[instruction.getArgument()];
+            if (f) {
+                return f->execute(m_runtime, instruction.getExtra());
             } else {
                 std::stringstream error;
                 error << "No handler for special instruction '" << instruction.toString() << "'";
@@ -37,9 +37,9 @@ void Interpreter::execute(st::TSmalltalkInstruction instruction)
             }
         } break;
         case opcode::doPrimitive: {
-            std::map<int, PrimitiveOpcode*>::const_iterator it = m_primitives.find(instruction.getExtra());
-            if (it != m_primitives.end()) {
-                it->second->execute(m_runtime, instruction.getArgument());
+            PrimitiveOpcode* f = m_primitives[instruction.getExtra()];
+            if (f) {
+                return f->execute(m_runtime, instruction.getArgument());
             } else {
                 std::stringstream error;
                 error << "No handler for primitive '" << instruction.toString() << "'";
@@ -47,9 +47,9 @@ void Interpreter::execute(st::TSmalltalkInstruction instruction)
             }
         } break;
         default: {
-            std::map<int, UsualOpcode*>::const_iterator it = m_usuals.find(instruction.getOpcode());
-            if (it != m_usuals.end()) {
-                it->second->execute(m_runtime, instruction.getArgument(), instruction.getExtra());
+            UsualOpcode* f = m_usuals[instruction.getOpcode()];
+            if (f) {
+                return f->execute(m_runtime, instruction.getArgument(), instruction.getExtra());
             } else {
                 std::stringstream error;
                 error << "No handler for usual instruction '" << instruction.toString() << "'";

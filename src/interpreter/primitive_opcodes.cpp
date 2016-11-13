@@ -9,6 +9,7 @@
 #include <cerrno>
 #include <stdexcept>
 #include <climits>
+#include <iostream>
 
 namespace Interpreter
 {
@@ -81,9 +82,9 @@ void PrimitiveBase::checkThrowArgKindMustBe(const TObject* arg, const TClass* kl
 
 void PrimitiveOpcodeRegular::execute(Runtime& runtime, const uint8_t argCount) {
     // we must check the primitive was called with the right argCount
-    this->checkThrowArgCount(this->consumeArgCount(), argCount);
+    //this->checkThrowArgCount(this->consumeArgCount(), argCount);
     // args are passed to primitive in stack
-    this->checkThrowStackSize(this->consumeArgCount(), runtime.currentContext()->stackTop);
+    //this->checkThrowStackSize(this->consumeArgCount(), runtime.currentContext()->stackTop);
 
     const TObject* result = runtime.nilObject();
     try {
@@ -91,7 +92,7 @@ void PrimitiveOpcodeRegular::execute(Runtime& runtime, const uint8_t argCount) {
     } catch(const std::bad_cast& e) {
         throw;
     } catch(const std::exception& e) {
-        // std::cerr << e.what() << std::endl;
+         std::cerr << e.what() << std::endl;
         // The primitive has failed, the execution flow continues in the current method after the primitive call
         runtime.stackPush(runtime.nilObject());
         return;
@@ -170,7 +171,7 @@ const TObject* PrimitiveAllocateBinaryObject::call(Runtime& runtime, const TObje
 
 const TObject* PrimitiveCloneBinaryObject::call(Runtime& runtime, const TObject* originalObject, const TObject* klassObject) {
     const TClass* klass = static_cast<const TClass*>(klassObject);
-    hptr<TByteObject> original = runtime.protectHptr( static_cast<TByteObject*>(const_cast<TObject*>(originalObject)) );
+    const hptr<TByteObject>& original = runtime.protectHptr( static_cast<TByteObject*>(const_cast<TObject*>(originalObject)) );
 
     // Creating clone
     uint32_t dataSize = original->getSize();
@@ -196,7 +197,7 @@ const TObject* PrimitiveGetSize::call(Runtime& /*runtime*/, const TObject* const
 
 const TObject* PrimitiveBinaryObjectAt::call(Runtime& runtime, const TObject* object, const TObject* indexObject) {
     this->checkThrowArgMustBeSmallInt(indexObject);
-    this->checkThrowArgKindMustBe(object, runtime.stringClass());
+    //this->checkThrowArgKindMustBe(object, runtime.stringClass());
 
     const TString* const binaryObject = static_cast<const TString*>(object);
 
@@ -271,14 +272,23 @@ const TObject* PrimitiveSmallInt::call(Runtime& runtime, const TObject* lhsObjec
     return this->impl(runtime, lhs, rhs);
 }
 
-const TObject* PrimitiveSmallIntAdd::impl(Runtime& /*runtime*/, const int32_t lhs, const int32_t rhs) {
-    // TODO overflow
+const TObject* PrimitiveSmallIntAdd::impl(Runtime& runtime, const int32_t lhs, const int32_t rhs) {
+    if ( (lhs > 0 && (rhs > INT_MAX - lhs)) // `lhs + rhs` would overflow
+      || (lhs < 0 && (rhs < INT_MIN - lhs)) // `lhs + rhs` would underflow
+    ) {
+        // TODO
+        // ::mpz_class left(lhs), right(rhs);
+        // return to_binary(runtime, left + right);
+    }
     return TInteger(lhs + rhs);
 }
 
 const TObject* PrimitiveSmallIntDiv::impl(Runtime& /*runtime*/, const int32_t lhs, const int32_t rhs) {
     if (rhs == 0)
         throw std::runtime_error("PrimitiveSmallIntDiv: division by zero");
+    if ((rhs == -1) && (lhs == INT_MIN)) { // `lhs / rhs` can overflow
+        // TODO
+    }
     return TInteger(lhs / rhs);
 }
 
@@ -300,13 +310,25 @@ const TObject* PrimitiveSmallIntEqual::impl(Runtime& runtime, const int32_t lhs,
     return (lhs == rhs) ? runtime.trueObject() : runtime.falseObject();
 }
 
-const TObject* PrimitiveSmallIntMul::impl(Runtime& /*runtime*/, const int32_t lhs, const int32_t rhs) {
-    // TODO check overflow
+const TObject* PrimitiveSmallIntMul::impl(Runtime& runtime, const int32_t lhs, const int32_t rhs) {
+    if ( (lhs > INT_MAX / rhs) // `lhs * rhs` would overflow
+      || (lhs < INT_MIN / rhs) // `lhs * rhs` would underflow
+      || ((lhs == -1) && (rhs == INT_MIN)) // `lhs * rhs` can overflow
+      || ((rhs == -1) && (lhs == INT_MIN)) // `lhs * rhs` can overflow
+    ) {
+    // TODO
+        // ::mpz_class left(lhs), right(rhs);
+        // return to_binary(runtime, left * right);
+    }
     return TInteger(lhs * rhs);
 }
 
 const TObject* PrimitiveSmallIntSub::impl(Runtime& /*runtime*/, const int32_t lhs, const int32_t rhs) {
-    // TODO check overflow
+    if ((lhs < 0 && (rhs > INT_MAX + lhs))  // `lhs - rhs` would overflow
+      ||(lhs > 0 && (rhs < INT_MIN + lhs)) // `lhs - rhs` would underflow
+    ) {
+        // TODO overflow
+    }
     return TInteger(lhs - rhs);
 }
 

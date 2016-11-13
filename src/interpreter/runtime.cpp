@@ -2,6 +2,7 @@
 #include <interpreter/exceptions.hpp>
 
 #include <cassert>
+#include <cstring>
 #include <stdexcept>
 
 namespace Interpreter
@@ -16,10 +17,10 @@ TObject* Runtime::newOrdinaryObject(const TClass* klass, std::size_t slotSize)
 {
     // Class may be moved during GC in allocation,
     // so we need to protect the pointer
-    hptr<TClass> pClass = protectHptr(const_cast<TClass*>(klass));
+    const hptr<TClass>& pClass = protectHptr(const_cast<TClass*>(klass));
 
     bool lastGCOccured = false;
-    void* const objectSlot = m_memoryManager->allocate(correctPadding(slotSize), &lastGCOccured);
+    void* const objectSlot = m_memoryManager->allocate(slotSize, &lastGCOccured);
     if (lastGCOccured) {
         //TODO
     }
@@ -29,13 +30,12 @@ TObject* Runtime::newOrdinaryObject(const TClass* klass, std::size_t slotSize)
     }
 
     // Object size stored in the TSize field of any ordinary object contains
-    // number of pointers except for the first two fields
+    // number of pointers except for the first two fields (size and class)
     const std::size_t fieldsCount = slotSize / sizeof(TObject*) - 2;
 
     TObject* const instance = new (objectSlot) TObject(fieldsCount, pClass);
 
-    for (std::size_t index = 0; index < fieldsCount; index++)
-        instance->putField(index, globals.nilObject);
+    std::fill(instance->getFields(), instance->getFields() + instance->getSize(), nilObject());
 
     return instance;
 }
@@ -43,7 +43,7 @@ TObject* Runtime::newOrdinaryObject(const TClass* klass, std::size_t slotSize)
 TByteObject* Runtime::newBinaryObject(const TClass* klass, std::size_t dataSize) {
     // Class may be moved during GC in allocation,
     // so we need to protect the pointer
-    hptr<TClass> pClass = protectHptr(const_cast<TClass*>(klass));
+    const hptr<TClass>& pClass = protectHptr(const_cast<TClass*>(klass));
 
     // All binary objects are descendants of ByteObject
     // They could not have ordinary fields, so we may use it
@@ -190,19 +190,21 @@ void Runtime::stackPush(const TObject* object) {
     //      bytecode which can overflow the stack of the context
 
     TObjectArray& stack = *this->currentContext()->stack;
-    const uint32_t top = this->currentContext()->stackTop;
     const uint32_t stackSize = stack.getSize();
 
-    if (top >= stack.getSize()) {
+    if (this->currentContext()->stackTop >= stack.getSize()) {
         hptr<TObjectArray> newStack = createHptrObject<TObjectArray>(stackSize + 7);
 
-        for (uint32_t i = 0; i < stackSize; i++)
-            newStack[i] = this->currentContext()->stack->getField(i);
+	std::copy(newStack->getFields(), newStack->getFields() + stackSize, currentContext()->stack->getFields());
+	
+        //for (uint32_t i = 0; i < stackSize; i++)
+        //    newStack[i] = this->currentContext()->stack->getField(i);
 
         this->currentContext()->stack = newStack;
     }
+    TInteger& top = this->currentContext()->stackTop;
     this->currentContext()->stack->putField(top, const_cast<TObject*>(object));
-    this->currentContext()->stackTop += 1;
+    this->currentContext()->stackTop = top + 1;
 }
 
 TObject* Runtime::stackPop() {
@@ -215,11 +217,12 @@ TObject* Runtime::stackPop() {
 }
 
 void Runtime::stackDrop(size_t elems) {
-    TInteger& stackTop = this->currentContext()->stackTop;
+    int32_t top = this->currentContext()->stackTop;
     while(elems--) {
         // this->currentContext()->stack->putField(stackTop - 1, const_cast<TObject*>( nilObject() ));
-        stackTop -= 1;
+        top--;
     }
+    this->currentContext()->stackTop = top;
 }
 
 TObject* Runtime::nilObject() const {
@@ -269,7 +272,7 @@ void Runtime::setPC(size_t pc) {
 }
 
 void Runtime::setProcess(TProcess* process) {
-    m_currentProcess = protectHptr(process);
+    m_currentProcess = process;
 }
 
 void Runtime::setContext(TContext* context) {

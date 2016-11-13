@@ -118,9 +118,9 @@ void SendMessage::call(Runtime& runtime, const TSymbol* selector, const TClass* 
     }
 
     // Create a new context for the giving method and arguments
-    hptr<TContext>   newContext = runtime.createHptrObject<TContext>();
-    hptr<TObjectArray> newStack = runtime.createHptrObject<TObjectArray>(receiverMethod->stackSize);
-    hptr<TObjectArray> newTemps = runtime.createHptrObject<TObjectArray>(receiverMethod->temporarySize);
+    hptr<TContext>          newContext = runtime.createHptrObject<TContext>();
+    const hptr<TObjectArray>& newStack = runtime.createHptrObject<TObjectArray>(receiverMethod->stackSize);
+    const hptr<TObjectArray>& newTemps = runtime.createHptrObject<TObjectArray>(receiverMethod->temporarySize);
 
     newContext->stack           = newStack;
     newContext->temporaries     = newTemps;
