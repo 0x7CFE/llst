@@ -52,7 +52,8 @@ enum Opcode {
     sendBinary,
     pushBlock,
     doPrimitive,
-    doSpecial = 15
+    doSpecial = 15,
+    max = 16
 };
 }
 
@@ -82,7 +83,8 @@ enum {
     branch,
     branchIfTrue,
     branchIfFalse,
-    sendToSuper = 11
+    sendToSuper = 11,
+    max = 12
 };
 }
 
@@ -108,11 +110,14 @@ enum {
     throwError        = 19,
     allocateByteArray = 20,
     cloneByteObject   = 23,
-    integerNew        = 32,
     flushCache        = 34,
     bulkReplace       = 38,
+    getTimeOfDay      = 230,
+    readLine          = 251,
     LLVMsendMessage   = 252,
-    getSystemTicks    = 253
+    getSystemTicks    = 253,
+    collectGarbage    = 254,
+    max               = 255
 };
 
 enum SmallIntOpcode {
@@ -129,6 +134,11 @@ enum SmallIntOpcode {
 };
 
 enum {
+    objectAt            = 24,
+    objectAtPut         = 5,
+    binaryObjectAt      = 21,
+    binaryObjectAtPut   = 22,
+
     stringAt        = 21,
     stringAtPut     = 22,
     arrayAt         = 24,
@@ -153,7 +163,11 @@ enum IntegerOpcode {
     integerMul,
     integerSub,
     integerLess,
-    integerEqual
+    integerEqual,
+    integerNew = 32,
+    integerAsSmallInt = 33,
+    integerTruncToSmallInt = 40,
+    integerAsString = 41
 };
 }
 

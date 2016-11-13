@@ -42,6 +42,8 @@
 #include <sstream>
 #include <typeinfo>
 
+#include <type_traits>
+
 struct TClass;
 struct TObject;
 struct TMethod;
@@ -58,9 +60,11 @@ inline bool isSmallInteger(const TObject* value) { return reinterpret_cast<int32
 
 // This is a special interpretation of Smalltalk's SmallInteger
 // The struct is binary compatible with the TObject*
+
+/*
 struct TInteger {
-    TInteger(int32_t value) : m_value( reinterpret_cast<int32_t>(newInteger(value)) ) { }
-    TInteger(const TObject* value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
+    TInteger(const int32_t value) : m_value( reinterpret_cast<int32_t>(newInteger(value)) ) { }
+    TInteger(const TObject* const value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
 
     int32_t getValue() const { return getIntegerValue(reinterpret_cast<TObject*>(m_value)); }
     int32_t rawValue() const { return m_value; }
@@ -75,6 +79,117 @@ private:
 protected:
     static int32_t  getIntegerValue(const TObject* value) { return reinterpret_cast<int32_t>(value) >> 1; }
     static TObject* newInteger(int32_t value) { return reinterpret_cast<TObject*>((value << 1) | 1); }
+};
+*/
+
+/*
+struct TInteger {
+public:
+    TInteger(int32_t value) : m_value( (value << 1) | 1 ) { }
+    TInteger(const TObject* value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
+
+    int32_t getValue() const { return m_value >> 1; }
+    int32_t rawValue() const { return m_value; }
+
+    operator int32_t() const { return getValue(); }
+    operator TObject*() const { return reinterpret_cast<TObject*>(m_value); }
+
+    int32_t operator +(int32_t right) const { return getValue() + right; }
+    int32_t operator -(int32_t right) const { return getValue() - right; }
+
+    TInteger& operator -=(const TInteger& right) { *this = *this - right; return *this; }
+    TInteger& operator +=(const TInteger& right) { *this = *this + right; return *this; }
+private:
+    int32_t m_value;
+};
+*/
+
+/*
+// This is a special interpretation of Smalltalk's SmallInteger
+// The struct is binary compatible with the TObject*
+struct TInteger {
+    static TInteger create(int32_t value) {
+        TInteger result;
+        result = value;
+        return result;
+    }
+    static TInteger create(const TObject* value) {
+        TInteger result;
+        result = value;
+        //new (&result.raw) type( isSmallInteger(value) ? const_cast<TObject*>(value) : throw std::bad_cast() );
+        return result;
+    }
+public:
+    TInteger() : raw() { }
+    TInteger(const TInteger& value) : raw(value.raw) { }
+    TInteger(int32_t value) {
+        new (&raw) type( (value << 1) | 1 );
+    }
+    TInteger(const TObject* const value) : raw( isSmallInteger(value) ? reinterpret_cast<type>(value) : throw std::bad_cast() ) {
+        //if ( !isSmallInteger(value) )
+        //    std::abort();
+        //new (&raw) type(const_cast<TObject*>(value));
+        //new (&raw) type(const_cast<TObject*>(value));
+        //new (&raw) type( isSmallInteger(value) ? const_cast<TObject*>(value) : throw std::bad_cast() throw std::abort() );
+    }
+    //TInteger(int32_t value) : m_value( ( static_cast<uint32_t>(value) << 1) | 1 ) { }
+    //TInteger(const TObject* value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
+
+    int32_t getValue() const { return reinterpret_cast<const type&>(raw) .as_int >> 1; }
+    int32_t rawValue() const { return reinterpret_cast<const type&>(raw) .as_int; }
+
+    operator int32_t() const { return getValue(); }
+    operator TObject*() const { return reinterpret_cast<const type&>(raw) .as_pointer; }
+
+    TInteger& operator =(int32_t value) {
+        new (this) TInteger(value);
+        return *this;
+    }
+
+    TInteger& operator =(const TObject* value) {
+        new (this) TInteger(value);
+        return *this;
+    }
+
+    int32_t operator +(int32_t right) const { return getValue() + right; }
+    int32_t operator -(int32_t right) const { return getValue() - right; }
+
+    TInteger& operator -=(const TInteger& right) { *this = *this - right; return *this; }
+    TInteger& operator +=(const TInteger& right) { *this = *this + right; return *this; }
+private:
+    union type {
+        int32_t as_int;
+        TObject* as_pointer;
+        type(int32_t value) : as_int(value) {}
+        type(TObject* value) : as_pointer(value) {}
+    };
+    //typedef std::aligned_union<sizeof(int32_t), TObject*>::type union_type;
+    union_type raw;
+};
+*/
+
+//static_assert(std::is_pod<TInteger>::value , "No way");
+
+// This is a special interpretation of Smalltalk's SmallInteger
+// The struct is binary compatible with the TObject*
+struct TInteger {
+public:
+    TInteger(int32_t value) : m_value( ( static_cast<uint32_t>(value) << 1) | 1 ) { }
+    TInteger(const TObject* value) : m_value( isSmallInteger(value) ? reinterpret_cast<int32_t>(value) : throw std::bad_cast() ) { }
+
+    int32_t getValue() const { return m_value >> 1; }
+    int32_t rawValue() const { return m_value; }
+
+    operator int32_t() const { return getValue(); }
+    operator TObject*() const { return reinterpret_cast<TObject*>(m_value); }
+
+    int32_t operator +(int32_t right) const { return getValue() + right; }
+    int32_t operator -(int32_t right) const { return getValue() - right; }
+
+    TInteger& operator -=(const TInteger& right) { *this = *this - right; return *this; }
+    TInteger& operator +=(const TInteger& right) { *this = *this + right; return *this; }
+private:
+    int32_t m_value;
 };
 
 // Helper struct used to hold object size and special
@@ -155,7 +270,9 @@ public:
 
     // TODO boundary checks
     TObject** getFields() { return fields; }
+    TObject* const * getFields() const { return fields; }
     TObject*  getField(uint32_t index) { return fields[index]; }
+    const TObject* getField(uint32_t index) const { return fields[index]; }
     TObject*& operator [] (uint32_t index) { return fields[index]; }
     void putField(uint32_t index, TObject* value) { fields[index] = value; }
 
@@ -261,6 +378,7 @@ struct TArray : public TObject {
     static const char* InstanceClassName() { return "Array"; }
 
     Element* getField(uint32_t index) { return static_cast<Element*>(fields[index]); }
+    const Element* getField(uint32_t index) const { return static_cast<const Element*>(fields[index]); }
     template <typename Type> Type* getField(uint32_t index) { return static_cast<Type*>(fields[index]); }
 
     // NOTE: Unlike C languages, indexing in Smalltalk is started from the 1.
@@ -375,5 +493,26 @@ struct TProcess : public TObject {
 
     static const char* InstanceClassName() { return "Process"; }
 };
+
+// Arbitrary-precision arithmetic
+// FIXME: rename TInteger -> TSmallInt, TLongInteger -> TInteger
+struct TLongInteger : public TByteObject {
+    // the first byte holds the sign
+    // -1 if negative, 0 if zero, 1 if positive
+    int getSign() const { return bytes[0]; }
+    void setSign(int sign) { bytes[0] = sign; }
+
+    // all but the first byte
+    uint8_t* getBuffer() { return bytes+1; }
+    uint32_t getBufferSize() const { return getSize() - 1; }
+
+    static const char* InstanceClassName() { return "Integer"; }
+
+    static const size_t order = -1; // 1 = host byte order, -1 = network byte order
+    static const size_t size = sizeof(uint8_t); // the size of element
+    static const size_t endian = 0; // should be [-1, 1]. autodetect if 0
+    static const size_t nails = 0; // should always be zero. nails not supported
+};
+
 
 #endif

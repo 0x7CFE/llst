@@ -83,16 +83,18 @@ void args::parse(int argc, char **argv)
                 memoryManagerType = optarg;
             } break;
             case heap: {
-                bool good_number = std::istringstream( optarg ) >> heapSize;
-                if (!good_number)
+                std::istringstream iss( optarg );
+                iss >> heapSize;
+                if (iss.fail())
                 {
                     std::cerr << "A malformed number is given for argument heap_size" << std::endl;
                     std::exit(1);
                 }
             } break;
             case heap_max: {
-                bool good_number = std::istringstream( optarg ) >> maxHeapSize;
-                if (!good_number)
+                std::istringstream iss( optarg );
+                iss >> maxHeapSize;
+                if (iss.fail())
                 {
                     std::cerr << "A malformed number is given for argument max_heap_size" << std::endl;
                     std::exit(1);

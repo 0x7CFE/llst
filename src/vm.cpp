@@ -161,6 +161,7 @@ bool SmalltalkVM::checkRoot(TObject* value, TObject** objectSlot)
 
 TMethod* SmalltalkVM::lookupMethodInCache(TSymbol* selector, TClass* klass)
 {
+    return 0;
     uint32_t hash = reinterpret_cast<uint32_t>(selector) ^ reinterpret_cast<uint32_t>(klass);
     TMethodCacheEntry& entry = m_lookupCache[hash % LOOKUP_CACHE_SIZE];
 
@@ -201,7 +202,7 @@ TMethod* SmalltalkVM::lookupMethod(TSymbol* selector, TClass* klass)
         method = methods->find<TMethod>(selector);
         if (method) {
             // Storing result in cache
-            updateMethodCache(selector, klass, method);
+            //updateMethodCache(selector, klass, method);
             return method;
         }
     }
@@ -1025,6 +1026,7 @@ TObject* SmalltalkVM::performPrimitive(uint8_t opcode, hptr<TProcess>& process, 
         case primitive::smallIntBitAnd:     // 37
         case primitive::smallIntBitShift:   // 39
 
+        case primitive::getTimeOfDay:       //230
         case primitive::getSystemTicks:     //253
 
         default: {

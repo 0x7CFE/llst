@@ -204,7 +204,7 @@ public:
             //mm->registerExternalPointer((TObject**) &target);
     }
 
-    hptr_base(const hptr_base<Object>& pointer) : target(pointer.target.data), mm(pointer.mm), isRegistered(true)
+    hptr_base(const hptr_base& pointer) : target(pointer.target.data), mm(pointer.mm), isRegistered(true)
     {
         if (mm) mm->registerExternalHeapPointer(target);
     }
@@ -215,7 +215,8 @@ public:
     //hptr_base<Object>& operator = (Object* object) { target = object; return *this; }
 
     Object* rawptr() const { return static_cast<Object*>(target.data); }
-    Object* operator -> () const { return static_cast<Object*>(target.data); }
+    Object* operator -> () { return static_cast<Object*>(target.data); }
+    const Object* operator -> () const { return static_cast<const Object*>(target.data); }
     //Object& (operator*)() const { return *target; }
     operator Object*() const { return static_cast<Object*>(target.data); }
 
@@ -227,7 +228,7 @@ public:
     typedef O Object;
 public:
     hptr(Object* object, IMemoryManager* mm, bool registerPointer = true) : hptr_base<Object>(object, mm, registerPointer) {}
-    hptr(const hptr<Object>& pointer) : hptr_base<Object>(pointer) { }
+    hptr(const hptr& pointer) : hptr_base<Object>(pointer) { }
     hptr<Object>& operator = (Object* object) { hptr_base<Object>::target.data = object; return *this; }
 
 //     template<typename I>
@@ -496,6 +497,7 @@ struct TGlobals {
     TClass*  arrayClass;
     TClass*  blockClass;
     TClass*  contextClass;
+    TClass*  processClass;
     TClass*  stringClass;
     TDictionary* globalsObject;
     TMethod* initialMethod;

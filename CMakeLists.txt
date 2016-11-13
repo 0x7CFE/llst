@@ -1,20 +1,64 @@
 cmake_minimum_required(VERSION 2.8.4)
 
-set (CMAKE_USER_MAKE_RULES_OVERRIDE "${CMAKE_SOURCE_DIR}/cmake/variables.cmake")
-set (CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-set (LLVM_PACKAGE_VERSION 3.4)
-
 project(llst)
+
+include(CheckCXXCompilerFlag)
+
+list (APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# message(STATUS "CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
+# message(STATUS "CMAKE_CXX_FLAGS_DEBUG ${CMAKE_CXX_FLAGS_DEBUG}")
+# message(STATUS "CMAKE_CXX_FLAGS_MINSIZEREL ${CMAKE_CXX_FLAGS_MINSIZEREL}")
+# message(STATUS "CMAKE_CXX_FLAGS_RELEASE ${CMAKE_CXX_FLAGS_RELEASE}")
+# message(STATUS "CMAKE_CXX_FLAGS_RELWITHDEBINFO ${CMAKE_CXX_FLAGS_RELWITHDEBINFO}")
+# message(STATUS "CMAKE_CXX_FLAGS_COVERAGE ${CMAKE_CXX_FLAGS_COVERAGE}")
+
+#set(CMAKE_CXX_STANDARD 11)
+
+# C++ compiler.
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wextra -fexceptions -frtti")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -ggdb3 -O0")
+set(CMAKE_CXX_FLAGS_MINSIZEREL "${CMAKE_CXX_FLAGS_MINSIZEREL} ")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE}")
+set(CMAKE_CXX_FLAGS_RELWITHDEBINFO "${CMAKE_CXX_FLAGS_RELWITHDEBINFO} -O3")
+set(CMAKE_CXX_FLAGS_COVERAGE "${CMAKE_CXX_FLAGS_COVERAGE} --coverage -fkeep-inline-functions")
+
+if( CMAKE_SIZEOF_VOID_P EQUAL 8 )
+    # This is a 64-bit OS
+    # LLST supports only 32-bit code
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -m32")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m32")
+    check_cxx_compiler_flag("-m32" CXX_HAS_32BIT_SUPPORT)
+    if (NOT CXX_HAS_32BIT_SUPPORT)
+        message(FATAL_ERROR "Your compiler does not support flag '-m32' to generate 32bit code")
+    endif()
+endif()
+
+#string(APPEND CMAKE_CXX_FLAGS " -fprofile-generate")
+#string(APPEND CMAKE_CXX_FLAGS " -fprofile-use")
+
+check_cxx_compiler_flag("-flto" CXX_HAS_LTO_SUPPORT)
+if (CXX_HAS_LTO_SUPPORT)
+    #string(APPEND CMAKE_CXX_FLAGS " -flto")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -flto")
+    set(CMAKE_AR "gcc-ar") # TODO check existance
+    set(CMAKE_RANLIB "gcc-ranlib")
+endif()
+
+set (LLVM_PACKAGE_VERSION 3.4)
 
 find_package(Threads REQUIRED QUIET)
 find_package(READLINE)
 find_package(LLVM ${LLVM_PACKAGE_VERSION} EXACT)
 find_package(POD2MAN)
 find_package(GZIP REQUIRED)
+find_package(GMP REQUIRED)
 
 option(USE_READLINE "Should we use the GNU readline and history libraries?" ON)
 option(USE_LLVM "Should we use LLVM to build JIT?" OFF)
 option(USE_POD2MAN "Should we use pod2man to build the documentation (we will create empty docs otherwise)?" ON)
+
+include_directories(SYSTEM ${GMP_INCLUDE_DIRS})
 
 if (USE_LLVM)
     if (LLVM_FOUND)
@@ -138,7 +182,10 @@ add_dependencies(llst image)
 if (USE_LLVM)
     target_link_libraries(llst jit trampoline ${LLVM_LIBS} ${LLVM_LD_FLAGS})
 endif()
-target_link_libraries(llst standard_set memory_managers stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+target_link_libraries(llst memory_managers standard_set stapi ${READLINE_LIBS_TO_LINK} ${CMAKE_THREAD_LIBS_INIT} ${CMAKE_DL_LIBS})
+
+add_executable(llst_test src/test_main.cpp)
+target_link_libraries(llst_test interpreter memory_managers standard_set ${GMP_LIBRARIES} ${READLINE_LIBS_TO_LINK})
 
 set(changelog_compressed "${CMAKE_CURRENT_BINARY_DIR}/changelog.gz")
 gzip_compress("compress_changelog" "${CMAKE_CURRENT_SOURCE_DIR}/ChangeLog" ${changelog_compressed})
