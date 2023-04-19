@@ -61,3 +61,5 @@ script:
 
 after_success:
   - if [ ${CXX} == g++ ] && [ ${BUILD_TYPE} == Coverage ]; then ~/.local/bin/coveralls --repo_token "INxVunXhVXbQWjVbwoIisKeXSJqCRGnI2" --exclude build/tests/gtest -E ".*CMake.*CompilerId.c" --gcov-options "\-lp" -r ../; fi
+
+# Added comment - 
