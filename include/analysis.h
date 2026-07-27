@@ -66,6 +66,34 @@ private:
     bool m_blockReturnFound;
 };
 
+// This detector scans the control graph to optimize binary operators.
+// It looks for the sequence: MarkArguments(2) -> SendMessage(selector)
+// where selector is a binary operator, and replaces it with SendBinary(selector).
+class BinaryOperatorOptimizer : public PlainNodeVisitor {
+public:
+    BinaryOperatorOptimizer(ControlGraph* graph) : PlainNodeVisitor(graph) { }
+
+    virtual bool visitNode(ControlNode& node) {
+        InstructionNode* instNode = ControlNode::cast<InstructionNode>(&node);
+        if (!instNode) return true;
+
+        const TSmalltalkInstruction& inst = instNode->getInstruction();
+        if (inst.getOpcode() == opcode::sendMessage) {
+            for (ControlNode* prevNode : instNode->getInEdges()) {
+                InstructionNode* prevInstNode = ControlNode::cast<InstructionNode>(prevNode);
+                if (prevInstNode) {
+                    const TSmalltalkInstruction& prevInst = prevInstNode->getInstruction();
+                    if (prevInst.getOpcode() == opcode::markArguments && prevInst.getArgument() == 2) {
+                        TSmalltalkInstruction binaryInst(opcode::sendBinary, inst.getArgument(), inst.getExtra());
+                        instNode->setInstruction(binaryInst);
+                    }
+                }
+            }
+        }
+        return true;
+    }
+};
+
 class ControlDomain;
 class ControlNode;
 class InstructionNode;
